@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "UFC Fantasy Lines Grabber",
+  "version": "2.0",
+  "description": "Auto-fetches UFC fantasy lines from Pick6 & Underdog, detects upcoming cards, and updates the analyzer automatically.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.draftkings.com/*",
+    "https://pick6.draftkings.com/*",
+    "https://*.underdogfantasy.com/*",
+    "https://*.underdogsports.com/*",
+    "https://betr.app/*",
+    "https://*.betr.app/*",
+    "http://ufcstats.com/*",
+    "http://www.ufcstats.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.prizepicks.com/*",
+    "https://app.prizepicks.com/*"
+  ],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.draftkings.com/*",
+        "https://*.underdogfantasy.com/*",
+        "https://*.underdogsports.com/*",
+        "https://betr.app/*",
+        "https://*.betr.app/*"
+      ],
+      "js": [
+        "dist/content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dist/injected.js"
+      ],
+      "matches": [
+        "https://*.underdogfantasy.com/*",
+        "https://*.underdogsports.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "analyzer.html",
+        "analyzer.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

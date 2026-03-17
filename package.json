@@ -1,0 +1,18 @@
+{
+  "name": "ufc-fantasy-lines-grabber",
+  "version": "2.1.0",
+  "description": "Auto-fetches UFC fantasy lines from Pick6 & Underdog, detects upcoming cards, and updates the analyzer automatically.",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "prebuild": "npm run clean"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.37",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

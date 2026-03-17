@@ -1,0 +1,89 @@
+══════════════════════════════════════════════════════════════════════
+  UFC FIGHT CARD PREDICTIONS & FANTASY PICKS
+══════════════════════════════════════════════════════════════════════
+  Generated : Tuesday, March 17, 2026 at 12:31 AM ET
+  Event     : UFC Fight Night: Della Maddalena vs. Prates
+  Date      : May 02, 2026
+  Source    : http://www.ufcstats.com/event-details/872b018076f831b0
+══════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 1:  JACK DELLA MADDALENA  vs.  CARLOS PRATES
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Carlos Prates  [LOW confidence]  (score diff: 0.5)
+
+  Jack Della Maddalena  —  Prediction score: 73.3 / 100
+    • Record: 18-3-0  (86% win rate)
+    • Recent (last 5): L W W W W
+    • Striking: 5.57 SLpM  51% acc  /  3.84 SApM  (net +1.73)
+    • Finish rate: 44%  (4/9 wins by KO/TKO or SUB)
+    • Grappling: 0.13 TD/15min  10% acc  /  0.1 Sub avg
+    Fantasy value: LOW  (~34 FP estimated)
+      - Sig strikes ~56/fight × 0.4 = 22 pts
+      - TDs ~0.1/fight × 5 = 0 pts
+      - Finish bonus 44% × 25 = 11 pts
+
+  Carlos Prates  —  Prediction score: 73.8 / 100
+    • Record: 23-7-0  (77% win rate)
+    • Recent (last 5): W W L W W
+    • Striking: 3.77 SLpM  55% acc  /  4.53 SApM  (net -0.76)
+    • Finish rate: 100%  (7/7 wins by KO/TKO or SUB)
+    • Grappling: 0.21 TD/15min  100% acc  /  0 Sub avg
+    Fantasy value: LOW  (~41 FP estimated)
+      - Sig strikes ~38/fight × 0.4 = 15 pts
+      - TDs ~0.1/fight × 5 = 1 pts
+      - Finish bonus 100% × 25 = 25 pts
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 2:  BENEIL DARIUSH  vs.  QUILLAN SALKILLD
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Quillan Salkilld  [HIGH confidence]  (score diff: 35.8)
+
+  Beneil Dariush  —  Prediction score: 57.5 / 100
+    • Record: 23-7-1  (74% win rate)
+    • Recent (last 5): L W L L W
+    • Striking: 3.78 SLpM  49% acc  /  2.62 SApM  (net +1.16)
+    • Finish rate: 29%  (2/7 wins by KO/TKO or SUB)
+    • Grappling: 2.11 TD/15min  38% acc  /  0.8 Sub avg
+    Fantasy value: LOW  (~29 FP estimated)
+      - Sig strikes ~38/fight × 0.4 = 15 pts
+      - TDs ~1.4/fight × 5 = 7 pts
+      - Finish bonus 29% × 25 = 7 pts
+
+  Quillan Salkilld  —  Prediction score: 93.3 / 100
+    • Record: 11-1-0  (92% win rate)
+    • Recent (last 5): W W W W W
+    • Striking: 5.16 SLpM  57% acc  /  3.24 SApM  (net +1.92)
+    • Finish rate: 40%  (2/5 wins by KO/TKO or SUB)
+    • Grappling: 7.95 TD/15min  36% acc  /  0.8 Sub avg
+    Fantasy value: MEDIUM  (~57 FP estimated)
+      - Sig strikes ~52/fight × 0.4 = 21 pts
+      - TDs ~5.3/fight × 5 = 27 pts
+      - Finish bonus 40% × 25 = 10 pts
+
+══════════════════════════════════════════════════════════════════════
+  PICKS AT A GLANCE
+══════════════════════════════════════════════════════════════════════
+
+   1.  Carlos Prates                over  Jack Della Maddalena         [LOW]
+   2.  Quillan Salkilld             over  Beneil Dariush               [HIGH]
+
+══════════════════════════════════════════════════════════════════════
+  FANTASY RANKINGS  (by estimated FP, highest first)
+══════════════════════════════════════════════════════════════════════
+
+   1.  Quillan Salkilld             MEDIUM    ~57 FP
+   2.  Carlos Prates                LOW       ~41 FP
+   3.  Jack Della Maddalena         LOW       ~34 FP
+   4.  Beneil Dariush               LOW       ~29 FP
+
+──────────────────────────────────────────────────────────────────────
+  METHODOLOGY
+──────────────────────────────────────────────────────────────────────
+  Prediction scores weight: win rate (30%), recent form (20%),
+  net striking (20%), finish rate (10%), grappling (10%).
+  FP estimates use: sig strikes × 0.4 + TDs × 5 + finish bonus.
+  Data sourced from ufcstats.com. Cross-reference with current odds.
+──────────────────────────────────────────────────────────────────────

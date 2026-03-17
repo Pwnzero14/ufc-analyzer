@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"redirect: ''follow''\" src/analyzer.ts)"
+    ]
+  }
+}
