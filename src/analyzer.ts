@@ -1,5 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
-import type { LineWatchSettings, LineMovementEvent, LineDropAlert, WatchPlatform, WatchedStatType } from './types/index.js';
+import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
+import { FANTASY_SCORING } from './config/index.js';
 
 // ── LOCAL TYPES ────────────────────────────────────────────────────────────
 interface LeanReason { icon: 'pos' | 'neg' | 'neu'; text: string }
@@ -23,10 +24,37 @@ interface LeanResult {
 }
 interface EffectiveLean extends LeanResult { _source: 'fp'|'ss'|'td'; _label: string }
 interface OppStats { oppName?: string|null; kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; ctrlSecs?: number|null }
-interface UFCFightHistory { result: string; opponent: string; event: string; method: string; round: number|null; date: string|null; kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; oppStats?: OppStats|null; fightUrl?: string }
+interface UFCFightHistory { result: string; opponent: string; event: string; method: string; round: number|null; date: string|null; kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; oppStats?: OppStats|null; fightUrl?: string }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
 interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_td?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null }
+
+function createEmptyLean(verdict = ''): LeanResult {
+  return { lean: 'none', conf: 0, reasons: [], verdict };
+}
+
+function createPlaceholderAnalyzerFighter(name: string, opponent: string): AnalyzerFighter {
+  return {
+    name,
+    line_p6: null,
+    line_p6_ss: null,
+    line_p6_td: null,
+    line_ud: null,
+    line_ud_ss: null,
+    line_ud_td: null,
+    line_betr: null,
+    line_betr_ss: null,
+    line_betr_td: null,
+    line_pp: null,
+    line_pp_ss: null,
+    line_pp_td: null,
+    opponent,
+    db: { loaded: false } as FighterDB,
+    lean: createEmptyLean(),
+    lean_ss: null,
+    lean_td: null,
+  };
+}
 
 // ── MODULE STATE ───────────────────────────────────────────────────────────
 const debugMessages: string[] = [];
@@ -39,9 +67,78 @@ let allFighters: AnalyzerFighter[] = [];
 let currentSearch = '';
 let currentSort = 'default';
 let currentDensity: 'compact'|'detailed' = 'detailed';
-let showLineHistory = false;
 let recentLineMoves: LineMovementEvent[] = [];
 let latestValueSpikeByFighter: Record<string, LineMovementEvent> = {};
+let isDataLoadInFlight = false;
+let queuedDataReload = false;
+let eventCountdownTimer: ReturnType<typeof setInterval>|null = null;
+let periodicRefreshTimer: ReturnType<typeof setInterval>|null = null;
+let upcomingCardPairs: Array<{ f1: string; f2: string }> = [];
+let upcomingEventName: string = '';
+
+function buildEventDisplayName(event: string, fighters: Array<{ f1: string; f2: string }> | undefined): string {
+  const pair = fighters?.[0];
+  if (!pair) return event;
+  const lastName = (s: string) => s.trim().split(/\s+/).pop() || s;
+  return `${event}: ${lastName(pair.f1)} vs. ${lastName(pair.f2)}`;
+};
+
+function strictCardNameMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const aParts = na.split(' ');
+  const bParts = nb.split(' ');
+  if (aParts.length < 2 || bParts.length < 2) return false;
+  const aFirst = aParts[0];
+  const aLast = aParts[aParts.length - 1];
+  const bFirst = bParts[0];
+  const bLast = bParts[bParts.length - 1];
+  if (aLast !== bLast) return false;
+  return aFirst[0] === bFirst[0] && (aFirst.length >= 3 || bFirst.length >= 3);
+}
+
+function findOpponentFromUpcomingCard(name: string): string|null {
+  for (const pair of upcomingCardPairs) {
+    if (strictCardNameMatch(name, pair.f1)) return pair.f2;
+    if (strictCardNameMatch(name, pair.f2)) return pair.f1;
+  }
+  return null;
+}
+
+const STORAGE_LINE_KEYS = ['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks'] as const;
+const STORAGE_CORE_LINE_KEYS = ['lines_pick6', 'lines_underdog'] as const;
+const STORAGE_BETR_LINE_KEYS = ['lines_pick6', 'lines_underdog', 'lines_betr'] as const;
+const STORAGE_LINE_DEBUG_KEYS = ['pick6', 'underdog', 'sportsbook'] as const;
+
+function storageGet<T = unknown>(keys: string[]): Promise<T> {
+  if (typeof chrome === 'undefined' || !chrome.storage) return Promise.resolve({} as T);
+  return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data as T)));
+}
+
+function storageSet(values: Record<string, unknown>): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.storage) return Promise.resolve();
+  return new Promise((resolve) => chrome.storage.local.set(values, () => resolve()));
+}
+
+function storageRemove(keys: string[]): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.storage) return Promise.resolve();
+  return new Promise((resolve) => chrome.storage.local.remove(keys, () => resolve()));
+}
+
+function runtimeSendMessage<T = unknown>(payload: Record<string, unknown>): Promise<T|null> {
+  if (typeof chrome === 'undefined' || !chrome.runtime) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(payload, (resp) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve((resp ?? null) as T|null);
+    });
+  });
+}
 
 // ── DEBUG PANEL ────────────────────────────────────────────────────────────
 function debugLog(msg: string): void {
@@ -68,15 +165,85 @@ function winBonus(won: boolean, method: string|null|undefined, round: number|nul
   return 40;
 }
 
-function calcFP(sigStr: number|null|undefined, totStr: number|null|undefined, ctrlSecs: number|null|undefined, kd: number|null|undefined, td: number|null|undefined, rev: number|null|undefined, won: boolean, method: string|null|undefined, round: number|null|undefined): number {
+type HistoricalScoringPlatform = 'pick6' | 'underdog' | 'prizepicks' | 'betr';
+
+function calcFPForPlatform(
+  platform: HistoricalScoringPlatform,
+  sigStr: number|null|undefined,
+  totStr: number|null|undefined,
+  ctrlSecs: number|null|undefined,
+  timeSecs: number|null|undefined,
+  kd: number|null|undefined,
+  td: number|null|undefined,
+  rev: number|null|undefined,
+  won: boolean,
+  method: string|null|undefined,
+  round: number|null|undefined,
+): number {
   const nonSig = Math.max(0, (totStr || 0) - (sigStr || 0));
-  return (sigStr  || 0) * 0.4
+  let fp = (sigStr  || 0) * FANTASY_SCORING.sigStrike
        + nonSig          * 0.2
-       + (ctrlSecs || 0) * 0.03
-       + (kd  || 0)      * 10
-       + (td  || 0)      * 5
-       + (rev || 0)      * 5
+       + (ctrlSecs || 0) * FANTASY_SCORING.controlTimePerSec
+       + (kd  || 0)      * FANTASY_SCORING.knockdown
+       + (td  || 0)      * FANTASY_SCORING.takedown
+       + (rev || 0)      * FANTASY_SCORING.reversal
        + winBonus(won, method, round);
+
+  if ((platform === 'pick6' || platform === 'underdog' || platform === 'betr') && won && isFinish(method) && (round || 0) === 1 && (timeSecs || 9999) <= 60) {
+    fp += 25;
+  }
+  return fp;
+}
+
+function calcFP(sigStr: number|null|undefined, totStr: number|null|undefined, ctrlSecs: number|null|undefined, kd: number|null|undefined, td: number|null|undefined, rev: number|null|undefined, won: boolean, method: string|null|undefined, round: number|null|undefined): number {
+  return calcFPForPlatform('pick6', sigStr, totStr, ctrlSecs, null, kd, td, rev, won, method, round);
+}
+
+function getFightFantasyValueForPlatform(
+  h: {
+    result?: string|null;
+    fp?: number|null;
+    fp_p6?: number|null;
+    fp_ud?: number|null;
+    sigStr?: number|null;
+    totStr?: number|null;
+    ctrlSecs?: number|null;
+    timeSecs?: number|null;
+    kd?: number|null;
+    td?: number|null;
+    rev?: number|null;
+    method?: string|null;
+    round?: number|null;
+  },
+  platform: 'pick6'|'underdog'|'prizepicks'|'betr'
+): number|null {
+  const won = h.result === 'win';
+  const canReconstruct = h.sigStr != null || h.totStr != null || h.kd != null || h.td != null || h.ctrlSecs != null;
+  if (platform === 'pick6') {
+    if (canReconstruct) {
+      return calcFPForPlatform('pick6', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+    }
+    if (h.fp_p6 != null) return h.fp_p6;
+    if (h.fp != null) return h.fp;
+    return null;
+  }
+  if (platform === 'underdog') {
+    if (canReconstruct) {
+      return calcFPForPlatform('underdog', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+    }
+    if (h.fp_ud != null) return h.fp_ud;
+    return null;
+  }
+  if (platform === 'prizepicks') {
+    if (canReconstruct) {
+      return calcFPForPlatform('prizepicks', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+    }
+    return h.fp ?? null;
+  }
+  if (canReconstruct) {
+    return calcFPForPlatform('betr', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+  }
+  return h.fp ?? null;
 }
 
 function isFinish(method: string|null|undefined): boolean {
@@ -151,7 +318,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
   if (!ufcData) {
     return {
       record: '—', country: '🏳️',
-      avgFP_p6: null, avgFP_ud: null,
+      avgFP_p6: null, avgFP_ud: null, avgFP_pp: null, avgFP_betr: null,
       avgSigStr: null, avgTD: null,
       style: 'balanced', finishRate: null,
       history: [], oppHistory: [], loaded: false, detailUrl: null
@@ -161,12 +328,15 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
   const { careerStats, fightHistory, detailUrl } = ufcData;
   const history: FightResult[] = (fightHistory || []).map(f => {
     const won = f.result === 'win';
-    const fp = (f.sigStr != null)
-      ? calcFP(f.sigStr, f.totStr, f.ctrlSecs, f.kd, f.td, f.rev, won, f.method, f.round)
+    const fpP6 = (f.sigStr != null)
+      ? calcFPForPlatform('pick6', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round)
+      : null;
+    const fpUd = (f.sigStr != null)
+      ? calcFPForPlatform('underdog', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round)
       : null;
     return {
-      opp: f.opponent, fp, fp_p6: fp, fp_ud: fp,
-      sigStr: f.sigStr, totStr: f.totStr, ctrlSecs: f.ctrlSecs,
+      opp: f.opponent, fp: fpP6, fp_p6: fpP6, fp_ud: fpUd,
+      sigStr: f.sigStr, totStr: f.totStr, ctrlSecs: f.ctrlSecs, timeSecs: f.timeSecs,
       td: f.td, kd: f.kd, rev: f.rev, method: f.method, result: f.result, date: f.date ?? undefined, round: f.round ?? undefined,
       oppStats: f.oppStats as FightStats | null | undefined,
     };
@@ -174,6 +344,26 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
 
   const validFights = history.filter(f => f.fp! > 0);
   const avgFP = validFights.length ? validFights.reduce((s,f) => s + (f.fp || 0), 0) / validFights.length : null;
+  const p6Samples = history.map((f) => f.fp_p6).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const udSamples = history.map((f) => f.fp_ud).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const ppSamples = (fightHistory || [])
+    .map((f) => {
+      const won = f.result === 'win';
+      if (f.sigStr == null) return null;
+      return calcFPForPlatform('prizepicks', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round);
+    })
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const betrSamples = (fightHistory || [])
+    .map((f) => {
+      const won = f.result === 'win';
+      if (f.sigStr == null) return null;
+      return calcFPForPlatform('betr', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round);
+    })
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const avgFP_p6 = p6Samples.length ? parseFloat((p6Samples.reduce((s, v) => s + v, 0) / p6Samples.length).toFixed(1)) : null;
+  const avgFP_ud = udSamples.length ? parseFloat((udSamples.reduce((s, v) => s + v, 0) / udSamples.length).toFixed(1)) : null;
+  const avgFP_pp = ppSamples.length ? parseFloat((ppSamples.reduce((s, v) => s + v, 0) / ppSamples.length).toFixed(1)) : null;
+  const avgFP_betr = betrSamples.length ? parseFloat((betrSamples.reduce((s, v) => s + v, 0) / betrSamples.length).toFixed(1)) : null;
 
   const fightsSS = history.filter(f => f.sigStr != null);
   const avgSigStr = fightsSS.length
@@ -196,8 +386,10 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
     record: careerStats?.record || '—',
     country: '🏴',
     avgFP: avgFP ? parseFloat(avgFP.toFixed(1)) : null,
-    avgFP_p6: avgFP ? parseFloat(avgFP.toFixed(1)) : null,
-    avgFP_ud: avgFP ? parseFloat(avgFP.toFixed(1)) : null,
+    avgFP_p6,
+    avgFP_ud,
+    avgFP_pp,
+    avgFP_betr,
     avgSigStr,
     avgTD: careerStats?.tdAvg || null,
     avgTDperFight,
@@ -226,7 +418,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
         const os = f.oppStats as FightStats;
         const oppWon = f.result === 'loss';
         const fp = (os.sigStr != null)
-          ? calcFP(os.sigStr, os.totStr, os.ctrlSecs, os.kd, os.td, null, oppWon, f.method, f.round)
+          ? calcFPForPlatform('pick6', os.sigStr, os.totStr, os.ctrlSecs, f.timeSecs, os.kd, os.td, null, oppWon, f.method, f.round)
           : null;
         return {
           opp: f.opp,
@@ -311,7 +503,7 @@ function parseFightHistoryLinks(html: string): UFCFightHistory[] {
   return fights.slice(0, 10);
 }
 
-function parseFightDetailStats(html: string, fighterName: string, fighterDetailUrl: string|null): { kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; method?: string|null; round?: number|null } {
+function parseFightDetailStats(html: string, fighterName: string, fighterDetailUrl: string|null): { kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; method?: string|null; round?: number|null } {
   const clean = (s: string) => (s||'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
   const firstNum = (s: string) => { const m = (s||'').match(/(\d+)/); return m ? parseInt(m[1]) : null; };
 
@@ -330,8 +522,14 @@ function parseFightDetailStats(html: string, fighterName: string, fighterDetailU
     else if (raw.includes('no contest')) detailMethod = 'NC';
     else if (raw.includes('disq')) detailMethod = 'DQ';
   }
-  const roundM = html.match(/Round:\s*<\/i>\s*(\d)/i);
+  const roundM = html.match(/Round:\s*<\/i>\s*(?:<[^>]+>\s*)*(\d+)/i)
+    || html.match(/Round:\s*(\d+)/i);
   if (roundM) detailRound = parseInt(roundM[1]);
+  let detailTimeSecs: number|null = null;
+  const timeM = html.match(/Time:\s*<\/i>\s*(?:<[^>]+>\s*)*(\d+):(\d{2})/i)
+    || html.match(/Time:\s*(\d+):(\d{2})/i)
+    || html.match(/\b(\d+):(\d{2})\b(?=[^<]*$)/i);
+  if (timeM) detailTimeSecs = parseInt(timeM[1]) * 60 + parseInt(timeM[2]);
 
   let totalsTable: string|null = null;
   for (const tableM of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
@@ -343,18 +541,18 @@ function parseFightDetailStats(html: string, fighterName: string, fighterDetailU
       totalsTable = tableHtml; break;
     }
   }
-  if (!totalsTable) return { method: detailMethod, round: detailRound };
+  if (!totalsTable) return { method: detailMethod, round: detailRound, timeSecs: detailTimeSecs };
 
   const rows = [...totalsTable.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
   const dataRows = rows.filter(r => !r[1].includes('<th') && r[1].includes('<td'));
-  if (dataRows.length === 0) return { method: detailMethod, round: detailRound };
+  if (dataRows.length === 0) return { method: detailMethod, round: detailRound, timeSecs: detailTimeSecs };
 
   const row = dataRows[0][1];
   const tds = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => {
     const ps = [...m[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => clean(p[1]));
     return ps;
   });
-  if (tds.length === 0) return { method: detailMethod, round: detailRound };
+  if (tds.length === 0) return { method: detailMethod, round: detailRound, timeSecs: detailTimeSecs };
 
   let fIdx = 0;
   if (fighterDetailUrl) {
@@ -382,7 +580,7 @@ function parseFightDetailStats(html: string, fighterName: string, fighterDetailU
   let ctrlSecs: number|null = null;
   const ctrlM  = val(9).match(/(\d+):(\d{2})/);
   if (ctrlM) ctrlSecs = parseInt(ctrlM[1]) * 60 + parseInt(ctrlM[2]);
-  return { kd, sigStr, totStr, td, sub, rev, ctrlSecs, method: detailMethod, round: detailRound };
+  return { kd, sigStr, totStr, td, sub, rev, ctrlSecs, timeSecs: detailTimeSecs, method: detailMethod, round: detailRound };
 }
 
 function parseFightDetailStatsOpponent(html: string, fighterName: string, fighterDetailUrl: string|null): OppStats|null {
@@ -442,9 +640,9 @@ function parseFightDetailStatsOpponent(html: string, fighterName: string, fighte
 
 // ── UFC STATS FETCH ────────────────────────────────────────────────────────
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
-  const cacheKey = `ufcstats_v38_${name.toLowerCase().replace(/\s+/g,'_')}`;
+  const cacheKey = `ufcstats_v39_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    const cached: Record<string, UFCStatsData> = await new Promise<Record<string, UFCStatsData>>(r => chrome.storage.local.get([cacheKey], r as any));
+    const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
     if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
       debugLog(`Cache hit: ${name}`);
       return cached[cacheKey];
@@ -1092,6 +1290,16 @@ interface PredictionResult {
   expectedValue: number;
 }
 
+type EnsembleModelName = 'bayesian' | 'historical' | 'regression' | 'style';
+
+interface ModelPrediction extends PredictionResult {}
+
+interface WeightedModelPrediction {
+  name: EnsembleModelName;
+  prediction: ModelPrediction;
+  weight: number;
+}
+
 interface EnsemblePrediction {
   finalPrediction: PredictionResult;
   modelAgreement: number;
@@ -1291,7 +1499,11 @@ class RiskManager {
 
 // #25: Ensemble Prediction Model - Combine multiple approaches
 class EnsemblePredictor {
-  private models = [
+  private models: Array<{
+    name: EnsembleModelName;
+    weight: number;
+    predictor: (fighter: FighterDB, line: number, opponent: FighterDB|null) => ModelPrediction;
+  }> = [
     { name: 'bayesian', weight: 0.35, predictor: this.bayesianModel },
     { name: 'historical', weight: 0.25, predictor: this.historicalModel },
     { name: 'regression', weight: 0.25, predictor: this.regressionModel },
@@ -1324,7 +1536,7 @@ class EnsemblePredictor {
     };
   }
   
-  private bayesianModel(fighter: FighterDB, line: number, opponent: FighterDB|null) {
+  private bayesianModel(fighter: FighterDB, line: number, opponent: FighterDB|null): ModelPrediction {
     const bayesian = calcBayesianLean(fighter, line, opponent);
     return {
       lean: bayesian.lean,
@@ -1334,7 +1546,7 @@ class EnsemblePredictor {
     };
   }
   
-  private historicalModel(fighter: FighterDB, line: number, opponent: FighterDB|null) {
+  private historicalModel(fighter: FighterDB, line: number, opponent: FighterDB|null): ModelPrediction {
     const avgFP = advancedTimeWeightedAverage(fighter.history || [], line);
     const edge = (avgFP - line) / line;
     return {
@@ -1345,7 +1557,7 @@ class EnsemblePredictor {
     };
   }
   
-  private regressionModel(fighter: FighterDB, line: number, opponent: FighterDB|null) {
+  private regressionModel(fighter: FighterDB, line: number, opponent: FighterDB|null): ModelPrediction {
     const optimizedLine = optimizeLinePrediction(fighter, opponent);
     const edge = (optimizedLine - line) / line;
     return {
@@ -1356,7 +1568,7 @@ class EnsemblePredictor {
     };
   }
   
-  private styleMatchupModel(fighter: FighterDB, line: number, opponent: FighterDB|null) {
+  private styleMatchupModel(fighter: FighterDB, line: number, opponent: FighterDB|null): ModelPrediction {
     if (!opponent) return { lean: 'push', confidence: 0.5, edge: 0, expectedValue: 0.5 };
     
     const { delta } = styleMatchupEdge(fighter.style, opponent.style, fighter, opponent);
@@ -1369,7 +1581,7 @@ class EnsemblePredictor {
     };
   }
   
-  private weightedAverage(predictions: Array<{name: string, prediction: any, weight: number}>): PredictionResult {
+  private weightedAverage(predictions: WeightedModelPrediction[]): PredictionResult {
     const totalWeight = predictions.reduce((sum, p) => sum + p.weight, 0);
     
     const weightedLean = predictions.reduce((result, p) => {
@@ -1395,7 +1607,7 @@ class EnsemblePredictor {
     };
   }
   
-  private calculateAgreement(predictions: Array<{prediction: any}>): number {
+  private calculateAgreement(predictions: Array<{prediction: ModelPrediction}>): number {
     const leans = predictions.map(p => p.prediction.lean);
     const mostCommon = leans.reduce((acc, lean) => {
       acc[lean] = (acc[lean] || 0) + 1;
@@ -1406,7 +1618,7 @@ class EnsemblePredictor {
     return maxAgreement / predictions.length;
   }
   
-  private calculateEnsembleConfidence(predictions: Array<{prediction: any, weight: number}>): number {
+  private calculateEnsembleConfidence(predictions: Array<{prediction: ModelPrediction, weight: number}>): number {
     const avgConfidence = predictions.reduce((sum, p) => sum + p.prediction.confidence * p.weight, 0) / 
                          predictions.reduce((sum, p) => sum + p.weight, 0);
     
@@ -1940,7 +2152,7 @@ function clamp01(v: number): number { return Math.max(0, Math.min(1, v)); }
 function inferArchetype(db: FighterDB): FighterArchetype {
   const slpm = db.slpm ?? 3.6;
   const td = db.avgTDperFight ?? db.avgTD ?? 0.8;
-  const subAvg = (db as any).subAvg ?? 0;
+  const subAvg = (db as FighterDB & { subAvg?: number | null }).subAvg ?? 0;
   const finish = db.finishRate ?? 0.45;
   const acc = db.strAcc ?? 42;
   const consistency = db.fpConsistency ?? 50;
@@ -2152,13 +2364,37 @@ const fantasyBrain: FantasyPredictionBrain = {
 // ── LEAN ENGINE ────────────────────────────────────────────────────────────
 function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_ud: number|null, line_pp: number|null, line_betr: number|null, oppDB: FighterDB|null): LeanResult {
   const availableLines = ([line_p6, line_ud, line_pp, line_betr].filter(l => l != null) as number[]);
-  const line = availableLines.length ? parseFloat((availableLines.reduce((s,l) => s+l, 0) / availableLines.length).toFixed(1)) : null;
+  const avgLine = availableLines.length ? parseFloat((availableLines.reduce((s,l) => s+l, 0) / availableLines.length).toFixed(1)) : null;
+  const selectedLine =
+    currentPlatform === 'pick6' ? line_p6 :
+    currentPlatform === 'underdog' ? line_ud :
+    currentPlatform === 'prizepicks' ? line_pp :
+    line_betr;
+  const line = selectedLine ?? avgLine;
   if (!line || !db || !db.loaded) return { lean: 'none', conf: 0, reasons: [], verdict: 'Loading stats...' };
 
-  const avgFP = db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP;
+  const platformAvgCandidates = [
+    line_p6 != null ? db.avgFP_p6 ?? null : null,
+    line_ud != null ? db.avgFP_ud ?? null : null,
+    line_pp != null ? db.avgFP_pp ?? null : null,
+    line_betr != null ? db.avgFP_betr ?? null : null,
+  ].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const avgFP = platformAvgCandidates.length
+    ? parseFloat((platformAvgCandidates.reduce((s, v) => s + v, 0) / platformAvgCandidates.length).toFixed(1))
+    : (db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_pp ?? db.avgFP_betr ?? db.avgFP);
   const history = db.history || [];
+  const historyPlatform: 'pick6'|'underdog'|'prizepicks'|'betr' =
+    currentPlatform === 'pick6' ? 'pick6' :
+    currentPlatform === 'underdog' ? 'underdog' :
+    currentPlatform === 'prizepicks' ? 'prizepicks' :
+    'betr';
+  const historyFP = history.map(h => getFightFantasyValueForPlatform(h, historyPlatform));
   const reasons: LeanReason[] = [];
   let score = 0;
+
+  if (platformAvgCandidates.length > 1) {
+    reasons.push({ icon: 'neu', text: `Platform-aware FP baseline from app-specific scoring profiles across ${platformAvgCandidates.length} books` });
+  }
 
   // Flag line divergence across books — disagreement signals uncertainty or value
   if (availableLines.length > 1) {
@@ -2167,40 +2403,17 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
     if (maxL - minL >= 2.0) {
       const parts = ([['P6', line_p6], ['UD', line_ud], ['PP', line_pp], ['BTR', line_betr]] as [string, number|null][]) 
         .filter(([, v]) => v != null).map(([lbl, v]) => `${lbl} ${v}`).join(' / ');
-      reasons.push({ icon: 'neu', text: `Books diverge: ${parts} — using avg ${line} for analysis` });
+      if (selectedLine != null) {
+        const src = currentPlatform === 'pick6' ? 'P6' : currentPlatform === 'underdog' ? 'UD' : currentPlatform === 'prizepicks' ? 'PP' : 'BTR';
+        reasons.push({ icon: 'neu', text: `Books diverge: ${parts} — using ${src} ${selectedLine} for analysis` });
+      } else {
+        reasons.push({ icon: 'neu', text: `Books diverge: ${parts} — using avg ${line} for analysis` });
+      }
       score += (line_p6 ?? line_ud ?? line_pp ?? line_betr)! < line ? 0.3 : -0.3; // favor the lower-line book slightly
     }
   }
 
-  // DFS-specific modular projection brain
-  const platformLines: Array<{ platform: DFSPlatform; line: number|null }> = [
-    { platform: 'draftkings', line: line_p6 },
-    { platform: 'underdog', line: line_ud },
-    { platform: 'prizepicks', line: line_pp },
-    { platform: 'betr', line: line_betr }
-  ];
-  const strikeModel = fantasyBrain.strikingModel(fantasyBrain.buildFeatures(db, oppDB, line), db, oppDB);
-  const grappleModel = fantasyBrain.grapplingModel(fantasyBrain.buildFeatures(db, oppDB, line), db, oppDB);
-  const finishModel = fantasyBrain.finishingModel(fantasyBrain.buildFeatures(db, oppDB, line), db, oppDB);
-  const matchupModel = fantasyBrain.matchupAdjustmentModel(fantasyBrain.buildFeatures(db, oppDB, line), db, oppDB);
-
-  const platformProjections = platformLines
-    .filter(p => p.line != null)
-    .map(p => fantasyBrain.fantasyScoringModel(p.platform, p.line as number, fantasyBrain.buildFeatures(db, oppDB, p.line), strikeModel, grappleModel, finishModel, matchupModel));
-
-  if (platformProjections.length) {
-    const weightedEdge = platformProjections.reduce((s, p) => s + (p.edgeVsLine * p.confidence), 0) / Math.max(0.001, platformProjections.reduce((s, p) => s + p.confidence, 0));
-    const agreement = platformProjections.filter(p => (p.edgeVsLine >= 0) === (weightedEdge >= 0)).length / platformProjections.length;
-    if (weightedEdge > 6) score += 1.8;
-    else if (weightedEdge > 2.5) score += 1.0;
-    else if (weightedEdge < -6) score -= 1.8;
-    else if (weightedEdge < -2.5) score -= 1.0;
-
-    const topProjection = [...platformProjections].sort((a, b) => Math.abs(b.edgeVsLine) - Math.abs(a.edgeVsLine))[0];
-    reasons.push({ icon: weightedEdge >= 0 ? 'pos' : 'neg', text: `DFS consensus edge ${weightedEdge >= 0 ? '+' : ''}${weightedEdge.toFixed(1)} across ${platformProjections.length} books (agreement ${Math.round(agreement * 100)}%)` });
-    reasons.push(...topProjection.reasons.slice(0, 2));
-    if (agreement < 0.6) reasons.push({ icon: 'neu', text: 'Cross-platform scoring disagreement detected — confidence reduced until model agreement improves' });
-  }
+  const platformProjections: number[] = [];
 
   if (avgFP != null) {
     const diff = avgFP - line;
@@ -2216,7 +2429,7 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
   }
 
   if (history.length >= 3) {
-    const hits = history.filter(h => h.fp != null && (h.fp || 0) > line).length;
+    const hits = historyFP.filter(v => v != null && v > line).length;
     const rate = hits / history.length;
     if (rate >= 0.75)      { score += 2;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) went over this exact line` }); }
     else if (rate >= 0.6)  { score += 1;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights over — consistent over tendency` }); }
@@ -2227,13 +2440,14 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
 
   if (history.length >= 3 && avgFP != null) {
     const recent = history.slice(0, 3);
-    const recentAvg = recent.reduce((s,h) => s + (h.fp || 0), 0) / recent.length;
+    const recentFP = recent.map(h => getFightFantasyValueForPlatform(h, historyPlatform)).filter((v): v is number => v != null);
+    const recentAvg = recentFP.length ? recentFP.reduce((s, v) => s + v, 0) / recentFP.length : avgFP;
     const trend = recentAvg - avgFP;
     if (trend > 8)       { score += 1;   reasons.push({ icon: 'pos', text: `Recent form trending UP — last 3 fights avg ${recentAvg.toFixed(1)} FP vs career avg ${avgFP.toFixed(1)}` }); }
     else if (trend < -8) { score -= 1;   reasons.push({ icon: 'neg', text: `Recent form trending DOWN — last 3 fights avg ${recentAvg.toFixed(1)} FP vs career avg ${avgFP.toFixed(1)}` }); }
 
     // Recent hit rate — more predictive than career hit rate
-    const recentHits = recent.filter(h => h.fp != null && (h.fp || 0) > line).length;
+    const recentHits = recentFP.filter(v => v > line).length;
     if (recentHits === 3)      { score += 1;   reasons.push({ icon: 'pos', text: `Recent hit rate: 3/3 last fights cleared this line — hot right now` }); }
     else if (recentHits === 0) { score -= 1;   reasons.push({ icon: 'neg', text: `Recent hit rate: 0/3 last fights cleared this line — cold streak at this number` }); }
   }
@@ -2255,6 +2469,31 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
   if (oppDB && oppDB.loaded) {
     const { delta: defDelta, edges: defEdges } = calcOpponentDefenseScore(oppDB, line);
     score += defDelta; reasons.push(...defEdges);
+
+    const oppAllowedSamples = (oppDB.oppHistory || [])
+      .map((h) => getFightFantasyValueForPlatform(h, historyPlatform))
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (oppAllowedSamples.length >= 3) {
+      const allowed = oppAllowedSamples.filter((v) => v > line).length;
+      const blocked = oppAllowedSamples.length - allowed;
+      const allowedRate = allowed / oppAllowedSamples.length;
+      if (allowedRate <= 0.30) {
+        score -= 1.1;
+        reasons.push({ icon: 'neg', text: `Opponent line defense: only ${allowed}/${oppAllowedSamples.length} opponents cleared ${line.toFixed(2)} FP (${blocked} held under)` });
+      } else if (allowedRate <= 0.45) {
+        score -= 0.5;
+        reasons.push({ icon: 'neg', text: `Opponent line defense: ${allowed}/${oppAllowedSamples.length} opponents cleared ${line.toFixed(2)} FP` });
+      } else if (allowedRate >= 0.70) {
+        score += 1.1;
+        reasons.push({ icon: 'pos', text: `Opponent allows coverage often: ${allowed}/${oppAllowedSamples.length} opponents cleared ${line.toFixed(2)} FP` });
+      } else if (allowedRate >= 0.55) {
+        score += 0.5;
+        reasons.push({ icon: 'pos', text: `Opponent has allowed this FP range: ${allowed}/${oppAllowedSamples.length} opponents cleared ${line.toFixed(2)} FP` });
+      } else {
+        reasons.push({ icon: 'neu', text: `Opponent line-allow rate is mixed: ${allowed}/${oppAllowedSamples.length} opponents cleared ${line.toFixed(2)} FP` });
+      }
+    }
+
     const { delta: matchupDelta, edges: matchupEdges } = styleMatchupEdge(db.style, oppDB.style, db, oppDB);
     score += matchupDelta; reasons.push(...matchupEdges);
     const { score: patScore, reasons: patReasons } = calcMatchupPatternEdge(db, oppDB, null, null, line);
@@ -2325,105 +2564,30 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
     reasons.push({ icon: 'neu', text: `${extremeValue.label} — line is ${extremeValue.severity.toFixed(1)} std devs from historical norm` });
   }
 
-  // ── ENHANCED PREDICTION SYSTEM ─────────────────────────────────────────────
-  // Use Bayesian framework and ensemble model for superior accuracy
-  const ensemblePredictor = new EnsemblePredictor();
-  const ensembleResult = ensemblePredictor.predict(db, line, oppDB);
+  const marketSignal = 1;
+  let lean: 'over'|'under'|'push' = 'push';
+  const threshold = 1.5;
+  if (score >= threshold) lean = 'over';
+  else if (score <= -threshold) lean = 'under';
 
-  // Extract final prediction from ensemble
-  let lean: 'over'|'under'|'push' = ensembleResult.finalPrediction.lean;
-  let conf: number = Math.round(ensembleResult.confidence * 100);
-
-  // Add ensemble insights to reasons
-  if (ensembleResult.modelAgreement > 0.75) {
-    reasons.push({ icon: 'pos', text: `High model agreement (${Math.round(ensembleResult.modelAgreement * 100)}%) — strong consensus across prediction methods` });
-  } else if (ensembleResult.modelAgreement < 0.5) {
-    reasons.push({ icon: 'neu', text: `Model disagreement detected — mixed signals across prediction approaches` });
-    conf = Math.max(35, conf * 0.8); // Reduce confidence when models disagree
-  }
-
-  // Bayesian probability insights
-  const bayesianResult = calcBayesianLean(db, line, oppDB);
-  const calibrator = new ProbabilityCalibrator();
-  const historySamples = buildHistoryCalibrationSamples(history, line, db.fpStdDev || 15);
-  const calibrationParams = calibrator.fitPlattScaling(historySamples);
-  const rawCalibratedOverProbability = calibrator.calibrate(bayesianResult.probability, calibrationParams);
-  const calibrationSampleFactor = Math.min(1, historySamples.length / 24);
-  const calibratedOverProbability = Math.max(
-    0.01,
-    Math.min(
-      0.99,
-      (rawCalibratedOverProbability * calibrationSampleFactor) + (bayesianResult.probability * (1 - calibrationSampleFactor))
+  let conf = Math.round(
+    35 + Math.min(
+      58,
+      (Math.min(2.6, Math.abs(score)) / 2.6) * 28 +
+      (Math.min(1, (db.fpConsistency || 0) / 100) * 0.35 + Math.min(1, history.length / 8) * 0.25 + marketSignal * 0.4) * 30
     )
   );
-  const leanProbability = lean === 'under' ? (1 - calibratedOverProbability) : calibratedOverProbability;
+  conf = Math.max(35, Math.min(95, conf));
 
-  // Blend ensemble confidence with calibrated probability confidence
-  const blendedConfidence = ((ensembleResult.confidence * 100) * 0.5) + ((leanProbability * 100) * 0.5);
-  conf = Math.round(Math.max(35, Math.min(95, blendedConfidence)));
-
-  const calibrationShift = Math.abs(calibratedOverProbability - bayesianResult.probability);
-  if (calibrationShift >= 0.05) {
-    const dir = calibratedOverProbability > bayesianResult.probability ? 'up' : 'down';
-    reasons.push({ icon: 'neu', text: `Probability calibration adjusted over probability ${dir} by ${(calibrationShift * 100).toFixed(1)}% using historical reliability` });
-  }
-  if (historySamples.length < 12) {
-    reasons.push({ icon: 'neu', text: `Limited calibration sample (${historySamples.length} fights) — using conservative probability shrinkage` });
-  }
-
-  if (bayesianResult.confidence > 0.7) {
-    reasons.push({ icon: 'pos', text: `Bayesian analysis: ${Math.round(bayesianResult.probability * 100)}% probability of hitting line — strong probabilistic evidence` });
-  }
-
-  // Regression-based line optimization insights
-  const optimizedLine = optimizeLinePrediction(db, oppDB);
-  const lineDiff = optimizedLine - line;
-  if (Math.abs(lineDiff) > 5) {
-    const direction = lineDiff > 0 ? 'higher' : 'lower';
-    reasons.push({ icon: lineDiff > 0 ? 'pos' : 'neg', text: `Statistical model suggests line should be ${Math.abs(lineDiff).toFixed(1)} pts ${direction} (${optimizedLine.toFixed(1)} vs ${line})` });
-  }
-
-  // Risk management insights
-  if (ensembleResult.betSize > 0) {
-    const riskLevel = ensembleResult.betSize > 50 ? 'high' : ensembleResult.betSize > 25 ? 'moderate' : 'low';
-    reasons.push({ icon: 'neu', text: `Kelly Criterion bet size: $${ensembleResult.betSize.toFixed(0)} (${riskLevel} risk) — optimal bankroll allocation` });
-  }
-
-  // Enhanced time-weighted analysis
-  const timeWeightedAvg = advancedTimeWeightedAverage(history, line);
-  if (avgFP && Math.abs(timeWeightedAvg - avgFP) > 3) {
-    const direction = timeWeightedAvg > avgFP ? 'improving' : 'declining';
-    reasons.push({ icon: timeWeightedAvg > avgFP ? 'pos' : 'neg', text: `Advanced time-weighting: Recent form ${direction} (${timeWeightedAvg.toFixed(1)} vs career ${avgFP.toFixed(1)})` });
-  }
-
-  // Fallback to original scoring if ensemble fails
-  if (lean === 'push' && Math.abs(score) > 0.5) {
-    // Use original logic as backup when ensemble is uncertain
-    if (score >= 0.5) lean = 'over';
-    else if (score <= -0.5) lean = 'under';
-    reasons.push({ icon: 'neu', text: 'Using traditional scoring as ensemble backup — mixed signals detected' });
-  }
-
-  if (platformProjections.length) {
-    const weightedEdge = platformProjections.reduce((s, p) => s + (p.edgeVsLine * p.confidence), 0) / Math.max(0.001, platformProjections.reduce((s, p) => s + p.confidence, 0));
-    const agreement = platformProjections.filter(p => (p.edgeVsLine >= 0) === (weightedEdge >= 0)).length / platformProjections.length;
-    const platformConfidence = Math.round(clamp01(platformProjections.reduce((s, p) => s + p.confidence, 0) / platformProjections.length) * 100);
-
-    if (weightedEdge >= 4 && agreement >= 0.66) lean = 'over';
-    else if (weightedEdge <= -4 && agreement >= 0.66) lean = 'under';
-
-    conf = Math.round((conf * 0.62) + (platformConfidence * 0.38));
-    if (agreement < 0.6) conf = Math.max(38, Math.round(conf * 0.88));
-    else if (agreement > 0.8) conf = Math.min(94, Math.round(conf * 1.06));
-  }
-
-  const lineStr = availableLines.length > 1 ? `avg ${line}` : line_p6 ? `P6 ${line_p6}` : line_ud ? `UD ${line_ud}` : line_pp ? `PP ${line_pp}` : `BTR ${line_betr}`;
+  const lineStr = selectedLine != null
+    ? `${currentPlatform === 'pick6' ? 'P6' : currentPlatform === 'underdog' ? 'UD' : currentPlatform === 'prizepicks' ? 'PP' : 'BTR'} ${selectedLine}`
+    : (availableLines.length > 1 ? `avg ${line}` : line_p6 ? `P6 ${line_p6}` : line_ud ? `UD ${line_ud}` : line_pp ? `PP ${line_pp}` : `BTR ${line_betr}`);
   const avgStr  = avgFP != null ? ` (avg ${avgFP.toFixed(1)})` : '';
   const verdict = lean === 'over'
     ? `LEAN OVER ${lineStr}${avgStr} — ${reasons[0]?.text?.split('—')[0]?.trim() || 'over value identified'}`
     : lean === 'under'
     ? `LEAN UNDER ${lineStr}${avgStr} — ${reasons[0]?.text?.split('—')[0]?.trim() || 'under value identified'}`
-    : `NO STRONG LEAN at ${lineStr}${avgStr} — line appears fairly set`;
+    : `LEAN ${score >= 0 ? 'OVER' : 'UNDER'} ${lineStr}${avgStr} — edge not yet at strong threshold`;
 
   const ev = lean !== 'push' ? parseFloat(((conf / 100) * 0.1 - (1 - conf / 100) * 1).toFixed(2)) : 0;
 
@@ -2433,14 +2597,7 @@ function calcLean(name: string, db: FighterDB|null, line_p6: number|null, line_u
     score: parseFloat(score.toFixed(2)), 
     reasons, 
     verdict, 
-    ev,
-    // Add new fields for enhanced analysis
-    ensembleAgreement: ensembleResult.modelAgreement,
-    bayesianProbability: bayesianResult.probability,
-    calibratedProbability: calibratedOverProbability,
-    optimizedLine: optimizedLine,
-    timeWeightedAvg: timeWeightedAvg,
-    kellyBetSize: ensembleResult.betSize
+    ev
   };
 }
 
@@ -2569,10 +2726,11 @@ function calcTDLean(_name: string, db: FighterDB|null, line_td: number|null, opp
 
 // ── RENDER UTILITIES ──────────────────────────────────────────────────────
 function activePlatformLine(f: AnalyzerFighter): number|null {
-  const pick6Value = f.line_p6 ?? f.line_p6_ss ?? f.line_p6_td ?? null;
-  const udValue    = f.line_ud ?? f.line_ud_ss ?? f.line_ud_td ?? null;
-  const betrValue  = f.line_betr ?? f.line_betr_ss ?? null;
-  const ppValue    = f.line_pp ?? f.line_pp_ss ?? f.line_pp_td ?? null;
+  // FP-only active line resolution: never fall back to SS/TD lines.
+  const pick6Value = f.line_p6 ?? null;
+  const udValue    = f.line_ud ?? null;
+  const betrValue  = f.line_betr ?? null;
+  const ppValue    = f.line_pp ?? null;
   if (currentPlatform === 'pick6')      return pick6Value ?? udValue ?? ppValue ?? betrValue ?? null;
   if (currentPlatform === 'underdog')   return udValue ?? pick6Value ?? ppValue ?? betrValue ?? null;
   if (currentPlatform === 'prizepicks') return ppValue ?? udValue ?? pick6Value ?? betrValue ?? null;
@@ -2588,6 +2746,13 @@ function activePlatformLabel(f: AnalyzerFighter): string {
   if (f.line_p6)    return `Pick6 ${f.line_p6}`;
   if (f.line_ud)    return `Underdog ${f.line_ud}`;
   return '—';
+}
+
+function activePlatformAvgFP(db: FighterDB): number | null {
+  if (currentPlatform === 'pick6') return db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_pp ?? db.avgFP_betr ?? db.avgFP ?? null;
+  if (currentPlatform === 'underdog') return db.avgFP_ud ?? db.avgFP_p6 ?? db.avgFP_pp ?? db.avgFP_betr ?? db.avgFP ?? null;
+  if (currentPlatform === 'prizepicks') return db.avgFP_pp ?? db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_betr ?? db.avgFP ?? null;
+  return db.avgFP_betr ?? db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_pp ?? db.avgFP ?? null;
 }
 
 function ensureLineLeans(): void {
@@ -2758,13 +2923,108 @@ function renderFighters(): void {
     renderModelHealthWidget();
     return;
   }
+function sanitizeOpponentName(raw: unknown, selfName?: string): string | null {
+  if (typeof raw !== 'string') return null;
+  let val = raw.replace(/^\s*vs\.?\s*/i, '').replace(/\s+/g, ' ').trim();
+  val = val.replace(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b.*$/i, '').trim();
+  val = val.replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)\b.*$/i, '').trim();
+  val = val.replace(/\b(?:edt|est|cdt|cst|mdt|mst|pdt|pst|utc)\b.*$/i, '').trim();
+  val = val.replace(/[^A-Za-z'\-\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!val || val.split(' ').length < 2) return null;
+  if (selfName && val.toLowerCase() === selfName.toLowerCase()) return null;
+  return val;
+}
+
+function sanitizeLooseOpponentToken(raw: unknown, selfName?: string): string | null {
+  if (typeof raw !== 'string') return null;
+  let val = raw.replace(/^\s*vs\.?\s*/i, '').replace(/\s+/g, ' ').trim();
+  val = val.replace(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b.*$/i, '').trim();
+  val = val.replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)\b.*$/i, '').trim();
+  val = val.replace(/\b(?:edt|est|cdt|cst|mdt|mst|pdt|pst|utc)\b.*$/i, '').trim();
+  val = val.replace(/[^A-Za-z'\-\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!val) return null;
+  if (selfName && val.toLowerCase() === selfName.toLowerCase()) return null;
+  return val;
+}
+
+function findOpponentBySingleToken(token: string, selfName: string): AnalyzerFighter | null {
+  const t = token.toLowerCase();
+  const matches = allFighters.filter((x) => {
+    if (x.name === selfName) return false;
+    const parts = x.name.toLowerCase().split(' ');
+    const last = parts[parts.length - 1] || '';
+    return last === t;
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | null, looseOpp: string | null): AnalyzerFighter | null {
+  const rawOpp = explicitOpp || looseOpp;
+  const fighterNorm = normalizeName(fighter.name) || fighter.name;
+  const cardOpp = findOpponentFromUpcomingCard(fighter.name);
+  const oppNorm = rawOpp ? (normalizeName(rawOpp) || rawOpp) : (cardOpp ? (normalizeName(cardOpp) || cardOpp) : null);
+  const singleToken = looseOpp && looseOpp.split(' ').length === 1 ? looseOpp.toLowerCase() : null;
+
+  let best: AnalyzerFighter | null = null;
+  let bestScore = 0;
+  let tieAtBest = false;
+
+  for (const candidate of allFighters) {
+    if (candidate.name === fighter.name) continue;
+
+    const candidateNorm = normalizeName(candidate.name) || candidate.name;
+    const candidateOppNorm = normalizeName(candidate.opponent || '') || null;
+    let score = 0;
+
+    if (oppNorm) {
+      if (candidateNorm === oppNorm) score = Math.max(score, 100);
+      else if (namesMatch(candidateNorm, oppNorm)) score = Math.max(score, 90);
+      else if (rawOpp && namesMatch(candidate.name, rawOpp)) score = Math.max(score, 88);
+    }
+
+    if (singleToken) {
+      const parts = candidateNorm.toLowerCase().split(' ');
+      const first = parts[0] || '';
+      const last = parts[parts.length - 1] || '';
+      if (last === singleToken) score = Math.max(score, 82);
+      else if (first === singleToken) score = Math.max(score, 78);
+    }
+
+    if (candidateOppNorm && (candidateOppNorm === fighterNorm || namesMatch(candidateOppNorm, fighterNorm))) {
+      score = Math.max(score, 72);
+    }
+
+    if (score === 0) continue;
+
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+      tieAtBest = false;
+    } else if (score === bestScore) {
+      tieAtBest = true;
+    }
+  }
+
+  if (best && !tieAtBest) return best;
+
+  const fallbackBySingleToken = singleToken ? findOpponentBySingleToken(singleToken, fighter.name) : null;
+  if (fallbackBySingleToken) return fallbackBySingleToken;
+
+  const fallbackByReverse = allFighters.find((x) => {
+    if (x.name === fighter.name) return false;
+    if (!x.opponent) return false;
+    const xOppNorm = normalizeName(x.opponent) || x.opponent;
+    return xOppNorm === fighterNorm || namesMatch(xOppNorm, fighterNorm);
+  });
+  return fallbackByReverse || null;
+}
   const totalFights = Math.ceil(fighters.length / 2);
   const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
   fighters.forEach((f, i) => {
-    const opp = f.opponent && f.opponent !== 'null' && f.opponent !== 'undefined' ? f.opponent : null;
-    const oppEntry = opp
-      ? (allFighters.find(x => x.name === opp) || allFighters.find(x => namesMatch(x.name, opp)))
-      : undefined;
+    const explicitOpp = sanitizeOpponentName(f.opponent, f.name);
+    const looseOpp = sanitizeLooseOpponentToken(f.opponent, f.name);
+    const opp = explicitOpp || looseOpp;
+    const oppEntry = resolveOpponentEntry(f, explicitOpp, looseOpp);
     if (i % 2 === 0 && showFightGroups) {
       const fightIndex = Math.floor(i / 2);
       let badgeText: string, badgeCls: string;
@@ -2777,7 +3037,7 @@ function renderFighters(): void {
       header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><div class="fight-group-line"></div>`;
       container.appendChild(header);
     }
-    debugLog(`TD lookup: ${f.name} → opp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? null} selfTdLine=${f.line_p6_td}`);
+    debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
     const row = buildFighterRow(f, oppEntry ?? null);
     row.style.setProperty('--row-index', String(i % 18));
     container.appendChild(row);
@@ -2804,20 +3064,54 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   const confInlineLabel = confPct > 0 ? `<span class="lean-conf-inline">${confPct}%</span>` : '';
   const activeLine = activePlatformLine(f);
   const platformLabel = activePlatformLabel(f);
-  const oppSsLine = oppEntry ? (oppEntry.line_p6_ss ?? oppEntry.line_ud_ss ?? oppEntry.line_betr_ss ?? null) : null;
-  const oppTdLine = oppEntry ? (oppEntry.line_p6_td ?? oppEntry.line_ud_td ?? null) : null;
+
+  function platformStatLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td'): number | null {
+    if (!entry) return null;
+    const p6 = stat === 'ss' ? entry.line_p6_ss : entry.line_p6_td;
+    const ud = stat === 'ss' ? entry.line_ud_ss : entry.line_ud_td;
+    const pp = stat === 'ss' ? entry.line_pp_ss : entry.line_pp_td;
+    const bt = stat === 'ss' ? entry.line_betr_ss : entry.line_betr_td;
+    if (currentPlatform === 'pick6') return p6 ?? ud ?? pp ?? bt ?? null;
+    if (currentPlatform === 'underdog') return ud ?? p6 ?? pp ?? bt ?? null;
+    if (currentPlatform === 'prizepicks') return pp ?? p6 ?? ud ?? bt ?? null;
+    return bt ?? p6 ?? ud ?? pp ?? null;
+  }
+
+  const oppSsLine = platformStatLine(oppEntry, 'ss');
+  const oppTdLine = platformStatLine(oppEntry, 'td');
   const oppFpLine = oppEntry ? activePlatformLine(oppEntry) : null;
   const oppName   = oppEntry ? oppEntry.name : (f.opponent || null);
+  debugLog(`SS/TD chart: ${f.name} → oppEntry="${oppEntry?.name ?? 'NOT FOUND'}" oppSsLine=${oppSsLine} oppTdLine=${oppTdLine} (opp ss p6=${oppEntry?.line_p6_ss ?? '—'} ud=${oppEntry?.line_ud_ss ?? '—'} pp=${oppEntry?.line_pp_ss ?? '—'} bt=${oppEntry?.line_betr_ss ?? '—'} | opp td p6=${oppEntry?.line_p6_td ?? '—'} ud=${oppEntry?.line_ud_td ?? '—'} pp=${oppEntry?.line_pp_td ?? '—'} bt=${oppEntry?.line_betr_td ?? '—'})`);
 
-  function buildHistoryBars(fights: (typeof db.history | typeof db.oppHistory), valFn: (h: any) => number|null|undefined, lineFP: number|null, lineSS: number|null, lineTD: number|null, labelFn: 'fp'|'ss'|'td'): string {
+  type HistoryRow = { opp?: string | null; fp?: number | null; sigStr?: number | null; td?: number | null };
+
+  function buildHistoryBars(
+    fights: HistoryRow[] | undefined,
+    valFn: (h: HistoryRow) => number | null | undefined,
+    lineFP: number | null,
+    lineSS: number | null,
+    lineTD: number | null,
+    labelFn: 'fp'|'ss'|'td'
+  ): string {
     if (!fights?.length) return db.loaded
       ? '<div class="history-empty">No fight history found on UFCStats</div>'
       : '<div class="history-empty">⟳ Fetching from UFCStats...</div>';
-    return (fights as any[]).slice(0,8).map((h: any) => {
+
+    const recentRows = fights.slice(0, 8);
+    const values = recentRows
+      .map(valFn)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+
+    if (!values.length) {
+      return '<div class="history-empty">No stat samples available</div>';
+    }
+
+    const line = labelFn === 'fp' ? lineFP : labelFn === 'ss' ? lineSS : lineTD;
+    const maxVal = Math.max(...values, (line || 0) * 1.3, 1);
+
+    return recentRows.map((h) => {
       const val = valFn(h);
       if (val == null) return '';
-      const line = labelFn === 'fp' ? lineFP : labelFn === 'ss' ? lineSS : lineTD;
-      const maxVal = Math.max(...((fights as any[]).map(valFn).filter((v: any) => v != null) as number[]), (line || 0) * 1.3, 1);
       const pct = Math.min(100, (val / maxVal) * 100);
       const linePct = line ? Math.min(100, (line / maxVal) * 100) : null;
       const isOver = line ? val > line : true;
@@ -2834,26 +3128,29 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
 
   const fights    = db.history    || [];
   const oppFights = db.oppHistory || [];
-  const ssLine = f.line_p6_ss ?? f.line_ud_ss ?? f.line_betr_ss ?? null;
-  const tdLine = f.line_p6_td ?? f.line_ud_td ?? null;
-  const primarySSLine = currentPlatform === 'pick6'
-    ? (f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_betr_ss ?? null)
-    : currentPlatform === 'underdog'
-      ? (f.line_ud_ss ?? f.line_p6_ss ?? f.line_pp_ss ?? f.line_betr_ss ?? null)
-      : currentPlatform === 'prizepicks'
-        ? (f.line_pp_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_betr_ss ?? null)
-        : (f.line_betr_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? null);
+  const ssLine = platformStatLine(f, 'ss');
+  const tdLine = platformStatLine(f, 'td');
+  const primarySSLine = ssLine;
   const avgSS = db.avgSigStr ?? null;
   const ssDelta = (avgSS != null && primarySSLine != null) ? avgSS - primarySSLine : null;
   const ssDeltaText = ssDelta == null ? '—' : `${ssDelta > 0 ? '+' : ''}${ssDelta.toFixed(1)}`;
   const ssDeltaClass = ssDelta == null ? '' : ssDelta >= 0 ? 'delta-plus' : 'delta-minus';
 
-  const historyHTML   = buildHistoryBars(fights, h => h.fp,     activeLine, ssLine, tdLine, 'fp');
+  const historyPlatform: 'pick6'|'underdog'|'prizepicks'|'betr' =
+    currentPlatform === 'pick6' ? 'pick6' :
+    currentPlatform === 'underdog' ? 'underdog' :
+    currentPlatform === 'prizepicks' ? 'prizepicks' :
+    'betr';
+
+  const historyHTML   = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, 'fp');
   const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, 'ss');
-  const tdHistoryHTML = buildHistoryBars(fights, h => h.td,     activeLine, ssLine, tdLine, 'td');
-  const oppFPHistory  = buildHistoryBars(oppFights, h => h.fp,     oppFpLine,  oppSsLine, oppTdLine, 'fp');
-  const oppSSHistory  = buildHistoryBars(oppFights, h => h.sigStr, oppFpLine,  oppSsLine, oppTdLine, 'ss');
-  const oppTDHistory  = buildHistoryBars(oppFights, h => h.td,     oppFpLine,  oppSsLine, oppTdLine, 'td');
+  const tdHistoryHTML = buildHistoryBars(fights, h => h.td,     activeLine, ssLine,    tdLine, 'td');
+  const oppCompareFpLine = oppFpLine;
+  const oppCompareSsLine = oppSsLine;
+  const oppCompareTdLine = oppTdLine;
+  const oppFPHistory  = buildHistoryBars(oppFights, h => getFightFantasyValueForPlatform(h, historyPlatform), oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, 'fp');
+  const oppSSHistory  = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, 'ss');
+  const oppTDHistory  = buildHistoryBars(oppFights, h => h.td,     oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, 'td');
 
   const reasonsHTML = lean.reasons?.map(r => `<div class="lean-point">
     <span class="lean-point-icon ${r.icon==='pos'?'pos':r.icon==='neg'?'neg':''}">${r.icon==='pos'?'↑':r.icon==='neg'?'↓':'→'}</span>
@@ -2871,18 +3168,254 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   
   const streakEmoji = db.streak?.type === 'hot' ? ' 🔥' : db.streak?.type === 'cold' ? ' ❄️' : '';
   const weightedAvg = db.avgFP_weighted ?? null;
-  const weightedDiff = (weightedAvg != null && db.avgFP_p6 != null) ? (weightedAvg - db.avgFP_p6) : null;
+  const platformAvgFP = activePlatformAvgFP(db);
+  const weightedDiff = (weightedAvg != null && platformAvgFP != null) ? (weightedAvg - platformAvgFP) : null;
   const weightedArrow = weightedDiff == null ? '' : weightedDiff > 3 ? ' ↑' : weightedDiff < -3 ? ' ↓' : '';
-  const bayesProb = lean.bayesianProbability != null ? Math.round(lean.bayesianProbability * 100) : null;
-  const calibratedProb = lean.calibratedProbability != null ? Math.round(lean.calibratedProbability * 100) : null;
-  const hitProb = (() => {
-    if (lean.calibratedProbability == null) return null;
-    return lean.lean === 'under'
-      ? Math.round((1 - lean.calibratedProbability) * 100)
-      : Math.round(lean.calibratedProbability * 100);
-  })();
-  const spikeEvent = lineDropService.getLatestSpikeForFighter(f.name);
-  const historySpark = showLineHistory ? getLineHistorySparkline(f.name) : '';
+  const hitProb = null;
+  const spikeEvent = null;
+
+  interface SSAnalysis {
+    name: string;
+    currentLine: number | null;
+    currentLineSource: string;
+    currentLineText: string;
+    avgText: string;
+    vsLineText: string;
+    matchupNotes: string;
+    verdictText: string;
+    confidenceText: string;
+    edge: number;
+    confidence: number;
+    available: boolean;
+  }
+
+  function selectedBookLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td'): number | null {
+    if (!entry) return null;
+    if (currentPlatform === 'pick6') return stat === 'ss' ? entry.line_p6_ss ?? null : entry.line_p6_td ?? null;
+    if (currentPlatform === 'underdog') return stat === 'ss' ? entry.line_ud_ss ?? null : entry.line_ud_td ?? null;
+    if (currentPlatform === 'prizepicks') return stat === 'ss' ? entry.line_pp_ss ?? null : entry.line_pp_td ?? null;
+    return stat === 'ss' ? entry.line_betr_ss ?? null : entry.line_betr_td ?? null;
+  }
+
+  function anyBookLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td'): number | null {
+    if (!entry) return null;
+    const p6 = stat === 'ss' ? entry.line_p6_ss : entry.line_p6_td;
+    const ud = stat === 'ss' ? entry.line_ud_ss : entry.line_ud_td;
+    const pp = stat === 'ss' ? entry.line_pp_ss : entry.line_pp_td;
+    const bt = stat === 'ss' ? entry.line_betr_ss : entry.line_betr_td;
+    return p6 ?? ud ?? pp ?? bt ?? null;
+  }
+
+  function formatLineSource(entry: AnalyzerFighter | null, stat: 'ss' | 'td', line: number | null): string {
+    if (!entry || line == null) return 'none';
+    const p6 = stat === 'ss' ? entry.line_p6_ss : entry.line_p6_td;
+    const ud = stat === 'ss' ? entry.line_ud_ss : entry.line_ud_td;
+    const pp = stat === 'ss' ? entry.line_pp_ss : entry.line_pp_td;
+    const bt = stat === 'ss' ? entry.line_betr_ss : entry.line_betr_td;
+    if (p6 === line) return 'P6';
+    if (ud === line) return 'UD';
+    if (pp === line) return 'PP';
+    if (bt === line) return 'BT';
+    return 'unknown';
+  }
+
+  function resolveAnalysisLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td'): { line: number | null; source: string } {
+    const selected = selectedBookLine(entry, stat);
+    if (selected != null) return { line: selected, source: currentPlatform.toUpperCase() };
+    const fallback = anyBookLine(entry, stat);
+    if (fallback != null) return { line: fallback, source: `fallback ${formatLineSource(entry, stat, fallback)}` };
+    return { line: null, source: 'missing' };
+  }
+
+  const fighterSsLineResolved = resolveAnalysisLine(f, 'ss');
+  const opponentSsLineResolved = resolveAnalysisLine(oppEntry, 'ss');
+
+  function buildSSAnalysis(
+    fighterName: string,
+    fighterDb: FighterDB | null,
+    currentSsLine: number | null,
+    lineSource: string,
+    opponentDb: FighterDB | null,
+  ): SSAnalysis {
+    if (!fighterDb?.loaded || currentSsLine == null || !Number.isFinite(currentSsLine)) {
+      return {
+        name: fighterName,
+        currentLine: currentSsLine,
+        currentLineSource: lineSource,
+        currentLineText: currentSsLine != null ? `${currentSsLine.toFixed(1)} (${lineSource})` : 'Unavailable',
+        avgText: 'Unavailable',
+        vsLineText: 'Insufficient line/history data',
+        matchupNotes: 'Needs both current SS line and fighter history.',
+        verdictText: 'No bet (insufficient data)',
+        confidenceText: '0',
+        edge: 0,
+        confidence: 0,
+        available: false,
+      };
+    }
+
+    const ssSamples = (fighterDb.history || [])
+      .map((h) => h.sigStr)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (!ssSamples.length) {
+      return {
+        name: fighterName,
+        currentLine: currentSsLine,
+        currentLineSource: lineSource,
+        currentLineText: `${currentSsLine.toFixed(1)} (${lineSource})`,
+        avgText: 'Unavailable',
+        vsLineText: 'No historical SS samples',
+        matchupNotes: 'Unable to compute historical over/under hit profile.',
+        verdictText: 'No bet (insufficient data)',
+        confidenceText: '0',
+        edge: 0,
+        confidence: 0,
+        available: false,
+      };
+    }
+
+    const avg = ssSamples.reduce((s, v) => s + v, 0) / ssSamples.length;
+    const overCount = ssSamples.filter((v) => v > currentSsLine).length;
+    const underCount = ssSamples.length - overCount;
+    const overRate = overCount / ssSamples.length;
+
+    let matchupAdj = 0;
+    const notes: string[] = [];
+    if (lineSource.startsWith('fallback')) {
+      notes.push(`Selected-book SS line missing; using ${lineSource}.`);
+    }
+    if (opponentDb?.loaded) {
+      const oppStrDef = opponentDb.strDef;
+      const oppSapm = opponentDb.sapm;
+      const oppTdDef = opponentDb.tdDef;
+      const oppAvgTd = opponentDb.avgTD;
+
+      if (oppStrDef != null) {
+        if (oppStrDef >= 60) { matchupAdj -= 4; notes.push(`Opponent striking defense ${oppStrDef}% suppresses clean SS volume.`); }
+        else if (oppStrDef <= 45) { matchupAdj += 4; notes.push(`Opponent striking defense ${oppStrDef}% is exploitable for SS accumulation.`); }
+      }
+      if (oppSapm != null) {
+        if (oppSapm >= 4.7) { matchupAdj += 2.5; notes.push(`Opponent absorbs ${oppSapm.toFixed(1)} sig strikes/min, pace supports overs.`); }
+        else if (oppSapm <= 3.0) { matchupAdj -= 2.5; notes.push(`Opponent absorbs only ${oppSapm.toFixed(1)} sig strikes/min, downside for SS output.`); }
+      }
+      if (oppAvgTd != null && oppAvgTd >= 2.2) {
+        matchupAdj -= 1.5;
+        notes.push(`Opponent wrestling pressure (${oppAvgTd.toFixed(1)} TD avg) can suppress striking exchanges.`);
+      }
+      if (oppTdDef != null && oppTdDef < 50 && (fighterDb.avgTD ?? 0) > 1.3) {
+        matchupAdj -= 1;
+        notes.push('Fighter may choose grappling routes vs weak TD defense, reducing SS ceiling.');
+      }
+    } else {
+      notes.push('Opponent profile not loaded; matchup adjustment limited to fighter history baseline.');
+    }
+
+    const projection = avg + matchupAdj;
+    const verdict = projection >= currentSsLine ? 'OVER' : 'UNDER';
+    const confidence = Math.max(
+      45,
+      Math.min(
+        93,
+        Math.round(
+          52
+          + Math.min(18, Math.abs(projection - currentSsLine) * 1.4)
+          + Math.min(12, Math.abs(overRate - 0.5) * 100 * 0.24)
+          + Math.min(8, ssSamples.length * 0.9)
+        )
+      )
+    );
+
+    const vsLineText = `${overCount}/${ssSamples.length} over (${(overRate * 100).toFixed(0)}%) · ${underCount}/${ssSamples.length} under`;
+    const matchupNotes = notes.length ? notes.join(' ') : 'Neutral style/pace indicators.';
+
+    return {
+      name: fighterName,
+      currentLine: currentSsLine,
+      currentLineSource: lineSource,
+      currentLineText: `${currentSsLine.toFixed(1)} (${lineSource})`,
+      avgText: avg.toFixed(1),
+      vsLineText,
+      matchupNotes,
+      verdictText: `${verdict} ${currentSsLine.toFixed(1)} (proj ${projection.toFixed(1)})`,
+      confidenceText: String(confidence),
+      edge: projection - currentSsLine,
+      confidence,
+      available: true,
+    };
+  }
+
+  function buildKeyReasons(a: SSAnalysis, b: SSAnalysis): string {
+    const reasons: string[] = [];
+    if (a.available) reasons.push(`${a.name}: edge ${a.edge >= 0 ? '+' : ''}${a.edge.toFixed(1)} vs line`);
+    if (b.available) reasons.push(`${b.name}: edge ${b.edge >= 0 ? '+' : ''}${b.edge.toFixed(1)} vs line`);
+    if (!reasons.length) reasons.push('Insufficient SS line/history data for one or both sides');
+    return reasons.join(' | ');
+  }
+
+  function validateSSOutput(a: SSAnalysis, b: SSAnalysis, keyReasons: string): boolean {
+    const check1 = a.currentLine != null && b.currentLine != null;
+    const check2 = a.avgText !== 'Unavailable' && b.avgText !== 'Unavailable' && a.vsLineText.length > 0 && b.vsLineText.length > 0;
+    const check3 = (a.verdictText.includes('OVER') || a.verdictText.includes('UNDER') || a.verdictText.includes('No bet'))
+      && (b.verdictText.includes('OVER') || b.verdictText.includes('UNDER') || b.verdictText.includes('No bet'));
+    const check4 = keyReasons.length > 0;
+    return check1 && check2 && check3 && check4;
+  }
+
+  let fighterSsAnalysis = buildSSAnalysis(f.name, db, fighterSsLineResolved.line, fighterSsLineResolved.source, oppEntry?.db || null);
+  let opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentSsLineResolved.line, opponentSsLineResolved.source, db);
+
+  // Self-correct once if selected-book line is missing by forcing best available line on both sides.
+  let keyReasons = buildKeyReasons(fighterSsAnalysis, opponentSsAnalysis);
+  if (!validateSSOutput(fighterSsAnalysis, opponentSsAnalysis, keyReasons)) {
+    const fighterFallbackLine = anyBookLine(f, 'ss');
+    const opponentFallbackLine = anyBookLine(oppEntry, 'ss');
+    fighterSsAnalysis = buildSSAnalysis(f.name, db, fighterFallbackLine, formatLineSource(f, 'ss', fighterFallbackLine), oppEntry?.db || null);
+    opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentFallbackLine, formatLineSource(oppEntry, 'ss', opponentFallbackLine), db);
+    keyReasons = buildKeyReasons(fighterSsAnalysis, opponentSsAnalysis);
+  }
+
+  const strongest = Math.abs(fighterSsAnalysis.edge) >= Math.abs(opponentSsAnalysis.edge)
+    ? fighterSsAnalysis
+    : opponentSsAnalysis;
+  const volatilityFlags: string[] = [];
+  if ((db.fpStdDev ?? 0) > 22) volatilityFlags.push(`${f.name} high variance profile`);
+  if ((oppEntry?.db?.fpStdDev ?? 0) > 22) volatilityFlags.push(`${oppEntry?.name || 'Opponent'} high variance profile`);
+  if (!fighterSsAnalysis.available || !opponentSsAnalysis.available) volatilityFlags.push('incomplete opponent/line data');
+  const recommendedLeans = [fighterSsAnalysis, opponentSsAnalysis]
+    .filter((x) => x.available && x.confidence >= 62)
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 2)
+    .map((x) => `${x.name}: ${x.verdictText} (${x.confidence}% conf)`);
+
+  const ssAnalysisHtml = `
+    <div class="detail-panel">
+      <div class="detail-panel-title">SS Matchup Analyzer</div>
+      <div class="lean-reason">
+        <div><strong>### Fighter SS Analysis</strong></div>
+        <div>- Name: ${fighterSsAnalysis.name}</div>
+        <div>- Current SS line: ${fighterSsAnalysis.currentLineText}</div>
+        <div>- Historical average SS: ${fighterSsAnalysis.avgText}</div>
+        <div>- Historical performance vs similar lines: ${fighterSsAnalysis.vsLineText}</div>
+        <div>- Matchup notes: ${fighterSsAnalysis.matchupNotes}</div>
+        <div>- Over/Under verdict: ${fighterSsAnalysis.verdictText}</div>
+        <div>- Confidence score (0-100): ${fighterSsAnalysis.confidenceText}</div>
+        <br>
+        <div><strong>### Opponent SS Analysis</strong></div>
+        <div>- Name: ${opponentSsAnalysis.name}</div>
+        <div>- Current SS line: ${opponentSsAnalysis.currentLineText}</div>
+        <div>- Historical average SS: ${opponentSsAnalysis.avgText}</div>
+        <div>- Historical performance vs similar lines: ${opponentSsAnalysis.vsLineText}</div>
+        <div>- Matchup notes: ${opponentSsAnalysis.matchupNotes}</div>
+        <div>- Over/Under verdict: ${opponentSsAnalysis.verdictText}</div>
+        <div>- Confidence score (0-100): ${opponentSsAnalysis.confidenceText}</div>
+        <br>
+        <div><strong>### Final Summary</strong></div>
+        <div>- Side with clearest value: ${strongest.available ? `${strongest.name} (${strongest.verdictText})` : 'No clear edge (insufficient data)'}</div>
+        <div>- Key reasons: ${keyReasons}</div>
+        <div>- Volatility / red flags: ${volatilityFlags.length ? volatilityFlags.join(' · ') : 'None flagged from fetched variance/style metrics'}</div>
+        <div>- Recommended lean(s) for pick’em platforms: ${recommendedLeans.length ? recommendedLeans.join(' | ') : 'No SS lean above confidence threshold'}</div>
+      </div>
+    </div>`;
 
   const row = document.createElement('div') as HTMLDivElement;
   const rowLeanClass = lean.lean === 'over' ? ' lean-over-row' : lean.lean === 'under' ? ' lean-under-row' : '';
@@ -2911,12 +3444,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
         ${f.line_pp_td != null ? `<div class="line-cell td"><div class="line-platform">PP TD</div><div class="line-value pp">${f.line_pp_td}</div></div>` : ''}
         ${f.line_p6 == null && f.line_ud == null && f.line_betr == null && f.line_pp == null && f.line_ud_ss == null && f.line_p6_ss == null && f.line_pp_ss == null ? '<div class="line-value-empty">No lines yet</div>' : ''}
         ${spikeEvent ? '<div class="value-spike">VALUE SPIKE</div>' : ''}
-        ${historySpark ? `<div class="line-history-inline">${historySpark}</div>` : ''}
       </div>
       <div class="stats-mini">
         <div class="stat-mini-cell stat-fp" title="Recent fantasy points average from UFCStats history">
           <div class="stat-mini-label" title="Recent fantasy points average from UFCStats history">Avg FP${weightedArrow}</div>
-          <div class="stat-mini-val">${db.avgFP_p6!=null?db.avgFP_p6.toFixed(1):'...'} ${avgFPPercentileLabel}</div>
+          <div class="stat-mini-val">${platformAvgFP!=null?platformAvgFP.toFixed(1):'...'} ${avgFPPercentileLabel}</div>
           <div class="fp-range-label">${db.fpFloor!=null?`${fpFloor}–${fpCeiling}`:''}</div>
         </div>
         <div class="stat-mini-cell stat-ss" title="Average significant strikes landed per fight"><div class="stat-mini-label" title="Average significant strikes landed per fight">Avg SS</div><div class="stat-mini-val">${avgSS!=null?avgSS.toFixed(1):'...'}</div></div>
@@ -2927,7 +3459,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
         ${confPct > 0 ? `<div class="confidence-meter" title="Confidence strength: ${confPct}%"><div class="confidence-fill" style="width:${confPct}%; background: rgba(${leanRGB}, 0.8);"></div></div>` : ''}
         ${hitProb != null ? `<div class="weighted-avg-label">Hit Probability: ${hitProb}%</div>` : ''}
-        ${(bayesProb != null || calibratedProb != null) ? `<div class="weighted-avg-label">Bayes: ${bayesProb != null ? bayesProb + '%' : '—'} · Cal: ${calibratedProb != null ? calibratedProb + '%' : '—'}</div>` : ''}
         ${lean.ev != null ? `<div class="ev-label">EV: ${lean.ev > 0 ? '+' : ''}${lean.ev}</div>` : ''}
         ${weightedAvg != null ? `<div class="weighted-avg-label">W.Avg: ${weightedAvg.toFixed(1)}</div>` : ''}
       </div>
@@ -2936,11 +3467,12 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
     <div class="fighter-detail">
       <div class="detail-grid">
         <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine?`<div class="panel-meta"><div class="panel-meta-line"></div> Line: ${activeLine}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine?` vs Line ${ssLine}`:''}</div>${ssHistoryHTML}${ssLine?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine?` vs Line ${tdLine}`:''}</div>${tdHistoryHTML}${tdLine?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppFpLine != null ? ` · vs ${oppName || 'opp'} FP line ${oppFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
-        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppSsLine != null ? ` · vs ${oppName || 'opp'} SS line ${oppSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
-        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppTdLine != null ? ` · vs ${oppName || 'opp'} TD line ${oppTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'} · BT: ${f.line_betr_ss||'—'}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        ${ssAnalysisHtml}
         <div class="detail-panel">
           <div class="detail-panel-title">UFCStats Career Data</div>
           <span class="stat-val mid">${db.record||'...'}</span>
@@ -3017,12 +3549,57 @@ function namesMatch(a: string, b: string): boolean {
   return false;
 }
 
-async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters: any[], ppFighters: any[] = []): Promise<void> {
-  debugLog(`P6 fighters (${(p6Fighters||[]).length}): ${(p6Fighters||[]).map((f:any)=>f.name).join(', ')}`);
-  debugLog(`UD fighters (${(udFighters||[]).length}): ${(udFighters||[]).map((f:any)=>f.name).join(', ')}`);
-  const map: Record<string, any> = {};
+interface RawLineFighter {
+  name?: string;
+  line_fp?: number | null;
+  line_ss?: number | null;
+  line_td?: number | null;
+  line?: number | null;
+  opponent?: string | null;
+}
 
-  function isValidFighterName(name: any): boolean {
+interface MergedLineEntry {
+  name: string;
+  line_p6: number | null;
+  line_p6_ss: number | null;
+  line_p6_td: number | null;
+  line_ud: number | null;
+  line_ud_ss: number | null;
+  line_ud_td: number | null;
+  line_pp: number | null;
+  line_pp_ss: number | null;
+  line_pp_td: number | null;
+  line_betr: number | null;
+  line_betr_ss: number | null;
+  line_betr_td: number | null;
+  opponent: string | null;
+}
+
+function createMergedLineEntry(name: string): MergedLineEntry {
+  return {
+    name,
+    line_p6: null,
+    line_p6_ss: null,
+    line_p6_td: null,
+    line_ud: null,
+    line_ud_ss: null,
+    line_ud_td: null,
+    line_pp: null,
+    line_pp_ss: null,
+    line_pp_td: null,
+    line_betr: null,
+    line_betr_ss: null,
+    line_betr_td: null,
+    opponent: null,
+  };
+}
+
+async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineFighter[], betrFighters: RawLineFighter[], ppFighters: RawLineFighter[] = []): Promise<void> {
+  debugLog(`P6 fighters (${(p6Fighters||[]).length}): ${(p6Fighters||[]).map((f) => f.name).join(', ')}`);
+  debugLog(`UD fighters (${(udFighters||[]).length}): ${(udFighters||[]).map((f) => f.name).join(', ')}`);
+  const map: Record<string, MergedLineEntry> = {};
+
+  function isValidFighterName(name: unknown): name is string {
     if (!name || typeof name !== 'string') return false;
     if (name.includes(':') || name.includes('(') || name.includes(')')) return false;
     if (name.length < 4 || name.length > 50) return false;
@@ -3032,27 +3609,27 @@ async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters
     return true;
   }
 
-  (p6Fighters || []).forEach((f: any) => {
+  (p6Fighters || []).forEach((f) => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name);
     if (!n) return;
-    if (!map[n]) map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, opponent:null };
+    if (!map[n]) map[n] = createMergedLineEntry(n);
     map[n].line_p6    = f.line_fp ?? f.line ?? null;
     map[n].line_p6_ss = f.line_ss ?? null;
     map[n].line_p6_td = f.line_td ?? null;
     if (f.opponent) map[n].opponent = normalizeName(f.opponent);
   });
 
-  function findOrCreateEntry(n: string): any {
+  function findOrCreateEntry(n: string): MergedLineEntry {
     if (map[n]) return map[n];
     const existing = Object.keys(map).find(k => namesMatch(k, n));
     if (existing) { if (existing !== n) debugLog(`Fuzzy merge: "${n}" → "${existing}"`); return map[existing]; }
     debugLog(`UD-only (no P6 match): "${n}"`);
-    map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, opponent:null };
+    map[n] = createMergedLineEntry(n);
     return map[n];
   }
 
-  (udFighters || []).forEach((f: any) => {
+  (udFighters || []).forEach((f) => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
@@ -3062,7 +3639,7 @@ async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
   });
 
-  (betrFighters || []).forEach((f: any) => {
+  (betrFighters || []).forEach((f) => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
@@ -3071,7 +3648,7 @@ async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters
     entry.line_betr_td = f.line_td ?? null;
   });
 
-  (ppFighters || []).forEach((f: any) => {
+  (ppFighters || []).forEach((f) => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
@@ -3081,36 +3658,37 @@ async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
   });
 
-  const emptyLean: LeanResult = { lean: 'none', conf: 0, reasons: [], verdict: '' };
-  allFighters = Object.values(map).map((f: any) => ({ ...f, db: { loaded: false } as FighterDB, lean: emptyLean }));
+  allFighters = Object.values(map).map((f) => ({ ...f, db: { loaded: false } as FighterDB, lean: createEmptyLean() }));
   renderFighters();
 
-  const entries: any[] = Object.values(map);
-  const dbResults = await Promise.all(entries.map((f: any) => fetchFighterStats(f.name)));
+  const entries: MergedLineEntry[] = Object.values(map);
+  const dbResults = await Promise.all(entries.map((f) => fetchFighterStats(f.name)));
   const dbMap: Record<string, FighterDB> = {};
-  entries.forEach((f: any, i: number) => { dbMap[f.name] = dbResults[i]; });
+  entries.forEach((f, i) => { dbMap[f.name] = dbResults[i]; });
 
   const paired = new Set<string>();
-  entries.forEach((f: any) => {
+  entries.forEach((f) => {
     if (paired.has(f.name)) return;
     const oppName = f.opponent;
-    let opp: any = null;
+    let opp: MergedLineEntry | null = null;
     if (oppName) {
-      opp = entries.find((x: any) => x.name === oppName)
-         || entries.find((x: any) => x.name.toLowerCase() === oppName.toLowerCase())
-         || entries.find((x: any) => {
+      opp = entries.find((x) => x.name !== f.name && x.name === oppName)
+         || entries.find((x) => x.name !== f.name && x.name.toLowerCase() === oppName.toLowerCase())
+         || entries.find((x) => {
+              if (x.name === f.name) return false;
               const xLast  = x.name.split(' ').pop()?.toLowerCase() || '';
               const oppLast = oppName.split(' ').pop()?.toLowerCase() || '';
               return xLast === oppLast && xLast.length > 3;
-            });
+          })
+        || null;
     }
 
     const dbA = dbMap[f.name];
     const dbB = opp ? dbMap[opp.name] : null;
 
     if (opp) {
-      const idxA = allFighters.findIndex((x: any) => x.name === f.name);
-      const idxB = allFighters.findIndex((x: any) => x.name === opp.name);
+      const idxA = allFighters.findIndex((x) => x.name === f.name);
+      const idxB = allFighters.findIndex((x) => x.name === opp.name);
       if (idxA >= 0) allFighters[idxA].opponent = opp.name;
       if (idxB >= 0) allFighters[idxB].opponent = f.name;
     }
@@ -3149,21 +3727,21 @@ async function mergeAndEnrich(p6Fighters: any[], udFighters: any[], betrFighters
   });
 
   debugLog('DEBUG fighters sample: ' + JSON.stringify(
-    allFighters.slice(0,3).map((f: any) => ({ name: f.name, line_p6: f.line_p6, line_ud: f.line_ud, line_fp: f.line_fp, line_p6_td: f.line_p6_td, line_ud_td: f.line_ud_td })), null, 2));
+    allFighters.slice(0,3).map((f) => ({ name: f.name, line_p6: f.line_p6, line_ud: f.line_ud, line_p6_td: f.line_p6_td, line_ud_td: f.line_ud_td })), null, 2));
 
   renderFighters();
 }
 
-function applyLean(f: any, db: FighterDB|null, lean: LeanResult): void {
-  const idx = allFighters.findIndex((x: any) => x.name === f.name);
+function applyLean(f: { name: string }, db: FighterDB|null, lean: LeanResult): void {
+  const idx = allFighters.findIndex((x) => x.name === f.name);
   if (idx >= 0) {
     allFighters[idx].db = db || { loaded: false } as FighterDB;
-    allFighters[idx].lean = lean || { lean: 'none', conf: 0, reasons: [], verdict: '' };
+    allFighters[idx].lean = lean || createEmptyLean();
   }
 }
 
 function updateFighterLeans(name: string, lean_ss: LeanResult|null, lean_td: LeanResult|null): void {
-  const idx = allFighters.findIndex((x: any) => x.name === name);
+  const idx = allFighters.findIndex((x) => x.name === name);
   if (idx >= 0) {
     if (lean_ss) allFighters[idx].lean_ss = lean_ss;
     if (lean_td) allFighters[idx].lean_td = lean_td;
@@ -3171,7 +3749,19 @@ function updateFighterLeans(name: string, lean_ss: LeanResult|null, lean_td: Lea
 }
 
 // ── UI FUNCTIONS ──────────────────────────────────────────────────────────
-function updatePlatformBar(data: any): void {
+interface PlatformLinesPayload {
+  fighters: RawLineFighter[];
+  capturedAt?: number;
+}
+
+interface AnalyzerDataPayload {
+  pick6?: PlatformLinesPayload | null;
+  underdog?: PlatformLinesPayload | null;
+  betr?: PlatformLinesPayload | null;
+  prizepicks?: PlatformLinesPayload | null;
+}
+
+function updatePlatformBar(data: AnalyzerDataPayload): void {
   const p6 = data.pick6?.fighters || [], ud = data.underdog?.fighters || [], betr = data.betr?.fighters || [];
   const pp = data.prizepicks?.fighters || [];
   const el = (id: string) => document.getElementById(id);
@@ -3198,21 +3788,56 @@ function updatePlatformBar(data: any): void {
   else { dot.className = 'ext-dot partial'; label.textContent = `Partial · ${total} lines`; label.style.color = 'var(--orange)'; }
 }
 
-function loadData(): void {
+async function loadData(): Promise<void> {
+  if (isDataLoadInFlight) {
+    queuedDataReload = true;
+    return;
+  }
+
+  isDataLoadInFlight = true;
   const icon = document.getElementById('refreshIcon');
   if (icon) icon.classList.add('spinning');
-  if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.local.get(['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks'], (result) => {
-      processData({ pick6: result['lines_pick6'] || null, underdog: result['lines_underdog'] || null, betr: result['lines_betr'] || null, prizepicks: result['lines_prizepicks'] || null })
-        .then(() => { if (icon) icon.classList.remove('spinning'); })
-        .catch(e => { console.error('LoadData error:', e); if (icon) icon.classList.remove('spinning'); });
-    });
-  } else {
-    setTimeout(() => { processData(DEMO_DATA).then(() => { if (icon) icon.classList.remove('spinning'); }).catch(() => { if (icon) icon.classList.remove('spinning'); }); }, 400);
+
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      const result = await storageGet<Record<string, PlatformLinesPayload | null>>([...STORAGE_LINE_KEYS]);
+      await processData({
+        pick6: result['lines_pick6'] || null,
+        underdog: result['lines_underdog'] || null,
+        betr: result['lines_betr'] || null,
+        prizepicks: result['lines_prizepicks'] || null
+      });
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await processData(DEMO_DATA);
+    }
+  } catch (e) {
+    console.error('LoadData error:', e);
+  } finally {
+    if (icon) icon.classList.remove('spinning');
+    isDataLoadInFlight = false;
+    if (queuedDataReload) {
+      queuedDataReload = false;
+      // Fire one trailing refresh to collapse bursty update events.
+      void loadData();
+    }
   }
 }
 
-async function processData(data: any): Promise<void> {
+function requestDataReload(delayMs = 0): void {
+  if (delayMs > 0) {
+    setTimeout(() => { void loadData(); }, delayMs);
+    return;
+  }
+  void loadData();
+}
+
+function startPeriodicDataReload(intervalMs = 60000): void {
+  if (periodicRefreshTimer) clearInterval(periodicRefreshTimer);
+  periodicRefreshTimer = setInterval(() => { requestDataReload(); }, intervalMs);
+}
+
+async function processData(data: AnalyzerDataPayload): Promise<void> {
   updatePlatformBar(data);
   const p6 = data.pick6?.fighters || [], ud = data.underdog?.fighters || [], betr = data.betr?.fighters || [], pp = data.prizepicks?.fighters || [];
   const empty = document.getElementById('emptyState'), container = document.getElementById('cardContainer');
@@ -3236,6 +3861,30 @@ function showToast(msg: string): void {
   if (!t) return;
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function setButtonBusyState(
+  button: HTMLButtonElement | null,
+  isBusy: boolean,
+  options: { busyText?: string; idleText?: string; busyOpacity?: string; idleOpacity?: string } = {},
+): void {
+  if (!button) return;
+  button.disabled = isBusy;
+  button.style.opacity = isBusy ? (options.busyOpacity ?? '0.6') : (options.idleOpacity ?? '1');
+  if (isBusy && options.busyText) button.textContent = options.busyText;
+  if (!isBusy && options.idleText) button.textContent = options.idleText;
+}
+
+function setIconSpinnerState(icon: HTMLElement | null, isSpinning: boolean, idleText = '⚡'): void {
+  if (!icon) return;
+  if (isSpinning) {
+    icon.textContent = '⟳';
+    icon.style.display = 'inline-block';
+    icon.style.animation = 'spin 1s linear infinite';
+    return;
+  }
+  icon.style.animation = '';
+  icon.textContent = idleText;
 }
 
 // ── DEMO DATA ──────────────────────────────────────────────────────────────
@@ -3267,23 +3916,58 @@ const DEMO_DATA = {
     { name: "Ion Cutelaba",        line_fp: 66.5,  line_ss: 46.5, line_td: 0.5,  opponent: "Oumar Sy" },
     { name: "Vitor Petrino",       line_fp: 77.5,  line_ss: 37.5, line_td: 0.5,  opponent: "Steven Asplund" },
   ], capturedAt: Date.now() },
-  betr: null as any,
-  prizepicks: null as any,
-};
+  betr: null,
+  prizepicks: null,
+} satisfies AnalyzerDataPayload;
+
+interface RuntimeLineDropItem {
+  platform?: string;
+  type?: string;
+  count?: number;
+  fighter?: string;
+  from?: number;
+  to?: number;
+  delta?: number;
+}
+
+interface RuntimeAnalyzerMessage {
+  type?: 'LINES_DROPPED' | 'LINES_UPDATED' | string;
+  drops?: RuntimeLineDropItem[];
+  platform?: string;
+  count?: number;
+  event?: string;
+  udCount?: number;
+  p6Count?: number;
+}
+
+function toWatchPlatform(value: string | undefined): WatchPlatform {
+  const normalized = String(value || 'underdog').toLowerCase();
+  if (normalized.includes('pick6')) return 'pick6';
+  if (normalized.includes('betr')) return 'betr';
+  if (normalized.includes('prize')) return 'prizepicks';
+  return 'underdog';
+}
+
+function toWatchedStat(value: string | undefined): WatchedStatType {
+  const normalized = String(value || 'fp').toLowerCase();
+  if (normalized.includes('ss')) return 'ss';
+  if (normalized.includes('td')) return 'td';
+  return 'fp';
+}
 
 // ── CHROME MESSAGE LISTENER ───────────────────────────────────────────────
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((msg: any) => {
+  chrome.runtime.onMessage.addListener((msg: RuntimeAnalyzerMessage) => {
     if (msg.type === 'LINES_DROPPED') {
       showLineDropAlert(msg);
       setWatcherVisualState('detected', 'Line Alert');
       const ts = Date.now();
-      const converted: LineMovementEvent[] = (msg.drops || []).map((d: any, i: number) => ({
+      const converted: LineMovementEvent[] = (msg.drops || []).map((d, i: number) => ({
         id: `bg-${ts}-${i}`,
         timestamp: ts,
         fighter: d.fighter || 'Multiple fighters',
-        platform: String(d.platform || 'underdog').toLowerCase().includes('pick6') ? 'pick6' : String(d.platform || 'underdog').toLowerCase().includes('betr') ? 'betr' : String(d.platform || 'underdog').toLowerCase().includes('prize') ? 'prizepicks' : 'underdog',
-        stat: String(d.type || 'fp').toLowerCase().includes('ss') ? 'ss' : String(d.type || 'fp').toLowerCase().includes('td') ? 'td' : 'fp',
+        platform: toWatchPlatform(d.platform),
+        stat: toWatchedStat(d.type),
         from: Number(d.from ?? 0),
         to: Number(d.to ?? 0),
         delta: Number(d.delta ?? -1),
@@ -3293,22 +3977,22 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         recentLineMoves = [...converted, ...recentLineMoves].slice(0, 120);
         renderLineMoveFeed();
       }
-      setTimeout(() => loadData(), 1500);
+      requestDataReload(1500);
     }
     if (msg.type === 'LINES_UPDATED') {
       console.log('[UFC Analyzer] Lines updated:', msg.platform, msg.count);
-      loadData();
+      requestDataReload();
     }
   });
 }
 
-function showLineDropAlert(msg: any): void {
+function showLineDropAlert(msg: RuntimeAnalyzerMessage): void {
   const banner = document.getElementById('lineDropBanner');
   const txt    = document.getElementById('lineDropText');
   if (!banner) return;
   const event = msg.event || 'Upcoming UFC Event';
   const dropSummary = (msg.drops || [])
-    .map((d: any) => `${d.platform} ${d.type} (${d.count} fighters)`)
+    .map((d) => `${d.platform} ${d.type} (${d.count} fighters)`)
     .join(' · ') || `${msg.udCount || 0} fighters on Underdog`;
   if (txt) txt.innerHTML = `🔔 <strong>LINES DROPPED!</strong> &nbsp;${event} — ${dropSummary}. Auto-loading now...`;
   banner.style.display = 'flex';
@@ -3316,8 +4000,29 @@ function showLineDropAlert(msg: any): void {
   setTimeout(() => { banner.style.display = 'none'; }, 25000);
 }
 
+function parseEventDateMs(raw: string): number {
+  if (!raw) return NaN;
+  const direct = new Date(raw).getTime();
+  if (Number.isFinite(direct)) return direct;
+  const fallback = new Date(`${raw} UTC`).getTime();
+  return Number.isFinite(fallback) ? fallback : NaN;
+}
+
 // ── LINE WATCHER SERVICE ──────────────────────────────────────────────────
-let watcherUIInterval: ReturnType<typeof setInterval>|null = null;
+
+interface WatcherStatusElements {
+  statusEl: HTMLElement | null;
+  pollBadge: HTMLElement | null;
+  lastBadge: HTMLElement | null;
+}
+
+function getWatcherStatusElements(): WatcherStatusElements {
+  return {
+    statusEl: document.getElementById('watcherStatus'),
+    pollBadge: document.getElementById('watcherPollBadge'),
+    lastBadge: document.getElementById('watcherLastBadge'),
+  };
+}
 
 type WatcherVisualState = 'idle'|'watching'|'detected'|'error';
 
@@ -3337,14 +4042,6 @@ function setWatcherVisualState(state: WatcherVisualState, text?: string): void {
   if (txt) {
     txt.textContent = text || (state === 'watching' ? 'Watching' : state === 'detected' ? 'Line Alert' : state === 'error' ? 'Watch Error' : 'Watch Lines');
   }
-}
-
-function getLineHistorySparkline(fighter: string): string {
-  const points = recentLineMoves.filter(e => e.fighter.toLowerCase() === fighter.toLowerCase()).slice(0, 8).reverse();
-  if (!points.length) return '';
-  const chars = points.map(p => p.direction === 'drop' ? '▁' : '▔').join('');
-  const last = points[points.length - 1];
-  return `${chars} ${last.platform.toUpperCase()} ${last.stat.toUpperCase()} ${last.to.toFixed(1)}`;
 }
 
 function renderLineMoveFeed(): void {
@@ -3378,6 +4075,7 @@ class LineDropService {
   };
   private snapshot = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private currentPollMinutes: number | null = null;
   private isPaused = false;
   private lastPollAt: number | null = null;
   private stealthAccumulator = new Map<string, { cumulative: number; lastTs: number }>();
@@ -3427,15 +4125,14 @@ class LineDropService {
 
   private async loadSettings(): Promise<void> {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
-    const data: any = await new Promise((resolve) => chrome.storage.local.get([this.settingsKey], resolve));
+    const data = await storageGet<Record<string, Partial<LineWatchSettings> | undefined>>([this.settingsKey]);
     const saved = data?.[this.settingsKey] as Partial<LineWatchSettings> | undefined;
     if (saved) this.settings = { ...this.settings, ...saved };
     this.syncSettingsToUI();
   }
 
   private async saveSettings(): Promise<void> {
-    if (typeof chrome === 'undefined' || !chrome.storage) return;
-    await new Promise<void>((resolve) => chrome.storage.local.set({ [this.settingsKey]: this.settings }, () => resolve()));
+    await storageSet({ [this.settingsKey]: this.settings });
   }
 
   private bindVisibilityHandlers(): void {
@@ -3463,12 +4160,6 @@ class LineDropService {
       showToast('Watch settings updated');
     });
     document.getElementById('watcherManualPollBtn')?.addEventListener('click', () => this.manualPoll());
-    document.getElementById('lineHistoryToggle')?.addEventListener('click', () => {
-      showLineHistory = !showLineHistory;
-      const btn = document.getElementById('lineHistoryToggle');
-      if (btn) btn.classList.toggle('active', showLineHistory);
-      renderFighters();
-    });
   }
 
   private syncSettingsToUI(): void {
@@ -3528,15 +4219,24 @@ class LineDropService {
     if (this.timer) clearInterval(this.timer);
     if (!this.settings.enabled) return;
     const mins = this.smartPollMinutes();
+    this.currentPollMinutes = mins;
     this.timer = setInterval(() => {
       if (!this.settings.enabled || this.isPaused) return;
       this.pollNow(false).catch(() => null);
     }, mins * 60000);
   }
 
+  private refreshTimerIfNeeded(): void {
+    if (!this.settings.enabled) return;
+    const nextMins = this.smartPollMinutes();
+    if (this.currentPollMinutes === nextMins) return;
+    this.scheduleTimer();
+    this.updateStatusUI();
+  }
+
   private smartPollMinutes(): number {
     const eventDateText = document.getElementById('eventDate')?.textContent || '';
-    const eventMs = eventDateText ? new Date(`${eventDateText} 2026`).getTime() : NaN;
+    const eventMs = parseEventDateMs(eventDateText);
     const days = Number.isFinite(eventMs) ? ((eventMs - Date.now()) / 86400000) : 5;
     if (days <= 0.5) return 3;
     if (days <= 1.5) return 5;
@@ -3547,7 +4247,7 @@ class LineDropService {
 
   private async getSnapshotPoints(): Promise<WatcherSnapshotPoint[]> {
     if (typeof chrome === 'undefined' || !chrome.storage) return [];
-    const storage: any = await new Promise((resolve) => chrome.storage.local.get(['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks'], resolve));
+    const storage = await storageGet<Record<string, PlatformLinesPayload | null>>([...STORAGE_LINE_KEYS]);
     const platformMap: Array<{ platform: WatchPlatform; key: string }> = [
       { platform: 'pick6', key: 'lines_pick6' },
       { platform: 'underdog', key: 'lines_underdog' },
@@ -3558,11 +4258,11 @@ class LineDropService {
     platformMap.forEach(({ platform, key }) => {
       if (!this.settings.watchPlatforms.includes(platform)) return;
       const fighters = storage?.[key]?.fighters || [];
-      fighters.forEach((f: any) => {
+      fighters.forEach((f) => {
         const name = String(f.name || '').trim();
         if (!name) return;
         if (this.settings.fighterAllowList.length && !this.settings.fighterAllowList.some(n => name.toLowerCase().includes(n.toLowerCase()))) return;
-        const pushPoint = (stat: WatchedStatType, value: any): void => {
+        const pushPoint = (stat: WatchedStatType, value: unknown): void => {
           if (!this.settings.watchStats.includes(stat)) return;
           if (value == null || value === '') return;
           const num = Number(value);
@@ -3665,7 +4365,9 @@ class LineDropService {
 
   private playAlertSound(): void {
     try {
-      const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) return;
+      const ac = new AudioContextCtor();
       const osc = ac.createOscillator();
       const gain = ac.createGain();
       osc.type = 'triangle';
@@ -3681,9 +4383,7 @@ class LineDropService {
   }
 
   private updateStatusUI(override?: string): void {
-    const statusEl = document.getElementById('watcherStatus');
-    const pollBadge = document.getElementById('watcherPollBadge');
-    const lastBadge = document.getElementById('watcherLastBadge');
+    const { statusEl, pollBadge, lastBadge } = getWatcherStatusElements();
     if (!statusEl || !pollBadge || !lastBadge) return;
     if (!this.settings.enabled) {
       statusEl.textContent = 'Idle · set filters, threshold, and direction then start watch';
@@ -3710,11 +4410,12 @@ class LineDropService {
       const points = await this.getSnapshotPoints();
       const events = this.detectEvents(points);
       this.lastPollAt = Date.now();
+      this.refreshTimerIfNeeded();
       this.updateStatusUI();
       if (events.length) this.emitAlert(events);
       else if (!initial) setWatcherVisualState('watching', 'Watching');
       if (!initial && typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage({ type: 'MANUAL_POLL_NOW' }, () => {});
+        void runtimeSendMessage({ type: 'MANUAL_POLL_NOW' });
       }
     } catch (e) {
       console.error('[LineDropService] Poll error', e);
@@ -3725,11 +4426,6 @@ class LineDropService {
 }
 
 const lineDropService = new LineDropService();
-
-function updateWatcherUI(): void {
-  // Legacy hook retained for compatibility with existing startup flow
-  // Service handles state rendering internally.
-}
 
 function toggleWatcher(): void {
   lineDropService.toggle().catch((e) => {
@@ -3745,28 +4441,38 @@ async function triggerAutoScrape(): Promise<void> {
   }
   const btn  = document.getElementById('autoScrapeBtn') as HTMLButtonElement|null;
   const icon = document.getElementById('autoScrapeIcon');
-  if (btn)  { btn.disabled = true; btn.style.opacity = '0.6'; }
-  if (icon) { icon.textContent = '⟳'; icon.style.display = 'inline-block'; icon.style.animation = 'spin 1s linear infinite'; }
-  showToast('⚡ Opening Pick6 + Underdog tabs to fetch live lines...');
-  chrome.runtime.sendMessage({ type: 'AUTO_SCRAPE_LINES' }, (result: any) => {
-    if (icon) { icon.style.animation = ''; icon.textContent = '⚡'; }
-    if (btn)  { btn.disabled = false; btn.style.opacity = '1'; }
-    if (result?.status === 'done') {
-      const totals = Object.values(result.results || {}).reduce((s: number, n: any) => s + n, 0);
-      showToast(`✓ Fetched lines from ${Object.keys(result.results || {}).length} platforms — ${totals} fighters loaded`);
-      loadData();
-    } else if (result?.status === 'already_running') {
-      showToast('Auto-scrape already in progress...');
-    } else {
-      showToast('Auto-scrape complete — click Refresh to load'); loadData();
-    }
-  });
+  setButtonBusyState(btn, true);
+  setIconSpinnerState(icon, true);
+  showToast('⚡ Fast auto-fetch: Underdog API first, tabs only if needed...');
+  type AutoScrapeResponse = { status?: 'done' | 'already_running' | string; results?: Record<string, number> };
+  let result: AutoScrapeResponse | null = null;
+  try {
+    result = await runtimeSendMessage<AutoScrapeResponse>({ type: 'AUTO_SCRAPE_LINES' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected auto-scrape error';
+    showToast(`Auto-scrape failed: ${message}`);
+    return;
+  } finally {
+    setIconSpinnerState(icon, false);
+    setButtonBusyState(btn, false);
+  }
+  if (result?.status === 'done') {
+    const totals = Object.values(result.results || {}).reduce((s: number, n) => s + n, 0);
+    showToast(`✓ Fetched lines from ${Object.keys(result.results || {}).length} platforms — ${totals} fighters loaded`);
+    requestDataReload();
+  } else if (result?.status === 'already_running') {
+    showToast('Auto-scrape already in progress...');
+  } else {
+    showToast('Auto-scrape complete — click Refresh to load');
+    requestDataReload();
+  }
 }
 
 // ── EVENT BANNER ──────────────────────────────────────────────────────────
 function formatCountdown(eventDate: string): string {
   const now = Date.now();
-  const target = new Date(eventDate + ' 2026').getTime();
+  const target = parseEventDateMs(eventDate);
+  if (!Number.isFinite(target)) return 'Date unavailable';
   const diff = target - now;
   if (diff <= 0) return 'LIVE NOW 🔴';
   const days  = Math.floor(diff / 86400000);
@@ -3786,33 +4492,67 @@ async function loadEventBanner(): Promise<void> {
   if (banner) banner.style.display = 'flex';
   if (nameEl) nameEl.textContent = 'Detecting next UFC event...';
 
-  chrome.runtime.sendMessage({ type: 'GET_UPCOMING_CARD' }, (resp: any) => {
-    const card = resp?.card;
-    if (!card) { if (banner) banner.style.display = 'none'; return; }
-    if (nameEl) nameEl.textContent = card.event || 'Upcoming UFC Event';
-    if (dateEl) dateEl.textContent = card.date || '';
-    if (cntEl)  cntEl.textContent  = formatCountdown(card.date);
-    setInterval(() => { if (cntEl) cntEl.textContent = formatCountdown(card.date); }, 60000);
-    if (card.fighters?.length && allFighters.length === 0) {
-      debugLog(`Detected card: ${card.event} — ${card.fighters.length} fights`);
-      const detected: AnalyzerFighter[] = [];
-      card.fighters.forEach(({ f1, f2 }: any) => {
-        const emptyLean: LeanResult = { lean: 'none', conf: 0, reasons: [], verdict: '' };
-        detected.push({ name: f1, line_fp: null, line_ss: null, line_td: null, opponent: f2, db: { loaded: false } as FighterDB, lean: emptyLean } as any);
-        detected.push({ name: f2, line_fp: null, line_ss: null, line_td: null, opponent: f1, db: { loaded: false } as FighterDB, lean: emptyLean } as any);
-      });
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.get(['lines_pick6', 'lines_underdog'], (result: any) => {
-          const hasRealData = (result['lines_pick6']?.fighters?.length || 0) + (result['lines_underdog']?.fighters?.length || 0) > 0;
-          if (!hasRealData) {
-            showToast(`📅 Detected ${card.event} — ${card.fighters.length} fights found. Click ⚡ AUTO-FETCH LINES to get odds.`);
-            allFighters = detected;
-            renderFighters();
-          }
-        });
-      }
+  type UpcomingCardFighter = { f1: string; f2: string };
+  type UpcomingCard = { event?: string; date?: string; fighters?: UpcomingCardFighter[]; fetchedAt?: number; url?: string };
+  type UpcomingCardResponse = { card?: UpcomingCard | null };
+  const isUsableCard = (card: UpcomingCard | null | undefined): card is UpcomingCard => {
+    if (!card || !card.date) return false;
+    const ts = parseEventDateMs(card.date);
+    if (!Number.isFinite(ts)) return false;
+    // Ignore stale old events to prevent wrong opponent mapping.
+    return ts >= Date.now() - 24 * 60 * 60 * 1000;
+  };
+  const resp = await runtimeSendMessage<UpcomingCardResponse>({ type: 'GET_UPCOMING_CARD' });
+  const cached = await storageGet<Record<string, UpcomingCard | null>>(['upcoming_ufc_card']);
+  const runtimeCard = isUsableCard(resp?.card) ? resp!.card! : null;
+  const cachedCard = isUsableCard(cached['upcoming_ufc_card']) ? cached['upcoming_ufc_card'] : null;
+  const card = runtimeCard || cachedCard || null;
+  if (!card) {
+    upcomingCardPairs = [];
+    if (banner) banner.style.display = 'none';
+    await storageRemove(['upcoming_ufc_card']);
+    debugLog('Upcoming card ignored: stale/invalid date in runtime+cache');
+    return;
+  }
+
+  upcomingCardPairs = (card.fighters || [])
+    .map((fight) => {
+      const f1 = normalizeName(fight.f1);
+      const f2 = normalizeName(fight.f2);
+      if (!f1 || !f2 || f1 === f2) return null;
+      return { f1, f2 };
+    })
+    .filter((p): p is { f1: string; f2: string } => p != null);
+  debugLog(`Upcoming card pairs loaded: ${upcomingCardPairs.length} (runtime=${resp?.card ? 'yes' : 'no'} cached=${cached['upcoming_ufc_card'] ? 'yes' : 'no'})`);
+
+  const cardDate = card.date || '';
+
+  if (nameEl) nameEl.textContent = card.event || 'Upcoming UFC Event';
+  upcomingEventName = buildEventDisplayName(card.event || '', card.fighters);
+  if (dateEl) dateEl.textContent = cardDate;
+  if (cntEl) cntEl.textContent = formatCountdown(cardDate);
+
+  if (eventCountdownTimer) clearInterval(eventCountdownTimer);
+  eventCountdownTimer = setInterval(() => {
+    if (cntEl) cntEl.textContent = formatCountdown(cardDate);
+  }, 60000);
+
+  if (card.fighters?.length && allFighters.length === 0) {
+    debugLog(`Detected card: ${card.event} — ${card.fighters.length} fights`);
+    const detected: AnalyzerFighter[] = [];
+    card.fighters.forEach(({ f1, f2 }) => {
+      detected.push(createPlaceholderAnalyzerFighter(f1, f2));
+      detected.push(createPlaceholderAnalyzerFighter(f2, f1));
+    });
+
+    const result = await storageGet<Record<string, PlatformLinesPayload | null>>([...STORAGE_CORE_LINE_KEYS]);
+    const hasRealData = (result['lines_pick6']?.fighters?.length || 0) + (result['lines_underdog']?.fighters?.length || 0) > 0;
+    if (!hasRealData) {
+      showToast(`📅 Detected ${card.event} — ${card.fighters.length} fights found. Click ⚡ AUTO-FETCH LINES to get odds.`);
+      allFighters = detected;
+      renderFighters();
     }
-  });
+  }
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
@@ -3835,21 +4575,6 @@ function applyDensityMode(): void {
     btn.classList.toggle('active', compact);
   }
 }
-
-document.querySelectorAll('[data-platform]').forEach(btn => {
-  btn.addEventListener('click', () => setActivePlatform((btn as HTMLElement).dataset['platform'] || 'pick6'));
-});
-setActivePlatform('pick6');
-
-document.getElementById('refreshBtn')?.addEventListener('click', loadData);
-document.getElementById('autoScrapeBtn')?.addEventListener('click', triggerAutoScrape);
-document.getElementById('watcherToggleBtn')?.addEventListener('click', toggleWatcher);
-document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
-document.getElementById('densityToggleBtn')?.addEventListener('click', () => {
-  currentDensity = currentDensity === 'compact' ? 'detailed' : 'compact';
-  applyDensityMode();
-});
-applyDensityMode();
 
 function exportToCSV(): void {
   const fighters = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
@@ -3961,134 +4686,214 @@ function runWalkForwardDiagnostics(): void {
   });
 }
 
-const emptyAutoFetch = document.getElementById('emptyStateAutoFetchBtn');
-if (emptyAutoFetch) emptyAutoFetch.addEventListener('click', triggerAutoScrape);
-const lineDropLoad = document.getElementById('lineDropLoadBtn');
-if (lineDropLoad) lineDropLoad.addEventListener('click', triggerAutoScrape);
-const lineDropDismiss = document.getElementById('lineDropDismissBtn');
-if (lineDropDismiss) lineDropDismiss.addEventListener('click', () => {
-  const banner = document.getElementById('lineDropBanner');
-  if (banner) banner.style.display = 'none';
-});
+function setExclusiveActive(selector: string, activeEl: Element): void {
+  document.querySelectorAll(selector).forEach((el) => el.classList.remove('active'));
+  activeEl.classList.add('active');
+}
 
-loadEventBanner();
-lineDropService.init().catch((e) => {
-  console.error('[LineDropService] init failed', e);
-  setWatcherVisualState('error', 'Watch Error');
-});
+function bindExclusiveButtons(selector: string, onActivate: (el: HTMLElement) => void): void {
+  document.querySelectorAll(selector).forEach((el) => {
+    el.addEventListener('click', () => {
+      setExclusiveActive(selector, el);
+      onActivate(el as HTMLElement);
+    });
+  });
+}
 
-document.querySelectorAll('.tab-btn[data-view]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const view = (btn as HTMLElement).dataset['view'] || 'all';
-    currentView = view;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+// ── UI INIT ───────────────────────────────────────────────────────────────
+function initAnalyzerCore(): void {
+  // Platform switcher
+  document.querySelectorAll('[data-platform]').forEach(btn => {
+    btn.addEventListener('click', () => setActivePlatform((btn as HTMLElement).dataset['platform'] || 'pick6'));
+  });
+  setActivePlatform('pick6');
+
+  // Top-bar buttons
+  document.getElementById('refreshBtn')?.addEventListener('click', loadData);
+  document.getElementById('autoScrapeBtn')?.addEventListener('click', triggerAutoScrape);
+  document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
+  document.getElementById('densityToggleBtn')?.addEventListener('click', () => {
+    currentDensity = currentDensity === 'compact' ? 'detailed' : 'compact';
+    applyDensityMode();
+  });
+  applyDensityMode();
+
+  // Line drop / empty-state buttons
+  document.getElementById('emptyStateAutoFetchBtn')?.addEventListener('click', triggerAutoScrape);
+
+  // Watcher and event banner removed by request; ensure any prior background watcher is stopped.
+  void runtimeSendMessage({ type: 'STOP_LINE_WATCHER' });
+
+  // View tabs
+  bindExclusiveButtons('.tab-btn[data-view]', (btn) => {
+    currentView = btn.dataset['view'] || 'all';
     renderFighters();
   });
-});
 
-document.getElementById('debugToggleBtn')?.addEventListener('click', () => {
-  const wrap = document.getElementById('debugPanelWrap');
-  if (!wrap) return;
-  const visible = !wrap.classList.contains('debug-panel-hidden');
-  wrap.classList.toggle('debug-panel-hidden', visible);
-  const tb = document.getElementById('debugToggleBtn');
-  if (tb) tb.textContent = visible ? '⚡ DEBUG' : '✕ DEBUG';
-});
+  // Debug panel toggle
+  document.getElementById('debugToggleBtn')?.addEventListener('click', () => {
+    const wrap = document.getElementById('debugPanelWrap');
+    if (!wrap) return;
+    const visible = !wrap.classList.contains('debug-panel-hidden');
+    wrap.classList.toggle('debug-panel-hidden', visible);
+    const tb = document.getElementById('debugToggleBtn');
+    if (tb) tb.textContent = visible ? '⚡ DEBUG' : '✕ DEBUG';
+  });
 
-document.getElementById('cardContainer')?.addEventListener('click', (e) => {
-  const main = (e.target as HTMLElement).closest('.fighter-main');
-  if (main) toggleRow((main.closest('.fighter-row') as HTMLElement));
-});
+  // Card row expand/collapse
+  document.getElementById('cardContainer')?.addEventListener('click', (e) => {
+    const main = (e.target as HTMLElement).closest('.fighter-main');
+    if (main) toggleRow((main.closest('.fighter-row') as HTMLElement));
+  });
 
-document.getElementById('fighterSearch')?.addEventListener('input', (e) => {
-  currentSearch = (e.target as HTMLInputElement).value || '';
-  renderFighters();
-});
-
-document.querySelectorAll('.sort-btn[data-sort]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentSort = (btn as HTMLElement).dataset['sort'] || 'default';
-    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  // Search
+  document.getElementById('fighterSearch')?.addEventListener('input', (e) => {
+    currentSearch = (e.target as HTMLInputElement).value || '';
     renderFighters();
   });
-});
 
-loadData();
-setInterval(loadData, 60000);
+  // Sort
+  bindExclusiveButtons('.sort-btn[data-sort]', (btn) => {
+    currentSort = btn.dataset['sort'] || 'default';
+    renderFighters();
+  });
 
-document.getElementById('modalClose')?.addEventListener('click', () => {
-  document.getElementById('fighterModal')?.classList.remove('open');
-});
-document.getElementById('fighterModal')?.addEventListener('click', (e) => {
-  if (e.target === document.getElementById('fighterModal'))
+  // Initial data load
+  requestDataReload();
+  startPeriodicDataReload(60000);
+
+  // Fighter modal
+  document.getElementById('modalClose')?.addEventListener('click', () => {
     document.getElementById('fighterModal')?.classList.remove('open');
-});
-document.querySelectorAll('.modal-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById((tab as HTMLElement).dataset['panel'] || '')?.classList.add('active');
   });
-});
+  document.getElementById('fighterModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('fighterModal'))
+      document.getElementById('fighterModal')?.classList.remove('open');
+  });
+  bindExclusiveButtons('.modal-tab', (tab) => {
+    document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(tab.dataset['panel'] || '')?.classList.add('active');
+  });
+}
+
+initAnalyzerCore();
 
 // ── DEBUG PANEL BUTTONS ───────────────────────────────────────────────────
+interface DebugCardSample {
+  text?: string;
+  aria?: string;
+}
+
+interface DebugCardEntry {
+  samples?: DebugCardSample[];
+  capturedAt?: number;
+}
+
+interface CachedHtmlFight {
+  opponent?: string;
+  kd?: number | null;
+  sigStr?: number | null;
+  totStr?: number | null;
+  td?: number | null;
+  ctrlSecs?: number | null;
+  round?: number | null;
+  method?: string;
+}
+
+interface CachedHtmlResponse {
+  error?: string;
+  html?: string;
+  detailUrl?: string;
+  fightHistory?: CachedHtmlFight[];
+}
+
+interface ClaudeApiResponse {
+  error?: string;
+  data?: {
+    content?: Array<{ text?: string }>;
+  };
+}
+
+interface OCRFighterRow {
+  name?: string;
+  fp?: number | null;
+  ss?: number | null;
+}
+
+function getDebugPanelEl(): HTMLElement | null {
+  return document.getElementById('debugPanel');
+}
+
+function setDebugPanelText(text: string): HTMLElement | null {
+  const panel = getDebugPanelEl();
+  if (!panel) return null;
+  panel.textContent = text;
+  return panel;
+}
+
+function appendDebugPanelText(panel: HTMLElement, text: string): void {
+  panel.textContent += text;
+}
+
+function scrollDebugPanelToBottom(panel: HTMLElement): void {
+  panel.scrollTop = panel.scrollHeight;
+}
+
 document.getElementById('dbgTestBtn')?.addEventListener('click', async () => {
-  const panel = document.getElementById('debugPanel');
+  const panel = setDebugPanelText('Reading stored card debug + live lines data...\n');
   if (!panel) return;
-  panel.textContent = 'Reading stored card debug + live lines data...\n';
-  const all: Record<string, any> = await new Promise(r => chrome.storage.local.get(null, r));
+  const all = await storageGet<Record<string, unknown>>([]);
   for (const platform of ['pick6', 'underdog']) {
     const key = `lines_${platform}`;
-    if (!all[key]) { panel.textContent += `${platform}: no lines captured\n`; continue; }
-    panel.textContent += `\n=== ${platform} captured fighters (${all[key].fighters?.length}) ===\n`;
-    (all[key].fighters || []).slice(0, 5).forEach((f: any) => {
-      panel.textContent += `  ${f.name}: fp=${f.line_fp ?? f.line} ss=${f.line_ss} td=${f.line_td}\n`;
+    const lineData = all[key] as PlatformLinesPayload | undefined;
+    if (!lineData) { appendDebugPanelText(panel, `${platform}: no lines captured\n`); continue; }
+    appendDebugPanelText(panel, `\n=== ${platform} captured fighters (${lineData.fighters?.length}) ===\n`);
+    (lineData.fighters || []).slice(0, 5).forEach((f) => {
+      appendDebugPanelText(panel, `  ${f.name}: fp=${f.line_fp ?? f.line} ss=${f.line_ss} td=${f.line_td}\n`);
     });
   }
-  for (const platform of ['pick6', 'underdog', 'sportsbook']) {
+  for (const platform of STORAGE_LINE_DEBUG_KEYS) {
     const key = `debug_card_${platform}`;
-    if (!all[key]) { panel.textContent += `\n${platform}: no card debug — visit the page\n`; continue; }
-    panel.textContent += `\n=== ${platform} card text samples ===\n`;
-    (all[key].samples || []).forEach((s: any, i: number) => { panel.textContent += `[${i}] ${s.text?.slice(0,800)}\n`; });
+    const debugEntry = all[key] as DebugCardEntry | undefined;
+    if (!debugEntry) { appendDebugPanelText(panel, `\n${platform}: no card debug — visit the page\n`); continue; }
+    appendDebugPanelText(panel, `\n=== ${platform} card text samples ===\n`);
+    (debugEntry.samples || []).forEach((s, i: number) => { appendDebugPanelText(panel, `[${i}] ${s.text?.slice(0,800)}\n`); });
   }
-  panel.scrollTop = panel.scrollHeight;
+  scrollDebugPanelToBottom(panel);
 });
 
 document.getElementById('dbgDumpBtn')?.addEventListener('click', async () => {
-  const panel = document.getElementById('debugPanel');
+  const panel = setDebugPanelText('Trying UFC Stats URLs with browser headers...\n');
   if (!panel) return;
-  panel.textContent = 'Trying UFC Stats URLs with browser headers...\n';
   const headers = { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5', 'Cache-Control': 'no-cache' };
   const urls = ['http://www.ufcstats.com/fighter-details/0bc62e3c498b5011', 'http://ufcstats.com/fighter-details/0bc62e3c498b5011'];
   for (const url of urls) {
     try {
-      panel.textContent += `GET ${url}\n`;
+      appendDebugPanelText(panel, `GET ${url}\n`);
       const res = await fetch(url, { headers, redirect: 'follow' as RequestRedirect, mode: 'cors' as RequestMode });
       const text = await res.text();
-      panel.textContent += `Status: ${res.status} | Bytes: ${text.length} | Final URL: ${res.url}\n`;
-      panel.textContent += `First 300 chars:\n${JSON.stringify(text.slice(0, 300))}\n\n`;
+      appendDebugPanelText(panel, `Status: ${res.status} | Bytes: ${text.length} | Final URL: ${res.url}\n`);
+      appendDebugPanelText(panel, `First 300 chars:\n${JSON.stringify(text.slice(0, 300))}\n\n`);
       if (text.length < 1000) continue;
       const trCount = (text.match(/<tr/gi)||[]).length;
-      panel.textContent += `<tr> tags: ${trCount}\n`;
-      ['b-fight-details__table-body','fighter-details','b-fight-details'].forEach(m => { panel.textContent += `  "${m}": ${text.includes(m)}\n`; });
+      appendDebugPanelText(panel, `<tr> tags: ${trCount}\n`);
+      ['b-fight-details__table-body','fighter-details','b-fight-details'].forEach(m => { appendDebugPanelText(panel, `  "${m}": ${text.includes(m)}\n`); });
       const rows = [...text.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
       const dataRow = rows.find(r => r[1].includes('fighter-details') && r[1].includes('<td'));
-      if (!dataRow) { panel.textContent += 'No data row with fighter-details link found\n'; continue; }
+      if (!dataRow) { appendDebugPanelText(panel, 'No data row with fighter-details link found\n'); continue; }
       const tds = [...dataRow[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
-      panel.textContent += `\nDATA ROW — ${tds.length} tds:\n`;
+      appendDebugPanelText(panel, `\nDATA ROW — ${tds.length} tds:\n`);
       tds.forEach((td, i) => {
         const ps = [...td[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => p[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim());
-        if (ps.length > 0) { panel.textContent += `  td[${i}]: "${ps[0]?.slice(0,45)}" | "${(ps[1]||'').slice(0,45)}"\n`; }
-        else { panel.textContent += `  td[${i}]: "${td[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,60)}"\n`; }
+        if (ps.length > 0) { appendDebugPanelText(panel, `  td[${i}]: "${ps[0]?.slice(0,45)}" | "${(ps[1]||'').slice(0,45)}"\n`); }
+        else { appendDebugPanelText(panel, `  td[${i}]: "${td[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,60)}"\n`); }
       });
-      panel.textContent += `\nRAW (first 1000 chars):\n${dataRow[1].slice(0,1000)}`;
-      panel.scrollTop = panel.scrollHeight; return;
-    } catch(e: unknown) { panel.textContent += `EXCEPTION: ${(e as Error).name}: ${(e as Error).message}\n\n`; }
+      appendDebugPanelText(panel, `\nRAW (first 1000 chars):\n${dataRow[1].slice(0,1000)}`);
+      scrollDebugPanelToBottom(panel);
+      return;
+    } catch(e: unknown) { appendDebugPanelText(panel, `EXCEPTION: ${(e as Error).name}: ${(e as Error).message}\n\n`); }
   }
-  panel.textContent += '\nAll URLs failed — UFC Stats may be blocking cross-origin requests.\n';
+  appendDebugPanelText(panel, '\nAll URLs failed — UFC Stats may be blocking cross-origin requests.\n');
 });
 
 document.getElementById('dbgCopyBtn')?.addEventListener('click', () => {
@@ -4102,44 +4907,43 @@ document.getElementById('dbgCopyBtn')?.addEventListener('click', () => {
 
 document.getElementById('dbgClearBtn')?.addEventListener('click', async () => {
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    const all: Record<string, any> = await new Promise(r => chrome.storage.local.get(null, r));
+    const all = await storageGet<Record<string, unknown>>([]);
     const keys = Object.keys(all).filter(k => k.startsWith('ufcstats_'));
-    await new Promise<void>(r => chrome.storage.local.remove(keys, r));
+    keys.push('upcoming_ufc_card');
+    await storageRemove(keys);
     const panel = document.getElementById('debugPanel');
     if (panel) panel.textContent = `Cleared ${keys.length} cached entries. Reloading...`;
     setTimeout(() => location.reload(), 800);
   }
 });
 
-document.getElementById('dbgBgDumpBtn')?.addEventListener('click', () => {
-  const panel = document.getElementById('debugPanel');
+document.getElementById('dbgBgDumpBtn')?.addEventListener('click', async () => {
+  const panel = setDebugPanelText('Reading Max Holloway from cache (must be loaded in analyzer first)...\n');
   if (!panel) return;
-  panel.textContent = 'Reading Max Holloway from cache (must be loaded in analyzer first)...\n';
-  chrome.runtime.sendMessage({ type: 'GET_CACHED_HTML', name: 'Max Holloway' }, (resp: any) => {
-    if (!resp || resp.error) {
-      panel.textContent += `${resp?.error}\n`;
-      panel.textContent += 'Scroll to Max Holloway in the analyzer to trigger a fetch, then try again.\n';
-      return;
-    }
-    panel.textContent += `Cache hit! HTML: ${resp.html?.length} chars | URL: ${resp.detailUrl}\n`;
-    panel.textContent += `\nParsed fights (${resp.fightHistory?.length}):\n`;
-    (resp.fightHistory||[]).forEach((f: any, i: number) => {
-      panel.textContent += `  [${i}] ${f.opponent} kd=${f.kd} sig=${f.sigStr} tot=${f.totStr} td=${f.td} ctrl=${f.ctrlSecs}s rnd=${f.round} method=${f.method}\n`;
-    });
-    panel.textContent += '\n--- RAW TD STRUCTURE ---\n';
-    const rows = [...(resp.html||'').matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
-    const dataRows = rows.filter((r: any) => !r[1].includes('<th') && (r[1].match(/<td/gi)||[]).length > 5);
-    panel.textContent += `Total rows: ${rows.length}, data rows: ${dataRows.length}\n`;
-    if (dataRows.length > 0) {
-      const row = dataRows[0][1];
-      const tds = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
-      tds.forEach((td: any, i: number) => {
-        const ps = [...td[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((p: any) => p[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim());
-        if (ps.length > 0) { panel.textContent += `td[${i}]: "${ps[0]?.slice(0,45)}" | "${(ps[1]||'').slice(0,45)}"\n`; }
-      });
-    }
-    panel.scrollTop = panel.scrollHeight;
+  const resp = await runtimeSendMessage<CachedHtmlResponse>({ type: 'GET_CACHED_HTML', name: 'Max Holloway' });
+  if (!resp || resp.error) {
+    appendDebugPanelText(panel, `${resp?.error}\n`);
+    appendDebugPanelText(panel, 'Scroll to Max Holloway in the analyzer to trigger a fetch, then try again.\n');
+    return;
+  }
+  appendDebugPanelText(panel, `Cache hit! HTML: ${resp.html?.length} chars | URL: ${resp.detailUrl}\n`);
+  appendDebugPanelText(panel, `\nParsed fights (${resp.fightHistory?.length}):\n`);
+  (resp.fightHistory||[]).forEach((f, i: number) => {
+    appendDebugPanelText(panel, `  [${i}] ${f.opponent} kd=${f.kd} sig=${f.sigStr} tot=${f.totStr} td=${f.td} ctrl=${f.ctrlSecs}s rnd=${f.round} method=${f.method}\n`);
   });
+  appendDebugPanelText(panel, '\n--- RAW TD STRUCTURE ---\n');
+  const rows = [...(resp.html||'').matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+  const dataRows = rows.filter((r) => !r[1].includes('<th') && (r[1].match(/<td/gi)||[]).length > 5);
+  appendDebugPanelText(panel, `Total rows: ${rows.length}, data rows: ${dataRows.length}\n`);
+  if (dataRows.length > 0) {
+    const row = dataRows[0][1];
+    const tds = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+    tds.forEach((td, i: number) => {
+      const ps = [...td[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((p) => p[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim());
+      if (ps.length > 0) { appendDebugPanelText(panel, `td[${i}]: "${ps[0]?.slice(0,45)}" | "${(ps[1]||'').slice(0,45)}"\n`); }
+    });
+  }
+  scrollDebugPanelToBottom(panel);
 });
 
 document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
@@ -4170,12 +4974,23 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
   closeBtn?.addEventListener('click', () => { if (modal) modal.classList.add('is-hidden'); });
   modal?.addEventListener('click', (e) => { if (e.target === modal && modal) modal.classList.add('is-hidden'); });
 
+  function setDropZoneHighlight(active: boolean): void {
+    if (!dropZone) return;
+    if (active) {
+      dropZone.style.borderColor = 'var(--orange)';
+      dropZone.style.background = 'rgba(255,122,43,0.08)';
+      return;
+    }
+    dropZone.style.borderColor = 'rgba(255,122,43,0.4)';
+    dropZone.style.background = 'rgba(255,122,43,0.04)';
+  }
+
   dropZone?.addEventListener('click', () => fileInput?.click());
-  dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); if (dropZone) { dropZone.style.borderColor = 'var(--orange)'; dropZone.style.background = 'rgba(255,122,43,0.08)'; } });
-  dropZone?.addEventListener('dragleave', () => { if (dropZone) { dropZone.style.borderColor = 'rgba(255,122,43,0.4)'; dropZone.style.background = 'rgba(255,122,43,0.04)'; } });
+  dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); setDropZoneHighlight(true); });
+  dropZone?.addEventListener('dragleave', () => { setDropZoneHighlight(false); });
   dropZone?.addEventListener('drop', (e: DragEvent) => {
     e.preventDefault();
-    if (dropZone) { dropZone.style.borderColor = 'rgba(255,122,43,0.4)'; dropZone.style.background = 'rgba(255,122,43,0.04)'; }
+    setDropZoneHighlight(false);
     if (e.dataTransfer) addFiles(Array.from(e.dataTransfer.files));
   });
   fileInput?.addEventListener('change', () => { if (fileInput.files) addFiles(Array.from(fileInput.files)); });
@@ -4202,7 +5017,12 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
       (wrap.querySelector('button') as HTMLButtonElement).addEventListener('click', () => { queuedImages.splice(i, 1); renderQueue(); });
       imageQueue.appendChild(wrap);
     });
-    if (analyzeBtn) { analyzeBtn.disabled = queuedImages.length === 0; analyzeBtn.style.opacity = queuedImages.length > 0 ? '1' : '0.4'; }
+    if (analyzeBtn) {
+      setButtonBusyState(analyzeBtn, queuedImages.length === 0, {
+        busyOpacity: '0.4',
+        idleOpacity: '1',
+      });
+    }
   }
 
   analyzeBtn?.addEventListener('click', async () => {
@@ -4210,8 +5030,8 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
     const apiKeyInput = document.getElementById('betrApiKey') as HTMLInputElement|null;
     const apiKey = apiKeyInput?.value?.trim();
     if (!apiKey) { if (analyzeStatus) analyzeStatus.textContent = '✗ Enter your Anthropic API key first'; return; }
-    if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ betr_api_key: apiKey });
-    if (analyzeBtn) { analyzeBtn.disabled = true; analyzeBtn.textContent = '⟳ Reading...'; }
+    if (typeof chrome !== 'undefined' && chrome.storage) await storageSet({ betr_api_key: apiKey });
+    setButtonBusyState(analyzeBtn, true, { busyText: '⟳ Reading...' });
     if (analyzeStatus) analyzeStatus.textContent = `Sending ${queuedImages.length} image(s) to AI...`;
     if (extracted) extracted.classList.add('is-hidden');
     try {
@@ -4223,16 +5043,13 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
         model: 'claude-sonnet-4-20250514', max_tokens: 1000,
         messages: [{ role: 'user', content: [...imageContent, { type: 'text', text: `These are screenshots from the Betr fantasy sports app showing UFC fighter prop lines. Extract every fighter's lines.\nReturn ONLY a JSON array: [{"name":"First Last","fp":number_or_null,"ss":number_or_null}]` }] }]
       };
-      const data: any = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'CLAUDE_API', payload, apiKey }, (resp: any) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else if (resp?.error) reject(new Error(resp.error));
-          else resolve(resp.data);
-        });
-      });
-      const text = data.content?.map((c: any) => c.text || '').join('');
-      let fighters: any[] = [];
-      try { fighters = JSON.parse(text.replace(/```json|```/g, '').trim()); }
+      const resp = await runtimeSendMessage<ClaudeApiResponse>({ type: 'CLAUDE_API', payload, apiKey });
+      if (!resp) throw new Error('No response from analyzer runtime');
+      if (resp?.error) throw new Error(resp.error);
+      const data = resp.data;
+      const text = data?.content?.map((c) => c.text || '').join('') || '';
+      let fighters: OCRFighterRow[] = [];
+      try { fighters = JSON.parse(text.replace(/```json|```/g, '').trim()) as OCRFighterRow[]; }
       catch(e) { throw new Error('Could not parse AI response: ' + text?.slice(0, 200)); }
       if (analyzeStatus) analyzeStatus.textContent = `✓ Found ${fighters.length} fighter(s)`;
       renderExtractedRows(fighters);
@@ -4240,13 +5057,13 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
     } catch(err: unknown) {
       if (analyzeStatus) analyzeStatus.textContent = '✗ Error: ' + (err as Error).message;
     } finally {
-      if (analyzeBtn) { analyzeBtn.disabled = false; analyzeBtn.textContent = '🔍 READ WITH AI'; }
+      setButtonBusyState(analyzeBtn, false, { idleText: '🔍 READ WITH AI' });
     }
   });
 
-  function renderExtractedRows(fighters: any[]): void { if (extractedRows) { extractedRows.innerHTML = ''; fighters.forEach(f => addExtractedRow(f)); } }
+  function renderExtractedRows(fighters: OCRFighterRow[]): void { if (extractedRows) { extractedRows.innerHTML = ''; fighters.forEach(f => addExtractedRow(f)); } }
 
-  function addExtractedRow(f: any = {}): void {
+  function addExtractedRow(f: OCRFighterRow = {}): void {
     if (!extractedRows) return;
     const row = document.createElement('div');
     row.className = 'betr-row';
@@ -4257,34 +5074,34 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
 
   addRowBtn?.addEventListener('click', () => addExtractedRow());
 
-  const UFC326_LINES = [
-    { name: 'Luis Fernandez', fp: 83.5, ss: 28.5 }, { name: 'Rafael Bellato', fp: null, ss: 24.5 },
-    { name: 'Rodolfo Tobias', fp: null, ss: 20.5 }, { name: 'Damir Nurgozhay', fp: null, ss: 18.5 },
-    { name: 'Sumudaerji', fp: null, ss: 48.5 }, { name: 'Jesus Aguilar', fp: null, ss: 32.5 },
-    { name: 'Cameron Durden', fp: null, ss: 40.5 }, { name: 'Nandor Tumendemberel', fp: null, ss: 33.5 },
-    { name: 'Randy Turcios', fp: null, ss: 42.5 }, { name: 'Adrian Montes', fp: null, ss: 40.5 },
-    { name: 'Donte Johnson', fp: 104.5, ss: 19.5 }, { name: 'Chris Brundage', fp: null, ss: 16.5 },
-    { name: 'Xuejun Long', fp: null, ss: 55.5 }, { name: 'Cody Garbrandt', fp: null, ss: 31.5 },
-    { name: 'Gilberto Rodrigues', fp: null, ss: 31.5 }, { name: 'Bruno Ferreira', fp: null, ss: 25.5 },
-    { name: 'Michael Johnson', fp: null, ss: 49.5 }, { name: 'Drew Dober', fp: null, ss: 44.5 },
-    { name: 'Raul Rosas Jr', fp: 86.5, ss: 29.5 }, { name: 'Rob Font', fp: null, ss: 25.5 },
-    { name: 'Caio Borralho', fp: 84.5, ss: 39.5 }, { name: 'Reinier de Ridder', fp: null, ss: 25.5 },
-    { name: 'Max Holloway', fp: null, ss: 90.5 }, { name: 'Charles Oliveira', fp: null, ss: 50.5 },
-    { name: 'Jonny Lee', fp: 86.5, ss: null }, { name: 'Gilberto Bolanos', fp: 50.5, ss: null },
-  ];
-
-  openBtn?.addEventListener('click', () => {
+  openBtn?.addEventListener('click', async () => {
     if (modal) modal.classList.remove('is-hidden');
-    if (extractedRows && !extractedRows.children.length) {
-      if (extracted) extracted.classList.remove('is-hidden');
-      renderExtractedRows(UFC326_LINES);
+    // Pre-populate rows from currently stored BETR lines AND update event title
+    if (extractedRows) {
+      try {
+        const stored = await storageGet<{ lines_betr?: { fighters?: RawLineFighter[] }; upcoming_ufc_card?: { event?: string; fighters?: Array<{ f1: string; f2: string }> } }>(['lines_betr', 'upcoming_ufc_card']);
+        // Update title from stored card event name + headliners
+        const storedCard = stored['upcoming_ufc_card'];
+        const eventName = storedCard ? buildEventDisplayName(storedCard.event || '', storedCard.fighters) : (upcomingEventName || '');
+        const reviewTitle = modal?.querySelector('.betr-review-title') as HTMLElement | null;
+        if (reviewTitle && eventName) {
+          reviewTitle.textContent = `${eventName} Lines \u2014 Review & Edit Before Saving`;
+        }
+        // Pre-populate only if empty
+        if (extractedRows.children.length === 0) {
+          const existing = stored['lines_betr']?.fighters || [];
+          if (existing.length > 0) {
+            renderExtractedRows(existing.map(f => ({ name: f.name || '', fp: f.line_fp ?? null, ss: f.line_ss ?? null })));
+          }
+        }
+      } catch { /* no stored lines is fine */ }
     }
   });
 
-  saveBtn?.addEventListener('click', () => {
+  saveBtn?.addEventListener('click', async () => {
     if (!extractedRows) return;
     const rows = extractedRows.querySelectorAll('div');
-    const fighters: any[] = [];
+    const fighters: RawLineFighter[] = [];
     rows.forEach(row => {
       const name = (row.querySelector('.betr-name') as HTMLInputElement)?.value?.trim();
       if (!name) return;
@@ -4295,19 +5112,17 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
     if (!fighters.length) { if (saveStatus) saveStatus.textContent = '✗ No valid lines to save'; return; }
     const data = { fighters, capturedAt: Date.now() };
     if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.set({ lines_betr: data }, () => {
-        if (saveStatus) saveStatus.textContent = `✓ Saved ${fighters.length} Betr lines`;
-        const countBetr = document.getElementById('countBetr');
-        if (countBetr) countBetr.textContent = fighters.length + ' fighters';
-        document.getElementById('pillBetr')?.classList.add('active');
-        setTimeout(() => { if (modal) modal.style.display = 'none'; }, 800);
-        chrome.storage.local.get(['lines_pick6','lines_underdog','lines_betr'], (result: any) => {
-          const p6 = result['lines_pick6']?.fighters || [];
-          const ud = result['lines_underdog']?.fighters || [];
-          const bt = result['lines_betr']?.fighters || [];
-          mergeAndEnrich(p6, ud, bt);
-        });
-      });
+      await storageSet({ lines_betr: data });
+      if (saveStatus) saveStatus.textContent = `✓ Saved ${fighters.length} Betr lines`;
+      const countBetr = document.getElementById('countBetr');
+      if (countBetr) countBetr.textContent = fighters.length + ' fighters';
+      document.getElementById('pillBetr')?.classList.add('active');
+      setTimeout(() => { if (modal) modal.classList.add('is-hidden'); }, 800);
+      const result = await storageGet<Record<string, PlatformLinesPayload | null>>([...STORAGE_BETR_LINE_KEYS]);
+      const p6 = result['lines_pick6']?.fighters || [];
+      const ud = result['lines_underdog']?.fighters || [];
+      const bt = result['lines_betr']?.fighters || [];
+      await mergeAndEnrich(p6, ud, bt);
     }
   });
 })();
@@ -4317,6 +5132,8 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
 // Mouse tracking for interactive backgrounds
 let mouseX = 50;
 let mouseY = 50;
+let dynamicEffectsInitialized = false;
+let performanceMonitorStarted = false;
 
 document.addEventListener('mousemove', (e) => {
   mouseX = (e.clientX / window.innerWidth) * 100;
@@ -4389,6 +5206,7 @@ let frameCount = 0;
 let lastTime = performance.now();
 
 function monitorPerformance(): void {
+  if (!performanceMonitorStarted) performanceMonitorStarted = true;
   frameCount++;
   const currentTime = performance.now();
   if (currentTime - lastTime >= 1000) {
@@ -4407,8 +5225,11 @@ function monitorPerformance(): void {
 
 // Initialize advanced effects
 document.addEventListener('DOMContentLoaded', () => {
-  addDynamicEffects();
-  monitorPerformance();
+  if (!dynamicEffectsInitialized) {
+    dynamicEffectsInitialized = true;
+    addDynamicEffects();
+  }
+  if (!performanceMonitorStarted) monitorPerformance();
 
   // Add loading animation to body
   document.body.classList.add('loading');
@@ -4426,55 +5247,74 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Keyboard shortcuts for power users
+function handleShortcutRefresh(): void {
+  requestDataReload();
+  // Add visual feedback
+  document.body.style.animation = 'none';
+  setTimeout(() => {
+    document.body.style.animation = 'pulse 0.3s ease-in-out';
+  }, 10);
+}
+
+function handleShortcutDebugToggle(): void {
+  const debugPanel = document.getElementById('debugPanelWrap');
+  if (debugPanel) {
+    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
 document.addEventListener('keydown', (e) => {
   // Ctrl+Shift+R for rapid refresh
   if (e.ctrlKey && e.shiftKey && e.key === 'R') {
     e.preventDefault();
-    loadData();
-    // Add visual feedback
-    document.body.style.animation = 'none';
-    setTimeout(() => {
-      document.body.style.animation = 'pulse 0.3s ease-in-out';
-    }, 10);
+    handleShortcutRefresh();
   }
 
   // Ctrl+Shift+D for debug mode toggle
   if (e.ctrlKey && e.shiftKey && e.key === 'D') {
     e.preventDefault();
-    const debugPanel = document.getElementById('debugPanelWrap');
-    if (debugPanel) {
-      debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
-    }
+    handleShortcutDebugToggle();
   }
 
 });
 
 // Auto-save user preferences
 let preferencesTimeout: number;
+const PREFS_STORAGE_KEY = 'ufc-analyzer-prefs';
+
+interface AnalyzerPreferences {
+  theme?: string;
+  lastVisit?: number;
+}
+
+function readAnalyzerPreferences(): AnalyzerPreferences | null {
+  const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AnalyzerPreferences;
+  } catch (e) {
+    console.warn('Failed to parse preferences:', e);
+    return null;
+  }
+}
+
 function savePreferences(): void {
   clearTimeout(preferencesTimeout);
   preferencesTimeout = setTimeout(() => {
-    const prefs = {
+    const prefs: AnalyzerPreferences = {
       theme: document.documentElement.className,
       lastVisit: Date.now()
     };
-    localStorage.setItem('ufc-analyzer-prefs', JSON.stringify(prefs));
+    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
   }, 1000);
 }
 
 window.addEventListener('beforeunload', savePreferences);
 
 // Load saved preferences
-const savedPrefs = localStorage.getItem('ufc-analyzer-prefs');
-if (savedPrefs) {
-  try {
-    const prefs = JSON.parse(savedPrefs);
-    if (prefs.theme) {
-      document.documentElement.className = prefs.theme;
-    }
-  } catch (e) {
-    console.warn('Failed to load preferences:', e);
-  }
+const savedPrefs = readAnalyzerPreferences();
+if (savedPrefs?.theme) {
+  document.documentElement.className = savedPrefs.theme;
 }
 
 

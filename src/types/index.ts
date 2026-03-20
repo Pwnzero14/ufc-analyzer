@@ -30,6 +30,7 @@ export interface FightResult {
   sigStr?: number | null;
   totStr?: number | null;
   ctrlSecs?: number | null;
+  timeSecs?: number | null;
   td?: number | null;
   kd?: number | null;
   rev?: number | null;
@@ -85,6 +86,8 @@ export interface FighterDB {
   avgFP?: number | null;
   avgFP_p6?: number | null;
   avgFP_ud?: number | null;
+  avgFP_pp?: number | null;
+  avgFP_betr?: number | null;
   avgSigStr?: number | null;
   avgTD?: number | null;
   avgTDperFight?: number | null;
@@ -118,10 +121,12 @@ export interface LineDropState {
   watching: boolean;
   lastP6Count: number;
   lastUDCount: number;
+  lastUDFPCount?: number;
   detectedAt?: number | null;
   eventDate?: string | null;
   eventName?: string | null;
   detectedUD?: number | null;
+  detectedUDFP?: number | null;
   detectedP6?: number | null;
   lastPollAt?: number | null;
   daysUntil?: number;

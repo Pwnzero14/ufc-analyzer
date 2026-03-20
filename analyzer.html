@@ -453,20 +453,38 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 .history-bar-wrap {
-  flex: 1; height: 13px; background: var(--bg3);
-  border-radius: 2px; overflow: hidden; position: relative;
+  flex: 1;
+  height: 12px;
+  background: var(--bg2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
 }
-.history-bar-fill { height: 100%; border-radius: 2px; }
-.history-bar-fill.over-line  { background: rgba(0,232,122,0.28); }
-.history-bar-fill.under-line { background: rgba(255,58,96,0.18); }
+.history-bar-fill {
+  height: 100%;
+  transition: width 0.18s ease;
+}
+.history-bar-fill.over-line  {
+  background: rgba(0,232,122,0.42);
+}
+.history-bar-fill.under-line {
+  background: rgba(255,58,96,0.32);
+}
 .history-bar-val {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9.5px; font-weight: 500; color: var(--text);
   min-width: 32px; text-align: right;
 }
 .line-marker {
-  position: absolute; top: 0; bottom: 0;
-  width: 1px; background: var(--gold); opacity: 0.7;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  transform: translateX(-50%);
+  border-left: 2px dashed rgba(248,198,74,0.88);
+  box-shadow: 0 0 3px rgba(248,198,74,0.25);
+  opacity: 1;
+  pointer-events: none;
 }
 
 .history-empty {
@@ -488,7 +506,8 @@ body {
 .panel-meta-line {
   width: 10px;
   height: 2px;
-  background: var(--gold);
+  height: 0;
+  border-top: 2px dashed rgba(248,198,74,0.88);
   display: inline-block;
 }
 
@@ -1236,31 +1255,6 @@ body {
   border: 1px solid rgba(248,198,74,0.5);
   border-radius: 10px;
   padding: 2px 6px;
-}
-
-.line-history-toggle {
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  background: var(--bg2);
-  color: var(--text2);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 4px 9px;
-  cursor: pointer;
-}
-
-.line-history-toggle.active {
-  border-color: rgba(44,212,208,0.5);
-  color: var(--cyan);
-  background: rgba(44,212,208,0.1);
-}
-
-.line-history-inline {
-  margin-top: 5px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text3);
-  letter-spacing: 0.02em;
 }
 
 .event-banner {
@@ -2250,6 +2244,79 @@ body.loading {
     gap: 12px;
   }
 
+  .learning-diagnostics-grid {
+    margin: 0 28px 10px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .ld-card {
+    border: 1px solid rgba(44,212,208,0.35);
+    background: linear-gradient(180deg, rgba(44,212,208,0.08), rgba(44,212,208,0.03));
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+  }
+
+  .ld-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-xs);
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .ld-value {
+    margin-top: 4px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cyan);
+  }
+
+  .ld-meta {
+    margin-top: 3px;
+    font-size: var(--text-xs);
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .ld-detail {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.45;
+    max-height: 90px;
+    overflow: auto;
+    border-top: 1px dashed rgba(44,212,208,0.3);
+    padding-top: 6px;
+  }
+
+  .best-picks-slip {
+    margin-top: 12px;
+    border: 1px solid rgba(44,212,208,0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(180deg, rgba(44,212,208,0.08), rgba(44,212,208,0.02));
+  }
+
+  .best-picks-slip-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 6px;
+  }
+
+  .best-picks-slip-line {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
   .mh-card {
     border: 1px solid var(--border2);
     background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
@@ -2470,6 +2537,7 @@ body.loading {
 
   @media (max-width: 1100px) {
     .model-health-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .learning-diagnostics-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
     .fighter-main { grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr); }
     .fighter-main > .stats-mini,
     .fighter-main > .lean-cell,
@@ -2483,7 +2551,8 @@ body.loading {
   @media (max-width: 760px) {
     .filter-bar,
     #cardContainer,
-    .model-health-grid { margin-left: 10px; margin-right: 10px; padding-left: 10px; padding-right: 10px; }
+    .model-health-grid,
+    .learning-diagnostics-grid { margin-left: 10px; margin-right: 10px; padding-left: 10px; padding-right: 10px; }
     .filter-bar-top,
     .filter-bar-bottom { flex-direction: column; align-items: stretch; gap: 8px; }
     .platform-pills-row { overflow-x: auto; padding-bottom: 4px; }
@@ -2538,11 +2607,6 @@ body.loading {
     <button class="btn btn-ghost auto-fetch-btn" id="autoScrapeBtn" title="Auto-opens Pick6 + Underdog tabs, scrapes lines, and loads them automatically">
       <span id="autoScrapeIcon">⚡</span> AUTO-FETCH LINES
     </button>
-    <button id="watcherToggleBtn" class="watcher-toggle-btn state-idle" title="Start smart line movement monitoring">
-      <span class="watcher-dot" id="watcherStateDot"></span>
-      <span id="watcherToggleText">Watch Lines</span>
-    </button>
-    <button id="watcherSettingsBtn" class="watcher-settings-btn" title="Line watch settings">⚙ Watch Settings</button>
     <button class="btn btn-ghost refresh-btn" id="refreshBtn">
       <span id="refreshIcon">↻</span> Refresh
     </button>
@@ -2550,96 +2614,6 @@ body.loading {
       <span>📄</span> Export
     </button>
   </div>
-</div>
-
-<!-- LINE DROP ALERT BANNER -->
-<div id="lineDropBanner" class="line-drop-banner">
-  <div class="line-drop-text" id="lineDropText"></div>
-  <div class="line-drop-actions">
-    <button id="lineDropLoadBtn" class="line-drop-load-btn">⚡ LOAD NOW</button>
-    <button id="lineDropDismissBtn" class="line-drop-dismiss-btn">✕</button>
-  </div>
-</div>
-
-<!-- WATCHER STATUS BAR -->
-<div id="watcherBar" class="watcher-bar">
-  <div class="watcher-label">LINE WATCH</div>
-  <div id="watcherStatus" class="watcher-status">Not watching · Will poll every 5 min when active</div>
-  <div class="watcher-bar-right">
-    <div class="watcher-mini-badge" id="watcherPollBadge">Poll: off</div>
-    <div class="watcher-mini-badge" id="watcherLastBadge">Last: --</div>
-  </div>
-</div>
-
-<div id="watcherSettingsPanel" class="watcher-panel is-hidden">
-  <div class="watcher-panel-head">
-    <div class="watcher-panel-title">Smart Line Watch Settings</div>
-    <div class="watcher-actions">
-      <button id="watcherManualPollBtn" class="watcher-action-btn">Poll Now</button>
-      <button id="watcherApplyBtn" class="watcher-action-btn primary">Save Settings</button>
-    </div>
-  </div>
-  <div class="watcher-grid">
-    <div class="watcher-field">
-      <label for="watchDirection">Movement</label>
-      <select id="watchDirection">
-        <option value="drop">Drops only</option>
-        <option value="both">Drops and rises</option>
-        <option value="rise">Rises only</option>
-      </select>
-    </div>
-    <div class="watcher-field">
-      <label for="watchThreshold">Threshold</label>
-      <input id="watchThreshold" type="number" min="0.1" step="0.1" value="1.5">
-    </div>
-    <div class="watcher-field">
-      <label for="watchFighterFilter">Fighter filter</label>
-      <input id="watchFighterFilter" type="text" placeholder="all fighters or comma list">
-    </div>
-    <div class="watcher-field">
-      <label>Platforms</label>
-      <div class="watcher-checks">
-        <label><input id="watchP6" type="checkbox" checked>Pick6</label>
-        <label><input id="watchUD" type="checkbox" checked>Underdog</label>
-        <label><input id="watchBetr" type="checkbox" checked>Betr</label>
-        <label><input id="watchPP" type="checkbox">PrizePicks</label>
-      </div>
-    </div>
-    <div class="watcher-field">
-      <label>Stats</label>
-      <div class="watcher-checks">
-        <label><input id="watchFP" type="checkbox" checked>FP</label>
-        <label><input id="watchSS" type="checkbox" checked>SS</label>
-        <label><input id="watchTD" type="checkbox" checked>TD</label>
-      </div>
-    </div>
-    <div class="watcher-field">
-      <label>Smart options</label>
-      <div class="watcher-checks">
-        <label><input id="watchStealth" type="checkbox" checked>Stealth detect</label>
-        <label><input id="watchSteam" type="checkbox" checked>Steam detect</label>
-        <label><input id="watchSound" type="checkbox">Sound alerts</label>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="line-move-feed" id="lineMoveFeed">
-  <div class="watcher-panel-head">
-    <div class="watcher-panel-title">Recent Line Movement</div>
-  </div>
-  <div id="lineMoveList" class="line-move-list">
-    <div class="line-move-item"><div class="meta">No movement events yet</div><div class="delta">--</div><div></div></div>
-  </div>
-</div>
-
-<!-- EVENT BANNER -->
-<div id="eventBanner" class="event-banner">
-  <div class="event-banner-main">
-    <div class="event-name" id="eventName">Detecting next event...</div>
-    <div class="event-date" id="eventDate"></div>
-  </div>
-  <div class="event-countdown" id="eventCountdown"></div>
 </div>
 
 <!-- FILTER ROW 1: Platform selector + search + BETR entry -->
@@ -2696,7 +2670,6 @@ body.loading {
     <button class="tab-btn" data-view="bestpicks">⚡ AI Best Picks</button>
   </div>
   <button id="densityToggleBtn" class="density-btn" title="Toggle between compact and detailed fighter cards">Compact View</button>
-  <button id="lineHistoryToggle" class="line-history-toggle" title="Show line movement trend on cards">Line History</button>
 </div>
 
 <div id="modelHealthWidget" class="model-health-grid" aria-live="polite">
@@ -2714,6 +2687,30 @@ body.loading {
     <div class="mh-label">Actionable Leans</div>
     <div class="mh-value" id="mhCoverage">0</div>
     <div class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</div>
+  </div>
+</div>
+
+<div id="learningDiagnosticsWidget" class="learning-diagnostics-grid" aria-live="polite">
+  <div class="ld-card">
+    <div class="ld-label">Learning Memory</div>
+    <div class="ld-value" id="ldResolved">0 resolved</div>
+    <div class="ld-meta" id="ldCoverage">No settled outcomes yet</div>
+  </div>
+  <div class="ld-card">
+    <div class="ld-label">Market Accuracy</div>
+    <div class="ld-value" id="ldMarketAcc">SS --% · FP --%</div>
+    <div class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</div>
+  </div>
+  <div class="ld-card">
+    <div class="ld-label">Pattern Tracker</div>
+    <div class="ld-value" id="ldPatternWin">Top hit tag: --</div>
+    <div class="ld-meta" id="ldPatternMiss">Top miss tag: --</div>
+  </div>
+  <div class="ld-card">
+    <div class="ld-label">Learning Drilldown</div>
+    <div class="ld-value" id="ldDrilldownTitle">No drilldown yet</div>
+    <div class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</div>
+    <div class="ld-detail" id="ldDrilldownBody">No settled picks yet.</div>
   </div>
 </div>
 <!-- STICKY FIGHTER HEADER (shown when cardContainer is visible) -->
@@ -2737,7 +2734,7 @@ body.loading {
     </div>
 
     <div id="betrExtracted">
-      <div class="betr-review-title">UFC 326 Lines — Review & Edit Before Saving</div>
+      <div class="betr-review-title">UFC London Lines — Review & Edit Before Saving</div>
       <div class="betr-grid-head">
         <div class="betr-grid-col">FIGHTER</div>
         <div class="betr-grid-col fp center">FP</div>

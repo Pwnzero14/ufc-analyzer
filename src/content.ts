@@ -78,6 +78,7 @@ function scrapePick6() {
   const fighters = {};
 
   try {
+    // ── Primary: Pick6 fantasy card UI ──────────────────────────────────
     document.querySelectorAll('[data-testid="cardButton"]').forEach((btn) => {
       const ariaLabel = btn.getAttribute('aria-label') || '';
       const nameMatch = ariaLabel.match(/Open (.+?)'s stat/i);
@@ -121,6 +122,51 @@ function scrapePick6() {
       }
     });
 
+    // ── Secondary: Pick6 sports/props page (different card layout) ───────
+    // Used on ?sport=UFC and /category/47 pages for SS and TD lines
+    if (Object.keys(fighters).length === 0) {
+      // Try pick-card or player-row style containers used on the sports prop pages
+      const propCardSelectors = [
+        '[class*="PickCard"]', '[class*="pick-card"]', '[class*="PlayerPick"]',
+        '[class*="player-pick"]', '[class*="prop-card"]', '[class*="PropCard"]',
+        '[class*="PickRow"]', '[class*="pick-row"]',
+      ];
+      document.querySelectorAll(propCardSelectors.join(',')).forEach((card) => {
+        const text = card.innerText || '';
+        const fpMatch = text.match(/([\d]+\.?\d*)\s*\n?\s*Fantasy Points/i);
+        const ssMatch = text.match(/([\d]+\.?\d*)\s*\n?\s*Significant Strikes/i);
+        const tdMatch = text.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
+        if (!fpMatch && !ssMatch && !tdMatch) return;
+        const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+        const vsIdx = lines.findIndex((l) => /^vs[.\s]/i.test(l));
+        const name = vsIdx > 0 ? lines[vsIdx - 1] : lines[0];
+        if (!name || name.length < 3 || name.length > 45) return;
+        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
+        if (fpMatch) fighters[name].line_fp = parseFloat(fpMatch[1]);
+        if (ssMatch) fighters[name].line_ss = parseFloat(ssMatch[1]);
+        if (tdMatch) fighters[name].line_td = parseFloat(tdMatch[1]);
+      });
+    }
+
+    // ── Tertiary: scan for any element whose text matches a line + stat label ─
+    // Broadest fallback for unknown card layouts on new Pick6 pages
+    if (Object.keys(fighters).length === 0) {
+      const allText = document.body.innerText || '';
+      // Find all "NUMBER \n Significant Strikes" or "NUMBER \n Takedowns" patterns with surrounding name
+      const lineBlocks = [...allText.matchAll(/([A-Z][a-z]+(?:\s+[A-Z][a-z'\-]+)+)\s*\n+([\d]+\.?\d*)\s*\n?(Fantasy Points|Significant Strikes|Takedown)/gi)];
+      for (const m of lineBlocks) {
+        const name = m[1].trim();
+        const val = parseFloat(m[2]);
+        const stat = m[3].toLowerCase();
+        if (!name || name.length > 45 || isNaN(val)) continue;
+        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
+        if (stat.includes('fantasy')) fighters[name].line_fp = val;
+        else if (stat.includes('significant')) fighters[name].line_ss = val;
+        else if (stat.includes('takedown')) fighters[name].line_td = val;
+      }
+    }
+
+    // ── Quaternary: generic PlayerCard fallback ──────────────────────────
     if (Object.keys(fighters).length === 0) {
       document.querySelectorAll('[class*="PlayerCard"], [class*="player"], [class*="Pick"]').forEach((card) => {
         const text = card.innerText || '';
