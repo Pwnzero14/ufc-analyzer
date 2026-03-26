@@ -20,7 +20,10 @@
     "http://www.ufcstats.com/*",
     "https://api.anthropic.com/*",
     "https://api.prizepicks.com/*",
-    "https://app.prizepicks.com/*"
+    "https://app.prizepicks.com/*",
+    "https://*.prizepicks.com/*",
+    "https://www.bestfightodds.com/*",
+    "https://www.ufc.com/*"
   ],
   "background": {
     "service_worker": "dist/background.js",
@@ -32,6 +35,8 @@
         "https://*.draftkings.com/*",
         "https://*.underdogfantasy.com/*",
         "https://*.underdogsports.com/*",
+        "https://app.prizepicks.com/*",
+        "https://*.prizepicks.com/*",
         "https://betr.app/*",
         "https://*.betr.app/*"
       ],

@@ -4,8 +4,16 @@ export interface Fighter {
   line_fp?: number | null;
   line_ss?: number | null;
   line_td?: number | null;
+  line_ft?: number | null;
   opponent?: string | null;
   capturedAt?: number;
+  // Side odds can be American (e.g., -110, +100) or payout multipliers (e.g., 0.66x, 1.34x)
+  ss_over_odds?: number | null;
+  ss_under_odds?: number | null;
+  td_over_odds?: number | null;
+  td_under_odds?: number | null;
+  ft_over_odds?: number | null;
+  ft_under_odds?: number | null;
 }
 
 // ── PLATFORM LINES ────────────────────────────────────────────────────────
@@ -19,6 +27,7 @@ export interface AllLines {
   underdog?: PlatformLines;
   betr?: PlatformLines;
   prizepicks?: PlatformLines;
+  draftkings_sportsbook?: PlatformLines;
 }
 
 // ── FIGHT HISTORY ─────────────────────────────────────────────────────────
@@ -219,4 +228,24 @@ export interface AppError {
   platform?: string;
   timestamp: number;
   severity: 'debug' | 'warn' | 'error';
+}
+
+// ── PROP ARCHIVE ─────────────────────────────────────────────────────────
+export type PropType =
+  | 'Fantasy'
+  | 'SS'
+  | 'TD'
+  | 'Control'
+  | 'FightTime'
+  | (string & {});
+
+export interface PropArchiveRecord {
+  fighter: string;
+  opponent: string;
+  event: string;
+  date: string; // ISO
+  platform?: string;
+  propType: PropType;
+  line?: number;
+  result: number;
 }
