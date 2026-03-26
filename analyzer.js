@@ -1289,7 +1289,7 @@ function calcTDLean(name, db, line_td, oppDB) {
 
 // ── RENDER ────────────────────────────────────────────────────────────────
 let currentView = 'all';
-let currentPlatform = 'pick6'; // 'pick6' or 'underdog'
+let currentPlatform = 'pick6'; // 'pick6' | 'underdog' | 'betr' | 'prizepicks' | 'draftkings_sportsbook'
 let allFighters = [];
 let currentSearch = '';
 let currentSort   = 'default'; // 'default'|'line'|'conf'|'avgfp'|'floor'|'ceil'|'consistency'
@@ -1312,24 +1312,31 @@ function activePlatformLine(f) {
   const pp_ss = f.line_pp_ss ?? null;
   const pp_td = f.line_pp_td ?? null;
 
+  const dk_ss = f.line_dk_ss ?? null;
+  const dk_td = f.line_dk_td ?? null;
+
   const pick6Value = pick6 ?? pick6_ss ?? pick6_td;
   const udValue    = ud    ?? ud_ss    ?? ud_td;
   const betrValue  = betr  ?? betr_ss  ?? betr_td;
   const ppValue    = pp    ?? pp_ss    ?? pp_td;
-  if (currentPlatform === 'pick6')      return pick6Value ?? udValue ?? ppValue ?? betrValue ?? null;
-  if (currentPlatform === 'underdog')   return udValue ?? pick6Value ?? ppValue ?? betrValue ?? null;
-  if (currentPlatform === 'prizepicks') return ppValue ?? udValue ?? pick6Value ?? betrValue ?? null;
-  return betrValue ?? ppValue ?? pick6Value ?? udValue ?? null;
+  const dkValue    = dk_ss ?? dk_td;
+  if (currentPlatform === 'pick6')                return pick6Value ?? udValue ?? ppValue ?? dkValue ?? betrValue ?? null;
+  if (currentPlatform === 'underdog')             return udValue ?? pick6Value ?? ppValue ?? dkValue ?? betrValue ?? null;
+  if (currentPlatform === 'prizepicks')           return ppValue ?? udValue ?? pick6Value ?? dkValue ?? betrValue ?? null;
+  if (currentPlatform === 'draftkings_sportsbook') return dkValue ?? pick6Value ?? udValue ?? ppValue ?? betrValue ?? null;
+  return betrValue ?? ppValue ?? pick6Value ?? udValue ?? dkValue ?? null;
 }
 
 function activePlatformLabel(f) {
   if (currentPlatform === 'pick6'       && f.line_p6)  return `Pick6 ${f.line_p6}`;
   if (currentPlatform === 'underdog'    && f.line_ud)  return `Underdog ${f.line_ud}`;
   if (currentPlatform === 'prizepicks'  && f.line_pp)  return `PrizePicks ${f.line_pp}`;
+  if (currentPlatform === 'draftkings_sportsbook' && (f.line_dk_ss != null || f.line_dk_td != null)) return `DK SS ${f.line_dk_ss ?? '—'} / TD ${f.line_dk_td ?? '—'}`;
   if (f.line_betr)  return `Betr ${f.line_betr}`;
   if (f.line_pp)    return `PrizePicks ${f.line_pp}`;
   if (f.line_p6)    return `Pick6 ${f.line_p6}`;
   if (f.line_ud)    return `Underdog ${f.line_ud}`;
+  if (f.line_dk_ss != null || f.line_dk_td != null) return `DK SS ${f.line_dk_ss ?? '—'} / TD ${f.line_dk_td ?? '—'}`;
   return '—';
 }
 
@@ -1404,6 +1411,31 @@ function renderBestPicks(container) {
 
   const html = buildSection(overs, 'over') + buildSection(unders, 'under');
   container.innerHTML = html || '<div style="text-align:center;padding:40px;color:var(--text3);font-family:\'JetBrains Mono\',monospace;font-size:12px;">No leans calculated yet — wait for UFCStats to finish loading</div>';
+}
+
+// ── ODDS FORMATTING HELPERS ────────────────────────────────────────────────
+/**
+ * Format American odds display
+ * -110 → "-110", +100 → "+100"
+ * Returns HTML string for odds display with color coding
+ */
+function formatOdds(odds) {
+  if (!odds) return '';
+  const sign = odds > 0 ? '+' : '';
+  const color = odds > 0 ? 'var(--green)' : 'var(--orange)'; // Positive odds (underdog) = green, negative (favorite) = orange
+  return `<span style="font-size:10px;color:${color};font-family:'JetBrains Mono',monospace;font-weight:600">${sign}${odds}</span>`;
+}
+
+/**
+ * Build odds display for a prop line
+ * Shows: "OVER +110 / UNDER -110" format
+ */
+function formatOddsDisplay(overOdds, underOdds) {
+  if (!overOdds && !underOdds) return '';
+  return `<div style="font-size:9px;color:var(--text3);margin-top:2px;display:flex;gap:4px;font-family:'JetBrains Mono',monospace">
+    ${overOdds ? `O:${formatOdds(overOdds)}` : ''}
+    ${underOdds ? `U:${formatOdds(underOdds)}` : ''}
+  </div>`;
 }
 
 function renderFighters() {
@@ -1556,17 +1588,19 @@ function buildFighterRow(f, oppEntry) {
       </div>
       <div class="platform-lines">
         ${f.line_p6    != null ? `<div class="line-cell"><div class="line-platform">P6 FP</div><div class="line-value p6">${f.line_p6}</div></div>` : ''}
-        ${f.line_p6_ss != null ? `<div class="line-cell"><div class="line-platform">P6 SS</div><div class="line-value p6">${f.line_p6_ss}</div></div>` : ''}
-        ${f.line_p6_td != null ? `<div class="line-cell"><div class="line-platform">P6 TD</div><div class="line-value p6">${f.line_p6_td}</div></div>` : ''}
+        ${f.line_p6_ss != null ? `<div class="line-cell"><div class="line-platform">P6 SS</div><div class="line-value p6">${f.line_p6_ss}</div>${formatOddsDisplay(f.ss_over_odds, f.ss_under_odds)}</div>` : ''}
+        ${f.line_p6_td != null ? `<div class="line-cell"><div class="line-platform">P6 TD</div><div class="line-value p6">${f.line_p6_td}</div>${formatOddsDisplay(f.td_over_odds, f.td_under_odds)}</div>` : ''}
         ${f.line_ud    != null ? `<div class="line-cell"><div class="line-platform">UD FP</div><div class="line-value ud">${f.line_ud}</div></div>` : ''}
-        ${f.line_ud_ss != null ? `<div class="line-cell"><div class="line-platform">UD SS</div><div class="line-value ud">${f.line_ud_ss}</div></div>` : ''}
-        ${f.line_ud_td != null ? `<div class="line-cell"><div class="line-platform">UD TD</div><div class="line-value ud">${f.line_ud_td}</div></div>` : ''}
+        ${f.line_ud_ss != null ? `<div class="line-cell"><div class="line-platform">UD SS</div><div class="line-value ud">${f.line_ud_ss}</div>${formatOddsDisplay(f.ss_over_odds, f.ss_under_odds)}</div>` : ''}
+        ${f.line_ud_td != null ? `<div class="line-cell"><div class="line-platform">UD TD</div><div class="line-value ud">${f.line_ud_td}</div>${formatOddsDisplay(f.td_over_odds, f.td_under_odds)}</div>` : ''}
+        ${f.line_dk_ss != null ? `<div class="line-cell"><div class="line-platform">DK SS</div><div class="line-value" style="color:#f59e0b">${f.line_dk_ss}</div>${formatOddsDisplay(f.ss_over_odds, f.ss_under_odds)}</div>` : ''}
+        ${f.line_dk_td != null ? `<div class="line-cell"><div class="line-platform">DK TD</div><div class="line-value" style="color:#f59e0b">${f.line_dk_td}</div>${formatOddsDisplay(f.td_over_odds, f.td_under_odds)}</div>` : ''}
         ${f.line_betr  != null ? `<div class="line-cell"><div class="line-platform">BT FP</div><div class="line-value" style="color:var(--orange)">${f.line_betr}</div></div>` : ''}
         ${f.line_betr_ss != null ? `<div class="line-cell"><div class="line-platform">BT SS</div><div class="line-value" style="color:var(--orange)">${f.line_betr_ss}</div></div>` : ''}
         ${f.line_pp    != null ? `<div class="line-cell"><div class="line-platform">PP FP</div><div class="line-value" style="color:var(--cyan)">${f.line_pp}</div></div>` : ''}
         ${f.line_pp_ss != null ? `<div class="line-cell"><div class="line-platform">PP SS</div><div class="line-value" style="color:var(--cyan)">${f.line_pp_ss}</div></div>` : ''}
         ${f.line_pp_td != null ? `<div class="line-cell"><div class="line-platform">PP TD</div><div class="line-value" style="color:var(--cyan)">${f.line_pp_td}</div></div>` : ''}
-        ${f.line_p6 == null && f.line_ud == null && f.line_betr == null && f.line_pp == null && f.line_ud_ss == null && f.line_p6_ss == null && f.line_pp_ss == null ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.06em;">No lines yet</div>` : ''}
+        ${f.line_p6 == null && f.line_ud == null && f.line_betr == null && f.line_pp == null && f.line_ud_ss == null && f.line_p6_ss == null && f.line_pp_ss == null && f.line_dk_ss == null && f.line_dk_td == null ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.06em;">No lines yet</div>` : ''}
       </div>
       <div class="stats-mini">
         <div class="stat-mini-cell">
@@ -1728,7 +1762,7 @@ function namesMatch(a, b) {
   return false;
 }
 
-async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters) {
+async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters, dkFighters) {
   debugLog(`P6 fighters (${(p6Fighters||[]).length}): ${(p6Fighters||[]).map(f=>f.name).join(', ')}`);
   debugLog(`UD fighters (${(udFighters||[]).length}): ${(udFighters||[]).map(f=>f.name).join(', ')}`);
   const map = {};
@@ -1746,11 +1780,15 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters) 
   (p6Fighters || []).forEach(f => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name);
-    if (!map[n]) map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, opponent:null };
+    if (!map[n]) map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, line_dk_ss:null, line_dk_td:null, opponent:null };
     // Support both old {line} format and new {line_fp, line_ss, line_td} format
     map[n].line_p6    = f.line_fp ?? f.line ?? null;
     map[n].line_p6_ss = f.line_ss ?? null;
     map[n].line_p6_td = f.line_td ?? null;
+    if (f.ss_over_odds != null) map[n].ss_over_odds = f.ss_over_odds;
+    if (f.ss_under_odds != null) map[n].ss_under_odds = f.ss_under_odds;
+    if (f.td_over_odds != null) map[n].td_over_odds = f.td_over_odds;
+    if (f.td_under_odds != null) map[n].td_under_odds = f.td_under_odds;
     if (f.opponent) map[n].opponent = normalizeName(f.opponent);
   });
 
@@ -1762,7 +1800,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters) 
       return map[existing];
     }
     debugLog(`UD-only (no P6 match): "${n}"`);
-    map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, opponent:null };
+    map[n] = { name:n, line_p6:null, line_p6_ss:null, line_p6_td:null, line_ud:null, line_ud_ss:null, line_ud_td:null, line_pp:null, line_pp_ss:null, line_pp_td:null, line_dk_ss:null, line_dk_td:null, opponent:null };
     return map[n];
   }
 
@@ -1800,6 +1838,19 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters) 
     entry.line_pp    = f.line_fp ?? f.line ?? null;
     entry.line_pp_ss = f.line_ss ?? null;
     entry.line_pp_td = f.line_td ?? null;
+    if (f.opponent) entry.opponent = normalizeName(f.opponent);
+  });
+
+  (dkFighters || []).forEach(f => {
+    if (!isValidFighterName(f.name)) return;
+    const n = normalizeName(f.name);
+    const entry = findOrCreateEntry(n);
+    entry.line_dk_ss = f.line_ss ?? null;
+    entry.line_dk_td = f.line_td ?? null;
+    if (f.ss_over_odds != null) entry.ss_over_odds = f.ss_over_odds;
+    if (f.ss_under_odds != null) entry.ss_under_odds = f.ss_under_odds;
+    if (f.td_over_odds != null) entry.td_over_odds = f.td_over_odds;
+    if (f.td_under_odds != null) entry.td_under_odds = f.td_under_odds;
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
   });
 
@@ -1921,25 +1972,34 @@ function updateFighterLeans(name, lean_ss, lean_td) {
 
 function updatePlatformBar(data) {
   const p6 = data.pick6?.fighters || [], ud = data.underdog?.fighters || [], betr = data.betr?.fighters || [];
-  const pp = data.prizepicks?.fighters || [];
+  const pp = data.prizepicks?.fighters || [], dk = data.draftkings_sportsbook?.fighters || [];
   document.getElementById('countP6').textContent   = p6.length   ? `${p6.length}`   : '—';
   document.getElementById('countUD').textContent   = ud.length   ? `${ud.length}`   : '—';
   document.getElementById('countBetr').textContent = betr.length ? `${betr.length}` : '—';
   const ppPill = document.getElementById('countPP');
   if (ppPill) ppPill.textContent = pp.length ? `${pp.length}` : '—';
+  const dkPill = document.getElementById('countDK');
+  if (dkPill) dkPill.textContent = dk.length ? `${dk.length}` : '—';
   document.getElementById('pillP6').classList.toggle('active', p6.length > 0);
   document.getElementById('pillUD').classList.toggle('active', ud.length > 0);
   document.getElementById('pillBetr').classList.toggle('active', betr.length > 0);
   document.getElementById('pillPP')?.classList.toggle('active', pp.length > 0);
+  document.getElementById('pillDK')?.classList.toggle('active', dk.length > 0);
   // Auto-select best available platform if current one has no data
   if (currentPlatform === 'pick6' && p6.length === 0) {
     if (ud.length > 0) setActivePlatform('underdog');
+    else if (pp.length > 0) setActivePlatform('prizepicks');
+    else if (dk.length > 0) setActivePlatform('draftkings_sportsbook');
+    else if (betr.length > 0) setActivePlatform('betr');
+  } else if (currentPlatform === 'draftkings_sportsbook' && dk.length === 0) {
+    if (p6.length > 0) setActivePlatform('pick6');
+    else if (ud.length > 0) setActivePlatform('underdog');
     else if (pp.length > 0) setActivePlatform('prizepicks');
     else if (betr.length > 0) setActivePlatform('betr');
   }
   // Re-apply selected indicator (in case pills were re-rendered)
   document.querySelector(`[data-platform="${currentPlatform}"]`)?.classList.add('platform-selected');
-  const total = p6.length + ud.length + betr.length + pp.length;
+  const total = p6.length + ud.length + betr.length + pp.length + dk.length;
   const dot = document.getElementById('extDot'), label = document.getElementById('extLabel');
   if (total === 0) { dot.className = 'ext-dot'; label.textContent = 'No extension data'; label.style.color = 'var(--text3)'; }
   else if (p6.length > 0) { dot.className = 'ext-dot live'; label.textContent = `Live · ${total} lines`; label.style.color = 'var(--green)'; }
@@ -1950,8 +2010,8 @@ function loadData() {
   const icon = document.getElementById('refreshIcon');
   icon.classList.add('spinning');
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.local.get(['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks'], (result) => {
-      processData({ pick6: result.lines_pick6 || null, underdog: result.lines_underdog || null, betr: result.lines_betr || null, prizepicks: result.lines_prizepicks || null })
+    chrome.storage.local.get(['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks', 'lines_draftkings_sportsbook'], (result) => {
+      processData({ pick6: result.lines_pick6 || null, underdog: result.lines_underdog || null, betr: result.lines_betr || null, prizepicks: result.lines_prizepicks || null, draftkings_sportsbook: result.lines_draftkings_sportsbook || null })
         .then(() => icon.classList.remove('spinning'))
         .catch(e => { console.error('LoadData error:', e); icon.classList.remove('spinning'); });
     });
@@ -1962,16 +2022,16 @@ function loadData() {
 
 async function processData(data) {
   updatePlatformBar(data);
-  const p6 = data.pick6?.fighters || [], ud = data.underdog?.fighters || [], betr = data.betr?.fighters || [], pp = data.prizepicks?.fighters || [];
+  const p6 = data.pick6?.fighters || [], ud = data.underdog?.fighters || [], betr = data.betr?.fighters || [], pp = data.prizepicks?.fighters || [], dk = data.draftkings_sportsbook?.fighters || [];
   const empty = document.getElementById('emptyState'), container = document.getElementById('cardContainer');
-  if (p6.length === 0 && ud.length === 0 && betr.length === 0 && pp.length === 0) {
+  if (p6.length === 0 && ud.length === 0 && betr.length === 0 && pp.length === 0 && dk.length === 0) {
     empty.style.display = 'block'; container.style.display = 'none'; return;
   }
   empty.style.display = 'none'; container.style.display = 'block';
   const fhr = document.getElementById('fighterHeaderRow');
   if (fhr) fhr.style.display = 'grid';
-  showToast(`Loading ${p6.length || ud.length || pp.length} fighters + fetching UFCStats...`);
-  await mergeAndEnrich(p6, ud, betr, pp);
+  showToast(`Loading ${p6.length || ud.length || pp.length || dk.length} fighters + fetching UFCStats...`);
+  await mergeAndEnrich(p6, ud, betr, pp, dk);
   showToast(`Loaded ${allFighters.filter(f => f.db?.loaded).length} fighters with stats!`);
 }
 
@@ -2226,8 +2286,13 @@ async function loadEventBanner() {
         detected.push({ name: f2, line_fp: null, line_ss: null, line_td: null, opponent: f1 });
       });
       // Only use detected fighters if no real lines have come in yet
-      chrome.storage.local.get(['lines_pick6', 'lines_underdog'], (result) => {
-        const hasRealData = (result.lines_pick6?.fighters?.length || 0) + (result.lines_underdog?.fighters?.length || 0) > 0;
+      chrome.storage.local.get(['lines_pick6', 'lines_underdog', 'lines_prizepicks', 'lines_draftkings_sportsbook', 'lines_betr'], (result) => {
+        const hasRealData =
+          (result.lines_pick6?.fighters?.length || 0) +
+          (result.lines_underdog?.fighters?.length || 0) +
+          (result.lines_prizepicks?.fighters?.length || 0) +
+          (result.lines_draftkings_sportsbook?.fighters?.length || 0) +
+          (result.lines_betr?.fighters?.length || 0) > 0;
         if (!hasRealData) {
           showToast(`📅 Detected ${card.event} — ${card.fighters.length} fights found. Click ⚡ AUTO-FETCH LINES to get odds.`);
           allFighters = detected.map(f => ({ ...f, db: { loaded: false }, lean: { lean: 'none', conf: 0, reasons: [], verdict: '' } }));
@@ -2246,7 +2311,12 @@ function setActivePlatform(platform) {
   const target = document.querySelector(`[data-platform="${platform}"]`);
   if (target) target.classList.add('platform-selected');
   const nameEl = document.getElementById('platformActiveName');
-  if (nameEl) nameEl.textContent = platform === 'pick6' ? 'Pick6' : platform === 'underdog' ? 'Underdog' : platform === 'prizepicks' ? 'PrizePicks' : 'Betr';
+  if (nameEl) nameEl.textContent =
+    platform === 'pick6' ? 'Pick6' :
+    platform === 'underdog' ? 'Underdog' :
+    platform === 'prizepicks' ? 'PrizePicks' :
+    platform === 'draftkings_sportsbook' ? 'DK Sportsbook' :
+    'Betr';
   renderFighters();
 }
 document.querySelectorAll('[data-platform]').forEach(btn => {
