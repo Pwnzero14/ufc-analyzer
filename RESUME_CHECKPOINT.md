@@ -1,8 +1,9 @@
 # Resume Checkpoint
 
-Last Saved: 2026-03-26
+Last Saved: 2026-03-27 (Session 2)
 Branch: feature/sleek-theme-v1
-HEAD: 4bfb6da
+HEAD: 91f3b50 (+ session 2 changes uncommitted)
+Snapshot: backups/full_project_snapshot_20260327_session2/
 
 ---
 
@@ -12,78 +13,109 @@ HEAD: 4bfb6da
 Resuming UFC Fantasy Lines Grabber project.
 
 Repo: C:\Users\abdir\Downloads\ufc_project_v2
-Branch: feature/sleek-theme-v1 (HEAD: 4bfb6da)
-Stack: Chrome/Opera Extension — Manifest V3, TypeScript → compiled analyzer.js + dist/
+Branch: feature/sleek-theme-v1
+Stack: Chrome/Opera Extension — Manifest V3, TypeScript → compiled dist/
+Event context: UFC Fight Night: Israel Adesanya vs Joe Pyfer (March 28, 2026, Seattle)
 
-WHAT'S BUILT (all committed, build is clean):
-1. Head-to-Head modal — ⚔ button on each fighter row, side-by-side comparison with UFC.com fighter images (og:image, cached in ufc_img_v1_{slug})
-2. Moneyline-adjusted FP projection — calcMLAdjustedFP() splits win/loss FP history, blends by implied win prob from moneyline; shows ML adj badge (+8.2 / -5.1) when shift ≥3pts
-3. Stat trend chips — ↑ L3 +8.2 (green) / ↓ L3 -5.1 (red) on Avg FP, Avg SS, TD panel; calcStatTrend() compares last-3 to career avg
-4. Opening line movement tracker — _openingLines Map + lines_open_v1 in chrome.storage; ▲/▼ chips on line cells when moved ≥0.5; persists across reloads, resets on new event
-5. Betr manual line persistence — lines_betr_manual_v1 (PROTECTED key, never cleared); save writes to both keys; detects and reports line moves on save
-6. Live auto-settling — LIVE_SETTLE_ALARM every 5 min during event window; startup catch-up if browser opens mid-event
+WHAT'S BUILT (all working, build is clean):
+1. Head-to-Head modal — ⚔ button on each fighter row, side-by-side comparison with UFC.com fighter images
+2. Moneyline-adjusted FP projection — calcMLAdjustedFP() blends win/loss history by implied win prob
+3. Stat trend chips — ↑/↓ L3 chips on Avg FP, Avg SS, TD panel
+4. Opening line movement tracker — lines_open_v1 in chrome.storage; ▲/▼ chips on line cells
+5. Betr manual line persistence — lines_betr_manual_v1 (PROTECTED, never cleared)
+6. Live auto-settling — LIVE_SETTLE_ALARM every 5 min during event window
+7. Pre-event Report Card modal — fight pairs ordered by UFCStats card order (main → prelims)
+8. Line Shopping Diff modal (🛒 Shop button) — all platforms side-by-side, lean-aware coloring
+   - OVER lean: lowest line = green/best (easiest to clear)
+   - UNDER lean: highest line = green/best (most room to go under)
+   - Platform labels on every cell (P6/UD/BT/PP/DK), lean chip per fighter
+9. Style Matchup panel (in expanded row detail)
+   - Matchup chip: STRIKER vs GRAPPLER etc. with color coding
+   - styleMatchupEdge() reasons for all 9 style pair combinations (incl. balanced cases)
+   - SS over rate by opponent style (when cached opponent data available)
+   - deriveStyle() fixed: slpm > 3.5 AND tdAvg < 1.5 → striker (catches kickboxers like Izzy)
+10. Injury/Weight Cut News Flag (⚠ NEWS badge)
+    - Fetches Google News RSS per fighter after data loads (30-min cache)
+    - Keywords: injur, withdraw, pull, weight cut, hospitali, surgery, fracture, etc.
+    - Pulsing badge on fighter row → click opens news modal with headlines + links
+11. KO/SUB/DEC Finish Split (in Career Data panel)
+    - Win methods: KO/TKO (red) · SUB (purple) · DEC (blue) mini bars
+    - Loss methods: KO/TKO losses highlighted with ⚠ count (chin exposure)
+12. Fight Time Breakdown panel (in expanded row detail)
+    - Win + loss method bars for both fighters
+    - Combined early-finish risk: 1 - (1-myFinish) × (1-oppFinish) → HIGH/MOD/LOW
+    - Direct FT signal: ↓ LEAN UNDER FT or ↑ LEAN OVER FT
+13. calcFTLean enhanced
+    - KO/TKO loss vulnerability: -0.7 when ≥50% losses by stoppage
+    - Opponent KO threat: -0.5 when opponent wins ≥40% by KO/TKO
+    - FT lean panel title now shows direction inline: FT Lean ▼ UNDER 72%
+14. Opponent Activity Context panel (in expanded row detail)
+    - Splits FP/SS over rates by opponent activity (oppStats.sigStr as proxy)
+    - vs active opp (>25 SS landed): X% over rate
+    - vs passive opp (<12 SS landed): X% over rate
+    - Quality flag when 25%+ drop vs active opponents
 
 KEY FILES:
-- src/analyzer.ts — main logic (~7700+ lines)
+- src/analyzer.ts — main logic (~8600+ lines)
 - analyzer.html — UI + all CSS
-- manifest.json — MV3 config (host_permissions includes ufc.com for fighter images)
-- src/background.ts — alarms, settling, storage
+- manifest.json — MV3 config (host_permissions includes news.google.com)
+- src/background.ts — alarms, settling, storage, FIND_CARD_FOR_FIGHTERS handler
+- src/services/StorageService.ts — all chrome.storage wrappers
 
 STORAGE KEYS:
-lines_pick6 / lines_underdog / lines_betr / lines_betr_manual_v1 (PROTECTED) / lines_prizepicks / lines_draftkings_sportsbook / lines_open_v1 / ufc_img_v1_{slug} / prop_archive_v1 / ai_lean_snapshots_v1
+lines_pick6 / lines_underdog / lines_betr / lines_betr_manual_v1 (PROTECTED) / lines_prizepicks /
+lines_draftkings_sportsbook / lines_open_v1 / upcoming_ufc_card / last_completed_ufc_card /
+ufc_img_v1_{slug} / prop_archive_v1 / ai_lean_snapshots_v1
 
-SUGGESTED NEXT FEATURES (not started):
-4. Best 2/3-pick stack suggestions — same-fight fighters both projecting over, ranked by combined edge
-5. Fight method/time prediction — KO/sub/dec probability from finish rates + styles, feeds SS/TD line value
-6. Push probability per line — % chance of landing exactly on line based on historical distribution
-7. Unit/bankroll tracker — log picks per event, track P&L by platform and prop type
-8. Pre-event report card — one-click export of all leans/lines/confidence as shareable summary
+NEW FUNCTIONS ADDED THIS SESSION:
+- fetchFighterNews(name) / fetchAllFighterNews() — Google News RSS, 30-min cache
+- generateLineShopModal() — lean-aware line shopping diff table
+- buildStyleMatchupPanel(db, oppDB, ssLine, tdLine) — matchup chip + edge reasons + SS hit rates
+- buildFightTimeSummaryPanel(db, oppDB, ftLine) — finish split bars + combined finish risk
+- buildOpponentQualityPanel(db, fpLine, ssLine) — active vs passive opponent over rate splits
+- styleMatchupEdge() — expanded to handle all 9 style pair combinations
 
-TO RESUME: run `npm run build`, reload extension in Opera, pick a feature above.
+MODULE STATE:
+- _newsCache: Map<string, {items, fetchedAt}> — fighter news cache
+- _newsAlertFighters: Set<string> — fighters with injury/news alerts
+- NEWS_INJURY_KEYWORDS / NEWS_CACHE_TTL — news filtering constants
+
+SUGGESTED NEXT FEATURES:
+- Stack builder — which 2-3-pick combos from same fight have highest combined EV
+- Quick pick export — one-click copy of locked picks in platform-ready format
+- Side bet dedicated view — SS/TD/FT-only table with their own lean chips
+- Lock picks mode — mark picks as locked, float to top, dim rest
+- Confidence filter slider — show only fighters above X% confidence
 ```
 
 ---
 
-## What Was Built This Session
+## What Was Built This Session (2026-03-27, Session 2)
 
-### Head-to-Head Modal
-- ⚔ button on every fighter row (hover to reveal)
-- Side-by-side comparison: record, style, country, all lines, FP projections, striking, grappling, leans
-- Fighter images fetched from `ufc.com/athlete/{slug}`, cached in chrome.storage under `ufc_img_v1_{slug}`
-- Apostrophe fix for slugs (O'Neill → oneill)
+### Line Shopping Diff (🛒 Shop button)
+- New modal comparing all platforms side-by-side per fighter
+- Platform labels on every cell (P6/UD/BT/PP/DK above each value)
+- Lean-aware coloring: OVER lean → lowest line = green/best; UNDER lean → highest = green/best
+- Lean chip per fighter row showing direction + confidence
+- Sorted by biggest spread descending
 
-### Moneyline-Adjusted FP Projection
-- `calcMLAdjustedFP(history, moneyline)` — splits history into wins/losses, recency-weights each bucket, blends by implied win probability
-- Shows as primary value in Avg FP cell; `+8.2` / `-5.1` ML adj badge when shift ≥3 pts
-- Only fires when fighter has BOTH wins and losses in history
+### Style Matchup Panel
+- Added to expanded row detail
+- Matchup chip with color per pair (STRIKER vs GRAPPLER etc.)
+- Fixed deriveStyle(): lowered striker threshold to slpm > 3.5 AND tdAvg < 1.5
+- Added all 9 balanced matchup cases to styleMatchupEdge()
+- Removed empty "not enough cached data" message — panel only renders if content exists
 
-### Stat Trend Chips
-- `calcStatTrend(history, getter, threshold, n=3)` — last-3 avg vs career avg
-- `↑ L3 +8.2` (green) / `↓ L3 -5.1` (red) chips next to Avg FP and Avg SS in stats-mini
-- TD trend chip on Takedowns panel title in detail view
-- Threshold: FP=5pts, SS=4 strikes, TD=0.5. Requires ≥5 fights total.
+### Injury/Weight Cut News Flag
+- Google News RSS fetch per fighter (https://news.google.com/*)
+- 30-min in-memory cache, runs after data loads
+- ⚠ NEWS badge on fighter row, click → news modal with alert headlines + links
 
-### Opening Line / Movement Tracker
-- `_openingLines` Map + `lines_open_v1` in chrome.storage (persists across reloads)
-- `loadOpeningLines()` runs at start of loadData; `snapshotOpeningLines()` runs after mergeAndEnrich
-- Resets automatically when event name changes
-- `lineCell()` shows `▲0.5` (green) / `▼3.0` (red) chips on every line cell when moved ≥0.5
-
-### Betr Manual Line Persistence
-- Save writes to both `lines_betr` and `lines_betr_manual_v1` (protected key)
-- `applyBetrManualOverrides()` merges manual lines on top of scraped lines on every load
-- Auto-fetch and clear-lines never touches `lines_betr_manual_v1`
-- Save button detects line movements on save and reports them
-
----
-
-## Suggested Next Features
-
-4. **Best 2-pick and 3-pick stack suggestions** — fighters from same fight who both project over, ranked by combined edge
-5. **Fight method/time prediction** — KO/sub/dec probability from finish rates + styles → feeds SS/TD line value
-6. **Push probability per line** — for lines within 5pts of avg, show % chance of landing exactly on it
-7. **Unit/bankroll tracker** — log actual picks per event, track P&L over time by platform and prop type
-8. **Pre-event report card** — one-click export of all current leans, lines, confidence scores as shareable summary
+### KO/SUB/DEC Finish Split + Fight Time Suite
+- Win/loss method breakdown bars in Career Data panel
+- Fight Time Breakdown panel: both fighters' finish profiles + combined risk score + FT signal
+- calcFTLean enhanced with KO-loss vulnerability and opponent KO threat scoring
+- Opponent Activity Context panel: active vs passive opponent over rate splits
 
 ---
 
