@@ -11,6 +11,8 @@ const PLATFORMS = [
   { id: 'pick6' as const, label: CONFIG.platforms.pick6.label, color: CONFIG.platforms.pick6.color },
   { id: 'underdog' as const, label: CONFIG.platforms.underdog.label, color: CONFIG.platforms.underdog.color },
   { id: 'betr' as const, label: CONFIG.platforms.betr.label, color: CONFIG.platforms.betr.color },
+  { id: 'prizepicks' as const, label: CONFIG.platforms.prizepicks.label, color: CONFIG.platforms.prizepicks.color },
+  { id: 'draftkings_sportsbook' as const, label: 'DraftKings Sportsbook', color: '#f59e0b' },
 ];
 
 function timeAgo(ts?: number): string {
@@ -76,6 +78,8 @@ function render(lines: AllLines): void {
     pick6: lines.pick6?.fighters || [],
     underdog: lines.underdog?.fighters || [],
     betr: lines.betr?.fighters || [],
+    prizepicks: lines.prizepicks?.fighters || [],
+    draftkings_sportsbook: lines.draftkings_sportsbook?.fighters || [],
   };
 
   const preview = document.getElementById('json-preview');
@@ -137,17 +141,18 @@ document.getElementById('retry-pick6-btn')?.addEventListener('click', async () =
   btn.disabled = true;
 
   try {
-    const tabs = await chrome.tabs.query({ url: '*://*.draftkings.com/*' });
-    if (tabs.length > 0) {
-      await chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id! },
-        files: ['dist/content.js'],
-      });
-      await new Promise((r) => setTimeout(r, 4000));
-      await loadAndRender();
-    } else {
-      alert('Open pick6.draftkings.com to a UFC slate first, then retry.');
-    }
+    const pick6Tabs = await chrome.tabs.query({ url: '*://pick6.draftkings.com/*' });
+    const targetTab = pick6Tabs[0] || await chrome.tabs.create({ url: CONFIG.platforms.pick6.url, active: true });
+
+    await new Promise((r) => setTimeout(r, 3500));
+
+    await chrome.scripting.executeScript({
+      target: { tabId: targetTab.id! },
+      files: ['dist/content.js'],
+    });
+
+    await new Promise((r) => setTimeout(r, 4000));
+    await loadAndRender();
   } catch (error) {
     console.error('[UFC Popup] Retry error:', error);
   } finally {

@@ -7,7 +7,7 @@ export const CONFIG = {
       id: 'pick6',
       label: 'Pick6 (DraftKings)',
       color: '#63b3ed',
-      url: 'https://pick6.draftkings.com/pick6/available-players?sport=MMA',
+      url: 'https://pick6.draftkings.com/?sport=UFC',
     },
     underdog: {
       id: 'underdog',
@@ -20,6 +20,12 @@ export const CONFIG = {
       label: 'Betr Fantasy',
       color: '#ff6b2b',
       url: 'https://betr.app/fantasy',
+    },
+    prizepicks: {
+      id: 'prizepicks',
+      label: 'PrizePicks',
+      color: '#3bcf8e',
+      url: 'https://app.prizepicks.com/board',
     },
   },
 
@@ -48,6 +54,7 @@ export const CONFIG = {
     ],
     ufcstats: {
       upcoming: 'http://www.ufcstats.com/statistics/events/upcoming?page=all',
+      completed: 'http://www.ufcstats.com/statistics/events/completed?page=all',
       base: 'http://www.ufcstats.com',
     },
   },

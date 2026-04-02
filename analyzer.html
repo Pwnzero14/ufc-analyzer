@@ -1039,6 +1039,8 @@ body {
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+  flex-shrink: 1;
+  min-width: 0;
 }
 .sort-label {
   font-family: 'JetBrains Mono', monospace;
@@ -1063,6 +1065,97 @@ body {
 }
 .sort-btn.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
 .sort-btn:hover:not(.active) { color: var(--text); border-color: var(--border3); }
+
+/* ── TREND WINDOW TOGGLE ── */
+.trend-window-group { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+/* Sharp line movement badge */
+.sharp-move-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.sharp-move-book {
+  font-weight: 400;
+  opacity: 0.65;
+  font-size: 8px;
+}
+/* Round normalization tag (5R↑ / 3R↓) shown in stat-mini cells */
+.round-norm-tag {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+/* Consensus lean badge */
+.consensus-lean {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  margin-top: 2px;
+}
+/* Per-fighter archive accuracy */
+.archive-accuracy-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  margin-top: 3px;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+}
+/* Opp-adjusted SS projection badge */
+.opp-allows-badge {
+  font-size: 8px;
+  color: var(--text3);
+  margin-left: 3px;
+  letter-spacing: 0.01em;
+  opacity: 0.75;
+}
+/* Best line shopping badge */
+.best-shop-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green);
+  line-height: 1;
+  margin-top: 2px;
+}
+.line-cell.best-line {
+  border-color: rgba(0, 232, 122, 0.35);
+  background: rgba(0, 232, 122, 0.06);
+}
+/* SS variance / spread sub-label */
+.ss-spread-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+  cursor: default;
+}
+.trend-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 4px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.trend-btn.active { background: var(--blue); color: #000; border-color: var(--blue); font-weight: 700; }
+.trend-btn:hover:not(.active) { color: var(--text); border-color: var(--border3); }
 
 /* ── CONSISTENCY BADGE ── */
 .consistency-badge {
@@ -1122,6 +1215,8 @@ body {
   padding-top: 5px;
   padding-bottom: 5px;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .platform-pills-row {
   display: flex;
@@ -1595,6 +1690,7 @@ body {
   border-radius: 4px;
   overflow: hidden;
   background: var(--bg2);
+  flex-shrink: 0;
 }
 .view-tabs .tab-btn {
   font-family: 'Oswald', sans-serif;
@@ -2595,6 +2691,8 @@ body.loading {
     font-size: 10px;
     letter-spacing: 0.08em;
     cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .density-btn.active {
@@ -3030,12 +3128,19 @@ body.loading {
 .ls-cell-val { display: inline-flex; flex-direction: column; align-items: center; padding: 3px 7px 2px; border-radius: 3px; min-width: 32px; line-height: 1.25; }
 .ls-best  { background: rgba(72,199,142,0.22); color: #48c78e; font-weight: 700; }
 .ls-worst { background: rgba(255,100,100,0.14); color: #ff6464; }
+.ls-scale-mismatch { opacity: 0.38; color: var(--text4, #555); font-style: italic; border: 1px dashed rgba(255,255,255,0.1); }
+.archive-stat-summary { display:flex; gap:10px; flex-wrap:wrap; padding:8px 4px; }
+.archive-stat-badge { display:flex; flex-direction:column; gap:2px; padding:8px 14px; background:var(--surface2); border-radius:8px; border-left:3px solid var(--asb-color, var(--text-muted)); min-width:70px; }
+.archive-stat-badge.archive-stat-empty { border-left-color:var(--text4,#555); opacity:0.5; }
+.asb-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
+.asb-val { font-size:13px; font-weight:700; }
 .ls-lean-chip { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; }
 .ls-lean-over  { background: rgba(0,232,122,0.12); color: #00e87a; }
 .ls-lean-under { background: rgba(255,58,96,0.12); color: #ff3a60; }
 
 /* ── NEWS BADGE & MODAL ── */
 .news-warn-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(255,60,60,0.15); color: #ff6060; border: 1px solid rgba(255,60,60,0.28); cursor: pointer; white-space: nowrap; animation: pulse-warn 2s ease-in-out infinite; }
+.conflict-warn { font-size: 9px; font-weight: 600; color: #f0c040; opacity: 0.85; margin-top: 3px; letter-spacing: 0.02em; cursor: default; }
 @keyframes pulse-warn { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
 .news-modal-box { max-width: 560px; }
 .news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -3123,7 +3228,7 @@ body.loading {
   <div class="header-right">
     <div class="ext-status">
       <div class="ext-dot" id="extDot"></div>
-      <span id="extLabel" class="ext-label-muted">No extension data</span>
+      <span id="extLabel" class="ext-label-muted">No extension data</span><span id="openingLinesCount" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span>
     </div>
     <button class="btn btn-ghost auto-fetch-btn" id="autoScrapeBtn" title="Auto-opens Pick6 + Underdog tabs, scrapes lines, and loads them automatically">
       <span id="autoScrapeIcon">⚡</span> AUTO-FETCH LINES
@@ -3182,7 +3287,7 @@ body.loading {
     </div>
   </div>
   <div class="filter-bar-center">
-    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="🔍 Search fighters..." autocomplete="off">
+    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="🔍 Search fighters... or conf:70+ lean:over td:under split:yes" autocomplete="off">
   </div>
   <div class="filter-bar-actions">
     <button id="manualEntryBtn" class="manual-entry-btn">✏️ BETR LINES</button>
@@ -3210,6 +3315,12 @@ body.loading {
     <button class="tab-btn" data-view="under">▼ Lean Under</button>
     <button class="tab-btn" data-view="bestpicks">⚡ AI Best Picks</button>
     <button class="tab-btn" data-view="archive">Archive</button>
+  </div>
+  <div class="trend-window-group" title="Trend window: compare recent N fights vs career average">
+    <span class="sort-label">Trend:</span>
+    <button class="trend-btn active" data-window="3">L3</button>
+    <button class="trend-btn" data-window="5">L5</button>
+    <button class="trend-btn" data-window="0">Career</button>
   </div>
   <button id="historyDensityToggleBtn" class="density-btn" title="Toggle history panel readability">History: Compact</button>
   <button id="densityToggleBtn" class="density-btn" title="Toggle between compact and detailed fighter cards">Compact View</button>

@@ -116,6 +116,8 @@ export interface FighterDB {
   fpStdDev?: number | null;
   fpConsistency?: number | null;
   fpMedian?: number | null;
+  ssStdDev?: number | null;
+  avgTimeMins?: number | null;
   avgFP_perRound?: number | null;
   streak?: Streak;
   fiveRoundRate?: number;
@@ -199,6 +201,7 @@ export interface FighterLineHistory {
 export interface UFCFight {
   f1: string;
   f2: string;
+  scheduledRounds?: number;
 }
 
 export interface UpcomingCard {

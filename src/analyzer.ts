@@ -75,9 +75,31 @@ const statsCachePromises: Record<string, Promise<FighterDB>> = {};
 
 let currentView = 'all';
 let currentPlatform = 'pick6';
+let trendWindow: 3 | 5 | 0 = 3; // 0 = career (no windowed chip)
 let allFighters: AnalyzerFighter[] = [];
 let _leanCache: Map<string, EffectiveLean> | null = null;
 let _fighterByNorm: Map<string, AnalyzerFighter> | null = null;
+// Fighter-level archive accuracy: normName → propType → {hits, total}
+let _fighterArchiveStats: Map<string, Record<string, { hits: number; total: number }>> | null = null;
+
+async function loadFighterArchiveStats(): Promise<void> {
+  const payload = await storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY]);
+  const rows = Array.isArray(payload[STORAGE_PROP_ARCHIVE_KEY])
+    ? (payload[STORAGE_PROP_ARCHIVE_KEY] as PropArchiveRecord[])
+    : [];
+  const map = new Map<string, Record<string, { hits: number; total: number }>>();
+  for (const r of rows) {
+    if (!r.fighter || !Number.isFinite(Number(r.line)) || !Number.isFinite(Number(r.result))) continue;
+    const key = (normalizeName(r.fighter) || r.fighter).toLowerCase();
+    const pt = String(r.propType || 'Unknown');
+    if (!map.has(key)) map.set(key, {});
+    const entry = map.get(key)!;
+    if (!entry[pt]) entry[pt] = { hits: 0, total: 0 };
+    entry[pt].total++;
+    if (Number(r.result) > Number(r.line)) entry[pt].hits++;
+  }
+  _fighterArchiveStats = map;
+}
 
 // ── NEWS CACHE ─────────────────────────────────────────────────────────────
 interface NewsItem { title: string; link: string; pubDate: string; source: string }
@@ -106,9 +128,12 @@ let eventCountdownTimer: ReturnType<typeof setInterval>|null = null;
 let periodicRefreshTimer: ReturnType<typeof setInterval>|null = null;
 let upcomingCardPairs: Array<{ f1: string; f2: string }> = [];
 let upcomingEventName: string = '';
+let upcomingEventTs: number = 0;
 let inferredEventNameFromLines: string = '';
+// Maps normalized fighter name → scheduled rounds (3 or 5) from upcoming card scrape
+const scheduledRoundsMap = new Map<string, number>();
 
-type UpcomingCardFighter = { f1: string; f2: string };
+type UpcomingCardFighter = { f1: string; f2: string; scheduledRounds?: number };
 type UpcomingCard = { event?: string; date?: string; fighters?: UpcomingCardFighter[]; fetchedAt?: number; url?: string };
 type UpcomingCardResponse = { card?: UpcomingCard | null };
 
@@ -150,6 +175,8 @@ function isUpcomingCardFighter(name: string | null | undefined): boolean {
 
 function filterPayloadToUpcomingCard(payload: PlatformLinesPayload | null | undefined): PlatformLinesPayload | null {
   if (!payload?.fighters?.length || !upcomingCardPairs.length) return payload || null;
+  // If the cached card is >10 days away it's the wrong event — don't filter.
+  if (Number.isFinite(upcomingEventTs) && upcomingEventTs - Date.now() > 10 * 24 * 60 * 60 * 1000) return payload;
   const fighters = payload.fighters.filter((fighter) => {
     const fighterName = normalizeName(String(fighter?.name || ''));
     const opponentName = normalizeName(String(fighter?.opponent || ''));
@@ -213,18 +240,24 @@ function applyUpcomingCardContext(card: UpcomingCard | null): void {
   if (!card) {
     upcomingCardPairs = [];
     upcomingEventName = '';
+    scheduledRoundsMap.clear();
     return;
   }
 
+  scheduledRoundsMap.clear();
   upcomingCardPairs = (card.fighters || [])
     .map((fight) => {
       const f1 = normalizeName(fight.f1);
       const f2 = normalizeName(fight.f2);
       if (!f1 || !f2 || f1 === f2) return null;
+      const rounds = fight.scheduledRounds ?? 3;
+      scheduledRoundsMap.set(f1, rounds);
+      scheduledRoundsMap.set(f2, rounds);
       return { f1, f2 };
     })
     .filter((p): p is { f1: string; f2: string } => p != null);
   upcomingEventName = buildEventDisplayName(card.event || '', card.fighters);
+  upcomingEventTs = parseEventDateMs(card.date || '');
 }
 
 async function syncUpcomingCardContext(forceRefresh = false): Promise<UpcomingCard | null> {
@@ -564,6 +597,10 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
   const avgSigStr = fightsSS.length
     ? parseFloat((fightsSS.reduce((s,f) => s + (f.sigStr || 0), 0) / fightsSS.length).toFixed(1))
     : (careerStats?.slpm != null ? parseFloat((careerStats.slpm * 15).toFixed(1)) : null);
+  const ssVals = fightsSS.map(f => f.sigStr as number);
+  const ssStdDev = ssVals.length >= 2
+    ? parseFloat(Math.sqrt(ssVals.reduce((s, v) => s + Math.pow(v - ssVals.reduce((a, b) => a + b, 0) / ssVals.length, 2), 0) / ssVals.length).toFixed(1))
+    : null;
   const fightsTD = history.filter(f => f.td != null);
   const avgTDperFight = fightsTD.length ? parseFloat((fightsTD.reduce((s,f) => s + (f.td || 0), 0) / fightsTD.length).toFixed(1)) : null;
 
@@ -576,6 +613,10 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
   const streak         = detectStreak(history);
   const fiveRoundFights = history.filter(f => (f.round || 0) >= 4).length;
   const fiveRoundRate   = history.length > 0 ? parseFloat((fiveRoundFights / history.length).toFixed(2)) : 0;
+  const timeSamples = history.filter(h => h.timeSecs != null && (h.timeSecs as number) > 0).map(h => (h.timeSecs as number) / 60);
+  const avgTimeMins = timeSamples.length >= 2
+    ? parseFloat((timeSamples.reduce((s, v) => s + v, 0) / timeSamples.length).toFixed(1))
+    : null;
 
   return {
     record: careerStats?.record || '—',
@@ -586,6 +627,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
     avgFP_pp,
     avgFP_betr,
     avgSigStr,
+    ssStdDev,
     avgTD: careerStats?.tdAvg || null,
     avgTDperFight,
     slpm: careerStats?.slpm || null,
@@ -606,6 +648,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
     avgFP_perRound,
     streak,
     fiveRoundRate,
+    avgTimeMins,
     history,
     oppHistory: history
       .filter(f => f.oppStats != null)
@@ -2984,6 +3027,22 @@ function calcLean(
     'betr';
   const historyFP = history.map(h => getFightFantasyValueForPlatform(h, historyPlatform));
   const mlAdjFP = calcMLAdjustedFP(history, moneyline);
+
+  // ── Opp-adjusted FP projection ────────────────────────────────────────────
+  // Use opponent's historical FP-allowed to estimate matchup-specific output.
+  const oppFPSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+    .map(h => getFightFantasyValueForPlatform(h, historyPlatform))
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const oppAvgFPAllowed = oppFPSamples.length >= 3
+    ? parseFloat((oppFPSamples.reduce((s, v) => s + v, 0) / oppFPSamples.length).toFixed(1))
+    : null;
+  const baseFP = mlAdjFP ?? avgFP ?? null;
+  const projFP = (baseFP != null && oppAvgFPAllowed != null)
+    ? parseFloat(((baseFP + oppAvgFPAllowed) / 2).toFixed(1))
+    : null;
+  // When projFP is available it subsumes ML adjustment — use it as the primary signal
+  const effectiveFP = projFP ?? baseFP ?? avgFP ?? null;
+
   const reasons: LeanReason[] = [];
   let score = 0;
 
@@ -3010,21 +3069,25 @@ function calcLean(
 
   const platformProjections: number[] = [];
 
-  if (avgFP != null) {
-    const diff = avgFP - line;
-    if (diff > 12)      { score += 2.5; reasons.push({ icon: 'pos', text: `Historical avg (${avgFP.toFixed(1)} FP) is ${diff.toFixed(1)} pts above the line — strong over value` }); }
-    else if (diff > 5)  { score += 1.5; reasons.push({ icon: 'pos', text: `Historical avg (${avgFP.toFixed(1)} FP) is ${diff.toFixed(1)} pts above the line` }); }
-    else if (diff > 1)  { score += 0.5; reasons.push({ icon: 'pos', text: `Historical avg (${avgFP.toFixed(1)} FP) slightly edges the line` }); }
-    else if (diff < -12){ score -= 2.5; reasons.push({ icon: 'neg', text: `Historical avg (${avgFP.toFixed(1)} FP) is ${Math.abs(diff).toFixed(1)} pts BELOW the line — line may be set too high` }); }
-    else if (diff < -5) { score -= 1.5; reasons.push({ icon: 'neg', text: `Historical avg (${avgFP.toFixed(1)} FP) trails the line by ${Math.abs(diff).toFixed(1)} pts` }); }
-    else if (diff < -1) { score -= 0.5; reasons.push({ icon: 'neg', text: `Historical avg (${avgFP.toFixed(1)} FP) slightly below the line` }); }
-    else                { reasons.push({ icon: 'neu', text: `Historical avg (${avgFP.toFixed(1)} FP) is essentially at the line — genuine toss-up` }); }
+  if (effectiveFP != null) {
+    const fpLabel = projFP != null
+      ? `Proj FP (${effectiveFP.toFixed(1)} — avg ${(baseFP ?? avgFP ?? 0).toFixed(1)} + opp allows ${oppAvgFPAllowed})`
+      : `Historical avg (${effectiveFP.toFixed(1)} FP)`;
+    const diff = effectiveFP - line;
+    if (diff > 12)      { score += 2.5; reasons.push({ icon: 'pos', text: `${fpLabel} is ${diff.toFixed(1)} pts above the line — strong over value` }); }
+    else if (diff > 5)  { score += 1.5; reasons.push({ icon: 'pos', text: `${fpLabel} is ${diff.toFixed(1)} pts above the line` }); }
+    else if (diff > 1)  { score += 0.5; reasons.push({ icon: 'pos', text: `${fpLabel} slightly edges the line` }); }
+    else if (diff < -12){ score -= 2.5; reasons.push({ icon: 'neg', text: `${fpLabel} is ${Math.abs(diff).toFixed(1)} pts BELOW the line — line may be set too high` }); }
+    else if (diff < -5) { score -= 1.5; reasons.push({ icon: 'neg', text: `${fpLabel} trails the line by ${Math.abs(diff).toFixed(1)} pts` }); }
+    else if (diff < -1) { score -= 0.5; reasons.push({ icon: 'neg', text: `${fpLabel} slightly below the line` }); }
+    else                { reasons.push({ icon: 'neu', text: `${fpLabel} is essentially at the line — genuine toss-up` }); }
   } else {
     reasons.push({ icon: 'neu', text: `No historical FP data available — line analysis based on career stats only` });
   }
 
   // ── MONEYLINE-ADJUSTED PROJECTION ────────────────────────────────────────
-  if (mlAdjFP != null && moneyline != null && avgFP != null) {
+  // Only surface the ML adj signal when projFP is NOT active (projFP already incorporates mlAdjFP)
+  if (projFP == null && mlAdjFP != null && moneyline != null && avgFP != null) {
     const impliedPct = Math.round(moneylineToImpliedProb(moneyline) * 100);
     const adjDiff = mlAdjFP - line;
     const shift = mlAdjFP - avgFP;
@@ -3332,17 +3395,33 @@ function calcSSLean(_name: string, db: FighterDB|null, line_ss: number|null, opp
   if (history.length < 3) return null;
 
   const avgSS = history.reduce((s,h) => s + (h.sigStr || 0), 0) / history.length;
+
+  // ── Opp-adjusted SS projection ────────────────────────────────────────────
+  const oppSSSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+    .map(h => h.sigStr)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const oppAvgSSAllowedLean = oppSSSamples.length >= 3
+    ? parseFloat((oppSSSamples.reduce((s, v) => s + v, 0) / oppSSSamples.length).toFixed(1))
+    : null;
+  const projSSLean = oppAvgSSAllowedLean != null
+    ? parseFloat(((avgSS + oppAvgSSAllowedLean) / 2).toFixed(1))
+    : null;
+  const effectiveSS = projSSLean ?? avgSS;
+
   const reasons: LeanReason[] = [];
   let score = 0;
 
-  const diff = avgSS - line_ss;
-  if      (diff > 20)  { score += 2.5; reasons.push({ icon:'pos', text:`Avg SS (${avgSS.toFixed(1)}) is ${diff.toFixed(1)} above line — strong over value` }); }
-  else if (diff > 8)   { score += 1.5; reasons.push({ icon:'pos', text:`Avg SS (${avgSS.toFixed(1)}) edges the line by ${diff.toFixed(1)}` }); }
-  else if (diff > 3)   { score += 0.5; reasons.push({ icon:'pos', text:`Avg SS (${avgSS.toFixed(1)}) slightly above line` }); }
-  else if (diff < -20) { score -= 2.5; reasons.push({ icon:'neg', text:`Avg SS (${avgSS.toFixed(1)}) is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
-  else if (diff < -8)  { score -= 1.5; reasons.push({ icon:'neg', text:`Avg SS (${avgSS.toFixed(1)}) trails line by ${Math.abs(diff).toFixed(1)}` }); }
-  else if (diff < -3)  { score -= 0.5; reasons.push({ icon:'neg', text:`Avg SS (${avgSS.toFixed(1)}) slightly below line` }); }
-  else                 {               reasons.push({ icon:'neu', text:`Avg SS (${avgSS.toFixed(1)}) near line — toss-up` }); }
+  const ssLabel = projSSLean != null
+    ? `Proj SS (${effectiveSS.toFixed(1)} — avg ${avgSS.toFixed(1)} + opp allows ${oppAvgSSAllowedLean})`
+    : `Avg SS (${effectiveSS.toFixed(1)})`;
+  const diff = effectiveSS - line_ss;
+  if      (diff > 20)  { score += 2.5; reasons.push({ icon:'pos', text:`${ssLabel} is ${diff.toFixed(1)} above line — strong over value` }); }
+  else if (diff > 8)   { score += 1.5; reasons.push({ icon:'pos', text:`${ssLabel} edges the line by ${diff.toFixed(1)}` }); }
+  else if (diff > 3)   { score += 0.5; reasons.push({ icon:'pos', text:`${ssLabel} slightly above line` }); }
+  else if (diff < -20) { score -= 2.5; reasons.push({ icon:'neg', text:`${ssLabel} is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
+  else if (diff < -8)  { score -= 1.5; reasons.push({ icon:'neg', text:`${ssLabel} trails line by ${Math.abs(diff).toFixed(1)}` }); }
+  else if (diff < -3)  { score -= 0.5; reasons.push({ icon:'neg', text:`${ssLabel} slightly below line` }); }
+  else                 {               reasons.push({ icon:'neu', text:`${ssLabel} near line — toss-up` }); }
 
   const hits = history.filter(h => (h.sigStr || 0) > line_ss).length;
   const rate = hits / history.length;
@@ -3389,13 +3468,29 @@ function calcSSLean(_name: string, db: FighterDB|null, line_ss: number|null, opp
   else if (score <= -0.5){ lean = 'under'; conf = 54; }
   else                   { lean = 'push';  conf = 50; }
 
-  const verdict = lean === 'over'
-    ? `SS OVER ${line_ss} (avg ${avgSS.toFixed(1)}) — ${reasons[0]?.text}`
-    : lean === 'under'
-    ? `SS UNDER ${line_ss} (avg ${avgSS.toFixed(1)}) — ${reasons[0]?.text}`
-    : `SS NO LEAN at ${line_ss} (avg ${avgSS.toFixed(1)})`;
+  // Variance haircut: high SS spread means the outcome is less predictable
+  const ssStdDev = db.ssStdDev ?? null;
+  if (ssStdDev != null && lean !== 'push') {
+    if (ssStdDev > 14) {
+      conf = Math.max(50, conf - 8);
+      reasons.push({ icon: 'neg', text: `High SS variance (±${ssStdDev.toFixed(1)}) — volatile output, confidence reduced` });
+    } else if (ssStdDev > 7) {
+      conf = Math.max(50, conf - 4);
+      reasons.push({ icon: 'neu', text: `Moderate SS variance (±${ssStdDev.toFixed(1)}) — some output unpredictability` });
+    } else {
+      conf = Math.min(90, conf + 3);
+      reasons.push({ icon: 'pos', text: `Tight SS variance (±${ssStdDev.toFixed(1)}) — consistent output, confidence boosted` });
+    }
+  }
 
-  return { lean, conf: Math.round(conf), score: parseFloat(score.toFixed(2)), reasons, verdict, avg: avgSS, line: line_ss, type: 'ss' };
+  const ssVerdict = projSSLean != null ? `proj ${projSSLean.toFixed(1)}` : `avg ${avgSS.toFixed(1)}`;
+  const verdict = lean === 'over'
+    ? `SS OVER ${line_ss} (${ssVerdict}) — ${reasons[0]?.text}`
+    : lean === 'under'
+    ? `SS UNDER ${line_ss} (${ssVerdict}) — ${reasons[0]?.text}`
+    : `SS NO LEAN at ${line_ss} (${ssVerdict})`;
+
+  return { lean, conf: Math.round(conf), score: parseFloat(score.toFixed(2)), reasons, verdict, avg: effectiveSS, line: line_ss, type: 'ss' };
 }
 
 function calcTDLean(_name: string, db: FighterDB|null, line_td: number|null, oppDB: FighterDB|null, dkLine?: number|null): LeanResult|null {
@@ -3404,17 +3499,33 @@ function calcTDLean(_name: string, db: FighterDB|null, line_td: number|null, opp
   if (history.length < 3) return null;
 
   const avgTD = history.reduce((s,h) => s + (h.td || 0), 0) / history.length;
+
+  // ── Opp-adjusted TD projection ────────────────────────────────────────────
+  const oppTDSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+    .map(h => h.td)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  const oppAvgTDAllowed = oppTDSamples.length >= 3
+    ? parseFloat((oppTDSamples.reduce((s, v) => s + v, 0) / oppTDSamples.length).toFixed(1))
+    : null;
+  const projTD = (oppAvgTDAllowed != null)
+    ? parseFloat(((avgTD + oppAvgTDAllowed) / 2).toFixed(1))
+    : null;
+  const effectiveTD = projTD ?? avgTD;
+
   const reasons: LeanReason[] = [];
   let score = 0;
 
-  const diff = avgTD - line_td;
-  if      (diff > 3)   { score += 2.5; reasons.push({ icon:'pos', text:`Avg TDs (${avgTD.toFixed(1)}) is ${diff.toFixed(1)} above line — strong over value` }); }
-  else if (diff > 1.5) { score += 1.5; reasons.push({ icon:'pos', text:`Avg TDs (${avgTD.toFixed(1)}) edges line by ${diff.toFixed(1)}` }); }
-  else if (diff > 0.5) { score += 0.5; reasons.push({ icon:'pos', text:`Avg TDs (${avgTD.toFixed(1)}) slightly above line` }); }
-  else if (diff < -3)  { score -= 2.5; reasons.push({ icon:'neg', text:`Avg TDs (${avgTD.toFixed(1)}) is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
-  else if (diff < -1.5){ score -= 1.5; reasons.push({ icon:'neg', text:`Avg TDs (${avgTD.toFixed(1)}) trails line by ${Math.abs(diff).toFixed(1)}` }); }
-  else if (diff < -0.5){ score -= 0.5; reasons.push({ icon:'neg', text:`Avg TDs (${avgTD.toFixed(1)}) slightly below line` }); }
-  else                 {               reasons.push({ icon:'neu', text:`Avg TDs (${avgTD.toFixed(1)}) near line — toss-up` }); }
+  const tdLabel = projTD != null
+    ? `Proj TDs (${effectiveTD.toFixed(1)} — avg ${avgTD.toFixed(1)} + opp allows ${oppAvgTDAllowed})`
+    : `Avg TDs (${effectiveTD.toFixed(1)})`;
+  const diff = effectiveTD - line_td;
+  if      (diff > 3)   { score += 2.5; reasons.push({ icon:'pos', text:`${tdLabel} is ${diff.toFixed(1)} above line — strong over value` }); }
+  else if (diff > 1.5) { score += 1.5; reasons.push({ icon:'pos', text:`${tdLabel} edges line by ${diff.toFixed(1)}` }); }
+  else if (diff > 0.5) { score += 0.5; reasons.push({ icon:'pos', text:`${tdLabel} slightly above line` }); }
+  else if (diff < -3)  { score -= 2.5; reasons.push({ icon:'neg', text:`${tdLabel} is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
+  else if (diff < -1.5){ score -= 1.5; reasons.push({ icon:'neg', text:`${tdLabel} trails line by ${Math.abs(diff).toFixed(1)}` }); }
+  else if (diff < -0.5){ score -= 0.5; reasons.push({ icon:'neg', text:`${tdLabel} slightly below line` }); }
+  else                 {               reasons.push({ icon:'neu', text:`${tdLabel} near line — toss-up` }); }
 
   const hits = history.filter(h => (h.td || 0) > line_td).length;
   const rate = hits / history.length;
@@ -3461,13 +3572,14 @@ function calcTDLean(_name: string, db: FighterDB|null, line_td: number|null, opp
   else if (score <= -0.5){ lean = 'under'; conf = 54; }
   else                   { lean = 'push';  conf = 50; }
 
+  const tdVerdict = projTD != null ? `proj ${projTD.toFixed(1)}` : `avg ${avgTD.toFixed(1)}`;
   const verdict = lean === 'over'
-    ? `TD OVER ${line_td} (avg ${avgTD.toFixed(1)}) — ${reasons[0]?.text}`
+    ? `TD OVER ${line_td} (${tdVerdict}) — ${reasons[0]?.text}`
     : lean === 'under'
-    ? `TD UNDER ${line_td} (avg ${avgTD.toFixed(1)}) — ${reasons[0]?.text}`
-    : `TD NO LEAN at ${line_td} (avg ${avgTD.toFixed(1)})`;
+    ? `TD UNDER ${line_td} (${tdVerdict}) — ${reasons[0]?.text}`
+    : `TD NO LEAN at ${line_td} (${tdVerdict})`;
 
-  return { lean, conf: Math.round(conf), score: parseFloat(score.toFixed(2)), reasons, verdict, avg: avgTD, line: line_td, type: 'td' };
+  return { lean, conf: Math.round(conf), score: parseFloat(score.toFixed(2)), reasons, verdict, avg: effectiveTD, line: line_td, type: 'td' };
 }
 
 function calcFTLean(_name: string, db: FighterDB|null, line_ft: number|null, oppDB: FighterDB|null, dkLine?: number|null): LeanResult|null {
@@ -3652,6 +3764,54 @@ function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
 function getEffectiveLean(f: AnalyzerFighter): EffectiveLean {
   return _leanCache?.get(f.name) ?? _computeEffectiveLean(f);
 }
+
+/**
+ * Compute EV% for a fighter's effective lean using actual side odds (DK American or UD multiplier).
+ * Returns null when no side odds are available (FP lean, or stat lean with no odds scraped).
+ * EV% = round((winProb * profitPerUnit - lossProb) * 100)
+ */
+function computeFighterEV(f: AnalyzerFighter, el: EffectiveLean): number | null {
+  if (el.lean !== 'over' && el.lean !== 'under') return null;
+  const isOver = el.lean === 'over';
+  const odds =
+    el._source === 'ss' ? (isOver ? f.ss_over_odds  : f.ss_under_odds)  :
+    el._source === 'td' ? (isOver ? f.td_over_odds  : f.td_under_odds)  :
+    el._source === 'ft' ? (isOver ? f.ft_over_odds  : f.ft_under_odds)  :
+    null;
+  if (odds == null || !Number.isFinite(odds)) return null;
+  // American odds (|odds| >= 100) → convert to profit-per-unit
+  // Underdog multiplier (0 < odds < 20) → already profit-per-unit (e.g. 0.94)
+  let profit: number;
+  if (Math.abs(odds) >= 100) {
+    profit = odds < 0 ? 100 / Math.abs(odds) : odds / 100;
+  } else if (odds > 0) {
+    profit = odds;
+  } else {
+    return null;
+  }
+  const winProb = (el.conf || 0) / 100;
+  return Math.round((winProb * profit - (1 - winProb)) * 100);
+}
+
+/** Returns true when FP drives the lean but SS AND TD both lean the opposite direction — hidden risk. */
+function hasCrossStatConflict(f: AnalyzerFighter): boolean {
+  const eff = getEffectiveLean(f);
+  if (eff._source !== 'fp' || !eff.lean || eff.lean === 'none' || eff.lean === 'push') return false;
+  const opposite = eff.lean === 'over' ? 'under' : 'over';
+  const ssOpp = f.lean_ss?.lean === opposite;
+  const tdOpp = f.lean_td?.lean === opposite;
+  return ssOpp && tdOpp;
+}
+// Consensus lean: FP + SS + TD all point the same direction with actionable confidence
+function hasConsensusLean(f: AnalyzerFighter): 'over' | 'under' | null {
+  const eff = getEffectiveLean(f);
+  const dir = eff.lean;
+  if (!dir || dir === 'none' || dir === 'push') return null;
+  if ((f.lean_ss?.conf ?? 0) < 55 || (f.lean_td?.conf ?? 0) < 55) return null;
+  const ssMatch = f.lean_ss?.lean === dir;
+  const tdMatch = f.lean_td?.lean === dir;
+  return (ssMatch && tdMatch) ? dir : null;
+}
 function primeCaches(): void {
   _leanCache = new Map();
   _fighterByNorm = new Map();
@@ -3789,7 +3949,11 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
         .filter((name) => !!name)
     ).size;
     setText('ldResolved', `${resolvedRows.length} resolved`);
-    setText('ldCoverage', `${fighterCount} fighters across ${eventCount} event${eventCount === 1 ? '' : 's'} (archive window)`);
+    const MIN_CALIBRATION_EVENTS = 6;
+    const calibNote = eventCount >= MIN_CALIBRATION_EVENTS
+      ? `(archive window)`
+      : `(archive window · ${MIN_CALIBRATION_EVENTS - eventCount} more event${MIN_CALIBRATION_EVENTS - eventCount === 1 ? '' : 's'} to unlock calibration)`;
+    setText('ldCoverage', `${fighterCount} fighters across ${eventCount} event${eventCount === 1 ? '' : 's'} ${calibNote}`);
 
     const computeOverRate = (rows: PropArchiveRecord[]): { hits: number; total: number; pct: number | null } => {
       let hits = 0;
@@ -3806,7 +3970,7 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
 
     const ssStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'SS'));
     const fpStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'Fantasy'));
-    const tdStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'Takedowns'));
+    const tdStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'TD'));
     const ftStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'FightTime'));
     const ssLabel = ssStats.pct == null ? '--%' : `${ssStats.pct}%`;
     const fpLabel = fpStats.pct == null ? '--%' : `${fpStats.pct}%`;
@@ -4066,7 +4230,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return true;
     });
 
-    if (matchingRows.length < 3) {
+    // FT and TD are low-sample stat types — require only 2 settled rows instead of 3
+    const minSamples = (propType === 'FT' || propType === 'TD') ? 2 : 3;
+
+    if (matchingRows.length < minSamples) {
       bestPickConfidenceCache.set(cacheKey, baseConfidence);
       bestPickReasonCache.set(cacheKey, null);
       return baseConfidence;
@@ -4085,16 +4252,22 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       if (directionalEdge > 0) hits += 1;
     }
 
-    if (total < 3) {
+    if (total < minSamples) {
       bestPickConfidenceCache.set(cacheKey, baseConfidence);
       bestPickReasonCache.set(cacheKey, null);
       return baseConfidence;
     }
 
     const hitRate = hits / total;
+    // Dead zone: 47–53% hit rate is statistical noise, not signal — skip adjustment entirely
+    if (hitRate >= 0.47 && hitRate <= 0.53) {
+      bestPickConfidenceCache.set(cacheKey, baseConfidence);
+      bestPickReasonCache.set(cacheKey, null);
+      return baseConfidence;
+    }
     const avgDirectionalEdge = directionalEdgeSum / total;
     const isStatOver = el.lean === 'over' && (el._source === 'ss' || el._source === 'td' || el._source === 'ft');
-    const penalty = hitRate < 0.52
+    const penalty = hitRate < 0.47
       ? Math.min(18, ((0.52 - hitRate) * 42) + (avgDirectionalEdge < 0 ? Math.min(8, Math.abs(avgDirectionalEdge) / 4) : 0) + (isStatOver ? 3 : 0))
       : 0;
     const bonus = hitRate > 0.62 && avgDirectionalEdge > 0
@@ -4103,11 +4276,12 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const oddsAdjustment = getOddsAdjustment(f, el, baseConfidence);
     const adjustedConfidence = Math.round(Math.max(0, Math.min(99, baseConfidence - penalty + bonus + oddsAdjustment.delta)));
 
+    const lowNTag = minSamples === 2 ? ' (low-n)' : '';
     let note: string | null = null;
     if (penalty >= 4) {
-      note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples, so confidence was trimmed.`;
+      note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples${lowNTag}, so confidence was trimmed.`;
     } else if (bonus >= 3) {
-      note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples, so confidence was boosted.`;
+      note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples${lowNTag}, so confidence was boosted.`;
     }
     if (oddsAdjustment.note) {
       note = note ? `${note} ${oddsAdjustment.note}` : oddsAdjustment.note;
@@ -4140,23 +4314,49 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return { label: 'Low', rank: 1 };
   };
 
+  // Correlation penalty map: same-fight pair in same section — lower-ranked fighter is demoted
+  const corrPenaltyMap = new Map<string, number>();
+
   const bestPickSort = (a: AnalyzerFighter, b: AnalyzerFighter): number => {
     const ta = pickTier(a);
     const tb = pickTier(b);
     if (tb.rank !== ta.rank) return tb.rank - ta.rank;
     const ea = getBestPickLean(a);
     const eb = getBestPickLean(b);
-    const adjA = getAdjustedBestPickConfidence(a);
-    const adjB = getAdjustedBestPickConfidence(b);
+    const adjA = getAdjustedBestPickConfidence(a) - (corrPenaltyMap.get(a.name) || 0);
+    const adjB = getAdjustedBestPickConfidence(b) - (corrPenaltyMap.get(b.name) || 0);
     if (adjB !== adjA) return adjB - adjA;
     return ((eb.ev || 0) - (ea.ev || 0));
   };
 
-  const overs  = visibleFighters.filter(f => getBestPickLean(f).lean === 'over').sort(bestPickSort).slice(0, 8);
-  const unders = visibleFighters.filter(f => getBestPickLean(f).lean === 'under').sort(bestPickSort).slice(0, 8);
+  // Detect same-fight pairs and penalize the lower-ranked fighter
+  const buildCorrPenalties = (sorted: AnalyzerFighter[]): void => {
+    const seenNames = new Map<string, string>(); // lowercase name → original
+    for (const f of sorted) {
+      if (!f.opponent) continue;
+      const oppKey = f.opponent.toLowerCase();
+      if (seenNames.has(oppKey)) {
+        // f appears after its opponent in the ranked list — it's the weaker side
+        corrPenaltyMap.set(f.name, 10);
+      } else {
+        seenNames.set(f.name.toLowerCase(), f.name);
+      }
+    }
+  };
+
+  // Sort without slice first to establish rank order for conflict detection
+  const allOvers  = visibleFighters.filter(f => getBestPickLean(f).lean === 'over').sort(bestPickSort);
+  const allUnders = visibleFighters.filter(f => getBestPickLean(f).lean === 'under').sort(bestPickSort);
+
+  // Populate penalty map, then re-sort so penalized fighters drop in rank
+  buildCorrPenalties(allOvers);
+  buildCorrPenalties(allUnders);
+
+  const overs  = allOvers.sort(bestPickSort).slice(0, 8);
+  const unders = allUnders.sort(bestPickSort).slice(0, 8);
   void persistBestPicksSnapshot(overs, unders);
 
-  // Feature 6: flag fighters whose opponent is in the SAME section (can't both dominate)
+  // Flag fighters whose opponent is still in the SAME section after demotion
   const overNames = new Set(overs.map(f => f.name.toLowerCase()));
   const underNames = new Set(unders.map(f => f.name.toLowerCase()));
   const conflictFighters = new Set<string>();
@@ -4176,9 +4376,13 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
       const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source">(${el._source?.toUpperCase()} line)</span>` : '';
 
-      // Feature 6: conflict tag
-      const conflictTag = conflictFighters.has(f.name)
-        ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">⚡ corr</span>` : '';
+      // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts show ⚡ corr
+      const corrPenalty = corrPenaltyMap.get(f.name) || 0;
+      const conflictTag = corrPenalty > 0
+        ? ` <span class="best-pick-conflict" title="Opponent picked same direction — demoted ${corrPenalty}pts (correlated slate risk)">⬇ corr</span>`
+        : conflictFighters.has(f.name)
+        ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">⚡ corr</span>`
+        : '';
 
       // Feature 1: show best available line across platforms if a better one exists
       const src = el._source;
@@ -4347,6 +4551,12 @@ const _h2hFighterMap = new Map<string, AnalyzerFighter>();
 // ── OPENING LINE TRACKER ───────────────────────────────────────────────────
 const _openingLines = new Map<string, number>();
 let _openingLinesEventKey = '';
+let _skipNextSnapshot = false;
+// True only when baseline was loaded from storage (not freshly created this session).
+// Stale-baseline auto-detect must NOT fire on a freshly-created baseline (delta is always 0 then).
+let _openingLinesFromStorage = false;
+// Once stale detect fires once per session, prevent it from firing again (avoids infinite reset loop).
+let _staleDetectFired = false;
 
 function openingLineKey(platform: string, stat: string, name: string): string {
   return `${platform}|${stat}|${name.toLowerCase().trim()}`;
@@ -4361,12 +4571,29 @@ async function loadOpeningLines(): Promise<void> {
   for (const [k, v] of Object.entries(data.lines)) {
     if (Number.isFinite(v)) _openingLines.set(k, v);
   }
+  _openingLinesFromStorage = _openingLines.size > 0;
+}
+
+function normalizeEventKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function snapshotOpeningLines(): void {
+  // If we just cleared a stale baseline, skip this one cycle so the NEXT auto-fetch
+  // sets fresh opening values (not the same current values we just cleared).
+  if (_skipNextSnapshot) {
+    _skipNextSnapshot = false;
+    return;
+  }
   const eventKey = inferredEventNameFromLines || 'unknown';
-  if (eventKey !== _openingLinesEventKey && eventKey !== 'unknown') {
+  // Only reset opening lines when the event genuinely changes (normalized match).
+  // Never clear if stored key is empty (first session) or current key is unknown.
+  const storedNorm  = normalizeEventKey(_openingLinesEventKey);
+  const currentNorm = normalizeEventKey(eventKey);
+  if (currentNorm !== 'unknown' && storedNorm !== '' && currentNorm !== storedNorm) {
     _openingLines.clear();
+    _openingLinesEventKey = eventKey;
+  } else if (currentNorm !== 'unknown' && storedNorm === '') {
     _openingLinesEventKey = eventKey;
   }
 
@@ -4448,6 +4675,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const currentRoster = new Set(
     allFighters.map((f) => normalizeName(f.name)?.toLowerCase()).filter((n): n is string => !!n)
   );
+  // When no lines are loaded, treat all archive fighters as "on roster" so archive always shows
+  const rosterFilter = (fighter: string) => currentRoster.size === 0 || currentRoster.has(fighter.toLowerCase());
 
   const londonTs = Date.parse(UFC_LONDON_CUTOFF_ISO);
   const nowTs    = Date.now();
@@ -4463,16 +4692,18 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // ── Per-event breakdown ────────────────────────────────────────────────
   // key = dedup key, value includes display name, date, and counts
-  const eventMap = new Map<string, { display: string; date: number; hits: number; total: number; unresolved: number }>();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const eventMap = new Map<string, { display: string; date: number; hits: number; total: number; unresolved: number; recordCount: number }>();
   for (const r of allRows.filter(r => Number.isFinite(Date.parse(r.date)) && Date.parse(r.date) >= londonTs)) {
     const ev = r.event || 'Unknown';
     const key = eventDedupeKey(ev);
     const rDate = Date.parse(r.date);
-    const bucket = eventMap.get(key) || { display: ev, date: rDate, hits: 0, total: 0, unresolved: 0 };
+    const bucket = eventMap.get(key) || { display: ev, date: rDate, hits: 0, total: 0, unresolved: 0, recordCount: 0 };
     // Prefer the longer, more descriptive event name as display name
     if (ev.length > bucket.display.length) bucket.display = ev;
     // Track earliest record date for this event
     if (rDate < bucket.date) bucket.date = rDate;
+    bucket.recordCount++;
     if (Number.isFinite(Number(r.line)) && Number.isFinite(Number(r.result))) {
       bucket.total++;
       if (Number(r.result) > Number(r.line)) bucket.hits++;
@@ -4481,6 +4712,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     }
     eventMap.set(key, bucket);
   }
+
+  // Note: eventDedupeKey already handles reversed-name duplicates (e.g. "Grasso vs Barber" ↔
+  // "Barber vs Grasso") by sorting surnames — no extra date-proximity merge needed.
 
   // ── AI lean snapshot accuracy per event ───────────────────────────────
   const aiSnapshotPayload = await storageGet<Record<string, unknown>>([STORAGE_AI_LEAN_SNAPSHOT_KEY]);
@@ -4519,7 +4753,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const aiAccuracyMap = new Map<string, { hits: number; total: number }>();
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
-    if (!key || aiAccuracyMap.has(key)) continue;  // keep first (most recent) snapshot per event
+    if (!key || aiAccuracyMap.has(key)) continue;
     const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
     const acc = computeAiAccuracy(snap, eventArchiveRows);
     if (acc.total > 0) aiAccuracyMap.set(key, acc);
@@ -4527,11 +4761,11 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // Split into past events (show results) and upcoming (show as pending only)
   const pastEventRows = Array.from(eventMap.values())
-    .filter(d => d.date <= nowTs)
+    .filter(d => d.date <= nowTs || d.total > 0) // treat settled events as past regardless of date
     .sort((a, b) => b.date - a.date)
     .slice(0, 6);
   const upcomingEvents = Array.from(eventMap.values())
-    .filter(d => d.date > nowTs);
+    .filter(d => d.date > nowTs && d.total === 0);
 
   // Only count resolved rows from past events for stats
   const pastEventKeys = new Set(
@@ -4548,6 +4782,53 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     Number.isFinite(Number(r.line)) && !Number.isFinite(Number(r.result))
   ).length;
 
+  // ── Pending outcomes — past events with unresolved props ─────────────────
+  // Build per-event pending breakdowns (propType counts) for the settlement banner
+  type PendingEvent = { display: string; total: number; byType: Record<string, number> };
+  const pendingEventMap = new Map<string, PendingEvent>();
+  for (const r of allRows) {
+    if (!Number.isFinite(Number(r.line)) || Number.isFinite(Number(r.result))) continue;
+    const key = eventDedupeKey(r.event || '');
+    const evData = eventMap.get(key);
+    // Only show banner for PAST events (not upcoming futures)
+    if (!evData || (evData.date > nowTs && evData.total === 0)) continue;
+    const p = pendingEventMap.get(key) || { display: evData.display, total: 0, byType: {} };
+    p.total++;
+    const pt = String(r.propType || 'Unknown');
+    p.byType[pt] = (p.byType[pt] || 0) + 1;
+    pendingEventMap.set(key, p);
+  }
+  const pendingEvents = Array.from(pendingEventMap.values()).sort((a, b) => b.total - a.total);
+
+  // ── AI pick accuracy by stat type (lean-direction correct, over + under) ──
+  const aiAccuracyByType: Record<string, { hits: number; total: number }> = {};
+  for (const snap of aiSnapshots) {
+    const key = eventDedupeKey(String(snap?.event || ''));
+    if (!key || !pastEventKeys.has(key)) continue;
+    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    for (const pick of (snap?.picks ?? []) as any[]) {
+      const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
+      const lean = String(pick?.lean || '');
+      const source = String(pick?.source || 'fp');
+      const activeLine = Number(pick?.activeLine);
+      if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine)) continue;
+      const propType = source === 'ss' ? 'SS' : source === 'td' ? 'TD' : source === 'ft' ? 'FightTime' : 'Fantasy';
+      const match = eventArchiveRows
+        .filter(r =>
+          normalizeName(r.fighter)?.toLowerCase() === fighter &&
+          String(r.propType) === propType &&
+          Number.isFinite(Number(r.result))
+        )
+        .sort((a, b) => Math.abs(Number(a.line ?? activeLine) - activeLine) - Math.abs(Number(b.line ?? activeLine) - activeLine))[0];
+      if (!match) continue;
+      if (!aiAccuracyByType[propType]) aiAccuracyByType[propType] = { hits: 0, total: 0 };
+      aiAccuracyByType[propType].total++;
+      const res = Number(match.result);
+      if (lean === 'over' && res > activeLine) aiAccuracyByType[propType].hits++;
+      if (lean === 'under' && res < activeLine) aiAccuracyByType[propType].hits++;
+    }
+  }
+
   // ── Fantasy hit rate ───────────────────────────────────────────────────
   const fantasyRows = resolvedRows.filter(r => r.propType === 'Fantasy');
   const fantasyHits  = fantasyRows.filter(r => Number(r.result) > Number(r.line)).length;
@@ -4563,7 +4844,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     fighterFantasy.set(key, entry);
   }
   const topFantasy = Array.from(fighterFantasy.entries())
-    .filter(([fighter, v]) => v.total >= 2 && currentRoster.has(fighter.toLowerCase()))
+    .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
     .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
     .sort((a, b) => b.rate - a.rate || b.total - a.total)
     .slice(0, 8);
@@ -4579,7 +4860,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     fighterSS.set(key, entry);
   }
   const topSS = Array.from(fighterSS.entries())
-    .filter(([fighter, v]) => v.total >= 2 && currentRoster.has(fighter.toLowerCase()))
+    .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
     .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
     .sort((a, b) => b.rate - a.rate || b.total - a.total)
     .slice(0, 8);
@@ -4596,11 +4877,26 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     fighterTD.set(key, entry);
   }
   const topTD = Array.from(fighterTD.entries())
-    .filter(([fighter, v]) => v.total >= 2 && currentRoster.has(fighter.toLowerCase()))
+    .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
     .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
     .sort((a, b) => b.rate - a.rate || b.total - a.total)
     .slice(0, 8);
   const tdHits = tdRows.filter(r => Number(r.result) > Number(r.line)).length;
+
+  // ── FightTime hit rate ────────────────────────────────────────────────
+  const ftRows = resolvedRows.filter(r => String(r.propType) === 'FightTime');
+  const ftHits = ftRows.filter(r => Number(r.result) > Number(r.line)).length;
+
+  // ── Per-platform summary (all prop types combined) ────────────────────
+  const platSummary = new Map<string, { hits: number; total: number; edgeSum: number }>();
+  for (const r of resolvedRows.filter(r => !!r.platform)) {
+    const key = String(r.platform).toLowerCase();
+    const b = platSummary.get(key) || { hits: 0, total: 0, edgeSum: 0 };
+    b.total++;
+    b.edgeSum += Number(r.result) - Number(r.line);
+    if (Number(r.result) > Number(r.line)) b.hits++;
+    platSummary.set(key, b);
+  }
 
   // ── Platform bias ──────────────────────────────────────────────────────
   const biasMap = new Map<string, { platform: string; propType: string; hits: number; total: number; edgeSum: number }>();
@@ -4622,13 +4918,15 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const deleteBtn = (eventName: string) =>
     `<button class="archive-delete-event-btn" data-event="${eventName.replace(/"/g, '&quot;')}" title="Delete all records for this event" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:0 4px;line-height:1">✕</button>`;
 
-  const upcomingHtml = upcomingEvents.map(d =>
-    `<div class="best-pick-row" style="opacity:0.6">
-      <div class="best-pick-rank" style="font-size:10px;min-width:44px;color:var(--text-muted)">UPCOMING</div>
-      <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${d.unresolved} lines archived · awaiting results</div></div>
-      ${deleteBtn(d.display)}
-    </div>`
-  ).join('');
+  const upcomingHtml = upcomingEvents
+    .filter(d => d.unresolved > 0 || d.total > 0) // hide empty shell events
+    .map(d =>
+      `<div class="best-pick-row" style="opacity:0.6">
+        <div class="best-pick-rank" style="font-size:10px;min-width:44px;color:var(--text-muted)">UPCOMING</div>
+        <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${d.unresolved} lines archived · awaiting results</div></div>
+        ${deleteBtn(d.display)}
+      </div>`
+    ).join('');
 
   const eventHtml = (pastEventRows.length || upcomingHtml)
     ? upcomingHtml + pastEventRows.map((d) => {
@@ -4676,6 +4974,44 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         </div>`).join('')
     : `<div class="inline-empty-msg">Need 2+ events per fighter — overall: ${tdHits}/${tdRows.length}</div>`;
 
+  // ── AI pick accuracy by stat type (lean-direction correct, not raw over rate) ──
+  const aiStatBadge = (label: string, propType: string): string => {
+    const d = aiAccuracyByType[propType];
+    if (!d?.total) return `<span class="archive-stat-badge archive-stat-empty"><span class="asb-label">${label}</span><span class="asb-val">—</span></span>`;
+    const pct = Math.round((d.hits / d.total) * 100);
+    const lowN = d.total < 5;
+    // Don't color-grade until 5+ samples — small samples produce misleading red/green signals
+    const color = lowN ? 'var(--text-muted)' : pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+    const nTag = lowN ? ` <span style="opacity:0.5;font-size:9px">(n=${d.total})</span>` : '';
+    return `<span class="archive-stat-badge"${lowN ? '' : ` style="--asb-color:${color}"`}><span class="asb-label">${label}</span><span class="asb-val" style="color:${color}">${d.hits}/${d.total} <span style="opacity:0.7">(${pct}%)${nTag}</span></span></span>`;
+  };
+  const statSummaryHtml = `
+    <div class="archive-stat-summary">
+      ${aiStatBadge('FP', 'Fantasy')}
+      ${aiStatBadge('SS', 'SS')}
+      ${aiStatBadge('TD', 'TD')}
+      ${aiStatBadge('FT', 'FightTime')}
+    </div>`;
+
+  // ── Per-platform summary ────────────────────────────────────────────────
+  const PLAT_LABELS: Record<string, string> = { pick6: 'Pick6', underdog: 'UD', prizepicks: 'PP', betr: 'Betr', draftkings_sportsbook: 'DK' };
+  const platSummaryHtml = platSummary.size > 0
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">` +
+      [...platSummary.entries()]
+        .filter(([, v]) => v.total >= 1)
+        .sort((a, b) => (b[1].hits / b[1].total) - (a[1].hits / a[1].total))
+        .map(([plat, v]) => {
+          const pct = Math.round((v.hits / v.total) * 100);
+          const avgEdge = (v.edgeSum / v.total).toFixed(1);
+          const col = pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+          return `<span style="font-size:11px;padding:3px 8px;border-radius:5px;background:var(--surface2)">
+            <span style="color:var(--text-muted)">${PLAT_LABELS[plat] || plat.toUpperCase()}</span>
+            <span style="color:${col};font-weight:700;margin-left:4px">${pct}%</span>
+            <span style="color:var(--text-muted);font-size:10px;margin-left:3px">${v.hits}/${v.total} · edge ${Number(avgEdge) > 0 ? '+' : ''}${avgEdge}</span>
+          </span>`;
+        }).join('') + `</div>`
+    : '';
+
   // Platform bias — sortable; sort key stored at module level so it persists across re-renders
   const sk = _archiveBiasSortKey;
   const sortFn = (a: typeof biasRows[0], b: typeof biasRows[0]): number => {
@@ -4699,11 +5035,81 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       </div>`).join('')
     : '<div class="inline-empty-msg">No resolved outcomes yet</div>';
 
+  // ── Platform bias bar chart (avg edge per stat, grouped by platform) ─────
+  // Shows whether each platform sets lines too high (+) or too low (-) per stat.
+  const STAT_ORDER_CHART = ['Fantasy', 'SS', 'TD', 'FightTime'];
+  const STAT_LABELS_CHART: Record<string, string> = { Fantasy: 'FP', SS: 'SS', TD: 'TD', FightTime: 'FT' };
+  const biasChartData: Record<string, Record<string, { avgEdge: number; total: number }>> = {};
+  for (const b of Array.from(biasMap.values()).filter(bv => bv.total >= 2)) {
+    if (!biasChartData[b.propType]) biasChartData[b.propType] = {};
+    biasChartData[b.propType][b.platform] = {
+      avgEdge: Number((b.edgeSum / b.total).toFixed(1)),
+      total: b.total,
+    };
+  }
+  const allEdgeAbsVals = Object.values(biasChartData)
+    .flatMap(plats => Object.values(plats).map(v => Math.abs(v.avgEdge)));
+  const maxEdgeScale = allEdgeAbsVals.length ? Math.max(...allEdgeAbsVals, 1) : 1;
+
+  const biasByStatHtml = STAT_ORDER_CHART.filter(pt => biasChartData[pt] && Object.keys(biasChartData[pt]).length > 0).map(pt => {
+    const label = STAT_LABELS_CHART[pt] || pt;
+    const entries = Object.entries(biasChartData[pt]).sort((a, b) => b[1].avgEdge - a[1].avgEdge);
+    const bars = entries.map(([plat, { avgEdge, total }]) => {
+      const pctBar = Math.round(Math.abs(avgEdge) / maxEdgeScale * 80); // cap at 80% width
+      const isPos = avgEdge >= 0;
+      const col = isPos ? 'var(--green)' : 'var(--red)';
+      const platLabel = PLAT_LABELS[plat] || plat.toUpperCase();
+      return `<div title="${platLabel} · avg edge ${avgEdge > 0 ? '+' : ''}${avgEdge} · n=${total}" style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:9px;color:var(--text-muted);min-width:26px;text-align:right">${platLabel}</span>
+        <div style="width:100px;background:var(--surface2);border-radius:2px;height:8px;overflow:hidden">
+          <div style="height:100%;width:${pctBar}%;background:${col};border-radius:2px;opacity:0.85"></div>
+        </div>
+        <span style="font-size:9px;color:${col};min-width:30px">${avgEdge > 0 ? '+' : ''}${avgEdge}</span>
+      </div>`;
+    }).join('');
+    return `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px">
+      <span style="font-size:10px;font-weight:700;color:var(--text);min-width:16px;padding-top:1px">${label}</span>
+      <div style="display:flex;flex-direction:column;gap:2px">${bars}</div>
+    </div>`;
+  }).join('');
+
+  const biasChartHtml = biasByStatHtml
+    ? `<div style="margin:8px 0 10px 0;padding:8px 10px;background:var(--surface2);border-radius:6px">
+        <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em">Avg Edge by Stat (+ = result beats line)</div>
+        ${biasByStatHtml}
+       </div>`
+    : '';
+
   const statusLine = unresolvedCount > 0
     ? `<span style="color:var(--amber)">${unresolvedCount} unresolved records</span>`
     : `<span style="color:var(--green)">All records settled ✓</span>`;
 
+  // ── Awaiting Settlement banner ─────────────────────────────────────────
+  const TYPE_ABBR: Record<string, string> = { Fantasy: 'FP', SS: 'SS', TD: 'TD', FightTime: 'FT' };
+  const pendingBannerHtml = pendingEvents.length > 0 ? `
+    <div class="pending-settle-banner" style="margin-bottom:12px;border:1px solid rgba(240,180,40,0.35);border-left:3px solid var(--amber);border-radius:6px;background:rgba(240,180,40,0.06);padding:10px 14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber);font-weight:700">⏳ Awaiting Settlement</span>
+        <span style="font-size:10px;color:var(--text-muted)">${unresolvedCount} props across ${pendingEvents.length} event${pendingEvents.length === 1 ? '' : 's'} need results</span>
+        <button id="pendingSettleBtn" style="margin-left:auto;background:var(--amber);color:#000;border:none;border-radius:4px;padding:3px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;cursor:pointer;letter-spacing:0.04em">⚡ SETTLE NOW</button>
+      </div>
+      ${pendingEvents.map(p => {
+        const breakdown = Object.entries(p.byType)
+          .sort((a, b) => b[1] - a[1])
+          .map(([type, n]) => `${TYPE_ABBR[type] ?? type} ×${n}`)
+          .join(' · ');
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,0.04)">
+          <span style="font-size:11px;color:var(--amber);font-weight:700;min-width:28px">${p.total}</span>
+          <div>
+            <div style="font-size:11px;color:var(--text);font-weight:600">${p.display}</div>
+            <div style="font-size:10px;color:var(--text-muted)">${breakdown}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   container.innerHTML = `
+    ${pendingBannerHtml}
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
       <button id="archiveSettleBtn" class="btn btn-sm" style="background:var(--accent);color:#fff;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:12px">
         ⚡ Settle from UFCStats
@@ -4716,6 +5122,10 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     <div class="best-picks-section" style="margin-bottom:12px">
       <div class="best-picks-header"><span class="best-picks-title">Per-Event Results</span><span class="best-picks-count">${resolvedRows.length} resolved</span></div>
       ${eventHtml}
+    </div>
+    <div class="best-picks-section" style="margin-bottom:12px">
+      <div class="best-picks-header"><span class="best-picks-title">AI Pick Accuracy by Stat Type</span><span class="best-picks-count" style="font-size:10px;color:var(--text-muted)">lean direction correct (over + under)</span></div>
+      ${statSummaryHtml}
     </div>
     <div class="best-picks-grid">
       <div class="best-picks-section over">
@@ -4734,20 +5144,30 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       </div>
     </div>
     <div class="best-picks-section" id="archiveBiasSection" style="margin-top:12px">
-      <div class="best-picks-header"><span class="best-picks-title">Platform Bias by Prop Type</span><span class="best-picks-count">Resolved outcomes</span></div>
+      <div class="best-picks-header"><span class="best-picks-title">Platform Bias</span><span class="best-picks-count" style="font-size:10px;color:var(--text-muted)">${resolvedRows.filter(r => !!r.platform).length} records with platform</span></div>
+      ${platSummaryHtml}
+      ${biasChartHtml}
       ${biasHtml}
+    </div>
+    <div class="best-picks-section" style="margin-top:12px">
+      <div class="best-picks-header"><span class="best-picks-title">Calibrated Hit Rate</span><span class="best-picks-count" style="font-size:10px;color:var(--text-muted)">${resolvedRows.length} resolved · need ~30+ for reliable calibration</span></div>
+      <div class="inline-empty-msg" style="font-size:11px">
+        ${resolvedRows.length < 30
+          ? `${resolvedRows.length}/30 records — calibration unlocks after Adesanya vs Pyfer and future events settle. Currently learning from ${new Set(resolvedRows.map(r => r.event)).size} event(s).`
+          : `${resolvedRows.length} records — see Learning Diagnostics widget for calibration accuracy.`}
+      </div>
     </div>
   `;
 
-  // Wire up action buttons
-  document.getElementById('archiveSettleBtn')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement;
+  // Shared settle handler — used by both the main button and the pending banner CTA
+  const runSettle = async (btn: HTMLButtonElement, resetLabel: string) => {
     btn.disabled = true;
     btn.textContent = '⏳ Fetching results...';
     try {
       const res = await runtimeSendMessage<{ ok: boolean; settled: number; skipped: number; errors: string[] }>({ type: 'GRADE_ARCHIVE' });
       if (res?.ok) {
         showToast(`✓ Settled ${res.settled} records from UFCStats${res.errors.length ? ` (${res.errors.length} events not found yet)` : ''}`);
+        _fighterArchiveStats = null; // force reload so fighter cards reflect new results
         void renderArchivePanel(container);
       } else {
         showToast('Settle failed — check console');
@@ -4756,8 +5176,17 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       showToast('Settle error — extension may need reload');
     } finally {
       btn.disabled = false;
-      btn.textContent = '⚡ Settle from UFCStats';
+      btn.textContent = resetLabel;
     }
+  };
+
+  // Wire up action buttons
+  document.getElementById('archiveSettleBtn')?.addEventListener('click', (e) => {
+    void runSettle(e.currentTarget as HTMLButtonElement, '⚡ Settle from UFCStats');
+  });
+
+  document.getElementById('pendingSettleBtn')?.addEventListener('click', (e) => {
+    void runSettle(e.currentTarget as HTMLButtonElement, '⚡ SETTLE NOW');
   });
 
   document.getElementById('archiveBackfillBtn')?.addEventListener('click', async (e) => {
@@ -4808,12 +5237,38 @@ function renderFighters(): void {
   if (currentView === 'bestpicks') { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); return; }
   if (currentView === 'archive') { void renderArchivePanel(container); return; }
 
+  // Load archive stats once per session for per-fighter accuracy badges
+  if (_fighterArchiveStats === null) { void loadFighterArchiveStats(); }
+
   primeCaches();
   const _q = currentSearch.toLowerCase().trim();
+
+  // Parse advanced filter tags: conf:70+, lean:over, fp:under, ss:over, td:under, split:yes, ev:+
+  const _tagRe = /\b(conf|lean|fp|ss|td|ft|split|ev):([^\s]+)/gi;
+  const _tags: Record<string, string> = {};
+  const _nameQ = _q.replace(_tagRe, (_, k, v) => { _tags[k.toLowerCase()] = v.toLowerCase(); return ''; }).trim();
+
   let fighters = allFighters.filter(f => {
-    if (_q && !f.name.toLowerCase().includes(_q)) return false;
+    if (_nameQ && !f.name.toLowerCase().includes(_nameQ)) return false;
     if (currentView === 'over'  && getEffectiveLean(f).lean !== 'over')  return false;
     if (currentView === 'under' && getEffectiveLean(f).lean !== 'under') return false;
+    // Advanced tag filters
+    if (_tags['lean']) { if (getEffectiveLean(f).lean !== _tags['lean']) return false; }
+    if (_tags['fp'])   { if (f.lean?.lean !== _tags['fp']) return false; }
+    if (_tags['ss'])   { if (f.lean_ss?.lean !== _tags['ss']) return false; }
+    if (_tags['td'])   { if (f.lean_td?.lean !== _tags['td']) return false; }
+    if (_tags['ft'])   { if (f.lean_ft?.lean !== _tags['ft']) return false; }
+    if (_tags['split']) { if (_tags['split'] === 'yes' && !hasCrossStatConflict(f)) return false; }
+    if (_tags['ev']) {
+      const ev = computeFighterEV(f, getEffectiveLean(f));
+      if (_tags['ev'] === '+' && (ev == null || ev <= 0)) return false;
+      if (_tags['ev'] === '-' && (ev == null || ev >= 0)) return false;
+    }
+    if (_tags['conf']) {
+      const op = _tags['conf'].endsWith('+') ? '>=' : _tags['conf'].endsWith('-') ? '<=' : '>=';
+      const n  = parseInt(_tags['conf']);
+      if (!isNaN(n)) { const c = getEffectiveLean(f).conf || 0; if (op === '>=' && c < n) return false; if (op === '<=' && c > n) return false; }
+    }
     return true;
   });
   fighters = applySourceVisibilityFilter(fighters);
@@ -4945,7 +5400,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       container.appendChild(header);
     }
     debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
-    const row = buildFighterRow(f, oppEntry ?? null);
+    const row = buildFighterRow(f, oppEntry ?? null, Math.floor(i / 2));
     row.style.setProperty('--row-index', String(i % 18));
     container.appendChild(row);
     if (!showFightGroups && i % 2 === 1 && i < fighters.length - 1) {
@@ -5195,8 +5650,14 @@ function generateLineShopModal(): void {
   // Lean-aware formatter: for OVER lean, lowest line = best (easiest to clear);
   // for UNDER lean, highest line = best (most room to go under).
   type LeanDir = 'over' | 'under' | 'none';
-  const fmtCell = (val: number | null | undefined, vals: number[], plat: string, leanDir: LeanDir): string => {
+  const fmtCell = (val: number | null | undefined, vals: number[], plat: string, leanDir: LeanDir, compatVals?: number[]): string => {
     if (val == null) return `<span class="ls-empty">—</span>`;
+    // If a compatible-vals set was supplied and this value isn't in it, it's a
+    // different scale (e.g. Underdog per-round vs. total-fight).  Show it muted.
+    if (compatVals && !compatVals.includes(val)) {
+      const mismatchTitle = plat === 'PP' ? 'PrizePicks uses different FP scoring — excluded from spread' : 'Different scale — excluded from spread';
+      return `<span class="ls-cell-val ls-scale-mismatch" title="${mismatchTitle}"><span class="ls-plat-tag">${plat}</span>~${val}</span>`;
+    }
     let cls = 'ls-neutral';
     if (vals.length >= 2) {
       const mx = Math.max(...vals);
@@ -5204,7 +5665,8 @@ function generateLineShopModal(): void {
       if (mx > mn) {
         if (leanDir === 'over')  cls = val === mn ? 'ls-best' : val === mx ? 'ls-worst' : 'ls-neutral';
         else if (leanDir === 'under') cls = val === mx ? 'ls-best' : val === mn ? 'ls-worst' : 'ls-neutral';
-        else cls = val === mx ? 'ls-high' : val === mn ? 'ls-low' : 'ls-neutral';
+        // No lean: treat lowest line as best value (easiest over) — green/red like leaned props
+        else cls = val === mn ? 'ls-best' : val === mx ? 'ls-worst' : 'ls-neutral';
       }
     }
     return `<span class="ls-cell-val ${cls}"><span class="ls-plat-tag">${plat}</span>${val}</span>`;
@@ -5216,19 +5678,36 @@ function generateLineShopModal(): void {
     return `<span class="ls-spread-chip ls-spread-med">${spread}</span>`;
   };
 
+  // Filter values that are on a compatible scale (within 3x of median).
+  // Prevents a platform using per-round or differently-scoped props from
+  // inflating the spread vs. platforms using total-fight stats.
+  // Filter values that are on a compatible scale (within 45%–220% of median).
+  // Prevents a platform using per-round or differently-scoped props from
+  // inflating the spread vs. platforms using total-fight stats.
+  const compatibleFilter = (vals: number[]): number[] => {
+    if (vals.length < 2) return vals;
+    const sorted = [...vals].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    return vals.filter(v => median > 0 && v >= median * 0.45 && v <= median * 2.2);
+  };
+
   const rows = allFighters.map(f => {
-    const fps = [f.line_p6, f.line_ud, f.line_betr, f.line_pp].filter(v => v != null) as number[];
+    const fps = [f.line_p6, f.line_ud, f.line_betr].filter(v => v != null) as number[]; // PP excluded: different scoring system
     const sss = [f.line_p6_ss, f.line_ud_ss, f.line_betr_ss, f.line_pp_ss, f.line_dk_ss].filter(v => v != null) as number[];
     const tds = [f.line_p6_td, f.line_ud_td, f.line_betr_td, f.line_pp_td, f.line_dk_td].filter(v => v != null) as number[];
+    const fps_compat = compatibleFilter(fps);
+    const sss_compat = compatibleFilter(sss);
+    const tds_compat = compatibleFilter(tds);
     const spread = (vals: number[]) => vals.length >= 2 ? parseFloat((Math.max(...vals) - Math.min(...vals)).toFixed(1)) : 0;
-    const fp_sp = spread(fps), ss_sp = spread(sss), td_sp = spread(tds);
+    const fp_sp = spread(fps_compat), ss_sp = spread(sss_compat), td_sp = spread(tds_compat);
     const leanDir = (f.lean?.lean === 'over' || f.lean?.lean === 'under') ? f.lean.lean as LeanDir : 'none' as LeanDir;
     const ssLeanDir = (f.lean_ss?.lean === 'over' || f.lean_ss?.lean === 'under') ? f.lean_ss.lean as LeanDir : leanDir;
     const tdLeanDir = (f.lean_td?.lean === 'over' || f.lean_td?.lean === 'under') ? f.lean_td.lean as LeanDir : leanDir;
-    return { f, fps, sss, tds, fp_sp, ss_sp, td_sp, max_sp: Math.max(fp_sp, ss_sp, td_sp), leanDir, ssLeanDir, tdLeanDir };
+    return { f, fps, fps_compat, sss, sss_compat, tds, tds_compat, fp_sp, ss_sp, td_sp, max_sp: Math.max(fp_sp, ss_sp, td_sp), leanDir, ssLeanDir, tdLeanDir };
   }).sort((a, b) => b.max_sp - a.max_sp);
 
-  const rowsHtml = rows.map(({ f, fps, sss, tds, fp_sp, ss_sp, td_sp, leanDir, ssLeanDir, tdLeanDir }) => {
+  const rowsHtml = rows.map(({ f, fps, fps_compat, sss, sss_compat, tds, tds_compat, fp_sp, ss_sp, td_sp, leanDir, ssLeanDir, tdLeanDir }) => {
     const conf = f.lean?.conf || 0;
     const leanChip = leanDir !== 'none'
       ? `<span class="ls-lean-chip ls-lean-${leanDir}">${leanDir === 'over' ? '▲' : '▼'} ${leanDir.toUpperCase()}${conf > 0 ? ` ${conf}%` : ''}</span>`
@@ -5239,26 +5718,26 @@ function generateLineShopModal(): void {
         ${f.opponent ? `<div style="font-size:9px;color:var(--text4)">vs ${f.opponent}</div>` : ''}
       </td>
       <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6,     fps, 'P6', leanDir)}
-        ${fmtCell(f.line_ud,     fps, 'UD', leanDir)}
-        ${fmtCell(f.line_betr,   fps, 'BT', leanDir)}
-        ${fmtCell(f.line_pp,     fps, 'PP', leanDir)}
+        ${fmtCell(f.line_p6,     fps_compat, 'P6', leanDir, fps_compat)}
+        ${fmtCell(f.line_ud,     fps_compat, 'UD', leanDir, fps_compat)}
+        ${fmtCell(f.line_betr,   fps_compat, 'BT', leanDir, fps_compat)}
+        ${fmtCell(f.line_pp,     fps_compat, 'PP', leanDir, [])}
       </div></td>
       <td>${spreadChip(fp_sp)}</td>
       <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6_ss,   sss, 'P6', ssLeanDir)}
-        ${fmtCell(f.line_ud_ss,   sss, 'UD', ssLeanDir)}
-        ${fmtCell(f.line_betr_ss, sss, 'BT', ssLeanDir)}
-        ${fmtCell(f.line_pp_ss,   sss, 'PP', ssLeanDir)}
-        ${fmtCell(f.line_dk_ss,   sss, 'DK', ssLeanDir)}
+        ${fmtCell(f.line_p6_ss,   sss_compat, 'P6', ssLeanDir, sss_compat)}
+        ${fmtCell(f.line_ud_ss,   sss_compat, 'UD', ssLeanDir, sss_compat)}
+        ${fmtCell(f.line_betr_ss, sss_compat, 'BT', ssLeanDir, sss_compat)}
+        ${fmtCell(f.line_pp_ss,   sss_compat, 'PP', ssLeanDir, sss_compat)}
+        ${fmtCell(f.line_dk_ss,   sss_compat, 'DK', ssLeanDir, sss_compat)}
       </div></td>
       <td>${spreadChip(ss_sp)}</td>
       <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6_td,   tds, 'P6', tdLeanDir)}
-        ${fmtCell(f.line_ud_td,   tds, 'UD', tdLeanDir)}
-        ${fmtCell(f.line_betr_td, tds, 'BT', tdLeanDir)}
-        ${fmtCell(f.line_pp_td,   tds, 'PP', tdLeanDir)}
-        ${fmtCell(f.line_dk_td,   tds, 'DK', tdLeanDir)}
+        ${fmtCell(f.line_p6_td,   tds_compat, 'P6', tdLeanDir, tds_compat)}
+        ${fmtCell(f.line_ud_td,   tds_compat, 'UD', tdLeanDir, tds_compat)}
+        ${fmtCell(f.line_betr_td, tds_compat, 'BT', tdLeanDir, tds_compat)}
+        ${fmtCell(f.line_pp_td,   tds_compat, 'PP', tdLeanDir, tds_compat)}
+        ${fmtCell(f.line_dk_td,   tds_compat, 'DK', tdLeanDir, tds_compat)}
       </div></td>
       <td>${spreadChip(td_sp)}</td>
     </tr>`;
@@ -5292,10 +5771,11 @@ function generateLineShopModal(): void {
   modal.classList.remove('is-hidden');
 }
 
-function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HTMLDivElement {
+function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fightIndex = 0): HTMLDivElement {
   _h2hFighterMap.set(f.name.toLowerCase(), f);
   const db = f.db || {} as FighterDB;
   const lean = getEffectiveLean(f);
+  const leanEv = computeFighterEV(f, lean);
   const leanClass = lean.lean === 'over' ? 'lean-over' : lean.lean === 'under' ? 'lean-under' : lean.lean === 'push' ? 'lean-push' : 'lean-none';
   const leanSuffix = lean._label || '';
   const leanText  = lean.lean === 'over' ? `▲ OVER${leanSuffix}` : lean.lean === 'under' ? `▼ UNDER${leanSuffix}` : lean.lean === 'push' ? '~ PUSH' : db.loaded ? '—' : '⟳';
@@ -5308,6 +5788,49 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   const activeLine = activePlatformLine(f);
   const platformLabel = activePlatformLabel(f);
   const showSource = (s: 'p6'|'ud'|'pp'|'betr'|'dk') => !!sourceVisibility[s];
+  // ── Best line shopping ─────────────────────────────────────────────────────
+  // For each stat, find which book has the best number given lean direction.
+  // over → want the LOWEST line (easiest to beat); under → want the HIGHEST line.
+  // Only badge when ≥2 books post the stat AND spread ≥ 0.5.
+  type BookEntry = { source: 'p6'|'ud'|'pp'|'betr'|'dk'; value: number };
+  function calcBestShop(
+    candidates: BookEntry[],
+    leanDir: string | null | undefined
+  ): 'p6'|'ud'|'pp'|'betr'|'dk' | null {
+    const visible = candidates.filter(c => c.value != null && showSource(c.source));
+    if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none') return null;
+    const vals = visible.map(c => c.value);
+    if (Math.max(...vals) - Math.min(...vals) < 0.5) return null;
+    const best = leanDir === 'over'
+      ? visible.reduce((b, c) => c.value < b.value ? c : b)
+      : visible.reduce((b, c) => c.value > b.value ? c : b);
+    return best.source;
+  }
+  const ssCandidates: BookEntry[] = ([
+    { source: 'p6'   as const, value: f.line_p6_ss   },
+    { source: 'ud'   as const, value: f.line_ud_ss   },
+    { source: 'pp'   as const, value: f.line_pp_ss   },
+    { source: 'betr' as const, value: f.line_betr_ss },
+    { source: 'dk'   as const, value: f.line_dk_ss   },
+  ] as BookEntry[]).filter(c => c.value != null);
+  const tdCandidates: BookEntry[] = ([
+    { source: 'p6'   as const, value: f.line_p6_td   },
+    { source: 'ud'   as const, value: f.line_ud_td   },
+    { source: 'pp'   as const, value: f.line_pp_td   },
+    { source: 'betr' as const, value: f.line_betr_td },
+    { source: 'dk'   as const, value: f.line_dk_td   },
+  ] as BookEntry[]).filter(c => c.value != null);
+  const ftCandidates: BookEntry[] = ([
+    { source: 'p6'   as const, value: f.line_p6_ft   },
+    { source: 'ud'   as const, value: f.line_ud_ft   },
+    { source: 'pp'   as const, value: f.line_pp_ft   },
+    { source: 'betr' as const, value: f.line_betr_ft },
+    { source: 'dk'   as const, value: f.line_dk_ft   },
+  ] as BookEntry[]).filter(c => c.value != null);
+  const bestSS = calcBestShop(ssCandidates, f.lean_ss?.lean ?? null);
+  const bestTD = calcBestShop(tdCandidates, f.lean_td?.lean ?? null);
+  const bestFT = calcBestShop(ftCandidates, f.lean_ft?.lean ?? null);
+
   const lineCell = (source: 'p6'|'ud'|'pp'|'betr'|'dk', stat: 'fp'|'ss'|'td'|'ft', value: number | null | undefined): string => {
     if (value == null || !showSource(source)) return '';
     const sourceLabel = source === 'p6' ? 'P6' : source === 'ud' ? 'UD' : source === 'pp' ? 'PP' : source === 'dk' ? 'DK' : 'BT';
@@ -5316,7 +5839,14 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
     const movementHtml = (delta != null && Math.abs(delta) >= 0.5)
       ? `<div class="line-movement ${delta > 0 ? 'mv-up' : 'mv-down'}" title="Opened: ${openVal}">${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}</div>`
       : '';
-    return `<div class="line-cell ${stat} src-${source}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div></div>`;
+    const isBest = (stat === 'ss' && bestSS === source) ||
+                   (stat === 'td' && bestTD === source) ||
+                   (stat === 'ft' && bestFT === source);
+    const leanDir = stat === 'ss' ? f.lean_ss?.lean : stat === 'td' ? f.lean_td?.lean : stat === 'ft' ? f.lean_ft?.lean : null;
+    const bestBadge = isBest
+      ? `<div class="best-shop-badge" title="Best line for ${leanDir?.toUpperCase()} on ${sourceLabel}: ${value} vs other books">best</div>`
+      : '';
+    return `<div class="line-cell ${stat} src-${source}${isBest?' best-line':''}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${bestBadge}</div>`;
   };
 
   function platformStatLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td' | 'ft'): number | null {
@@ -5401,9 +5931,97 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   const ftLine = platformStatLine(f, 'ft');
   const primarySSLine = ssLine;
   const avgSS = db.avgSigStr ?? null;
-  const ssDelta = (avgSS != null && primarySSLine != null) ? avgSS - primarySSLine : null;
+
+  // ── Opponent-adjusted SS projection ───────────────────────────────────────
+  // oppHistory[n].sigStr = SS landed ON the opponent in fight n = "SS allowed"
+  const oppSSAllowedSamples = (oppEntry?.db?.oppHistory ?? [])
+    .map(h => h.sigStr)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const oppAvgSSAllowed = oppSSAllowedSamples.length >= 3
+    ? parseFloat((oppSSAllowedSamples.reduce((s, v) => s + v, 0) / oppSSAllowedSamples.length).toFixed(1))
+    : null;
+  // Classic attack/defense split: average fighter output with opponent's concession rate
+  const projSS = (avgSS != null && oppAvgSSAllowed != null)
+    ? parseFloat(((avgSS + oppAvgSSAllowed) / 2).toFixed(1))
+    : null;
+  const displaySS = projSS ?? avgSS;
+
+  // ── 5R vs 3R normalization ─────────────────────────────────────────────────
+  // Primary: scheduledRoundsMap populated from UFCStats upcoming card scrape.
+  // Fallback: FT line > 12.5 min. Default: 3 rounds.
+  const _ftLine = platformStatLine(f, 'ft');
+  const _normFighterName = normalizeName(f.name);
+  const _cardRounds = _normFighterName ? scheduledRoundsMap.get(_normFighterName) : undefined;
+  // Fallback when scheduledRoundsMap not yet populated (cache predates scrape change):
+  // UFCStats lists fights prelims-first, main event last — so last pair = main event = 5R
+  const _mainEventPair = upcomingCardPairs.length > 0 ? upcomingCardPairs[upcomingCardPairs.length - 1] : null;
+  const _isMainEventFighter = _normFighterName != null && _mainEventPair != null &&
+    (_mainEventPair.f1 === _normFighterName || _mainEventPair.f2 === _normFighterName);
+  const isFiveRound = _cardRounds != null ? _cardRounds === 5 : _isMainEventFighter;
+  // Expected average actual fight durations (accounting for all finish rates in that format)
+  const FIVE_ROUND_MINS  = 15.0;
+  const THREE_ROUND_MINS = 9.0;
+  const histAvgMins = db.avgTimeMins ?? null;
+  let roundNormFactor = 1.0;
+  let roundNormTag    = '';  // '5R↑' | '3R↓' | ''
+  if (histAvgMins != null && histAvgMins >= 3) {
+    if (isFiveRound) {
+      // 5R fight: boost stats if fighter's history is shorter (typical 3R background)
+      const raw = FIVE_ROUND_MINS / histAvgMins;
+      if (raw > 1.08) {
+        roundNormFactor = parseFloat(Math.min(1.8, raw).toFixed(3));
+        roundNormTag = '5R↑';
+      } else if (raw < 0.92) {
+        roundNormFactor = parseFloat(Math.max(0.6, raw).toFixed(3));
+        roundNormTag = '5R↓';
+      }
+    } else {
+      // 3R fight: only reduce if fighter's history is notably longer (e.g. title fight veterans)
+      const raw = THREE_ROUND_MINS / histAvgMins;
+      if (raw < 0.92) {
+        roundNormFactor = parseFloat(Math.max(0.6, raw).toFixed(3));
+        roundNormTag = '3R↓';
+      }
+      // Never boost for 3R fights — the line already accounts for the fighter's finish rate
+    }
+  }
+
+  // Round-normalize SS: apply factor after opp-adjustment, before delta calc
+  const normDisplaySS = (displaySS != null && roundNormFactor !== 1.0)
+    ? parseFloat((displaySS * roundNormFactor).toFixed(1))
+    : null;
+  const finalDisplaySS = normDisplaySS ?? displaySS;
+
+  // ── Opponent-adjusted TD projection ──────────────────────────────────────────
+  const avgTDraw = db.avgTDperFight ?? null;
+  const oppTDAllowedSamples = (oppEntry?.db?.oppHistory ?? [])
+    .map(h => h.td)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  const oppAvgTDAllowed = oppTDAllowedSamples.length >= 3
+    ? parseFloat((oppTDAllowedSamples.reduce((s, v) => s + v, 0) / oppTDAllowedSamples.length).toFixed(1))
+    : null;
+  const projTD = (avgTDraw != null && oppAvgTDAllowed != null)
+    ? parseFloat(((avgTDraw + oppAvgTDAllowed) / 2).toFixed(1))
+    : null;
+  const displayTD = projTD ?? avgTDraw;
+  const normDisplayTD = (displayTD != null && roundNormFactor !== 1.0)
+    ? parseFloat((displayTD * roundNormFactor).toFixed(1))
+    : null;
+  const finalDisplayTD = normDisplayTD ?? displayTD;
+
+  const ssDelta = (finalDisplaySS != null && primarySSLine != null) ? finalDisplaySS - primarySSLine : null;
   const ssDeltaText = ssDelta == null ? '—' : `${ssDelta > 0 ? '+' : ''}${ssDelta.toFixed(1)}`;
   const ssDeltaClass = ssDelta == null ? '' : ssDelta >= 0 ? 'delta-plus' : 'delta-minus';
+
+  // ── SS variance band ───────────────────────────────────────────────────────
+  const ssStdDev = db.ssStdDev ?? null;
+  // Thresholds: ≤7 tight (predictable), 7–14 moderate, >14 volatile
+  const ssSpreadColor = ssStdDev == null ? '' : ssStdDev <= 7 ? 'var(--green)' : ssStdDev <= 14 ? 'var(--amber)' : 'var(--red)';
+  const ssSpreadLabel = ssStdDev != null ? `±${ssStdDev.toFixed(1)}` : '';
+  const ssSpreadTip   = ssStdDev == null ? '' :
+    ssStdDev <= 7  ? `SS spread ±${ssStdDev.toFixed(1)} — tight (predictable output, high line confidence)` :
+    ssStdDev <= 14 ? `SS spread ±${ssStdDev.toFixed(1)} — moderate variance (treat lean with some caution)` :
+                     `SS spread ±${ssStdDev.toFixed(1)} — volatile output (wide range, lean confidence is lower)`;
 
   const historyPlatform: 'pick6'|'underdog'|'prizepicks'|'betr' =
     currentPlatform === 'pick6' ? 'pick6' :
@@ -5482,6 +6100,42 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   const avgFPPercentileLabel = peerPercentiles.avgFPPercentile >= 75 ? '🔴' : peerPercentiles.avgFPPercentile >= 50 ? '🟡' : '🟢';
   
   const streakEmoji = db.streak?.type === 'hot' ? ' 🔥' : db.streak?.type === 'cold' ? ' ❄️' : '';
+
+  // ── Sharp line movement detection ─────────────────────────────────────────
+  // Flag any stat/platform where current line has moved ≥2 pts from opening
+  const SHARP_THRESHOLD = 1.0;
+  type MoveEntry = { platLabel: string; statLabel: string; delta: number; opening: number; current: number };
+  const sharpMoves: MoveEntry[] = [];
+  const _allStatLines: Array<[string, string, number | null | undefined]> = [
+    ['p6',   'fp', f.line_p6],    ['p6',   'ss', f.line_p6_ss],  ['p6',   'td', f.line_p6_td],  ['p6',   'ft', f.line_p6_ft],
+    ['ud',   'fp', f.line_ud],    ['ud',   'ss', f.line_ud_ss],  ['ud',   'td', f.line_ud_td],  ['ud',   'ft', f.line_ud_ft],
+    ['pp',   'fp', f.line_pp],    ['pp',   'ss', f.line_pp_ss],  ['pp',   'td', f.line_pp_td],  ['pp',   'ft', f.line_pp_ft],
+    ['betr', 'fp', f.line_betr],  ['betr', 'ss', f.line_betr_ss],['betr', 'td', f.line_betr_td],['betr', 'ft', f.line_betr_ft],
+    ['dk',   'ss', f.line_dk_ss], ['dk',   'td', f.line_dk_td],  ['dk',   'ft', f.line_dk_ft],
+  ];
+  for (const [plat, stat, current] of _allStatLines) {
+    if (current == null) continue;
+    const opening = _openingLines.get(openingLineKey(plat, stat, f.name));
+    if (opening == null) continue;
+    const delta = parseFloat((current - opening).toFixed(1));
+    if (Math.abs(delta) >= SHARP_THRESHOLD) {
+      const platLabel = plat === 'p6' ? 'P6' : plat === 'ud' ? 'UD' : plat === 'pp' ? 'PP' : plat === 'dk' ? 'DK' : 'BT';
+      const statLabel = stat.toUpperCase();
+      sharpMoves.push({ platLabel, statLabel, delta, opening, current });
+    }
+  }
+  sharpMoves.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  // Deduplicate: if same stat moved on multiple books, keep largest move only
+  const seenStat = new Set<string>();
+  const dedupedMoves = sharpMoves.filter(m => { if (seenStat.has(m.statLabel)) return false; seenStat.add(m.statLabel); return true; });
+  const sharpBadgeHtml = dedupedMoves.length > 0 ? (() => {
+    const top = dedupedMoves[0];
+    const arrow = top.delta > 0 ? '📈' : '📉';
+    const sign  = top.delta > 0 ? '+' : '';
+    const extra = dedupedMoves.length > 1 ? ` <span style="opacity:0.6">+${dedupedMoves.length - 1} more</span>` : '';
+    const tipLines = dedupedMoves.map(m => `${m.platLabel} ${m.statLabel}: ${m.opening} → ${m.current} (${m.delta > 0 ? '+' : ''}${m.delta})`).join(' · ');
+    return `<div class="sharp-move-badge" title="Line movement since opening: ${tipLines}">${arrow} ${top.statLabel} ${sign}${top.delta} <span class="sharp-move-book">${top.platLabel}</span>${extra}</div>`;
+  })() : '';
   const weightedAvg = db.avgFP_weighted ?? null;
   const platformAvgFP = activePlatformAvgFP(db);
   const weightedDiff = (weightedAvg != null && platformAvgFP != null) ? (weightedAvg - platformAvgFP) : null;
@@ -5489,14 +6143,33 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
   const mlAdjFP = calcMLAdjustedFP(db.history || [], f.moneyline ?? null);
   const mlAdjShift = (mlAdjFP != null && platformAvgFP != null) ? mlAdjFP - platformAvgFP : null;
 
-  const fpTrend  = calcStatTrend(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), 5);
-  const ssTrend  = calcStatTrend(fights, h => h.sigStr ?? null, 4);
-  const tdTrend  = calcStatTrend(fights, h => h.td   ?? null, 0.5);
+  // ── Opponent-adjusted FP projection ──────────────────────────────────────────
+  const oppFPAllowedSamples = (oppEntry?.db?.oppHistory ?? [])
+    .map(h => h.fp)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const oppAvgFPAllowed = oppFPAllowedSamples.length >= 3
+    ? parseFloat((oppFPAllowedSamples.reduce((s, v) => s + v, 0) / oppFPAllowedSamples.length).toFixed(1))
+    : null;
+  const baseAvgFP = mlAdjFP ?? platformAvgFP ?? null;
+  const projFP = (baseAvgFP != null && oppAvgFPAllowed != null)
+    ? parseFloat(((baseAvgFP + oppAvgFPAllowed) / 2).toFixed(1))
+    : null;
+  // Round-normalized display values (applied after mlAdj / proj calculations)
+  const normDisplayFP = roundNormFactor !== 1.0
+    ? parseFloat(((projFP ?? mlAdjFP ?? platformAvgFP ?? 0) * roundNormFactor).toFixed(1))
+    : null;
+  // normDisplaySS and normDisplayTD computed after projSS/avgTD are available (below)
+
+  const _tw = trendWindow === 0 ? 9999 : trendWindow; // 9999 → all vals "recent" → delta=0 → flat → no chip
+  const fpTrend  = calcStatTrend(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), 5, _tw);
+  const ssTrend  = calcStatTrend(fights, h => h.sigStr ?? null, 4, _tw);
+  const tdTrend  = calcStatTrend(fights, h => h.td   ?? null, 0.5, _tw);
+  const _twLabel = trendWindow === 0 ? 'Career' : `L${trendWindow}`;
 
   function trendChip(t: StatTrend, tooltip: string): string {
     if (t.direction === null || t.direction === 'flat' || t.delta == null) return '';
     const sign = t.delta > 0 ? '+' : '';
-    return `<span class="stat-trend-chip ${t.direction}" title="${tooltip}">${t.direction === 'up' ? '↑' : '↓'} L3 ${sign}${t.delta}</span>`;
+    return `<span class="stat-trend-chip ${t.direction}" title="${tooltip}">${t.direction === 'up' ? '↑' : '↓'} ${_twLabel} ${sign}${t.delta}</span>`;
   }
   // Removed hitProb, badgeText, badgeCls, spikeEvent UI, and all oddsBadge/fantasy_over_odds/fantasy_under_odds logic
   const hitProb = null;
@@ -5759,7 +6432,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
         <div class="fighter-flag">${db.country || '🏴'}</div>
         <div>
           <div class="fighter-name" title="${f.name}">${f.name}${streakEmoji}</div>
-          <div class="fighter-record">${db.record || '—'} · ${db.style || '...'}</div>
+          <div class="fighter-record">${db.record || '—'} · ${db.style || '...'}${(() => { const oppStrength = calcOpponentStrengthScore(oppEntry?.db ?? null); const emoji = oppStrength.score >= 1.45 ? '🔴' : oppStrength.score >= 0.75 ? '🟡' : oppStrength.score > -0.2 ? '⚪' : '🟢'; return oppEntry?.db?.loaded ? ` <span title="${oppStrength.label}" style="font-size:11px;opacity:0.85">${emoji}</span>` : ''; })()}</div>
+          ${sharpBadgeHtml}
         </div>
       </div>
       <div class="platform-lines">
@@ -5786,20 +6460,38 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
         <!-- Removed spikeEvent and odds badge UI -->
       </div>
       <div class="stats-mini">
-        <div class="stat-mini-cell stat-fp" title="${mlAdjFP!=null?`ML-adjusted: ${mlAdjFP.toFixed(1)} FP (win/loss FP weighted by ${f.moneyline!=null?(f.moneyline<0?f.moneyline:'+'+f.moneyline):'-'} implied win prob). Raw avg: ${platformAvgFP!=null?platformAvgFP.toFixed(1):'—'}`:'Recent fantasy points average from UFCStats history'}">
-          <div class="stat-mini-label">Avg FP</div>
-          <div class="stat-mini-val">${mlAdjFP!=null?mlAdjFP.toFixed(1):(platformAvgFP!=null?platformAvgFP.toFixed(1):'...')} ${avgFPPercentileLabel}${mlAdjShift!=null&&Math.abs(mlAdjShift)>=3?`<span class="ml-adj-badge ${mlAdjShift>0?'pos':'neg'}">${mlAdjShift>0?'+':''}${mlAdjShift.toFixed(1)}</span>`:''}${trendChip(fpTrend,`Last 3 avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</div>
+        <div class="stat-mini-cell stat-fp" title="${normDisplayFP!=null?`Round-normalized (${roundNormTag}): ${(projFP??mlAdjFP??platformAvgFP??0).toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplayFP}. Hist avg fight: ${histAvgMins}m, expected: ${isFiveRound?FIVE_ROUND_MINS:THREE_ROUND_MINS}m.`:projFP!=null?`Opp-adjusted projection: (your avg ${baseAvgFP!.toFixed(1)} + opp allows ${oppAvgFPAllowed!.toFixed(1)}) ÷ 2 = ${projFP.toFixed(1)}. Based on ${oppFPAllowedSamples.length} opp fights.`:mlAdjFP!=null?`ML-adjusted: ${mlAdjFP.toFixed(1)} FP (win/loss FP weighted by ${f.moneyline!=null?(f.moneyline<0?f.moneyline:'+'+f.moneyline):'-'} implied win prob). Raw avg: ${platformAvgFP!=null?platformAvgFP.toFixed(1):'—'}`:'Recent fantasy points average from UFCStats history'}">
+          <div class="stat-mini-label">${projFP!=null?'Proj FP':'Avg FP'}${roundNormTag?` <span class="round-norm-tag">${roundNormTag}</span>`:''}</div>
+          <div class="stat-mini-val">${normDisplayFP!=null?normDisplayFP.toFixed(1):projFP!=null?projFP.toFixed(1):mlAdjFP!=null?mlAdjFP.toFixed(1):(platformAvgFP!=null?platformAvgFP.toFixed(1):'...')} ${avgFPPercentileLabel}${projFP!=null&&!normDisplayFP?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgFPAllowed} FP avg">(${oppAvgFPAllowed})</span>`:''}${mlAdjShift!=null&&Math.abs(mlAdjShift)>=3&&!normDisplayFP&&!projFP?`<span class="ml-adj-badge ${mlAdjShift>0?'pos':'neg'}">${mlAdjShift>0?'+':''}${mlAdjShift.toFixed(1)}</span>`:''}${trendChip(fpTrend,`${_twLabel} avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</div>
           <div class="fp-range-label">${db.fpFloor!=null?`${fpFloor}–${fpCeiling}`:''}</div>
         </div>
-        <div class="stat-mini-cell stat-ss" title="Average significant strikes landed per fight"><div class="stat-mini-label">Avg SS</div><div class="stat-mini-val">${avgSS!=null?avgSS.toFixed(1):'...'}${trendChip(ssTrend,`SS last 3 avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</div></div>
+        <div class="stat-mini-cell stat-ss" title="${normDisplaySS!=null?`Round-normalized (${roundNormTag}): ${displaySS!.toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplaySS}. Hist avg fight: ${histAvgMins}m, expected: ${isFiveRound?FIVE_ROUND_MINS:THREE_ROUND_MINS}m.`:projSS!=null?`Opp-adjusted projection: (your avg ${avgSS!.toFixed(1)} + opp allows ${oppAvgSSAllowed!.toFixed(1)}) ÷ 2 = ${projSS.toFixed(1)}. Based on ${oppSSAllowedSamples.length} opp fights.${ssSpreadTip?' | '+ssSpreadTip:''}`:ssSpreadTip||'Average significant strikes landed per fight'}"><div class="stat-mini-label">${projSS!=null?'Proj SS':'Avg SS'}${roundNormTag?` <span class="round-norm-tag">${roundNormTag}</span>`:''}</div><div class="stat-mini-val">${finalDisplaySS!=null?finalDisplaySS.toFixed(1):'...'}${projSS!=null&&!normDisplaySS?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>`:''}${trendChip(ssTrend,`SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</div>${ssSpreadLabel?`<div class="ss-spread-label" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor!==1.0?`±${(parseFloat(ssSpreadLabel.slice(1))*roundNormFactor).toFixed(1)}`:ssSpreadLabel}</div>`:''}</div>
         <div class="stat-mini-cell stat-ss" title="Current active platform SS betting line"><div class="stat-mini-label" title="Current active platform SS betting line">SS Line</div><div class="stat-mini-val">${primarySSLine!=null?primarySSLine.toFixed(1):'...'}</div></div>
-        <div class="stat-mini-cell ${ssDeltaClass}" title="Delta = Avg SS minus active SS line. Positive favors over, negative favors under."><div class="stat-mini-label" title="Delta = Avg SS minus active SS line">SS Delta</div><div class="stat-mini-val">${ssDeltaText}</div></div>
+        <div class="stat-mini-cell ${ssDeltaClass}" title="${normDisplaySS!=null?`Delta = Norm SS (${finalDisplaySS!.toFixed(1)}) minus SS line (${roundNormTag} adjusted).`:projSS!=null?`Delta = Proj SS (${projSS.toFixed(1)}) minus SS line. Projection = (raw avg ${avgSS!.toFixed(1)} + opp allows ${oppAvgSSAllowed!.toFixed(1)}) ÷ 2.`:'Delta = Avg SS minus active SS line. Positive favors over, negative favors under.'}"><div class="stat-mini-label" title="SS Delta">SS Delta</div><div class="stat-mini-val">${ssDeltaText}${normDisplayTD!=null?` <span style="font-size:8px;color:var(--text-muted)" title="${projTD!=null?`Proj TD opp-adj: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}, normalized: ${projTD} × ${roundNormFactor.toFixed(2)} = ${normDisplayTD}`:`TD normalized: ${avgTDraw} × ${roundNormFactor.toFixed(2)} = ${normDisplayTD}`}">(${projTD!=null?'P':'A'}TD ${normDisplayTD})</span>`:projTD!=null&&!normDisplayTD?` <span style="font-size:8px;color:var(--text-muted)" title="Proj TD: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}">(PTD ${projTD})</span>`:''}</div></div>
       </div>
       <div class="lean-cell">
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
         ${confPct > 0 ? `<div class="confidence-meter" title="Confidence strength: ${confPct}%"><div class="confidence-fill" style="width:${confPct}%; background: rgba(${leanRGB}, 0.8);"></div></div>` : ''}
-        <!-- Removed hitProb, badgeText, and badgeCls UI -->
-        ${lean.ev != null ? `<div class="ev-label">EV: ${lean.ev > 0 ? '+' : ''}${lean.ev}</div>` : ''}
+        ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
+        ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
+        ${(() => {
+          if (!_fighterArchiveStats) return '';
+          const key = (normalizeName(f.name) || f.name).toLowerCase();
+          const stats = _fighterArchiveStats.get(key);
+          if (!stats) return '';
+          const parts: string[] = [];
+          for (const [pt, d] of Object.entries(stats)) {
+            if (d.total < 2) continue;
+            const pct = Math.round(d.hits / d.total * 100);
+            const col = pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+            const label = pt === 'FightTime' ? 'FT' : pt;
+            parts.push(`<span style="color:${col}">${label} ${pct}%</span>`);
+          }
+          if (!parts.length) return '';
+          const totalEvents = Math.max(...Object.values(stats).map(d => d.total));
+          return `<div class="archive-accuracy-badge" title="Archive hit rate for ${f.name} across ${totalEvents} settled event(s)">📊 ${parts.join(' · ')}</div>`;
+        })()}
+        ${leanEv != null ? `<div class="ev-label">EV: ${leanEv > 0 ? '+' : ''}${leanEv}%</div>` : ''}
         ${weightedAvg != null ? `<div class="weighted-avg-label">W.Avg: ${weightedAvg.toFixed(1)}</div>` : ''}
       </div>
       <div class="row-expand-slot">${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<button class="h2h-btn" data-fighter="${f.name}" title="Head-to-head vs ${f.opponent || 'opponent'}">⚔</button><span class="expand-arrow">▼</span></div>
@@ -5808,7 +6500,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null): HT
       <div class="detail-grid">
         <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine?`<div class="panel-meta"><div class="panel-meta-line"></div> Line: ${activeLine}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'} · BT: ${f.line_betr_ss||'—'}</div>` : ''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD last 3 avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">Fight Time History${ftLine!=null?` vs Line ${formatMinutesAsClock(ftLine)}`:''}</div>${ftHistoryHTML}${ftLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ft!=null?formatMinutesAsClock(f.line_p6_ft):'—'} · UD: ${f.line_ud_ft!=null?formatMinutesAsClock(f.line_ud_ft):'—'} · PP: ${f.line_pp_ft!=null?formatMinutesAsClock(f.line_pp_ft):'—'} · BT: ${f.line_betr_ft!=null?formatMinutesAsClock(f.line_betr_ft):'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
@@ -5883,7 +6575,13 @@ function toggleRow(row: HTMLElement): void { row.classList.toggle('expanded'); }
 // ── FIGHTER IMAGE FETCHER ──────────────────────────────────────────────────
 const _fighterImgCache = new Map<string, string | null>();
 
+// UFC.com slugs that don't follow the standard word-hyphen pattern
+const _slugOverrides: Record<string, string> = {
+  'Abdul Rakhman Yakhyaev': 'abdulrakhman-yakhyaev',
+};
+
 function nameToUfcSlug(name: string): string {
+  if (_slugOverrides[name]) return _slugOverrides[name];
   return name.toLowerCase()
     .replace(/['''`]/g, '')        // drop apostrophes (O'Neill → oneill)
     .replace(/[^a-z0-9]+/g, '-')  // non-alphanumeric → hyphen
@@ -5932,7 +6630,7 @@ async function fetchFighterImageUrl(name: string): Promise<string | null> {
       if (m?.[1] && m[1].startsWith('http')) { url = m[1]; break; }
     }
     _fighterImgCache.set(slug, url);
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (url && typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.set({ [cacheKey]: url });
     }
     return url;
@@ -6084,7 +6782,7 @@ const NAME_ALIASES: Record<string, string> = {
 function normalizeName(name: string|null|undefined): string|null {
   if (!name || name === 'null' || name === 'undefined') return null;
   let n = name.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').trim();
-  n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ');
+  n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ');
   n = n.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   return NAME_ALIASES[n] || n;
 }
@@ -6263,7 +6961,16 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     entry.line_betr_ss = f.line_ss ?? null;
     entry.line_betr_td = f.line_td ?? null;
     entry.line_betr_ft = f.line_ft ?? null;
-    if (f.opponent) entry.opponent = normalizeName(f.opponent);
+    if (f.opponent) {
+      const normalizedOpp = normalizeName(f.opponent);
+      // Resolve abbreviated Betr opponent (e.g. "B. Ribeiro") to the canonical map key
+      // (e.g. "brendson ribeiro") so the reciprocal-opponent prune doesn't discard them.
+      const resolvedOpp = (normalizedOpp && (Object.keys(map).find(k => namesMatch(k, normalizedOpp)) || normalizedOpp)) || null;
+      // Only overwrite if we don't already have a longer (more complete) opponent name.
+      if (resolvedOpp && (!entry.opponent || resolvedOpp.length > entry.opponent.length)) {
+        entry.opponent = resolvedOpp;
+      }
+    }
     // Betr lines are entered manually without opponents — look them up from the
     // upcoming card so the fighter survives the missing-opponent prune below.
     if (!entry.opponent) {
@@ -6542,6 +7249,7 @@ function updatePlatformBar(data: AnalyzerDataPayload): void {
   if (total === 0) { dot.className = 'ext-dot'; label.textContent = 'No extension data'; label.style.color = 'var(--text3)'; }
   else if (p6.length > 0) { dot.className = 'ext-dot live'; label.textContent = `Live · ${total} lines`; label.style.color = 'var(--green)'; }
   else { dot.className = 'ext-dot partial'; label.textContent = `Partial · ${total} lines`; label.style.color = 'var(--orange)'; }
+  // openingLinesCount is managed by processData() diagnostic — do not overwrite here
 }
 
 async function loadData(): Promise<void> {
@@ -6557,6 +7265,11 @@ async function loadData(): Promise<void> {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage) {
       await syncUpcomingCardContext();
+      // If scheduledRoundsMap is empty but we have card pairs, cache predates the
+      // scheduledRounds scrape change — force a fresh fetch to get round data
+      if (scheduledRoundsMap.size === 0 && upcomingCardPairs.length > 0) {
+        await syncUpcomingCardContext(true);
+      }
       await loadOpeningLines();
       const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY]);
       const rawOdds = result[STORAGE_ODDS_KEY];
@@ -6650,6 +7363,41 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
   showToast(`Loading ${p6.length || ud.length || betr.length || pp.length || dk.length} fighters + fetching UFCStats...`);
   await mergeAndEnrich(p6, ud, betr, pp, dk);
   snapshotOpeningLines();
+  const _oc = document.getElementById('openingLinesCount');
+  if (_oc && _openingLines.size > 0) {
+    // Compute max delta across all fighters/stats to diagnose if movements are below threshold
+    let _maxDelta = 0;
+    let _matchCount = 0;
+    for (const fighter of allFighters) {
+      const _checks: Array<[string,string,number|null|undefined]> = [
+        ['p6','fp',fighter.line_p6],['p6','ss',fighter.line_p6_ss],['p6','td',fighter.line_p6_td],['p6','ft',fighter.line_p6_ft],
+        ['ud','fp',fighter.line_ud],['ud','ss',fighter.line_ud_ss],['ud','td',fighter.line_ud_td],['ud','ft',fighter.line_ud_ft],
+        ['pp','fp',fighter.line_pp],['pp','ss',fighter.line_pp_ss],['pp','td',fighter.line_pp_td],['pp','ft',fighter.line_pp_ft],
+        ['betr','fp',fighter.line_betr],['betr','ss',fighter.line_betr_ss],['betr','td',fighter.line_betr_td],['betr','ft',fighter.line_betr_ft],
+      ];
+      for (const [pl,st,cur] of _checks) {
+        if (cur == null) continue;
+        const op = _openingLines.get(openingLineKey(pl, st, fighter.name));
+        if (op == null) continue;
+        _matchCount++;
+        _maxDelta = Math.max(_maxDelta, Math.abs(cur - op));
+      }
+    }
+    // Auto-detect stale baseline: if we have good key matches but zero delta AND the baseline
+    // came from storage (not freshly created this session — fresh baselines always start at Δ0).
+    if (_matchCount >= 5 && _maxDelta === 0 && _openingLinesFromStorage && !_staleDetectFired) {
+      _skipNextSnapshot = true;
+      _openingLinesFromStorage = false;
+      _staleDetectFired = true;
+      _openingLines.clear();
+      void storageSet({ lines_open_v1: null });
+      _oc.textContent = ` · 📍baseline reset — tracking from next fetch`;
+    } else {
+      _oc.textContent = ` · 📍${_openingLines.size} stored / ${_matchCount} matched · max Δ${_maxDelta.toFixed(1)}`;
+    }
+  } else if (_oc) {
+    _oc.textContent = _openingLines.size === 0 ? ' · 📍awaiting baseline' : '';
+  }
   showToast(`Loaded ${allFighters.filter(f => f.db?.loaded).length} fighters with stats!`);
 }
 
@@ -6812,9 +7560,11 @@ function showLineDropAlert(msg: RuntimeAnalyzerMessage): void {
 
 function parseEventDateMs(raw: string): number {
   if (!raw) return NaN;
-  const direct = new Date(raw).getTime();
+  // UFCStats uses "Apr. 4, 2026" — strip the period so V8 can parse it.
+  const normalized = raw.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\./gi, '$1');
+  const direct = new Date(normalized).getTime();
   if (Number.isFinite(direct)) return direct;
-  const fallback = new Date(`${raw} UTC`).getTime();
+  const fallback = new Date(`${normalized} UTC`).getTime();
   return Number.isFinite(fallback) ? fallback : NaN;
 }
 
@@ -7447,6 +8197,13 @@ function setActivePlatform(platform: string): void {
   renderFighters();
 }
 
+function setTrendWindow(w: 3 | 5 | 0): void {
+  trendWindow = w;
+  document.querySelectorAll('.trend-btn[data-window]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.trend-btn[data-window="${w}"]`)?.classList.add('active');
+  renderFighters();
+}
+
 function bindSourceToggles(): void {
   const buttons = document.querySelectorAll<HTMLButtonElement>('.source-toggle[data-source]');
   buttons.forEach((btn) => {
@@ -7502,7 +8259,8 @@ function exportToCSV(): void {
       const calibratedProb = el.calibratedProbability != null ? (el.calibratedProbability * 100).toFixed(1) : '';
       const modelAgreement = el.ensembleAgreement != null ? (el.ensembleAgreement * 100).toFixed(1) : '';
       const kellyBetSize = el.kellyBetSize != null ? el.kellyBetSize.toFixed(2) : '';
-      return `"${f.name}","${f.opponent || ''}","${platform}","${line || ''}","${el.lean}","${el.conf}","${bayesProb}","${calibratedProb}","${modelAgreement}","${kellyBetSize}","${el.ev || ''}","${el.verdict}"`;
+      const ev = computeFighterEV(f, el);
+      return `"${f.name}","${f.opponent || ''}","${platform}","${line || ''}","${el.lean}","${el.conf}","${bayesProb}","${calibratedProb}","${modelAgreement}","${kellyBetSize}","${ev != null ? ev + '%' : ''}","${el.verdict}"`;
     })
   ].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -7950,10 +8708,19 @@ function initAnalyzerCore(): void {
     btn.addEventListener('click', () => setActivePlatform((btn as HTMLElement).dataset['platform'] || 'pick6'));
   });
   setActivePlatform('pick6');
+
+  // Trend window toggle (L3 / L5 / Career)
+  document.querySelectorAll('.trend-btn[data-window]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const w = parseInt((btn as HTMLElement).dataset['window'] || '3');
+      setTrendWindow((w === 0 || w === 5 ? w : 3) as 3 | 5 | 0);
+    });
+  });
   bindSourceToggles();
 
   // Top-bar buttons
   document.getElementById('refreshBtn')?.addEventListener('click', loadData);
+
   document.getElementById('autoScrapeBtn')?.addEventListener('click', triggerAutoScrape);
   document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
   document.getElementById('reportCardBtn')?.addEventListener('click', generateReportCard);
@@ -8003,6 +8770,13 @@ function initAnalyzerCore(): void {
   // View tabs
   bindExclusiveButtons('.tab-btn[data-view]', (btn) => {
     currentView = btn.dataset['view'] || 'all';
+    // Archive and best picks work without lines — ensure container is visible
+    if (currentView === 'archive' || currentView === 'bestpicks') {
+      const empty = document.getElementById('emptyState');
+      const container = document.getElementById('cardContainer');
+      if (empty) empty.style.display = 'none';
+      if (container) container.style.display = 'block';
+    }
     renderFighters();
   });
 
@@ -8405,7 +9179,10 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
     if (extractedRows) {
       try {
         await syncUpcomingCardContext(true);
-        const stored = await storageGet<{ lines_betr?: { fighters?: RawLineFighter[] } }>(['lines_betr']);
+        const stored = await storageGet<{
+          lines_betr?: { fighters?: RawLineFighter[] };
+          lines_betr_manual_v1?: { fighters?: RawLineFighter[] };
+        }>(['lines_betr', 'lines_betr_manual_v1']);
 
         // Do not fall back to UFCStats event text here; that feed can lag and show the wrong card.
         const eventName = (inferredEventNameFromLines || '').trim();
@@ -8418,33 +9195,38 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
 
         // Always refresh rows on modal open so stale event rows cannot linger between cards.
         extractedRows.innerHTML = '';
-        const existing = stored['lines_betr']?.fighters || [];
-        const filteredExisting = upcomingCardPairs.length
+        const baseExisting = stored['lines_betr']?.fighters || [];
+        const manualOverrides = stored['lines_betr_manual_v1']?.fighters;
+        // Apply manual overrides so user-adjusted values survive a clear+re-seed cycle.
+        const existing = manualOverrides?.length
+          ? applyBetrManualOverrides(baseExisting, manualOverrides)
+          : baseExisting;
+        // Bypass card filter when upcoming event is >10 days away (avoids filtering against the wrong card)
+        const tooFarAway = Number.isFinite(upcomingEventTs) && upcomingEventTs - Date.now() > 10 * 24 * 60 * 60 * 1000;
+        const filteredExisting = (!tooFarAway && upcomingCardPairs.length)
           ? existing.filter((f) => isUpcomingCardFighter(f.name) || isUpcomingCardFighter(f.opponent || ''))
           : existing;
         if (filteredExisting.length > 0) {
           renderExtractedRows(filteredExisting.map(f => ({ name: f.name || '', fp: f.line_fp ?? null, ss: f.line_ss ?? null })));
         } else {
           // No stored lines — pre-fill with the current card's known Betr lines so the user only needs to click Save.
+          // Event: UFC Fight Night — Moicano vs. Duncan (April 4, 2026)
           const BETR_PREFILL: OCRFighterRow[] = [
-            { name: 'Alexia Thainara',    fp: 95.5,  ss: null  },
-            { name: 'Navajo Stirling',    fp: 97.5,  ss: null  },
-            { name: 'Chase Hooper',       fp: 85.5,  ss: null  },
-            { name: 'Lance Gibson Jr.',   fp: 50.5,  ss: null  },
-            { name: 'Ignacio Bahamondes', fp: 84.5,  ss: null  },
-            { name: 'Tofiq Musayev',      fp: 50.5,  ss: null  },
-            { name: 'Terrance McKinney',  fp: null,  ss: 20.5  },
-            { name: 'Kyle Nelson',        fp: null,  ss: 15.5  },
-            { name: 'Yousri Belgaroui',   fp: null,  ss: 48.5  },
-            { name: 'Mansur Abdul-Malik', fp: null,  ss: 25.5  },
-            { name: 'Lerryan Douglas',    fp: 95.5,  ss: 31.5  },
-            { name: 'Julian Erosa',       fp: 50.5,  ss: 24.5  },
-            { name: 'Michael Chiesa',     fp: 95.5,  ss: 20.5  },
-            { name: 'Niko Price',         fp: null,  ss: 17.5  },
-            { name: 'Maycee Barber',      fp: 75.5,  ss: 53.5  },
-            { name: 'Alexa Grasso',       fp: null,  ss: 40.5  },
-            { name: 'Israel Adesanya',    fp: null,  ss: 69.5  },
-            { name: 'Joe Pyfer',          fp: null,  ss: 50.5  },
+            { name: 'J. Delano',    fp: 85.5,  ss: 70.5 },
+            { name: 'T. McMillen',  fp: 102.5, ss: 26.5 },
+            { name: 'A. Yakhyaev', fp: 115.5, ss: 17.5 },
+            { name: 'C. Duncan',   fp: 84.5,  ss: 40.5 },
+            { name: 'E. Ewing',    fp: null,  ss: 43.5 },
+            { name: 'R. Estevam',  fp: null,  ss: 22.5 },
+            { name: 'B. Ribeiro',  fp: null,  ss: 7.5  },
+            { name: 'R. Ruchała',  fp: null,  ss: 36.5 },
+            { name: 'M. Zecchini', fp: null,  ss: 12.5 },
+            { name: 'T. Ricci',    fp: null,  ss: 50.5 },
+            { name: 'V. Jandiroba',fp: null,  ss: 37.5 },
+            { name: 'R. Moicano',  fp: null,  ss: 36.5 },
+            { name: 'A. Bekoev',   fp: 93.5,  ss: null },
+            { name: 'L. Vannata',  fp: 80.5,  ss: null },
+            { name: 'A. Costa',    fp: 89.5,  ss: null },
           ];
           renderExtractedRows(BETR_PREFILL);
         }
@@ -8463,7 +9245,16 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
       const ss = parseFloat((row.querySelector('.betr-ss') as HTMLInputElement)?.value) || null;
       if (fp || ss) fighters.push({ name, line_fp: fp, line_ss: ss, line_td: null });
     });
-    if (!fighters.length) { if (saveStatus) saveStatus.textContent = '✗ No valid lines to save'; return; }
+    if (!fighters.length) {
+      // No valid lines — explicitly clear Betr manual storage
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        chrome.storage.local.remove('lines_betr_manual_v1', () => {
+          if (saveStatus) saveStatus.textContent = '✓ Betr lines cleared';
+          setTimeout(() => { if (saveStatus) saveStatus.textContent = ''; }, 2000);
+        });
+      }
+      return;
+    }
     const capturedAt = Date.now();
     const data = { fighters, capturedAt };
     if (typeof chrome !== 'undefined' && chrome.storage) {

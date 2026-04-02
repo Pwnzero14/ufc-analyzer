@@ -26,7 +26,7 @@ function normalizePropType(propType: unknown): PropType {
   if (/^td$/i.test(v)) return 'TD';
   if (/^fantasy$/i.test(v)) return 'Fantasy';
   if (/^control$/i.test(v)) return 'Control';
-  if (/^fight\s*time$/i.test(v) || /^fighttime$/i.test(v)) return 'FightTime';
+  if (/^ft$/i.test(v) || /^fight\s*time$/i.test(v) || /^fighttime$/i.test(v)) return 'FightTime';
   return v as PropType;
 }
 

@@ -33,7 +33,7 @@ function normalizeOddsName(name: unknown): string | null {
   if (typeof name !== 'string') return null;
   let n = name.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').trim();
   if (!n) return null;
-  n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ');
+  n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ');
   n = n
     .split(' ')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -51,13 +51,24 @@ function parseBestFightOddsMoneylines(html: string): Record<string, number> {
     const fighterName = normalizeOddsName(match[1]);
     if (!fighterName) continue;
 
-    const odds = [...match[2].matchAll(/>([+-]\d{2,4})</g)]
+    // Match only the current-odds spans (id="oID...") to avoid stale/non-ML values
+    const odds = [...match[2].matchAll(/id="oID[^"]*">([+-]\d{2,4})</g)]
       .map((m) => Number(m[1]))
       .filter((v) => Number.isFinite(v));
-    if (!odds.length) continue;
+    if (!odds.length) {
+      // Fallback: any odds-shaped value in the row
+      const fallback = [...match[2].matchAll(/>([+-]\d{2,4})</g)]
+        .map((m) => Number(m[1]))
+        .filter((v) => Number.isFinite(v));
+      if (!fallback.length) continue;
+      odds.push(...fallback);
+    }
 
-    const consensus = Math.round(odds.reduce((a, b) => a + b, 0) / odds.length);
-    out[fighterName] = consensus;
+    // Use median instead of mean — more robust when some books haven't moved their line yet
+    const sorted = [...odds].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    out[fighterName] = median;
   }
 
   return out;
@@ -94,27 +105,29 @@ async function refreshFightOddsFromBestFightOdds(reason: string): Promise<number
 }
 
 // ── INITIALIZE BETR LINES FROM MANUAL INPUT ────────────────────────────
+// Event: UFC Fight Night — Moicano vs. Duncan (April 4, 2026)
 async function initializeBetrLines() {
   const betrFighters = [
-    // Fantasy Pts (FP)
-    { name: 'I. Baraniewski', opponent: 'A. Lane', line_ss: 18.5, line_fp: 109.5, line_td: null },
-    { name: 'L. Riley', opponent: 'M. Aswell', line_ss: 68.5, line_fp: 77.5, line_td: null },
-    { name: 'M. Evloev', opponent: 'L. Murphy', line_ss: 66.5, line_fp: 98.5, line_td: null },
-    { name: 'R. Oliveira', opponent: 'S. Dyer', line_ss: null, line_fp: 50.5, line_td: null },
-    { name: 'M. Pinto', opponent: 'Franco', line_ss: null, line_fp: 106.5, line_td: null },
-    { name: 'M. Kondratavičius', opponent: 'Trocoli', line_ss: null, line_fp: 106.5, line_td: null },
-    { name: 'C. Duncan', opponent: 'R. Dolidze', line_ss: 49.5, line_fp: 85.5, line_td: null },
-    { name: 'R. Dolidze', opponent: 'C. Duncan', line_ss: 28.5, line_fp: 50.5, line_td: null },
-    { name: 'S. Dyer', opponent: 'R. Oliveira', line_ss: null, line_fp: 81.5, line_td: null },
-    
-    // Sig Strikes (SS) only
-    { name: 'K. Campbell', opponent: 'D. Silva', line_ss: 63.5, line_fp: null, line_td: null },
-    { name: 'D. Silva', opponent: 'K. Campbell', line_ss: 58.5, line_fp: null, line_td: null },
-    { name: 'L. Murphy', opponent: 'M. Evloev', line_ss: 56.5, line_fp: null, line_td: null },
-    { name: 'M. Aswell', opponent: 'L. Riley', line_ss: 68.5, line_fp: null, line_td: null },
-    { name: 'A. Lane', opponent: 'I. Baraniewski', line_ss: 11.5, line_fp: null, line_td: null },
-    { name: 'M. Page', opponent: 'S. Patterson', line_ss: 25.5, line_fp: null, line_td: null },
-    { name: 'S. Patterson', opponent: 'M. Page', line_ss: 23.5, line_fp: null, line_td: null },
+    // SS + FP
+    { name: 'J. Delano',    opponent: 'R. Ruchała',   line_ss: 70.5, line_fp: 85.5,  line_td: null },
+    { name: 'T. McMillen',  opponent: 'M. Zecchini',  line_ss: 26.5, line_fp: 102.5, line_td: null },
+    { name: 'A. Yakhyaev',  opponent: 'B. Ribeiro',   line_ss: 17.5, line_fp: 115.5, line_td: null },
+    { name: 'C. Duncan',    opponent: 'R. Moicano',   line_ss: 40.5, line_fp: 84.5,  line_td: null },
+
+    // SS only
+    { name: 'E. Ewing',     opponent: 'R. Estevam',   line_ss: 43.5, line_fp: null,  line_td: null },
+    { name: 'R. Estevam',   opponent: 'E. Ewing',     line_ss: 22.5, line_fp: null,  line_td: null },
+    { name: 'B. Ribeiro',   opponent: 'A. Yakhyaev',  line_ss: 7.5,  line_fp: null,  line_td: null },
+    { name: 'R. Ruchała',   opponent: 'J. Delano',    line_ss: 36.5, line_fp: null,  line_td: null },
+    { name: 'M. Zecchini',  opponent: 'T. McMillen',  line_ss: 12.5, line_fp: null,  line_td: null },
+    { name: 'T. Ricci',     opponent: 'V. Jandiroba', line_ss: 50.5, line_fp: null,  line_td: null },
+    { name: 'V. Jandiroba', opponent: 'T. Ricci',     line_ss: 37.5, line_fp: null,  line_td: null },
+    { name: 'R. Moicano',   opponent: 'C. Duncan',    line_ss: 36.5, line_fp: null,  line_td: null },
+
+    // FP only
+    { name: 'A. Bekoev',    opponent: 'Gore',         line_ss: null, line_fp: 93.5,  line_td: null },
+    { name: 'L. Vannata',   opponent: 'Flowers',      line_ss: null, line_fp: 80.5,  line_td: null },
+    { name: 'A. Costa',     opponent: 'Nicoll',       line_ss: null, line_fp: 89.5,  line_td: null },
   ];
   
   store.betr = {
@@ -165,6 +178,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ card: null });
       });
     return true;
+  } else if (request.type === 'FIND_CARD_FOR_FIGHTERS') {
+    findCardForFighters(Array.isArray(request.names) ? request.names : [])
+      .then((card) => sendResponse({ card }))
+      .catch(() => sendResponse({ card: null }));
+    return true;
   } else if (request.type === 'ADD_BETR_LINES') {
     // Manually add Betr lines
     if (request.fighters && Array.isArray(request.fighters)) {
@@ -200,6 +218,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           result.settled += bf.changed;
           notifyAnalyzerTabs({ type: 'ARCHIVE_SETTLED', settled: result.settled });
         }
+        void updatePendingBadge();
         sendResponse({ ok: true, ...result });
       })
       .catch(e => sendResponse({ ok: false, error: String(e) }));
@@ -208,6 +227,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     PropArchiveService.backfillUnresolvedFromKnownOutcomes({ minHoursBetweenRuns: 0 })
       .then(result => {
         if (result.changed > 0) notifyAnalyzerTabs({ type: 'ARCHIVE_SETTLED', settled: result.changed });
+        void updatePendingBadge();
         sendResponse({ ok: true, ...result });
       })
       .catch(e => sendResponse({ ok: false, error: String(e) }));
@@ -376,6 +396,7 @@ function extractUnderdogSideOdds(line: any): { overOdds: number | null; underOdd
 
 const POST_EVENT_SETTLE_ALARM = 'ufc_post_event_settle';
 const LIVE_SETTLE_ALARM       = 'ufc_live_settle';
+const LINE_REFRESH_ALARM      = 'ufc_line_refresh';
 
 function parseCtrlTime(ctrl: string): number {
   const m = ctrl.match(/^(\d+):(\d{2})$/);
@@ -412,6 +433,7 @@ function computeFP(stats: {
 async function fetchFightDetails(url: string): Promise<Array<{
   name: string; won: boolean; ss: number; totalStr: number; td: number;
   kd: number; rev: number; ctrlSecs: number; method: string; round: number;
+  fightTimeMins: number;
 }>> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
@@ -427,11 +449,16 @@ async function fetchFightDetails(url: string): Promise<Array<{
     const statusMatches = [...html.matchAll(/person-status[^>]*>\s*([WLD])/gi)];
     const statuses = statusMatches.slice(0, 2).map(m => m[1].toUpperCase());
 
-    // Method and round
-    const methodM = html.match(/Method:<\/i>\s*<i[^>]*>\s*([^<]+)/i);
-    const roundM  = html.match(/Round:<\/i>\s*<i[^>]*>\s*(\d+)/i);
+    // Method and round — UFCStats structure: <i>Label: </i>value</i>
+    // e.g. "Round: </i> 3 </i>" — value is plain text after the label's closing tag
+    const methodM = html.match(/Method:[^<]*<\/i>\s*([A-Za-z][^<\n]+)/i);
+    const roundM  = html.match(/Round:[^<]*<\/i>\s*(\d+)/i);
+    const timeM   = html.match(/Time:[^<]*<\/i>\s*(\d+):(\d+)/i);
     const method = methodM ? methodM[1].trim() : 'Decision';
     const round  = roundM  ? parseInt(roundM[1]) : 3;
+    // Total fight time in minutes: completed rounds + time in last round
+    const lastRoundMins = timeM ? (parseInt(timeM[1]) + parseInt(timeM[2]) / 60) : 5;
+    const fightTimeMins = Math.round(((round - 1) * 5 + lastRoundMins) * 100) / 100;
 
     // UFCStats fight detail page: the FIRST <tbody> is the Totals table.
     // Each data row has ONE <tr> with both fighters; each <td> separates values using <p> tags.
@@ -462,7 +489,7 @@ async function fetchFightDetails(url: string): Promise<Array<{
       const td      = tdM ? parseInt(tdM[1]) : 0;
       const rev     = parseInt(cellVal(cells[8] ?? '', i)) || 0;
       const ctrl    = parseCtrlTime(cellVal(cells[9] ?? '', i) || '0:00');
-      result.push({ name: names[i], won: statuses[i] === 'W', ss, totalStr, td, kd, rev, ctrlSecs: ctrl, method, round });
+      result.push({ name: names[i], won: statuses[i] === 'W', ss, totalStr, td, kd, rev, ctrlSecs: ctrl, method, round, fightTimeMins });
     }
     return result;
   } catch {
@@ -470,14 +497,37 @@ async function fetchFightDetails(url: string): Promise<Array<{
   }
 }
 
+let _settleInProgress = false;
 async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; includeZeroResults?: boolean }): Promise<{ settled: number; skipped: number; errors: string[] }> {
+  if (_settleInProgress) {
+    console.log('[UFC Settle] Already running — skipping concurrent call');
+    return { settled: 0, skipped: 0, errors: [] };
+  }
+  _settleInProgress = true;
+  try {
+    return await _fetchAndSettleFromUFCStats(opts);
+  } finally {
+    _settleInProgress = false;
+  }
+}
+async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; includeZeroResults?: boolean }): Promise<{ settled: number; skipped: number; errors: string[] }> {
   let settled = 0, skipped = 0;
   const errors: string[] = [];
 
+  // Inline normalizers matching PropArchiveService logic
+  const _normName  = (s: string) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const _normEvent = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+  const _normProp  = (v: string) => {
+    if (/^ss$/i.test(v)) return 'ss';
+    if (/^td$/i.test(v)) return 'td';
+    if (/^fantasy$/i.test(v)) return 'fantasy';
+    if (/^control$/i.test(v)) return 'control';
+    if (/^ft$/i.test(v) || /^fight\s*time$/i.test(v) || /^fighttime$/i.test(v)) return 'fighttime';
+    return v.toLowerCase();
+  };
+
   try {
-    // Load unresolved archive records.
-    // When includeZeroResults=true (manual trigger), also re-settle records where result===0
-    // since that usually means a previous settle run stored wrong values (parsing failure).
+    // Load archive once. All modifications happen in-memory; write once at the end.
     const raw = await new Promise<Record<string, any>>((res) => chrome.storage.local.get(['prop_archive_v1'], res));
     const archive: PropArchiveRecord[] = Array.isArray(raw.prop_archive_v1) ? raw.prop_archive_v1 : [];
     const unresolved = archive.filter(r => {
@@ -486,9 +536,32 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
       if (opts?.includeZeroResults && Number(r.result) === 0) return true; // likely bad parse
       return false;
     });
+    if (unresolved.length > 0 && unresolved.length <= 100) {
+      const sample = unresolved.slice(0, 20);
+      console.log('[UFC Settle] Unresolved sample:', sample.map(r => `${r.fighter}|${r.event}|${r.propType}|line=${r.line}`).join('\n  '));
+    }
     if (!unresolved.length) {
       console.log('[UFC Settle] No unresolved records — archive is up to date');
       return { settled: 0, skipped: 0, errors: [] };
+    }
+
+    // Bulk apply: set result on matching archive records in-memory (no per-call read-modify-write).
+    // Returns number of records updated.
+    function applyResult(names: string[], event: string, propType: string, result: number): number {
+      if (!Number.isFinite(result)) return 0;
+      const nEvent = _normEvent(event);
+      const nProp  = _normProp(propType);
+      const nNames = new Set(names.map(_normName).filter(Boolean));
+      let count = 0;
+      for (const row of archive) {
+        if (!nNames.has(_normName(String(row.fighter || '')))) continue;
+        if (_normEvent(String(row.event || '')) !== nEvent) continue;
+        if (_normProp(String(row.propType || '')) !== nProp) continue;
+        if (Number.isFinite(Number(row.result)) && !opts?.includeZeroResults) continue; // already resolved
+        row.result = result;
+        count++;
+      }
+      return count;
     }
 
     const eventNames = [...new Set(unresolved.map(r => r.event))];
@@ -523,6 +596,11 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
       return new Set([a, b]);
     }
 
+    // Cache parsed results from matched events for fallback surname lookup
+    type FightResult = Awaited<ReturnType<typeof fetchFightDetails>>[number];
+    const matchedEventCache: Array<{ date: string; results: FightResult[] }> = [];
+    const unmatchedEvents: string[] = [];
+
     for (const archiveEvent of eventNames) {
       if (opts?.forceEventName && !archiveEvent.toLowerCase().includes(opts.forceEventName.toLowerCase())) continue;
 
@@ -544,9 +622,8 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
       });
 
       if (!match) {
-        console.log(`[UFC Settle] No completed UFCStats event matched: "${archiveEvent}"`);
-        errors.push(`No match: ${archiveEvent}`);
-        skipped++;
+        console.log(`[UFC Settle] No completed UFCStats event matched: "${archiveEvent}" — will retry via fighter lookup`);
+        unmatchedEvents.push(archiveEvent);
         continue;
       }
       console.log(`[UFC Settle] Matched "${archiveEvent}" → "${match.name}"`);
@@ -570,6 +647,7 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
       }
 
       console.log(`[UFC Settle] Parsed ${allFightResults.length} fighter results from ${fightUrls.length} fights`);
+      matchedEventCache.push({ date: match.date, results: allFightResults });
 
       // Map last-name → full name so "M Aswell" can match "Michael Aswell Jr"
       const lastNameMap = new Map<string, string>();
@@ -591,18 +669,138 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
           namesToTry.add(`${parts[0][0]} ${parts.slice(1).join(' ')}`); // "M Aswell Jr"
           namesToTry.add(`${parts[0][0]} ${parts[parts.length - 1]}`);  // "M Aswell"
         }
-
-        let didSettle = false;
-        for (const name of namesToTry) {
-          const a = await PropArchiveService.updateResult(name, archiveEvent, 'SS' as any,      f.ss, { date: match.date });
-          const b = await PropArchiveService.updateResult(name, archiveEvent, 'TD' as any,      f.td, { date: match.date });
-          const c = await PropArchiveService.updateResult(name, archiveEvent, 'Fantasy' as any, fp,   { date: match.date });
-          if (a || b || c) didSettle = true;
+        if (parts.length >= 3) {
+          // "Lance Gibson Jr." → archive may store as "Lance Jr" (first + suffix, no middle)
+          namesToTry.add(`${parts[0]} ${parts[parts.length - 1]}`); // "Lance Jr."
         }
-        if (didSettle) {
-          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} (${f.won ? 'W' : 'L'} R${f.round})`);
+
+        const nameVariants = [f.name, ...Array.from(namesToTry)];
+        const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
+                + applyResult(nameVariants, archiveEvent, 'TD', f.td)
+                + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
+                + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins);
+        if (n > 0) {
+          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min (${f.won ? 'W' : 'L'} R${f.round})`);
           settled++;
         }
+      }
+    }
+
+    // Fallback: for unmatched events (e.g. stored as "Fight Night: A vs B" sub-fight),
+    // find the closest-dated completed UFCStats event and settle the two fighters from it.
+    if (unmatchedEvents.length > 0) {
+      // Build a date → parsed results cache so we don't re-fetch the same event page twice
+      const fetchedEventCache = new Map<string, { date: string; results: FightResult[] }>();
+
+      // Pre-populate from this run's matched events (may be empty if main card already settled)
+      for (const cached of matchedEventCache) {
+        const key = cached.results.map(r => r.name).sort().join('|');
+        fetchedEventCache.set(key, cached);
+      }
+
+      for (const archiveEvent of unmatchedEvents) {
+        const surnames = eventSurnames(archiveEvent);
+        if (surnames.size < 2) { errors.push(`No match: ${archiveEvent}`); skipped++; continue; }
+
+        // First try already-fetched event caches
+        let matchedEntry: { date: string; results: FightResult[] } | null = null;
+        for (const entry of fetchedEventCache.values()) {
+          const lastNames = new Set(entry.results.map(r => r.name?.trim().split(/\s+/).pop()?.toLowerCase()).filter(Boolean));
+          if ([...surnames].every(s => lastNames.has(s))) { matchedEntry = entry; break; }
+        }
+
+        // If not found, find the closest-dated completed event by the archive record dates
+        if (!matchedEntry) {
+          const recordDates = unresolved
+            .filter(r => r.event === archiveEvent && Number.isFinite(Date.parse(r.date)))
+            .map(r => Date.parse(r.date));
+          const recordDate = recordDates.length ? Math.max(...recordDates) : Date.now();
+
+          // Sort completed events by proximity to the archive record date and try each
+          const candidates = [...completedEvents]
+            .map(ev => ({ ev, diff: Math.abs(new Date(ev.date).getTime() - recordDate) }))
+            .sort((a, b) => a.diff - b.diff)
+            .slice(0, 5); // try up to 5 nearest events
+
+          for (const { ev } of candidates) {
+            if (matchedEntry) break;
+            const cacheKey = ev.url;
+            let entry = fetchedEventCache.get(cacheKey);
+            if (!entry) {
+              try {
+                const evRes = await fetch(ev.url, { signal: AbortSignal.timeout(12000) });
+                if (!evRes.ok) continue;
+                const evHtml = await evRes.text();
+                const fightUrls = [...new Set([...evHtml.matchAll(/href="(http[^"]*fight-details\/[a-f0-9]+)"/gi)].map(m => m[1]))];
+                const results: FightResult[] = [];
+                for (const fightUrl of fightUrls) {
+                  results.push(...await fetchFightDetails(fightUrl));
+                  await new Promise(r => setTimeout(r, 250));
+                }
+                entry = { date: ev.date, results };
+                fetchedEventCache.set(cacheKey, entry);
+                console.log(`[UFC Settle] Fallback fetched event "${ev.name}" (${results.length} fighters)`);
+              } catch { continue; }
+            }
+            const lastNames = new Set(entry.results.map(r => r.name?.trim().split(/\s+/).pop()?.toLowerCase()).filter(Boolean));
+            if ([...surnames].every(s => lastNames.has(s))) matchedEntry = entry;
+          }
+        }
+
+        if (!matchedEntry) {
+          console.log(`[UFC Settle] No completed UFCStats event matched: "${archiveEvent}"`);
+          errors.push(`No match: ${archiveEvent}`); skipped++; continue;
+        }
+
+        console.log(`[UFC Settle] Fallback matched "${archiveEvent}" via fighter surname lookup`);
+        // Build last-name → UFCStats result lookup for the matched card
+        const cardLastNameMap = new Map<string, FightResult>();
+        for (const f of matchedEntry.results) {
+          if (!f.name) continue;
+          const last = f.name.trim().split(/\s+/).pop()!.toLowerCase();
+          cardLastNameMap.set(last, f);
+        }
+        // Iterate fighters actually stored in the archive under this sub-event,
+        // look them up in the card results by last name, then settle.
+        const archiveFighters = [...new Set(
+          unresolved.filter(r => r.event === archiveEvent).map(r => r.fighter)
+        )];
+        console.log(`[UFC Settle] Fallback: ${archiveFighters.length} fighters stored under "${archiveEvent}"`);
+        for (const archiveName of archiveFighters) {
+          const last = archiveName.trim().split(/\s+/).pop()?.toLowerCase();
+          const f = last ? cardLastNameMap.get(last) : undefined;
+          if (!f) { console.log(`[UFC Settle] Fallback: no card result for archive name "${archiveName}" (last="${last}")`); skipped++; continue; }
+          const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
+          const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
+                  + applyResult([archiveName], archiveEvent, 'TD', f.td)
+                  + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
+                  + applyResult([archiveName], archiveEvent, 'FightTime', f.fightTimeMins);
+          if (n > 0) { console.log(`[UFC Settle] Fallback settled ${archiveName} (→${f.name}) under "${archiveEvent}"`); settled++; }
+        }
+      }
+    }
+
+    // Single write for all in-memory modifications (avoids per-record read-modify-write races)
+    if (settled > 0) {
+      await new Promise<void>((res, rej) => chrome.storage.local.set({ prop_archive_v1: archive }, () => {
+        const err = chrome.runtime?.lastError;
+        if (err) rej(new Error(err.message)); else res();
+      }));
+      console.log(`[UFC Settle] Wrote ${archive.length} records to storage`);
+
+      // Post-write verification — confirms values actually landed in storage
+      const _verify = await new Promise<any>((res) => chrome.storage.local.get(['prop_archive_v1'], res));
+      const _written = Array.isArray(_verify.prop_archive_v1) ? _verify.prop_archive_v1 : [];
+      const _postUnresolved = _written.filter((r: any) =>
+        Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result))
+      );
+      console.log(`[UFC Settle] Post-write verify: ${_written.length} total, ${_postUnresolved.length} still unresolved`);
+      if (_postUnresolved.length > 0) {
+        console.log('[UFC Settle] Post-write still unresolved (first 8):\n  ' +
+          _postUnresolved.slice(0, 8).map((r: any) =>
+            `fighter="${r.fighter}" event="${r.event}" prop="${r.propType}" line=${r.line} result=${JSON.stringify(r.result)}`
+          ).join('\n  ')
+        );
       }
     }
   } catch (e) {
@@ -925,11 +1123,13 @@ async function handleClearLines(): Promise<void> {
   store.betr = null;
   store.prizepicks = null;
   store.draftkings_sportsbook = null;
+  autoScrapeInProgress = false; // allow a fresh auto-fetch immediately after clear
   await StorageService.clearLines();
+  await initializeBetrLines(); // re-seed Betr so opponent pruning works after clear
 }
 
 const STARTUP_MIGRATION_KEY = 'startup_migration_version';
-const STARTUP_MIGRATION_VERSION = '2026-03-23-cache-reset-v1';
+const STARTUP_MIGRATION_VERSION = '2026-04-02-moicano-duncan-v3';
 
 async function getStorageRecord(keys: string[]): Promise<Record<string, any>> {
   return await new Promise((resolve) => {
@@ -997,10 +1197,12 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
 
     if (lines.pick6) store.pick6 = lines.pick6;
     if (lines.underdog) store.underdog = lines.underdog;
-    if (lines.betr) store.betr = lines.betr;
     if (lines.prizepicks) store.prizepicks = lines.prizepicks;
     if (lines.draftkings_sportsbook) store.draftkings_sportsbook = lines.draftkings_sportsbook;
     console.log('[UFC] Restored persisted lines on startup');
+
+    // Always load hardcoded Betr lines for the current event (overrides any stale storage)
+    await initializeBetrLines();
 
     await refreshFightOddsFromBestFightOdds('startup');
 
@@ -1019,19 +1221,20 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
         Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result))
       );
 
+      const nowTs = Date.now();
+
       if (card?.date && unresolved.length > 0) {
         const eventTs = parseEventDateMs(card.date);
-        const now = Date.now();
         const liveEndTs  = eventTs + 8  * 60 * 60 * 1000; // 8h after event start
         const settleEndTs = eventTs + 28 * 60 * 60 * 1000; // 28h after event start
 
-        if (Number.isFinite(eventTs) && now >= eventTs && now < settleEndTs) {
+        if (Number.isFinite(eventTs) && nowTs >= eventTs && nowTs < settleEndTs) {
           console.log(`[UFC Settle] Startup catch-up: event "${card.event}" in window, ${unresolved.length} unresolved — settling now`);
           // Immediate settle
           runSettle().catch(e => console.error('[UFC Settle] Startup settle error:', e));
 
           // Re-schedule live alarm if still within the live window
-          if (now < liveEndTs) {
+          if (nowTs < liveEndTs) {
             chrome.alarms.get(LIVE_SETTLE_ALARM, (existing) => {
               if (!existing) {
                 chrome.alarms.create(LIVE_SETTLE_ALARM, { delayInMinutes: 5, periodInMinutes: 5 });
@@ -1040,6 +1243,22 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
             });
           }
         }
+      }
+
+      // ── Stale pending outcomes auto-detect ─────────────────────────────────
+      // Unresolved records from events older than the 28h live window — these
+      // were never caught by the window-based catch-up above. Auto-settle once
+      // and badge the icon so the user can see there are pending outcomes.
+      const staleUnresolved = archive.filter((r: any) =>
+        Number.isFinite(Number(r.line)) && Number(r.line) > 0 &&
+        !Number.isFinite(Number(r.result)) &&
+        Date.parse(r.date) < nowTs - 28 * 60 * 60 * 1000
+      );
+      void updatePendingBadge();
+      if (staleUnresolved.length > 0) {
+        const staleEvents = [...new Set(staleUnresolved.map((r: any) => String(r.event)))];
+        console.log(`[UFC Settle] ${staleUnresolved.length} stale unresolved props across [${staleEvents.join(', ')}] — auto-settling`);
+        runSettle().catch(e => console.error('[UFC Settle] Stale auto-settle error:', e));
       }
     } catch (e) {
       console.error('[UFC Settle] Startup catch-up error:', e);
@@ -1191,7 +1410,14 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
       || ''
     ).toLowerCase();
     let lineType: 'fp'|'ss'|'td'|'ft'|null = null;
-    if (title.includes('significant strike') || title === 'significant strikes') lineType = 'ss';
+    if (title.includes('significant strike') || title === 'significant strikes') {
+      // Skip round-specific props (e.g. "Sig Strikes Rd 1", "Round 1 Significant Strikes")
+      // — these have much lower lines and would overwrite the total-fight value.
+      if (/\bround\b|\brd\.?\s*\d|\br\d\b/i.test(title)) {
+        continue;
+      }
+      lineType = 'ss';
+    }
     else if (title.includes('takedown') && !title.includes('def')) lineType = 'td';
     else if (title.includes('fight time') || title.includes('fighttime') || title.includes('fight lasts') || title.includes('fight duration')) lineType = 'ft';
     else if (title.includes('fantasy') || title.includes(' pts') || title === 'fantasy points' || title === '') lineType = 'fp';
@@ -1260,7 +1486,17 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
       };
     }
     const normalizedStatValue = lineType === 'ft' ? normalizeFightTimeLineToMinutes(statValue) : statValue;
-    fighters[name][`line_${lineType}`] = normalizedStatValue;
+    // For SS and TD keep the highest value — total-fight lines are always greater than
+    // per-round variants, so this ensures a round-specific duplicate never overwrites
+    // the correct total-fight line.
+    const existing = fighters[name][`line_${lineType}`];
+    if ((lineType === 'ss' || lineType === 'td') && normalizedStatValue != null) {
+      if (existing == null || normalizedStatValue > existing) {
+        fighters[name][`line_${lineType}`] = normalizedStatValue;
+      }
+    } else {
+      fighters[name][`line_${lineType}`] = normalizedStatValue;
+    }
     const sideOdds = extractUnderdogSideOdds(line);
     if (lineType === 'ss') {
       if (sideOdds.overOdds != null) fighters[name].ss_over_odds = sideOdds.overOdds;
@@ -1340,7 +1576,15 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
 
   const upsert = (name: string, type: 'fp'|'ss'|'td'|'ft', value: number, opponent: string | null = null) => {
     if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, line_ft: null, opponent };
-    fighters[name][`line_${type}`] = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
+    const normalized = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
+    // For SS and TD, keep the highest value seen — standard total-fight lines are always
+    // greater than any round-specific duplicate that may slip through.
+    const existing = fighters[name][`line_${type}`];
+    if ((type === 'ss' || type === 'td') && normalized != null && existing != null && normalized < existing) {
+      // skip — existing value is higher (more likely to be the correct total-fight line)
+    } else {
+      fighters[name][`line_${type}`] = normalized;
+    }
     if (opponent && !fighters[name].opponent) fighters[name].opponent = opponent;
   };
 
@@ -1352,6 +1596,11 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     const leagueRelId = p.relationships?.league?.data?.id ? String(p.relationships.league.data.id) : '';
     const leagueName = String(leagueById.get(leagueRelId) || '').toLowerCase();
     if (!/\bmma\b|\bufc\b/.test(leagueName)) continue;
+
+    // Only keep standard base lines — skip demon (boosted) and goblin (easier) variants.
+    // If odds_type is present and not "standard", it's a special-mode line.
+    const oddsType = String(attrs.odds_type || attrs.projection_type || '').toLowerCase();
+    if (oddsType && oddsType !== 'standard') continue;
 
     const stat = String(attrs.stat_type || '').toLowerCase();
     let lineType: 'fp'|'ss'|'td'|'ft'|null = null;
@@ -1621,6 +1870,19 @@ async function scrapePick6ActiveFallback(
   return store.pick6?.fighters?.length || 0;
 }
 
+// Merge DK-scraped moneylines on top of existing BFO odds (DK is live and liquid).
+async function mergeDKMoneylines(dkOdds: Record<string, number>): Promise<void> {
+  try {
+    const res = await chrome.storage.local.get('fight_odds_moneyline');
+    const existing: Record<string, number> = (res.fight_odds_moneyline as Record<string, number>) || {};
+    const merged = { ...existing, ...dkOdds };
+    await StorageService.setFightOddsMoneyline(merged);
+    notifyAnalyzerTabs({ type: 'ODDS_UPDATED', count: Object.keys(merged).length, reason: 'dk-sportsbook' });
+  } catch (e) {
+    console.error('[UFC Odds] Failed to merge DK moneylines:', e);
+  }
+}
+
 async function autoScrapeAllPlatforms(): Promise<any> {
   if (autoScrapeInProgress) {
     return { status: 'already_running' };
@@ -1756,6 +2018,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
                   const out: Record<string, any> = {};
                   const href = (window.location.href || '').toLowerCase();
+                  const preferML = href.includes('category=fight-odds') && !href.includes('subcategory=');
                   const preferSS = href.includes('subcategory=significant-strikes-o-u');
                   const preferTD = href.includes('subcategory=takedowns-landed-o-u');
                   const preferFT = href.includes('subcategory=fight-time-o-u') || href.includes('subcategory=fight-time');
@@ -1897,16 +2160,54 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                     }
                   }
 
+                  // ── Fight-odds page: scrape moneylines ─────────────────
+                  const moneylines: Record<string, number> = {};
+                  if (preferML) {
+                    // Element-based: look for name elements paired with adjacent odds
+                    const nameEls = Array.from(document.querySelectorAll(
+                      '[class*="event-cell__name-text"], [class*="participant-name"], [class*="event-cell__name"]'
+                    ));
+                    for (const el of nameEls) {
+                      const name = ((el as HTMLElement).innerText || el.textContent || '').trim();
+                      if (!name || name.length < 4 || !/^[A-Z]/.test(name)) continue;
+                      // Walk up to find sibling/parent odds button
+                      const parent = el.closest('[class*="event-cell"], [class*="participant"]') || el.parentElement;
+                      if (!parent) continue;
+                      const oddsEl = parent.querySelector('[class*="sportsbook-odds"], [class*="american"], button[aria-label*="odds"]');
+                      if (!oddsEl) continue;
+                      const oddsText = ((oddsEl as HTMLElement).innerText || oddsEl.textContent || '').replace(/\s/g, '');
+                      const oddsMatch = oddsText.match(/^([+-]\d{2,4})$/);
+                      if (oddsMatch) {
+                        moneylines[name] = parseInt(oddsMatch[1], 10);
+                      }
+                    }
+
+                    // Text-based fallback: fighter name line followed by odds line
+                    if (Object.keys(moneylines).length < 2) {
+                      const lines = pageText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                      for (let i = 0; i < lines.length - 1; i++) {
+                        const nameMatch = lines[i].match(/^([A-Z][a-zA-Z'\s\-.]{3,35})$/);
+                        const oddsMatch = lines[i + 1].match(/^([+-]\d{2,4})$/);
+                        if (nameMatch && oddsMatch) {
+                          moneylines[nameMatch[1].trim()] = parseInt(oddsMatch[1], 10);
+                        }
+                      }
+                    }
+                  }
+
                   return {
                     fighters: Object.values(out).filter((f: any) => f.line_ss != null || f.line_td != null || f.line_ft != null),
+                    moneylines,
                     debug: {
                       pageTextLen: pageText.length,
                       hasSS: /Significant\s+Strikes/i.test(pageText),
                       hasTD: /Takedowns?/i.test(pageText),
                       hasFT: /Fight\s+Time/i.test(pageText),
+                      preferML,
                       preferSS,
                       preferTD,
                       preferFT,
+                      mlCount: Object.keys(moneylines).length,
                     },
                   };
                 },
@@ -1915,6 +2216,13 @@ async function autoScrapeAllPlatforms(): Promise<any> {
               const payload = injected?.[0]?.result as any;
               const directFighters = Array.isArray(payload?.fighters) ? payload.fighters : [];
               console.log(`[UFC Auto-Scrape] DraftKings direct scrape debug:`, payload?.debug || {});
+
+              // Merge any DK fight-odds moneylines into the shared odds store
+              const dkMLs = payload?.moneylines as Record<string, number> | undefined;
+              if (dkMLs && Object.keys(dkMLs).length > 0) {
+                await mergeDKMoneylines(dkMLs);
+                console.log(`[UFC Auto-Scrape] DraftKings moneylines merged: ${Object.keys(dkMLs).length} fighters`);
+              }
 
               if (directFighters.length > 0) {
                 await handleLinesCaptured('draftkings_sportsbook', { fighters: directFighters });
@@ -1981,6 +2289,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
 interface UpcomingCardFighter {
   f1: string;
   f2: string;
+  scheduledRounds?: number;
 }
 
 interface UpcomingCardCache {
@@ -1993,7 +2302,9 @@ interface UpcomingCardCache {
 
 function parseEventDateMs(raw: string | null | undefined): number {
   if (!raw) return NaN;
-  const ts = Date.parse(raw);
+  // UFCStats uses "Apr. 4, 2026" — the period makes Date.parse return NaN in V8.
+  const normalized = raw.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\./gi, '$1');
+  const ts = Date.parse(normalized);
   return Number.isFinite(ts) ? ts : NaN;
 }
 
@@ -2009,12 +2320,7 @@ function isCardDateUsable(raw: string | null | undefined): boolean {
 async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardCache | null> {
   const hit = await StorageService.getUpcomingCard();
   if (!forceRefresh && hit && hit.fetchedAt && Date.now() - hit.fetchedAt < 2 * 60 * 60 * 1000 && isCardDateUsable(hit.date)) {
-    // If the cached event is more than 10 days away, bust the cache to check for a closer event
-    const cachedTs = parseEventDateMs(hit.date);
-    const tenDays = 10 * 24 * 60 * 60 * 1000;
-    if (Number.isFinite(cachedTs) && cachedTs - Date.now() < tenDays) {
-      return hit as UpcomingCardCache;
-    }
+    return hit as UpcomingCardCache;
   }
 
   try {
@@ -2038,12 +2344,81 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
     if (!events.length) return null;
 
     const now = Date.now();
-    // Only consider truly upcoming events — exclude past events so a completed card
-    // (e.g. UFC London the day after) doesn't shadow the next real card.
-    const futureish = events.filter((e) => e.ts >= now);
+    // Include events within the past 36h so a card that UFCStats moved to the completed
+    // page early (e.g. the day before the event) still wins over a distant future card.
+    const futureish = events.filter((e) => e.ts >= now - 36 * 60 * 60 * 1000);
     const pool = futureish.length ? futureish : events;
     pool.sort((a, b) => a.ts - b.ts);
-    const nextEvent = pool[0];
+    let nextEvent = pool[0];
+
+    // If the nearest event is still >7 days away, check the completed page for a card
+    // that is within ±3 days of today (UFCStats sometimes moves cards to completed early).
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const threeDays = 3 * 24 * 60 * 60 * 1000;
+    if (!nextEvent || nextEvent.ts - now > sevenDays) {
+      try {
+        const compRes = await fetch(CONFIG.api.ufcstats.completed);
+        if (compRes.ok) {
+          const compHtml = await compRes.text();
+          const compEvents: Array<{ name: string; date: string; url: string; ts: number }> = [];
+          const compRows = [...compHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+          for (const rowM of compRows) {
+            const row = rowM[1];
+            if (row.includes('<th')) continue;
+            const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
+            const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/i);
+            const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+            if (!linkM || !nameM || !dateM) continue;
+            const ts = parseEventDateMs(dateM[0]);
+            if (!Number.isFinite(ts)) continue;
+            compEvents.push({ name: nameM[1].trim(), date: dateM[0], url: linkM[1], ts });
+          }
+          // Look for an event close to today on the completed page
+          const closeEnough = compEvents
+            .filter((e) => Math.abs(e.ts - now) < threeDays)
+            .sort((a, b) => Math.abs(a.ts - now) - Math.abs(b.ts - now));
+          if (closeEnough.length) {
+            console.log(`[UFC Card] Upcoming page had no close event; using completed page: ${closeEnough[0].name}`);
+            nextEvent = closeEnough[0];
+          }
+        }
+      } catch (e) {
+        console.warn('[UFC Card] Completed page fallback failed:', e);
+      }
+    }
+
+    // Also cache the most recently completed event (within 14 days) for report card ordering
+    const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+    const recentPast = events
+      .filter((e) => e.ts < now && e.ts >= now - fourteenDays)
+      .sort((a, b) => b.ts - a.ts);
+    if (recentPast.length) {
+      const lastEvent = recentPast[0];
+      try {
+        const lastRes = await fetch(lastEvent.url);
+        if (lastRes.ok) {
+          const lastHtml = await lastRes.text();
+          const lastFighters: UpcomingCardFighter[] = [];
+          const lastRows = [...lastHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+          for (const rowM of lastRows) {
+            const row = rowM[1];
+            if (row.includes('<th')) continue;
+            const nameLinks = [...row.matchAll(/fighter-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/gi)];
+            if (nameLinks.length < 2) continue;
+            const f1 = nameLinks[0][1].trim();
+            const f2 = nameLinks[1][1].trim();
+            if (!f1 || !f2 || f1 === '--' || f2 === '--') continue;
+            lastFighters.push({ f1, f2 });
+          }
+          if (lastFighters.length) {
+            await StorageService.setLastCompletedCard({
+              event: lastEvent.name, date: lastEvent.date, url: lastEvent.url,
+              fighters: lastFighters, fetchedAt: Date.now(),
+            });
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
 
     const evRes = await fetch(nextEvent.url);
     if (!evRes.ok) throw new Error(`Event HTTP ${evRes.status}`);
@@ -2059,7 +2434,14 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
       const f1 = nameLinks[0][1].trim();
       const f2 = nameLinks[1][1].trim();
       if (!f1 || !f2 || f1 === '--' || f2 === '--') continue;
-      fighters.push({ f1, f2 });
+      // Extract scheduled rounds: UFCStats event page has a "Rnd" column with just "3" or "5"
+      const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
+      let scheduledRounds = 3;
+      for (const cell of cells) {
+        const clean = cell.replace(/<[^>]+>/g, '').trim();
+        if (clean === '5') { scheduledRounds = 5; break; }
+      }
+      fighters.push({ f1, f2, scheduledRounds });
     }
 
     const card: UpcomingCardCache = {
@@ -2076,6 +2458,84 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
     console.error('[UFC] fetchUpcomingUFCCard failed:', e);
     return null;
   }
+}
+
+// ── FIND CARD FOR LOADED FIGHTERS ────────────────────────────────────────
+// Searches both UFCStats upcoming and completed events for one whose fighters
+// overlap with the provided names array. Used by report card when cached card
+// doesn't match the event whose lines are currently loaded.
+async function findCardForFighters(names: string[]): Promise<UpcomingCardCache | null> {
+  const nameSet = new Set(names.map(n => n.toLowerCase().replace(/[^a-z ]/g, '')));
+  const parseFighters = (html: string): UpcomingCardFighter[] => {
+    const result: UpcomingCardFighter[] = [];
+    for (const rowM of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const row = rowM[1];
+      if (row.includes('<th')) continue;
+      const links = [...row.matchAll(/fighter-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/gi)];
+      if (links.length < 2) continue;
+      const f1 = links[0][1].trim();
+      const f2 = links[1][1].trim();
+      if (!f1 || !f2 || f1 === '--' || f2 === '--') continue;
+      result.push({ f1, f2 });
+    }
+    return result;
+  };
+  const parseEventList = (html: string) => {
+    const evts: Array<{ name: string; date: string; url: string; ts: number }> = [];
+    for (const rowM of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const row = rowM[1];
+      if (row.includes('<th')) continue;
+      const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
+      const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/i);
+      const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+      if (!linkM || !nameM || !dateM) continue;
+      const ts = parseEventDateMs(dateM[0]);
+      if (!Number.isFinite(ts)) continue;
+      evts.push({ name: nameM[1].trim(), date: dateM[0], url: linkM[1], ts });
+    }
+    return evts;
+  };
+  const overlaps = (fighters: UpcomingCardFighter[]) => {
+    let count = 0;
+    for (const { f1, f2 } of fighters) {
+      if (nameSet.has(f1.toLowerCase().replace(/[^a-z ]/g, '')) ||
+          nameSet.has(f2.toLowerCase().replace(/[^a-z ]/g, ''))) count++;
+    }
+    return count >= Math.ceil(fighters.length * 0.4);
+  };
+  try {
+    const sources = [
+      'http://www.ufcstats.com/statistics/events/upcoming?page=all',
+      'http://www.ufcstats.com/statistics/events/completed?page=1',
+    ];
+    for (const src of sources) {
+      const res = await fetch(src);
+      if (!res.ok) continue;
+      const html = await res.text();
+      const evts = parseEventList(html);
+      // Check most recent events first (completed page is reverse-chronological)
+      const sorted = evts.slice().sort((a, b) => Math.abs(Date.now() - a.ts) - Math.abs(Date.now() - b.ts));
+      for (const evt of sorted.slice(0, 8)) {
+        try {
+          const evRes = await fetch(evt.url);
+          if (!evRes.ok) continue;
+          const evHtml = await evRes.text();
+          const fighters = parseFighters(evHtml);
+          if (fighters.length >= 6 && overlaps(fighters)) {
+            const card: UpcomingCardCache = {
+              event: evt.name, date: evt.date, url: evt.url,
+              fighters, fetchedAt: Date.now(),
+            };
+            await StorageService.setLastCompletedCard(card);
+            return card;
+          }
+        } catch { /* skip */ }
+      }
+    }
+  } catch (e) {
+    console.error('[UFC] findCardForFighters failed:', e);
+  }
+  return null;
 }
 
 // ── POST-EVENT ALARM ────────────────────────────────────────────────────
@@ -2118,6 +2578,50 @@ function schedulePostEventAlarm(card: UpcomingCardCache): void {
     chrome.alarms.create(POST_EVENT_SETTLE_ALARM, { when: alarmTs });
     console.log(`[UFC Settle] Post-event alarm set for ${new Date(alarmTs).toISOString()} ("${card.event}")`);
   }
+
+  // ── Line refresh alarm: auto-scrape lines on fight week/day ──
+  // Stop refreshing once the event starts (lines are locked in).
+  if (now < eventTs) {
+    chrome.alarms.clear(LINE_REFRESH_ALARM, () => {
+      const hoursUntilEvent = msUntilEvent / (60 * 60 * 1000);
+      // Fight day (<24h out): every 45 min. Thu/Fri (1-3 days out): every 90 min.
+      // Earlier fight week (3-7 days): every 4h. Beyond 7 days: don't schedule.
+      let periodMin: number | null = null;
+      if (hoursUntilEvent <= 24)       periodMin = 45;
+      else if (hoursUntilEvent <= 72)  periodMin = 90;
+      else if (hoursUntilEvent <= 168) periodMin = 240;
+
+      if (periodMin != null) {
+        chrome.alarms.create(LINE_REFRESH_ALARM, { delayInMinutes: periodMin, periodInMinutes: periodMin });
+        console.log(`[UFC Lines] Line refresh alarm set every ${periodMin} min (${Math.round(hoursUntilEvent)}h until event)`);
+      }
+    });
+  } else {
+    chrome.alarms.clear(LINE_REFRESH_ALARM);
+  }
+}
+
+// Update the extension icon badge with the count of past-event unresolved props.
+// Badge is amber with count when pending, cleared when all settled.
+async function updatePendingBadge(): Promise<void> {
+  try {
+    const raw = await new Promise<Record<string, any>>((res) =>
+      chrome.storage.local.get(['prop_archive_v1'], res)
+    );
+    const archive: any[] = Array.isArray(raw.prop_archive_v1) ? raw.prop_archive_v1 : [];
+    const nowTs = Date.now();
+    const pendingCount = archive.filter(r =>
+      Number.isFinite(Number(r.line)) && Number(r.line) > 0 &&
+      !Number.isFinite(Number(r.result)) &&
+      Date.parse(r.date) < nowTs
+    ).length;
+    chrome.action.setBadgeText({ text: pendingCount > 0 ? String(pendingCount) : '' });
+    if (pendingCount > 0) {
+      chrome.action.setBadgeBackgroundColor({ color: '#e8a838' });
+    }
+  } catch (e) {
+    console.warn('[UFC Badge] Failed to update badge:', e);
+  }
 }
 
 async function runSettle(): Promise<void> {
@@ -2133,10 +2637,27 @@ async function runSettle(): Promise<void> {
     console.log(`[UFC Settle] Backfill: ${changed} additional records resolved`);
     notifyAnalyzerTabs({ type: 'ARCHIVE_SETTLED', settled: changed });
   }
+  void updatePendingBadge();
 }
 
 // Fire when the scheduled post-event or live alarm triggers
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === LINE_REFRESH_ALARM) {
+    console.log('[UFC Lines] Auto-refresh alarm fired — scraping all platforms...');
+    // Stop refreshing once event has started
+    chrome.storage.local.get(['upcoming_ufc_card'], (res) => {
+      const card = res?.upcoming_ufc_card as UpcomingCardCache | undefined;
+      const eventTs = card?.date ? parseEventDateMs(card.date) : NaN;
+      if (Number.isFinite(eventTs) && Date.now() >= eventTs) {
+        chrome.alarms.clear(LINE_REFRESH_ALARM);
+        console.log('[UFC Lines] Event started — line refresh alarm cleared');
+        return;
+      }
+      autoScrapeAllPlatforms().catch(e => console.error('[UFC Lines] Auto-refresh error:', e));
+    });
+    return;
+  }
+
   if (alarm.name === LIVE_SETTLE_ALARM) {
     console.log('[UFC Settle] Live alarm fired — checking UFCStats for new results...');
     // Stop the live alarm once we're past the 8h event window

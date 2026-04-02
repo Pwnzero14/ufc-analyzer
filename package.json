@@ -6,7 +6,16 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
-    "prebuild": "npm run clean"
+    "snapshot:analyzer": "node snapshot-analyzer.js",
+    "archive:clean:betr": "node clean-betr-lingering.js",
+    "archive:import:settle": "node import-betr-settle-lines.js --file betr-settle-input.json",
+    "archive:import:settle:dry": "node import-betr-settle-lines.js --file betr-settle-input.json --dry-run",
+    "archive:backfill": "node backfill-archive-results.js",
+    "report:london": "node grade-london-best-picks.js",
+    "prebuild": "npm run clean",
+    "checkpoint:save": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode save",
+    "checkpoint:save:snapshot": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode save -CreateSnapshot",
+    "checkpoint:resume": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode resume"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.37",
@@ -14,5 +23,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "puppeteer": "^24.40.0"
   }
 }
