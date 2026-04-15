@@ -121,6 +121,7 @@ export const FANTASY_SCORING = {
   takedown: 5,
   reversal: 5,
   knockdown: 10,
+  quickWinBonus: 25,   // R1 finish in ≤60 seconds
   winBonus: {
     round1: 90,
     round2: 70,

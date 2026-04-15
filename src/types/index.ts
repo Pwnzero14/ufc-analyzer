@@ -152,7 +152,7 @@ export interface LineDrop {
 
 export type LineDirection = 'drop' | 'rise' | 'both';
 export type WatchedStatType = 'fp' | 'ss' | 'td';
-export type WatchPlatform = 'pick6' | 'underdog' | 'betr' | 'prizepicks';
+export type WatchPlatform = 'pick6' | 'underdog' | 'betr' | 'prizepicks' | 'dk';
 
 export interface LineWatchSettings {
   enabled: boolean;
@@ -197,11 +197,41 @@ export interface FighterLineHistory {
   points: Array<{ timestamp: number; value: number; platform: WatchPlatform }>;
 }
 
+// ── LINE HISTORY ─────────────────────────────────────────────────────────
+/** Compact snapshot point: one timestamp with per-platform values */
+export interface LineHistoryPoint {
+  t: number;                     // timestamp ms
+  v: Record<string, number>;     // platform abbrev -> value e.g. { p6: 23, ud: 22.5 }
+}
+
+/** Persisted line history for an entire event */
+export interface LineHistoryStore {
+  eventKey: string;
+  updatedAt: number;
+  /** Keys: "fighter_name_lower|stat" -> array of timestamped snapshots */
+  series: Record<string, LineHistoryPoint[]>;
+}
+
 // ── UPCOMING CARD ─────────────────────────────────────────────────────────
+export type WeightClass =
+  | 'flyweight'
+  | 'bantamweight'
+  | 'featherweight'
+  | 'lightweight'
+  | 'welterweight'
+  | 'middleweight'
+  | 'lightHeavyweight'
+  | 'heavyweight'
+  | 'womenStrawweight'
+  | 'womenFlyweight'
+  | 'womenBantamweight'
+  | 'womenFeatherweight';
+
 export interface UFCFight {
   f1: string;
   f2: string;
   scheduledRounds?: number;
+  weightClass?: WeightClass;
 }
 
 export interface UpcomingCard {
@@ -210,6 +240,7 @@ export interface UpcomingCard {
   url: string;
   fighters: UFCFight[];
   fetchedAt: number;
+  location?: string;
 }
 
 // ── SCRAPER RESULTS ───────────────────────────────────────────────────────
@@ -251,4 +282,98 @@ export interface PropArchiveRecord {
   propType: PropType;
   line?: number;
   result: number;
+}
+
+// ── PROP LINE PREDICTOR ─────────────────────────────────────────────────
+
+export interface StatPrediction {
+  line: number;
+  lean: 'over' | 'under';
+  confidence: number;
+  reasons: string[];
+}
+
+export interface PropPrediction {
+  fighter: string;
+  opponent: string;
+  scheduledRounds: number;
+  weightClass?: WeightClass;
+  ss: StatPrediction;
+  td: StatPrediction;
+  fantasy: StatPrediction;
+}
+
+export interface PredictionEvent {
+  event: string;
+  date: string;           // ISO
+  generatedAt: number;    // timestamp
+  predictions: PropPrediction[];
+  settled: boolean;
+}
+
+// Per-weight-class calibration bucket. `default` is the fallback when the class is
+// unknown or has never been sampled in the learning cycle. Class-specific entries are
+// written lazily as the learning cycle observes bias per class.
+export interface PerClassModifier {
+  default: number;
+  flyweight?: number;
+  bantamweight?: number;
+  featherweight?: number;
+  lightweight?: number;
+  welterweight?: number;
+  middleweight?: number;
+  lightHeavyweight?: number;
+  heavyweight?: number;
+  womenStrawweight?: number;
+  womenFlyweight?: number;
+  womenBantamweight?: number;
+  womenFeatherweight?: number;
+}
+
+export interface PredictorWeights {
+  ss_pace_modifier: PerClassModifier;
+  td_attempt_modifier: PerClassModifier;
+  fp_global_modifier: PerClassModifier;
+  fp_ss_weight: number;
+  fp_td_weight: number;
+  fp_ctrl_weight: number;
+  fp_kd_weight: number;
+  fp_win_weight: number;
+  version: number;
+}
+
+export interface FighterTrend {
+  fighter: string;
+  ss_trend: number;
+  td_trend: number;
+  fp_trend: number;
+  sampleCount: number;
+  lastUpdated: number;
+}
+
+export interface LearningPredictionResult {
+  fighter: string;
+  weightClass?: WeightClass;
+  predicted: { ss: number; td: number; fp: number };
+  actual: { ss: number; td: number; fp: number };
+  delta: { ss: number; td: number; fp: number };
+}
+
+export interface LearningSummary {
+  avgAbsDeltaSS: number;
+  avgAbsDeltaTD: number;
+  avgAbsDeltaFP: number;
+  bestPrediction: string;
+  worstPrediction: string;
+  // Per-class deltas applied this event, keyed by modifier name (e.g. "ss_pace_modifier.lightweight").
+  weightAdjustments: Record<string, number>;
+  trendUpdates: number;
+}
+
+export interface LearningResult {
+  event: string;
+  date: string;
+  learnedAt: number;
+  predictions: LearningPredictionResult[];
+  summary: LearningSummary;
 }

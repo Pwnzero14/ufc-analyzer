@@ -1,0 +1,728 @@
+// ── PROP LINE PREDICTOR SERVICE ──────────────────────────────────────────
+// Predicts SS, TD, and Fantasy lines for upcoming fights using fighter history,
+// opponent data, and self-learned weights. After settlement, runs a learning
+// cycle to update fighter trends and formula weights.
+
+import { FANTASY_SCORING } from '../config/index.js';
+import type {
+  FighterDB,
+  FighterTrend,
+  LearningPredictionResult,
+  LearningResult,
+  LearningSummary,
+  PerClassModifier,
+  PredictionEvent,
+  PredictorWeights,
+  PropArchiveRecord,
+  PropPrediction,
+  StatPrediction,
+  WeightClass,
+} from '../types/index.js';
+
+// ── Storage Keys ────────────────────────────────────────────────────────
+const PREDICTIONS_KEY = 'prop_predictions_v1';
+const WEIGHTS_KEY = 'prop_predictor_weights_v1';
+const TRENDS_KEY = 'prop_predictor_trends_v1';
+const LEARNING_LOG_KEY = 'prop_predictor_learning_log_v1';
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+function chromeGet<T = unknown>(keys: string[]): Promise<T> {
+  return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data as T)));
+}
+
+function chromeSet(values: Record<string, unknown>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      const err = chrome.runtime?.lastError;
+      if (err) reject(new Error(err.message));
+      else resolve();
+    });
+  });
+}
+
+function normName(s: string): string {
+  return s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function round1(v: number): number {
+  return Math.round(v * 2) / 2; // round to nearest 0.5
+}
+
+// ── Per-class modifier helpers ──────────────────────────────────────────
+function makeModifier(v = 1.0): PerClassModifier {
+  return { default: v };
+}
+
+// Read the modifier for a given weight class; fall back to `default` when the
+// class is unknown or has never been sampled.
+function getMod(map: PerClassModifier, wc?: WeightClass | null): number {
+  if (!wc) return map.default;
+  const v = map[wc];
+  return typeof v === 'number' ? v : map.default;
+}
+
+// Normalize a possibly-legacy (number) modifier field into a PerClassModifier.
+// Old stored weights had `ss_pace_modifier: number` — migrate by moving that
+// value into the `default` bucket. Idempotent for already-migrated values.
+function ensureModifier(v: unknown): PerClassModifier {
+  if (typeof v === 'number' && Number.isFinite(v)) return { default: v };
+  if (v && typeof v === 'object' && typeof (v as PerClassModifier).default === 'number') {
+    return v as PerClassModifier;
+  }
+  return { default: 1.0 };
+}
+
+function clampModifier(map: PerClassModifier, lo: number, hi: number): void {
+  map.default = clamp(map.default, lo, hi);
+  for (const k of Object.keys(map) as Array<keyof PerClassModifier>) {
+    if (k === 'default') continue;
+    const val = map[k];
+    if (typeof val === 'number') map[k] = clamp(val, lo, hi);
+  }
+}
+
+// ── Default Weights ─────────────────────────────────────────────────────
+const DEFAULT_WEIGHTS: PredictorWeights = {
+  ss_pace_modifier: makeModifier(1.0),
+  td_attempt_modifier: makeModifier(1.0),
+  fp_global_modifier: makeModifier(1.0),
+  fp_ss_weight: FANTASY_SCORING.sigStrike,
+  fp_td_weight: FANTASY_SCORING.takedown,
+  fp_ctrl_weight: FANTASY_SCORING.controlTimePerSec,
+  fp_kd_weight: FANTASY_SCORING.knockdown,
+  fp_win_weight: FANTASY_SCORING.winBonus.decision,
+  version: 2,
+};
+
+// Learning-cycle hyperparams
+const LEARNING_RATE = 0.1;      // fraction of relative error applied per event
+const MAX_STEP_PER_EVENT = 0.08; // cap per-event multiplicative change at ±8%
+const MIN_CLASS_SAMPLES = 2;    // need at least this many per-class samples to update a class-specific bucket
+
+// ── Service ─────────────────────────────────────────────────────────────
+export class PropLinePredictorService {
+
+  // ── Storage Accessors ───────────────────────────────────────────────
+
+  static async getWeights(): Promise<PredictorWeights> {
+    const raw = await chromeGet<Record<string, unknown>>([WEIGHTS_KEY]);
+    const stored = raw[WEIGHTS_KEY] as Record<string, unknown> | undefined;
+    if (!stored) {
+      return {
+        ...DEFAULT_WEIGHTS,
+        ss_pace_modifier: makeModifier(),
+        td_attempt_modifier: makeModifier(),
+        fp_global_modifier: makeModifier(),
+      };
+    }
+    // Migrate legacy numeric modifiers → PerClassModifier. Keeps older learned
+    // bias alive by putting the stored scalar into `default`.
+    const merged: PredictorWeights = {
+      ...DEFAULT_WEIGHTS,
+      ...(stored as unknown as Partial<PredictorWeights>),
+      ss_pace_modifier: ensureModifier(stored.ss_pace_modifier),
+      td_attempt_modifier: ensureModifier(stored.td_attempt_modifier),
+      fp_global_modifier: ensureModifier(stored.fp_global_modifier),
+    };
+    return merged;
+  }
+
+  static async saveWeights(w: PredictorWeights): Promise<void> {
+    await chromeSet({ [WEIGHTS_KEY]: w });
+  }
+
+  static async getTrends(): Promise<FighterTrend[]> {
+    const raw = await chromeGet<Record<string, unknown>>([TRENDS_KEY]);
+    return Array.isArray(raw[TRENDS_KEY]) ? raw[TRENDS_KEY] as FighterTrend[] : [];
+  }
+
+  static async saveTrends(trends: FighterTrend[]): Promise<void> {
+    // Prune to 200 most recently updated
+    const sorted = [...trends].sort((a, b) => b.lastUpdated - a.lastUpdated).slice(0, 200);
+    await chromeSet({ [TRENDS_KEY]: sorted });
+  }
+
+  static async getPredictions(): Promise<PredictionEvent[]> {
+    const raw = await chromeGet<Record<string, unknown>>([PREDICTIONS_KEY]);
+    const preds = Array.isArray(raw[PREDICTIONS_KEY]) ? raw[PREDICTIONS_KEY] as PredictionEvent[] : [];
+    // Fix duplicated "vs" in event names (e.g. "UFC FN: A vs. B: A vs. B" → "UFC FN: A vs. B")
+    for (const p of preds) {
+      const m = p.event.match(/^(.+\bvs\.?\s+\S+)\s*:\s*\S+\s+vs\.?\s+\S+$/i);
+      if (m) p.event = m[1];
+    }
+    return preds;
+  }
+
+  static async savePredictions(preds: PredictionEvent[]): Promise<void> {
+    await chromeSet({ [PREDICTIONS_KEY]: preds.slice(-10) });
+  }
+
+  static async getLearningLog(): Promise<LearningResult[]> {
+    const raw = await chromeGet<Record<string, unknown>>([LEARNING_LOG_KEY]);
+    return Array.isArray(raw[LEARNING_LOG_KEY]) ? raw[LEARNING_LOG_KEY] as LearningResult[] : [];
+  }
+
+  // ── Find trend for a fighter ────────────────────────────────────────
+
+  static findTrend(trends: FighterTrend[], fighter: string): FighterTrend | null {
+    const key = normName(fighter);
+    return trends.find(t => normName(t.fighter) === key) ?? null;
+  }
+
+  // ── SS Prediction ───────────────────────────────────────────────────
+
+  static predictSS(
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+    weights: PredictorWeights,
+    trend: FighterTrend | null,
+    weightClass?: WeightClass | null,
+  ): StatPrediction {
+    const reasons: string[] = [];
+
+    // Fighter's average sig strikes per fight
+    const fighterAvgSS = fighterDB.avgSigStr ?? ((fighterDB.slpm ?? 3) * 15);
+    reasons.push(`Avg SS: ${fighterAvgSS.toFixed(1)}`);
+
+    // Opponent absorbed: use opponent's SAPM * 15 as proxy for how many strikes they absorb
+    const oppAbsorbedSS = opponentDB ? ((opponentDB.sapm ?? 3) * 15) : fighterAvgSS;
+    if (opponentDB) reasons.push(`Opp absorbs: ${oppAbsorbedSS.toFixed(1)} SS/fight`);
+
+    // Rounds modifier (normalize to 3-round base)
+    const roundsModifier = scheduledRounds / 3;
+    if (scheduledRounds === 5) reasons.push('5-round fight (+67% base)');
+
+    // Core formula — pace modifier is per-weight-class so flyweight error doesn't drift heavyweight calibration
+    const ssMod = getMod(weights.ss_pace_modifier, weightClass);
+    let predicted = ((fighterAvgSS + oppAbsorbedSS) / 2) * ssMod * roundsModifier;
+
+    // Style adjustments
+    if (fighterDB.style === 'striker') {
+      predicted *= 1.08;
+      reasons.push('Striker style (+8%)');
+    }
+    if (opponentDB?.style === 'grappler') {
+      predicted *= 0.88;
+      reasons.push('vs Grappler (-12%)');
+    }
+
+    // Apply learned trend
+    if (trend && Math.abs(trend.ss_trend) > 0.5) {
+      predicted += trend.ss_trend;
+      reasons.push(`Trend adj: ${trend.ss_trend > 0 ? '+' : ''}${trend.ss_trend.toFixed(1)}`);
+    }
+
+    // Confidence
+    const sampleSize = fighterDB.history.filter(f => f.sigStr != null).length;
+    const confidence = clamp(
+      40 + sampleSize * 3 + (fighterDB.fpConsistency ?? 50) * 0.15 + (opponentDB ? 10 : 0),
+      25, 90,
+    );
+
+    const line = round1(clamp(predicted, 0.5, 200));
+    const lean = predicted > fighterAvgSS ? 'over' : 'under';
+
+    return { line, lean, confidence: Math.round(confidence), reasons };
+  }
+
+  // ── TD Prediction ───────────────────────────────────────────────────
+
+  static predictTD(
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+    weights: PredictorWeights,
+    trend: FighterTrend | null,
+    weightClass?: WeightClass | null,
+  ): StatPrediction {
+    const reasons: string[] = [];
+
+    // Fighter's TD per fight from history
+    const tdPerFight = fighterDB.avgTDperFight ?? 0;
+    reasons.push(`Avg TD/fight: ${tdPerFight.toFixed(1)}`);
+
+    // Opponent TD defense rate (0-1)
+    const oppTdDef = opponentDB ? (opponentDB.tdDef ?? 50) / 100 : 0.5;
+    if (opponentDB) reasons.push(`Opp TD Def: ${(oppTdDef * 100).toFixed(0)}%`);
+
+    const roundsModifier = scheduledRounds / 3;
+    if (scheduledRounds === 5) reasons.push('5-round fight');
+
+    // Core formula: attempts * success rate adjusted for opponent — per-class TD modifier
+    const tdMod = getMod(weights.td_attempt_modifier, weightClass);
+    let predicted = tdPerFight * (1 - oppTdDef * 0.5) * roundsModifier * tdMod;
+
+    // Style adjustments
+    if (fighterDB.style === 'grappler') {
+      predicted *= 1.15;
+      reasons.push('Grappler style (+15%)');
+    }
+    if (opponentDB?.style === 'striker') {
+      predicted *= 1.05;
+      reasons.push('vs Striker (+5% TD opp)');
+    }
+
+    // Apply learned trend
+    if (trend && Math.abs(trend.td_trend) > 0.1) {
+      predicted += trend.td_trend;
+      reasons.push(`Trend adj: ${trend.td_trend > 0 ? '+' : ''}${trend.td_trend.toFixed(1)}`);
+    }
+
+    // Confidence — TD is harder to predict, lower base
+    const sampleSize = fighterDB.history.filter(f => f.td != null).length;
+    const confidence = clamp(
+      30 + sampleSize * 3 + (opponentDB ? 10 : 0) + (tdPerFight > 1 ? 10 : 0),
+      20, 85,
+    );
+
+    const line = round1(clamp(predicted, 0.5, 20));
+    const lean = predicted > tdPerFight ? 'over' : 'under';
+
+    return { line, lean, confidence: Math.round(confidence), reasons };
+  }
+
+  // ── Calculate Betr FP for a single historical fight ──────────────────
+
+  private static calcBetrFP(f: { sigStr?: number|null; totStr?: number|null; ctrlSecs?: number|null; kd?: number|null; td?: number|null; rev?: number|null; result?: string|null; method?: string|null; round?: number|null; timeSecs?: number|null }): number | null {
+    if (f.sigStr == null && f.totStr == null && f.kd == null && f.td == null && f.ctrlSecs == null) return null;
+    const nonSig = Math.max(0, (f.totStr || 0) - (f.sigStr || 0));
+    const won = f.result === 'win';
+    let fp = (f.sigStr || 0) * FANTASY_SCORING.sigStrike
+           + nonSig            * FANTASY_SCORING.nonSigStrike
+           + (f.ctrlSecs || 0) * FANTASY_SCORING.controlTimePerSec
+           + (f.kd  || 0)      * FANTASY_SCORING.knockdown
+           + (f.td  || 0)      * FANTASY_SCORING.takedown
+           + (f.rev || 0)      * FANTASY_SCORING.reversal;
+    // Win bonus
+    if (won) {
+      const isDec = /DEC/i.test(f.method || '');
+      if (isDec) { fp += FANTASY_SCORING.winBonus.decision; }
+      else {
+        const r = f.round || 3;
+        if (r === 1) fp += FANTASY_SCORING.winBonus.round1;
+        else if (r === 2) fp += FANTASY_SCORING.winBonus.round2;
+        else if (r === 3) fp += FANTASY_SCORING.winBonus.round3;
+        else fp += FANTASY_SCORING.winBonus.round4Plus;
+        // Quick win bonus: R1 finish ≤60s
+        if (r === 1 && (f.timeSecs || 9999) <= 60) fp += FANTASY_SCORING.quickWinBonus;
+      }
+    }
+    return fp;
+  }
+
+  // ── Fantasy Prediction (Betr Scoring) ───────────────────────────────
+  //
+  // Strategy: Calculate what each historical fight scored under Betr rules,
+  // use recency-weighted average as baseline, then adjust for opponent
+  // matchup (defensive stats, finish susceptibility) and scheduled rounds.
+
+  static predictFantasy(
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+    weights: PredictorWeights,
+    trend: FighterTrend | null,
+    ssLine: number,
+    tdLine: number,
+    weightClass?: WeightClass | null,
+  ): StatPrediction {
+    const reasons: string[] = [];
+
+    // ── Step 1: Compute per-fight Betr scores from raw history ──────
+    const fightScores: { fp: number; isRecent: boolean; rounds: number; won: boolean; isFinish: boolean; round: number }[] = [];
+    const history = fighterDB.history;
+    for (let i = 0; i < history.length; i++) {
+      const f = history[i];
+      const betrFP = this.calcBetrFP(f);
+      if (betrFP == null) continue;
+      fightScores.push({
+        fp: betrFP,
+        isRecent: i < 3, // first 3 in history = most recent fights
+        rounds: f.round || 3,
+        won: f.result === 'win',
+        isFinish: /KO|TKO|SUB/i.test(f.method || ''),
+        round: f.round || 3,
+      });
+    }
+
+    // ── Step 2: Recency-weighted average ────────────────────────────
+    // Weights: most recent fight = 1.0, then 0.85, 0.72, 0.61, 0.52, etc.
+    let baseline: number;
+    if (fightScores.length > 0) {
+      let weightSum = 0;
+      let fpSum = 0;
+      for (let i = 0; i < fightScores.length; i++) {
+        const w = Math.pow(0.85, i); // exponential decay
+        fpSum += fightScores[i].fp * w;
+        weightSum += w;
+      }
+      baseline = fpSum / weightSum;
+      const plainAvg = fightScores.reduce((s, f) => s + f.fp, 0) / fightScores.length;
+      reasons.push(`Betr avg: ${plainAvg.toFixed(1)} (${fightScores.length} fights)`);
+      if (Math.abs(baseline - plainAvg) > 1) {
+        reasons.push(`Recency-weighted: ${baseline.toFixed(1)}`);
+      }
+    } else if (fighterDB.avgFP_betr != null && fighterDB.avgFP_betr > 0) {
+      baseline = fighterDB.avgFP_betr;
+      reasons.push(`Betr platform avg: ${baseline.toFixed(1)}`);
+    } else if (fighterDB.avgFP != null && fighterDB.avgFP > 0) {
+      baseline = fighterDB.avgFP;
+      reasons.push(`Career avg fallback: ${baseline.toFixed(1)}`);
+    } else {
+      // No history at all — build from predicted components as last resort
+      baseline = ssLine * FANTASY_SCORING.sigStrike
+               + ssLine * 0.3 * FANTASY_SCORING.nonSigStrike
+               + tdLine * FANTASY_SCORING.takedown
+               + FANTASY_SCORING.winBonus.decision * 0.5;
+      reasons.push('No history — component estimate');
+    }
+
+    // ── Step 3: Scheduled rounds adjustment ─────────────────────────
+    // If most history is 3-round but this is a 5-round fight (or vice versa),
+    // adjust the counting-stat portion proportionally.
+    if (fightScores.length >= 2) {
+      const avgHistRounds = fightScores.reduce((s, f) => s + f.rounds, 0) / fightScores.length;
+      if (Math.abs(scheduledRounds - avgHistRounds) > 0.5) {
+        // Estimate what fraction of total FP is counting stats vs win bonus
+        const avgWinBonus = fightScores.filter(f => f.won).length > 0
+          ? fightScores.filter(f => f.won).reduce((s, f) => {
+              if (!f.isFinish) return s + FANTASY_SCORING.winBonus.decision;
+              if (f.round === 1) return s + FANTASY_SCORING.winBonus.round1;
+              if (f.round === 2) return s + FANTASY_SCORING.winBonus.round2;
+              if (f.round === 3) return s + FANTASY_SCORING.winBonus.round3;
+              return s + FANTASY_SCORING.winBonus.round4Plus;
+            }, 0) / fightScores.length
+          : 0;
+        const countingStatPortion = Math.max(0, baseline - avgWinBonus);
+        const roundsRatio = scheduledRounds / avgHistRounds;
+        const adjustedCounting = countingStatPortion * roundsRatio;
+        const oldBaseline = baseline;
+        baseline = adjustedCounting + avgWinBonus;
+        if (scheduledRounds === 5) {
+          reasons.push(`5-rd adj: ${oldBaseline.toFixed(1)} → ${baseline.toFixed(1)}`);
+        }
+      }
+    }
+
+    // ── Step 4: Opponent matchup adjustments ────────────────────────
+    let oppMultiplier = 1.0;
+    const oppReasons: string[] = [];
+
+    if (opponentDB) {
+      // 4a. Striking absorption — opponent's SAPM vs league average (~3.5)
+      //     High SAPM = opponent gets hit a lot = more striking FP for our fighter
+      const oppSAPM = opponentDB.sapm ?? 3.5;
+      const sapmDelta = (oppSAPM - 3.5) / 3.5; // e.g. SAPM=5 → +43%, SAPM=2 → -43%
+      const strikingAdj = 1 + sapmDelta * 0.15; // dampen: ±6% per unit
+      if (Math.abs(sapmDelta) > 0.1) {
+        oppReasons.push(`Opp absorbs ${oppSAPM.toFixed(1)} S/min (${sapmDelta > 0 ? '+' : ''}${(sapmDelta * 15).toFixed(0)}%)`);
+      }
+
+      // 4b. Opponent striking defense — high strDef = harder to land
+      const oppStrDef = opponentDB.strDef ?? 55;
+      const strDefDelta = (55 - oppStrDef) / 100; // Below 55% = easier target
+      const strDefAdj = 1 + strDefDelta * 0.20;
+      if (Math.abs(strDefDelta) > 0.05) {
+        oppReasons.push(`Opp str def ${oppStrDef}%`);
+      }
+
+      // 4c. Opponent TD defense — affects grappling scoring
+      const oppTdDef = opponentDB.tdDef ?? 55;
+      const tdDefDelta = (55 - oppTdDef) / 100;
+      // Only applies to the grappling portion — estimate ~20% of FP from grappling
+      const tdAdj = 1 + tdDefDelta * 0.08;
+      if (Math.abs(tdDefDelta) > 0.05) {
+        oppReasons.push(`Opp TD def ${oppTdDef}%`);
+      }
+
+      // 4d. Opponent finish susceptibility — affects win bonus expectation
+      //     Look at opponent's loss history for KO/TKO/SUB losses
+      const oppLosses = opponentDB.history.filter(f => f.result === 'loss');
+      const oppFinishLosses = oppLosses.filter(f => /KO|TKO|SUB/i.test(f.method || ''));
+      const oppFinishLossRate = oppLosses.length >= 2 ? oppFinishLosses.length / oppLosses.length : 0.45;
+      // Compare to fighter's own finish rate
+      const fighterFinishRate = fighterDB.finishRate ?? 0.45;
+      // If fighter finishes often AND opponent gets finished often → boost win bonus
+      const finishSynergyDelta = ((fighterFinishRate - 0.45) + (oppFinishLossRate - 0.45)) / 2;
+      const finishAdj = 1 + finishSynergyDelta * 0.12;
+      if (Math.abs(finishSynergyDelta) > 0.05) {
+        oppReasons.push(`Finish synergy: ${fighterFinishRate > 0.5 ? 'finisher' : 'grinder'} vs ${oppFinishLossRate > 0.5 ? 'vulnerable' : 'durable'}`);
+      }
+
+      oppMultiplier = strikingAdj * strDefAdj * tdAdj * finishAdj;
+      oppMultiplier = clamp(oppMultiplier, 0.78, 1.25); // cap total adjustment ±22%
+    }
+
+    let predicted = baseline * oppMultiplier;
+    if (opponentDB && Math.abs(oppMultiplier - 1) > 0.01) {
+      reasons.push(`Opp adj: ×${oppMultiplier.toFixed(2)} (${oppReasons.join('; ')})`);
+    }
+
+    // ── Step 5: Style matchup modifiers ─────────────────────────────
+    if (fighterDB.style === 'grappler' && opponentDB?.style === 'grappler') {
+      // Grappler vs grappler often neutralizes grappling → less ctrl time
+      predicted *= 0.94;
+      reasons.push('Grappler vs grappler (-6%)');
+    }
+    if (fighterDB.style === 'striker' && opponentDB?.style === 'striker') {
+      // Striker vs striker = more action, more KD potential
+      predicted *= 1.04;
+      reasons.push('Striker vs striker (+4%)');
+    }
+
+    // ── Step 6: Apply learned trend ─────────────────────────────────
+    if (trend && Math.abs(trend.fp_trend) > 1) {
+      predicted += trend.fp_trend;
+      reasons.push(`Trend: ${trend.fp_trend > 0 ? '+' : ''}${trend.fp_trend.toFixed(1)}`);
+    }
+
+    // ── Step 6b: Apply learned FP calibration modifier (per weight class) ───
+    // This is the knob `runLearningCycle` turns to correct FP bias — per class so
+    // heavyweight over-prediction doesn't drag flyweight calibration down.
+    const fpMod = getMod(weights.fp_global_modifier, weightClass);
+    if (Math.abs(fpMod - 1) > 0.005) {
+      predicted *= fpMod;
+      reasons.push(`FP cal (${weightClass ?? 'default'}): ×${fpMod.toFixed(3)}`);
+    }
+
+    // ── Step 7: Floor/ceiling sanity from history ────────────────────
+    if (fighterDB.fpFloor != null && fighterDB.fpCeiling != null && fightScores.length >= 3) {
+      // Don't predict outside reasonable range unless opponent adjustments push it
+      const historicFloor = fighterDB.fpFloor * 0.85;
+      const historicCeiling = fighterDB.fpCeiling * 1.1;
+      if (predicted < historicFloor || predicted > historicCeiling) {
+        const clamped = clamp(predicted, historicFloor, historicCeiling);
+        reasons.push(`Clamped to historic range: ${historicFloor.toFixed(0)}-${historicCeiling.toFixed(0)}`);
+        predicted = clamped;
+      }
+    }
+
+    // ── Confidence ──────────────────────────────────────────────────
+    const sampleSize = fightScores.length;
+    const consistencyBonus = (fighterDB.fpConsistency ?? 50) * 0.25;
+    const oppBonus = opponentDB ? 10 : 0;
+    const recentBonus = sampleSize >= 3 ? 5 : 0;
+    const confidence = clamp(
+      30 + sampleSize * 4 + consistencyBonus + oppBonus + recentBonus,
+      20, 92,
+    );
+
+    const historicalAvg = fighterDB.avgFP_betr ?? fighterDB.avgFP ?? predicted;
+    const line = round1(clamp(predicted, 5, 250));
+    const lean = predicted > historicalAvg ? 'over' : 'under';
+
+    return { line, lean, confidence: Math.round(confidence), reasons };
+  }
+
+  // ── Predict All Stats for a Fighter ─────────────────────────────────
+
+  static predictFighter(
+    fighter: string,
+    opponent: string,
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+    weights: PredictorWeights,
+    trend: FighterTrend | null,
+    weightClass?: WeightClass | null,
+  ): PropPrediction {
+    const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
+    const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
+    const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass);
+
+    return { fighter, opponent, scheduledRounds, weightClass: weightClass ?? undefined, ss, td, fantasy };
+  }
+
+  // ── Learning Cycle ──────────────────────────────────────────────────
+
+  static async runLearningCycle(
+    eventName: string,
+    archiveRecords: PropArchiveRecord[],
+  ): Promise<LearningResult | null> {
+    const predictions = await this.getPredictions();
+    const eventPred = predictions.find(p =>
+      !p.settled && normName(p.event).includes(normName(eventName).slice(0, 20))
+    );
+    if (!eventPred) return null;
+
+    const weights = await this.getWeights();
+    const trends = await this.getTrends();
+    const results: LearningPredictionResult[] = [];
+
+    for (const pred of eventPred.predictions) {
+      const key = normName(pred.fighter);
+
+      // Find matching settled archive records
+      const ssActual = archiveRecords.find(r =>
+        normName(r.fighter) === key && r.propType === 'SS' && Number.isFinite(Number(r.result))
+      );
+      const tdActual = archiveRecords.find(r =>
+        normName(r.fighter) === key && r.propType === 'TD' && Number.isFinite(Number(r.result))
+      );
+      const fpActual = archiveRecords.find(r =>
+        normName(r.fighter) === key && (r.propType === 'Fantasy' || r.propType === 'FP') && Number.isFinite(Number(r.result))
+      );
+
+      const actual = {
+        ss: ssActual ? Number(ssActual.result) : NaN,
+        td: tdActual ? Number(tdActual.result) : NaN,
+        fp: fpActual ? Number(fpActual.result) : NaN,
+      };
+      const predicted = { ss: pred.ss.line, td: pred.td.line, fp: pred.fantasy.line };
+      const delta = {
+        ss: actual.ss - predicted.ss,
+        td: actual.td - predicted.td,
+        fp: actual.fp - predicted.fp,
+      };
+
+      results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta });
+
+      // Update fighter trend: trend = trend * 0.8 + delta * 0.2
+      let fighterTrend = this.findTrend(trends, pred.fighter);
+      if (!fighterTrend) {
+        fighterTrend = { fighter: pred.fighter, ss_trend: 0, td_trend: 0, fp_trend: 0, sampleCount: 0, lastUpdated: 0 };
+        trends.push(fighterTrend);
+      }
+      if (Number.isFinite(delta.ss)) fighterTrend.ss_trend = fighterTrend.ss_trend * 0.8 + delta.ss * 0.2;
+      if (Number.isFinite(delta.td)) fighterTrend.td_trend = fighterTrend.td_trend * 0.8 + delta.td * 0.2;
+      if (Number.isFinite(delta.fp)) fighterTrend.fp_trend = fighterTrend.fp_trend * 0.8 + delta.fp * 0.2;
+      fighterTrend.sampleCount++;
+      fighterTrend.lastUpdated = Date.now();
+    }
+
+    // ── Per-class proportional weight updates ──────────────────────────
+    // Each modifier (ss, td, fp) is now a PerClassModifier. We always update the
+    // `default` bucket using all samples (so events with no class data still learn)
+    // AND update each class-specific bucket that has ≥ MIN_CLASS_SAMPLES samples
+    // this event. This means flyweight bias no longer leaks into heavyweight calibration.
+    const weightAdj: Record<string, number> = {};
+
+    const proportionalStep = (
+      samples: LearningPredictionResult[],
+      pickActual: (r: LearningPredictionResult) => number,
+      pickDelta: (r: LearningPredictionResult) => number,
+      minActual: number,
+    ): number | null => {
+      if (samples.length === 0) return null;
+      const valid = samples.filter(r => Number.isFinite(pickDelta(r)));
+      if (valid.length === 0) return null;
+      const avgActual = valid.reduce((s, r) => s + pickActual(r), 0) / valid.length;
+      if (avgActual < minActual) return null;
+      const avgDelta = valid.reduce((s, r) => s + pickDelta(r), 0) / valid.length;
+      const relErr = avgDelta / avgActual;
+      return clamp(relErr * LEARNING_RATE, -MAX_STEP_PER_EVENT, MAX_STEP_PER_EVENT);
+    };
+
+    // Group results by weight class (undefined/unknown → 'default' bucket)
+    const resultsByClass = new Map<WeightClass | 'default', LearningPredictionResult[]>();
+    for (const r of results) {
+      const key = (r.weightClass ?? 'default') as WeightClass | 'default';
+      const bucket = resultsByClass.get(key) ?? [];
+      bucket.push(r);
+      resultsByClass.set(key, bucket);
+    }
+
+    type ModKey = 'ss_pace_modifier' | 'td_attempt_modifier' | 'fp_global_modifier';
+    const statConfigs: Array<{
+      mod: ModKey;
+      label: string;
+      pickActual: (r: LearningPredictionResult) => number;
+      pickDelta: (r: LearningPredictionResult) => number;
+      minActual: number;
+    }> = [
+      { mod: 'ss_pace_modifier',   label: 'ss', pickActual: r => r.actual.ss, pickDelta: r => r.delta.ss, minActual: 1   },
+      { mod: 'td_attempt_modifier',label: 'td', pickActual: r => r.actual.td, pickDelta: r => r.delta.td, minActual: 0.3 },
+      { mod: 'fp_global_modifier', label: 'fp', pickActual: r => r.actual.fp, pickDelta: r => r.delta.fp, minActual: 5   },
+    ];
+
+    for (const cfg of statConfigs) {
+      const map = weights[cfg.mod];
+
+      // 1) Always update the `default` bucket using ALL samples — this is the fallback
+      //    applied to classes we've never seen, and the most stable signal each event.
+      const allStep = proportionalStep(results, cfg.pickActual, cfg.pickDelta, cfg.minActual);
+      if (allStep != null) {
+        const old = map.default;
+        map.default = old * (1 + allStep);
+        weightAdj[`${cfg.mod}.default`] = map.default - old;
+      }
+
+      // 2) Update each weight class that has enough samples to be trustworthy.
+      //    Class-specific bucket is seeded from `default` (post-update) the first time
+      //    we see that class, so it inherits accumulated bias rather than starting at 1.0.
+      for (const [wc, bucket] of resultsByClass) {
+        if (wc === 'default') continue;
+        const valid = bucket.filter(r => Number.isFinite(cfg.pickDelta(r)));
+        if (valid.length < MIN_CLASS_SAMPLES) continue;
+        const step = proportionalStep(valid, cfg.pickActual, cfg.pickDelta, cfg.minActual);
+        if (step == null) continue;
+        const old = typeof map[wc] === 'number' ? (map[wc] as number) : map.default;
+        const next = old * (1 + step);
+        map[wc] = next;
+        weightAdj[`${cfg.mod}.${wc}`] = next - old;
+      }
+    }
+
+    // Clamp every bucket to sane ranges
+    clampModifier(weights.ss_pace_modifier, 0.7, 1.4);
+    clampModifier(weights.td_attempt_modifier, 0.5, 1.6);
+    clampModifier(weights.fp_global_modifier, 0.75, 1.30);
+    weights.version++;
+
+    // Persist
+    await this.saveWeights(weights);
+    await this.saveTrends(trends);
+
+    // Build summary
+    const allDeltas = results.filter(r => Number.isFinite(r.delta.ss) || Number.isFinite(r.delta.fp));
+    const bestIdx = allDeltas.reduce((best, r, i) => {
+      const score = Math.abs(r.delta.ss || 0) + Math.abs(r.delta.td || 0) + Math.abs(r.delta.fp || 0);
+      const bestScore = Math.abs(allDeltas[best].delta.ss || 0) + Math.abs(allDeltas[best].delta.td || 0) + Math.abs(allDeltas[best].delta.fp || 0);
+      return score < bestScore ? i : best;
+    }, 0);
+    const worstIdx = allDeltas.reduce((worst, r, i) => {
+      const score = Math.abs(r.delta.ss || 0) + Math.abs(r.delta.td || 0) + Math.abs(r.delta.fp || 0);
+      const worstScore = Math.abs(allDeltas[worst].delta.ss || 0) + Math.abs(allDeltas[worst].delta.td || 0) + Math.abs(allDeltas[worst].delta.fp || 0);
+      return score > worstScore ? i : worst;
+    }, 0);
+
+    const meanAbs = (arr: LearningPredictionResult[], pick: (r: LearningPredictionResult) => number): number => {
+      const valid = arr.filter(r => Number.isFinite(pick(r)));
+      if (!valid.length) return 0;
+      return valid.reduce((s, r) => s + Math.abs(pick(r)), 0) / valid.length;
+    };
+    const summary: LearningSummary = {
+      avgAbsDeltaSS: meanAbs(results, r => r.delta.ss),
+      avgAbsDeltaTD: meanAbs(results, r => r.delta.td),
+      avgAbsDeltaFP: meanAbs(results, r => r.delta.fp),
+      bestPrediction: allDeltas[bestIdx]?.fighter ?? '—',
+      worstPrediction: allDeltas[worstIdx]?.fighter ?? '—',
+      weightAdjustments: weightAdj,
+      trendUpdates: results.filter(r => Number.isFinite(r.delta.ss) || Number.isFinite(r.delta.td) || Number.isFinite(r.delta.fp)).length,
+    };
+
+    const learningResult: LearningResult = {
+      event: eventName,
+      date: new Date().toISOString(),
+      learnedAt: Date.now(),
+      predictions: results,
+      summary,
+    };
+
+    // Append to log
+    const log = await this.getLearningLog();
+    log.push(learningResult);
+    await chromeSet({ [LEARNING_LOG_KEY]: log.slice(-20) });
+
+    // Mark settled
+    eventPred.settled = true;
+    await this.savePredictions(predictions);
+
+    return learningResult;
+  }
+}

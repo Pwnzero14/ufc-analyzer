@@ -3,7 +3,69 @@
     "allow": [
       "Bash(npm run:*)",
       "Bash(npx tsc:*)",
-      "Bash(grep -n \"redirect: ''follow''\" src/analyzer.ts)"
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(node:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:www.ufcstats.com)",
+      "WebFetch(domain:ufcstats.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.ufc.com)",
+      "WebSearch",
+      "Bash(curl -s \"http://www.ufcstats.com/statistics/events/upcoming\")",
+      "Bash(grep -oP '\\(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec\\)[a-z]*\\\\.?\\\\s+\\\\d+,\\\\s+\\\\d{4}')",
+      "Bash(grep -oE '[A-Z][a-z]+\\\\.? [0-9]+, [0-9]{4}')",
+      "Bash(curl -s \"http://www.ufcstats.com/event-details/f3eb664db7fb1df3\")",
+      "Bash(read id:*)",
+      "Bash(curl -s http://www.ufcstats.com/event-details/__TRACKED_VAR__)",
+      "Bash(xargs wc:*)",
+      "Bash(wc -l \"c:\\\\Users\\\\abdir\\\\Downloads\\\\ufc_project_v2\\\\src\\\\services\"/*.ts)",
+      "Bash(ollama serve:*)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(cp -r src/ backups/full_project_snapshot_20260409_session1/src/)",
+      "Bash(cp analyzer.html backups/full_project_snapshot_20260409_session1/)",
+      "Bash(cp dist/analyzer.js backups/full_project_snapshot_20260409_session1/)",
+      "Bash(cp package.json tsconfig.json manifest.json backups/full_project_snapshot_20260409_session1/)",
+      "Bash(find /c/Users/abdir/Downloads/ufc_project_v2 -name \"*.ts\" -exec grep -l \"modal\\\\|tab\\\\|view\\\\|section\" {} \\\\;)",
+      "Bash(cp analyzer.html manifest.json package.json tsconfig.json \"backups/full_project_snapshot_20260412_session1/\")",
+      "Bash(cp dist/analyzer.js \"backups/full_project_snapshot_20260412_session1/\")",
+      "Bash(cp src/analyzer.ts src/background.ts src/content.ts src/injected.ts src/popup.ts \"backups/full_project_snapshot_20260412_session1/src/\")",
+      "Bash(cp -r src/config src/services src/types \"backups/full_project_snapshot_20260412_session1/src/\")",
+      "Bash(xargs -I {} grep -l \"UFC Fantasy\" {})",
+      "Bash(xargs -I {} stat -c \"%s %n\" {})",
+      "Bash(cmd.exe //c \"dir C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\dist\\\\\\\\analyzer.js\")",
+      "Bash(cmd.exe //c \"dir /AL C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\dist\")",
+      "Bash(cmd.exe //c \"fsutil reparsepoint query C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\dist\\\\\\\\analyzer.js\")",
+      "Bash(cmd.exe //c \"dir /AL C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\\")",
+      "Bash(cmd.exe //c \"dir /AL C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\\")",
+      "Bash(cmd.exe //c \"fsutil reparsepoint query C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\dist\")",
+      "Bash(cmd.exe //c \"fsutil reparsepoint query C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\")",
+      "Read(//c/Users/abdir/Downloads/ufc_project_v2/**)",
+      "Bash(cmd.exe //c \"dir C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\Downloads\\\\\\\\ufc_project_v2\\\\\\\\dist\\\\\\\\analyzer*.js\")"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const f=j.tool_input?.file_path||j.tool_response?.filePath||'';if(f.endsWith('.ts')){const{execSync}=require('child_process');try{execSync('npm run build',{cwd:'c:/Users/abdir/Downloads/ufc_project_v2',stdio:'pipe'});console.log(JSON.stringify({systemMessage:'Build passed.'}))}catch(e){console.log(JSON.stringify({systemMessage:'Build FAILED: '+e.stderr?.toString().slice(-200)}))}}})\"",
+            "timeout": 30,
+            "statusMessage": "Auto-building..."
+          }
+        ]
+      }
     ]
   }
 }

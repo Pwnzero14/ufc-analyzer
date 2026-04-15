@@ -6,6 +6,7 @@ import {
 import {
   AllLines,
   PropArchiveRecord,
+  WeightClass,
 } from './types/index.js';
 import { CONFIG, FANTASY_SCORING } from './config/index.js';
 
@@ -105,41 +106,76 @@ async function refreshFightOddsFromBestFightOdds(reason: string): Promise<number
 }
 
 // ── INITIALIZE BETR LINES FROM MANUAL INPUT ────────────────────────────
-// Event: UFC Fight Night — Moicano vs. Duncan (April 4, 2026)
+// Event: UFC 327 — April 11, 2026
+// IMPORTANT: update BETR_EVENT_DATE below whenever you update the fighter list.
+// If the event date is in the past, this function refuses to seed and wipes any
+// leftover stale Betr data — that's how RESET LINES survives a Chrome restart.
+const BETR_EVENT_DATE = '2026-04-11';
 async function initializeBetrLines() {
+  // Staleness gate: if the seed's event has already happened, don't re-seed.
+  // Wipe any existing Betr storage so the next analyzer load starts clean.
+  const seedEventMs = new Date(`${BETR_EVENT_DATE}T23:59:59`).getTime();
+  if (Number.isFinite(seedEventMs) && Date.now() > seedEventMs) {
+    try {
+      await new Promise<void>((res) =>
+        chrome.storage.local.remove(['lines_betr', 'lines_betr_manual_v1', 'betr_seed_hash', 'betr_event_date'], () => res())
+      );
+      store.betr = { fighters: [], capturedAt: Date.now() };
+      console.log(`[UFC] Betr seed skipped — event date ${BETR_EVENT_DATE} is past. Cleared stale Betr storage.`);
+    } catch (error) {
+      console.error('[UFC] Failed to clear stale Betr lines:', error);
+    }
+    return;
+  }
+
   const betrFighters = [
     // SS + FP
-    { name: 'J. Delano',    opponent: 'R. Ruchała',   line_ss: 70.5, line_fp: 85.5,  line_td: null },
-    { name: 'T. McMillen',  opponent: 'M. Zecchini',  line_ss: 26.5, line_fp: 102.5, line_td: null },
-    { name: 'A. Yakhyaev',  opponent: 'B. Ribeiro',   line_ss: 17.5, line_fp: 115.5, line_td: null },
-    { name: 'C. Duncan',    opponent: 'R. Moicano',   line_ss: 40.5, line_fp: 84.5,  line_td: null },
+    { name: 'C. Radtke',      opponent: 'F. Prado',       line_ss: 32.5, line_fp: 81.5,  line_td: null },
+    { name: 'K. Gastelum',    opponent: 'V. Luque',       line_ss: 50.5, line_fp: 89.5,  line_td: null },
+    { name: 'V. Luque',       opponent: 'K. Gastelum',    line_ss: 40.5, line_fp: 50.5,  line_td: null },
+    { name: 'M. Gamrot',      opponent: 'E. Ribovics',    line_ss: 45.5, line_fp: 85.5,  line_td: null },
+    { name: 'A. Pico',        opponent: 'P. Pitbull',     line_ss: 41.5, line_fp: 90.5,  line_td: null },
+    { name: 'P. Pitbull',     opponent: 'A. Pico',        line_ss: 30.5, line_fp: 50.5,  line_td: null },
+    { name: 'A. Murzakanov',  opponent: 'P. Costa',       line_ss: 50.5, line_fp: 87.5,  line_td: null },
 
     // SS only
-    { name: 'E. Ewing',     opponent: 'R. Estevam',   line_ss: 43.5, line_fp: null,  line_td: null },
-    { name: 'R. Estevam',   opponent: 'E. Ewing',     line_ss: 22.5, line_fp: null,  line_td: null },
-    { name: 'B. Ribeiro',   opponent: 'A. Yakhyaev',  line_ss: 7.5,  line_fp: null,  line_td: null },
-    { name: 'R. Ruchała',   opponent: 'J. Delano',    line_ss: 36.5, line_fp: null,  line_td: null },
-    { name: 'M. Zecchini',  opponent: 'T. McMillen',  line_ss: 12.5, line_fp: null,  line_td: null },
-    { name: 'T. Ricci',     opponent: 'V. Jandiroba', line_ss: 50.5, line_fp: null,  line_td: null },
-    { name: 'V. Jandiroba', opponent: 'T. Ricci',     line_ss: 37.5, line_fp: null,  line_td: null },
-    { name: 'R. Moicano',   opponent: 'C. Duncan',    line_ss: 36.5, line_fp: null,  line_td: null },
-
-    // FP only
-    { name: 'A. Bekoev',    opponent: 'Gore',         line_ss: null, line_fp: 93.5,  line_td: null },
-    { name: 'L. Vannata',   opponent: 'Flowers',      line_ss: null, line_fp: 80.5,  line_td: null },
-    { name: 'A. Costa',     opponent: 'Nicoll',       line_ss: null, line_fp: 89.5,  line_td: null },
+    { name: 'F. Prado',       opponent: 'C. Radtke',      line_ss: 32.5, line_fp: null,  line_td: null },
+    { name: 'T. Suarez',      opponent: 'L. Godinez',     line_ss: 30.5, line_fp: null,  line_td: null },
+    { name: 'L. Godinez',     opponent: 'T. Suarez',      line_ss: 28.5, line_fp: null,  line_td: null },
+    { name: 'E. Ribovics',    opponent: 'M. Gamrot',      line_ss: 53.5, line_fp: null,  line_td: null },
+    { name: 'K. Holland',     opponent: 'R. Brown',       line_ss: 50.5, line_fp: null,  line_td: null },
+    { name: 'R. Brown',       opponent: 'K. Holland',     line_ss: 50.5, line_fp: null,  line_td: null },
+    { name: 'C. Swanson',     opponent: 'N. Landwehr',    line_ss: 64.5, line_fp: null,  line_td: null },
+    { name: 'N. Landwehr',    opponent: 'C. Swanson',     line_ss: 63.5, line_fp: null,  line_td: null },
+    { name: 'D. Reyes',       opponent: 'J. Walker',      line_ss: 25.5, line_fp: null,  line_td: null },
+    { name: 'J. Walker',      opponent: 'D. Reyes',       line_ss: 20.5, line_fp: null,  line_td: null },
+    { name: 'J. Hokit',       opponent: 'C. Blaydes',     line_ss: 26.5, line_fp: null,  line_td: null },
+    { name: 'C. Blaydes',     opponent: 'J. Hokit',       line_ss: 25.5, line_fp: null,  line_td: null },
+    { name: 'P. Costa',       opponent: 'A. Murzakanov',  line_ss: 52.5, line_fp: null,  line_td: null },
+    { name: 'C. Ulberg',      opponent: 'J. Procházka',   line_ss: 59.5, line_fp: null,  line_td: null },
+    { name: 'J. Procházka',   opponent: 'C. Ulberg',      line_ss: 57.5, line_fp: null,  line_td: null },
   ];
   
   store.betr = {
     fighters: betrFighters,
     capturedAt: Date.now(),
   };
-  
-  // Persist to Chrome storage
+
+  // Deterministic fingerprint of the seed — only changes when the hardcoded
+  // fighter list is updated for a new event.  The analyzer uses this to detect
+  // stale betr baselines in lines_open_v1 and clear them.
+  const betrSeedHash = betrFighters.map(f => f.name).sort().join('|');
+
+  // Persist to Chrome storage — write lines + seed hash + event date atomically
+  // so the analyzer never sees a new hash with old data or vice-versa.
   try {
+    await new Promise<void>((res) =>
+      chrome.storage.local.set({ betr_seed_hash: betrSeedHash, betr_event_date: BETR_EVENT_DATE }, () => res())
+    );
     await StorageService.setLines('betr', betrFighters);
     await archivePlatformPropLines('betr', betrFighters);
-    console.log('[UFC] Initialized and persisted Betr lines:', betrFighters.length, 'fighters');
+
+    console.log('[UFC] Initialized and persisted Betr lines:', betrFighters.length, 'fighters, event:', BETR_EVENT_DATE, 'seedHash:', betrSeedHash.substring(0, 40));
   } catch (error) {
     console.error('[UFC] Failed to persist Betr lines:', error);
   }
@@ -162,6 +198,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleClearLines().catch((e) => {
       console.error('[UFC] Clear handler error:', e);
     });
+  } else if (request.type === 'CLEAR_BETR_LINES') {
+    handleClearBetrLines().then(() => sendResponse({ ok: true })).catch((e) => {
+      console.error('[UFC] Clear Betr error:', e);
+      sendResponse({ ok: false });
+    });
+    return true;
   } else if (request.type === 'AUTO_SCRAPE_LINES') {
     autoScrapeAllPlatforms().then(sendResponse).catch((e) => {
       console.error('[UFC] Auto-scrape error:', e);
@@ -520,7 +562,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
   const _normProp  = (v: string) => {
     if (/^ss$/i.test(v)) return 'ss';
     if (/^td$/i.test(v)) return 'td';
-    if (/^fantasy$/i.test(v)) return 'fantasy';
+    if (/^fantasy$/i.test(v) || /^fp$/i.test(v)) return 'fantasy';
     if (/^control$/i.test(v)) return 'control';
     if (/^ft$/i.test(v) || /^fight\s*time$/i.test(v) || /^fighttime$/i.test(v)) return 'fighttime';
     return v.toLowerCase();
@@ -580,7 +622,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
       if (row.includes('<th')) continue;
       const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
       const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+?)\s*<\/a>/i);
-      const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+      const dateM = row.match(/(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d+,\s+\d{4}/i);
       if (linkM && nameM) completedEvents.push({ name: nameM[1].trim(), url: linkM[1], date: dateM ? dateM[0] : '' });
     }
     console.log(`[UFC Settle] Found ${completedEvents.length} completed UFC events on UFCStats`);
@@ -807,6 +849,23 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(msg);
     console.error('[UFC Settle] Error:', e);
+  }
+
+  // After settlement, check if all records are now resolved — if so, clear Betr lines
+  // since the event is over and manually-entered Betr lines are no longer needed.
+  if (settled > 0) {
+    try {
+      const postRaw = await new Promise<Record<string, any>>((res) => chrome.storage.local.get(['prop_archive_v1'], res));
+      const postArchive: any[] = Array.isArray(postRaw.prop_archive_v1) ? postRaw.prop_archive_v1 : [];
+      const stillUnresolved = postArchive.filter((r: any) =>
+        Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result))
+      ).length;
+      if (stillUnresolved === 0) {
+        await handleClearBetrLines();
+      }
+    } catch (e) {
+      console.error('[UFC Settle] Post-settle Betr cleanup check failed:', e);
+    }
   }
 
   console.log(`[UFC Settle] Done — settled=${settled}, skipped=${skipped}, errors=${errors.length}`);
@@ -1120,12 +1179,26 @@ async function handleLinesCaptured(platform: string, data: any): Promise<void> {
 async function handleClearLines(): Promise<void> {
   store.pick6 = null;
   store.underdog = null;
-  store.betr = null;
+  // Betr lines are manually entered — preserve them across clears.
+  // They are cleared separately after settlement via handleClearBetrLines().
   store.prizepicks = null;
   store.draftkings_sportsbook = null;
   autoScrapeInProgress = false; // allow a fresh auto-fetch immediately after clear
   await StorageService.clearLines();
-  await initializeBetrLines(); // re-seed Betr so opponent pruning works after clear
+}
+
+/** Clear Betr lines only — called after event settlement. */
+async function handleClearBetrLines(): Promise<void> {
+  store.betr = null;
+  try {
+    await new Promise<void>((res, rej) => chrome.storage.local.remove(['lines_betr', 'lines_betr_manual_v1'], () => {
+      const err = chrome.runtime?.lastError;
+      if (err) rej(new Error(err.message)); else res();
+    }));
+    console.log('[UFC] Cleared Betr lines (post-event)');
+  } catch (e) {
+    console.error('[UFC] Failed to clear Betr lines:', e);
+  }
 }
 
 const STARTUP_MIGRATION_KEY = 'startup_migration_version';
@@ -1201,7 +1274,10 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
     if (lines.draftkings_sportsbook) store.draftkings_sportsbook = lines.draftkings_sportsbook;
     console.log('[UFC] Restored persisted lines on startup');
 
-    // Always load hardcoded Betr lines for the current event (overrides any stale storage)
+    // Always seed hardcoded Betr lines on startup — this ensures the latest
+    // hardcoded data is authoritative and clears stale opening-line baselines.
+    // Manual user adjustments persist in lines_betr_manual_v1 and are applied
+    // on top by the analyzer via applyBetrManualOverrides.
     await initializeBetrLines();
 
     await refreshFightOddsFromBestFightOdds('startup');
@@ -2290,6 +2366,31 @@ interface UpcomingCardFighter {
   f1: string;
   f2: string;
   scheduledRounds?: number;
+  weightClass?: WeightClass;
+}
+
+// Map a UFCStats "Weight class" cell string to our internal WeightClass enum.
+// Returns null for catchweight/openweight/unknown — those fall through to `default` calibration.
+function parseWeightClass(raw: string): WeightClass | null {
+  const s = raw.toLowerCase().replace(/[^a-z'\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const isWomen = /\bwomen/.test(s) || /\bw\s+(?:straw|fly|bantam|feather)weight\b/.test(s);
+  if (isWomen) {
+    if (/strawweight/.test(s)) return 'womenStrawweight';
+    if (/flyweight/.test(s)) return 'womenFlyweight';
+    if (/featherweight/.test(s)) return 'womenFeatherweight';
+    if (/bantamweight/.test(s)) return 'womenBantamweight';
+    return null;
+  }
+  if (/light\s*heavyweight/.test(s)) return 'lightHeavyweight';
+  if (/heavyweight/.test(s)) return 'heavyweight';
+  if (/middleweight/.test(s)) return 'middleweight';
+  if (/welterweight/.test(s)) return 'welterweight';
+  if (/lightweight/.test(s)) return 'lightweight';
+  if (/featherweight/.test(s)) return 'featherweight';
+  if (/bantamweight/.test(s)) return 'bantamweight';
+  if (/flyweight/.test(s)) return 'flyweight';
+  return null;
 }
 
 interface UpcomingCardCache {
@@ -2298,6 +2399,7 @@ interface UpcomingCardCache {
   url: string;
   fighters: UpcomingCardFighter[];
   fetchedAt: number;
+  location?: string;
 }
 
 function parseEventDateMs(raw: string | null | undefined): number {
@@ -2335,7 +2437,7 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
       if (row.includes('<th')) continue;
       const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
       const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/i);
-      const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+      const dateM = row.match(/(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d+,\s+\d{4}/i);
       if (!linkM || !nameM || !dateM) continue;
       const ts = parseEventDateMs(dateM[0]);
       if (!Number.isFinite(ts)) continue;
@@ -2367,7 +2469,7 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
             if (row.includes('<th')) continue;
             const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
             const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/i);
-            const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+            const dateM = row.match(/(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d+,\s+\d{4}/i);
             if (!linkM || !nameM || !dateM) continue;
             const ts = parseEventDateMs(dateM[0]);
             if (!Number.isFinite(ts)) continue;
@@ -2424,6 +2526,11 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
     if (!evRes.ok) throw new Error(`Event HTTP ${evRes.status}`);
     const evHtml = await evRes.text();
 
+    // Parse venue location from event detail page
+    const locationMatch = evHtml.match(/Location:\s*([^<]+)/i);
+    const location = locationMatch?.[1]?.trim() || undefined;
+    if (location) console.log(`[UFC Card] Location: ${location}`);
+
     const fighters: UpcomingCardFighter[] = [];
     const fightRows = [...evHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
     for (const rowM of fightRows) {
@@ -2434,14 +2541,20 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
       const f1 = nameLinks[0][1].trim();
       const f2 = nameLinks[1][1].trim();
       if (!f1 || !f2 || f1 === '--' || f2 === '--') continue;
-      // Extract scheduled rounds: UFCStats event page has a "Rnd" column with just "3" or "5"
+      // Extract scheduled rounds and weight class from the td cells.
+      // UFCStats event page columns: W/L • Fighter • KD • STR • TD • SUB • Weight class • Method • Round • Time
       const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
       let scheduledRounds = 3;
+      let weightClass: WeightClass | null = null;
       for (const cell of cells) {
         const clean = cell.replace(/<[^>]+>/g, '').trim();
-        if (clean === '5') { scheduledRounds = 5; break; }
+        if (!weightClass) {
+          const wc = parseWeightClass(clean);
+          if (wc) weightClass = wc;
+        }
+        if (clean === '5') scheduledRounds = 5;
       }
-      fighters.push({ f1, f2, scheduledRounds });
+      fighters.push({ f1, f2, scheduledRounds, weightClass: weightClass ?? undefined });
     }
 
     const card: UpcomingCardCache = {
@@ -2450,6 +2563,7 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
       url: nextEvent.url,
       fighters,
       fetchedAt: Date.now(),
+      location,
     };
     await StorageService.setUpcomingCard(card);
     schedulePostEventAlarm(card);
@@ -2487,7 +2601,7 @@ async function findCardForFighters(names: string[]): Promise<UpcomingCardCache |
       if (row.includes('<th')) continue;
       const linkM = row.match(/href="(http[^"]*event-details\/[a-f0-9]+)"/i);
       const nameM = row.match(/event-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/i);
-      const dateM = row.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d+,\s+\d{4}/i);
+      const dateM = row.match(/(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d+,\s+\d{4}/i);
       if (!linkM || !nameM || !dateM) continue;
       const ts = parseEventDateMs(dateM[0]);
       if (!Number.isFinite(ts)) continue;

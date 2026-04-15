@@ -1,7 +1,7 @@
 ══════════════════════════════════════════════════════════════════════
   UFC FIGHT CARD PREDICTIONS & FANTASY PICKS
 ══════════════════════════════════════════════════════════════════════
-  Generated : Tuesday, March 17, 2026 at 12:31 AM ET
+  Generated : Monday, March 23, 2026 at 11:55 AM ET
   Event     : UFC Fight Night: Della Maddalena vs. Prates
   Date      : May 02, 2026
   Source    : http://www.ufcstats.com/event-details/872b018076f831b0
@@ -63,21 +63,174 @@
       - TDs ~5.3/fight × 5 = 27 pts
       - Finish bonus 40% × 25 = 10 pts
 
+──────────────────────────────────────────────────────────────────────
+  FIGHT 3:  TAI TUIVASA  vs.  SEAN SHARAF
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Tai Tuivasa  [LOW confidence]  (score diff: 1.7)
+
+  Tai Tuivasa  —  Prediction score: 36.1 / 100
+    • Record: 15-9-0  (63% win rate)
+    • Recent (last 5): L L L L L
+    • Striking: 3.66 SLpM  48% acc  /  4.97 SApM  (net -1.31)
+    • Finish rate: 100%  (4/4 wins by KO/TKO or SUB)
+    • Grappling: 0 TD/15min  0% acc  /  0 Sub avg
+    Fantasy value: LOW  (~40 FP estimated)
+      - Sig strikes ~37/fight × 0.4 = 15 pts
+      - TDs ~0.0/fight × 5 = 0 pts
+      - Finish bonus 100% × 25 = 25 pts
+
+  Sean Sharaf  —  Prediction score: 34.4 / 100
+    • Record: 4-2-0  (67% win rate)
+    • Recent (last 2): L L
+    • Striking: 7.41 SLpM  43% acc  /  15 SApM  (net -7.59)
+    • Grappling: 0.93 TD/15min  11% acc  /  0 Sub avg
+    Fantasy value: LOW  (~33 FP estimated)
+      - Sig strikes ~74/fight × 0.4 = 30 pts
+      - TDs ~0.6/fight × 5 = 3 pts
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 4:  JUNIOR TAFA  vs.  KEVIN CHRISTIAN
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Kevin Christian  [MEDIUM confidence]  (score diff: 8.1)
+
+  Junior Tafa  —  Prediction score: 46.1 / 100
+    • Record: 6-5-0  (55% win rate)
+    • Recent (last 5): L L W L L
+    • Striking: 3.41 SLpM  51% acc  /  2.55 SApM  (net +0.86)
+    • Finish rate: 100%  (2/2 wins by KO/TKO or SUB)
+    • Grappling: 0 TD/15min  0% acc  /  0 Sub avg
+    Fantasy value: LOW  (~39 FP estimated)
+      - Sig strikes ~34/fight × 0.4 = 14 pts
+      - TDs ~0.0/fight × 5 = 0 pts
+      - Finish bonus 100% × 25 = 25 pts
+
+  Kevin Christian  —  Prediction score: 54.1 / 100
+    • Record: 9-3-0  (75% win rate)
+    • Recent (last 2): L W
+    • Striking: 1.64 SLpM  56% acc  /  2.65 SApM  (net -1.01)
+    • Finish rate: 0%  (0/1 wins by KO/TKO or SUB)
+    • Grappling: 0 TD/15min  0% acc  /  2.3 Sub avg
+    Fantasy value: LOW  (~7 FP estimated)
+      - Sig strikes ~16/fight × 0.4 = 7 pts
+      - TDs ~0.0/fight × 5 = 0 pts
+      - Finish bonus 0% × 25 = 0 pts
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 5:  CAM ROWSTON  vs.  ROBERT BRYCZEK
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Cam Rowston  [HIGH confidence]  (score diff: 18.1)
+
+  Cam Rowston  —  Prediction score: 82.1 / 100
+    • Record: 14-3-0  (82% win rate)
+    • Recent (last 4): W W W L
+    • Striking: 4.26 SLpM  46% acc  /  2.62 SApM  (net +1.64)
+    • Finish rate: 100%  (3/3 wins by KO/TKO or SUB)
+    • Grappling: 0.5 TD/15min  50% acc  /  0.5 Sub avg
+    Fantasy value: LOW  (~44 FP estimated)
+      - Sig strikes ~43/fight × 0.4 = 17 pts
+      - TDs ~0.3/fight × 5 = 2 pts
+      - Finish bonus 100% × 25 = 25 pts
+
+  Robert Bryczek  —  Prediction score: 64.0 / 100
+    • Record: 18-6-0  (75% win rate)
+    • Recent (last 2): W L
+    • Striking: 3.74 SLpM  36% acc  /  4.08 SApM  (net -0.34)
+    • Finish rate: 100%  (1/1 wins by KO/TKO or SUB)
+    • Grappling: 0.56 TD/15min  100% acc  /  0 Sub avg
+    Fantasy value: LOW  (~42 FP estimated)
+      - Sig strikes ~37/fight × 0.4 = 15 pts
+      - TDs ~0.4/fight × 5 = 2 pts
+      - Finish bonus 100% × 25 = 25 pts
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 6:  JACOB MALKOUN  vs.  GERALD MEERSCHAERT
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Jacob Malkoun  [HIGH confidence]  (score diff: 37.7)
+
+  Jacob Malkoun  —  Prediction score: 76.2 / 100
+    • Record: 9-3-0  (75% win rate)
+    • Recent (last 5): W W L W L
+    • Striking: 4.55 SLpM  58% acc  /  2.36 SApM  (net +2.19)
+    • Finish rate: 0%  (0/5 wins by KO/TKO or SUB)
+    • Grappling: 5.81 TD/15min  40% acc  /  0.9 Sub avg
+    Fantasy value: LOW  (~38 FP estimated)
+      - Sig strikes ~46/fight × 0.4 = 18 pts
+      - TDs ~3.9/fight × 5 = 19 pts
+      - Finish bonus 0% × 25 = 0 pts
+
+  Gerald Meerschaert  —  Prediction score: 38.5 / 100
+    • Record: 37-21-0  (64% win rate)
+    • Recent (last 5): L L L L W
+    • Striking: 3.01 SLpM  45% acc  /  3.52 SApM  (net -0.51)
+    • Finish rate: 0%  (0/3 wins by KO/TKO or SUB)
+    • Grappling: 1.82 TD/15min  30% acc  /  1.4 Sub avg
+    Fantasy value: LOW  (~18 FP estimated)
+      - Sig strikes ~30/fight × 0.4 = 12 pts
+      - TDs ~1.2/fight × 5 = 6 pts
+      - Finish bonus 0% × 25 = 0 pts
+
+──────────────────────────────────────────────────────────────────────
+  FIGHT 7:  STEVE ERCEG  vs.  TIM ELLIOTT
+──────────────────────────────────────────────────────────────────────
+
+  ★ PICK:  Tim Elliott  [MEDIUM confidence]  (score diff: 14.4)
+
+  Steve Erceg  —  Prediction score: 57.3 / 100
+    • Record: 13-4-0  (76% win rate)
+    • Recent (last 5): W L L L W
+    • Striking: 4 SLpM  45% acc  /  3.79 SApM  (net +0.21)
+    • Finish rate: 25%  (1/4 wins by KO/TKO or SUB)
+    • Grappling: 1.15 TD/15min  27% acc  /  0.4 Sub avg
+    Fantasy value: LOW  (~26 FP estimated)
+      - Sig strikes ~40/fight × 0.4 = 16 pts
+      - TDs ~0.8/fight × 5 = 4 pts
+      - Finish bonus 25% × 25 = 6 pts
+
+  Tim Elliott  —  Prediction score: 71.8 / 100
+    • Record: 22-13-1  (61% win rate)
+    • Recent (last 5): W W L W W
+    • Striking: 3.37 SLpM  44% acc  /  2.65 SApM  (net +0.72)
+    • Finish rate: 0%  (0/6 wins by KO/TKO or SUB)
+    • Grappling: 3.71 TD/15min  47% acc  /  1.1 Sub avg
+    Fantasy value: LOW  (~26 FP estimated)
+      - Sig strikes ~34/fight × 0.4 = 13 pts
+      - TDs ~2.5/fight × 5 = 12 pts
+      - Finish bonus 0% × 25 = 0 pts
+
 ══════════════════════════════════════════════════════════════════════
   PICKS AT A GLANCE
 ══════════════════════════════════════════════════════════════════════
 
    1.  Carlos Prates                over  Jack Della Maddalena         [LOW]
    2.  Quillan Salkilld             over  Beneil Dariush               [HIGH]
+   3.  Tai Tuivasa                  over  Sean Sharaf                  [LOW]
+   4.  Kevin Christian              over  Junior Tafa                  [MEDIUM]
+   5.  Cam Rowston                  over  Robert Bryczek               [HIGH]
+   6.  Jacob Malkoun                over  Gerald Meerschaert           [HIGH]
+   7.  Tim Elliott                  over  Steve Erceg                  [MEDIUM]
 
 ══════════════════════════════════════════════════════════════════════
   FANTASY RANKINGS  (by estimated FP, highest first)
 ══════════════════════════════════════════════════════════════════════
 
    1.  Quillan Salkilld             MEDIUM    ~57 FP
-   2.  Carlos Prates                LOW       ~41 FP
-   3.  Jack Della Maddalena         LOW       ~34 FP
-   4.  Beneil Dariush               LOW       ~29 FP
+   2.  Cam Rowston                  LOW       ~44 FP
+   3.  Robert Bryczek               LOW       ~42 FP
+   4.  Carlos Prates                LOW       ~41 FP
+   5.  Tai Tuivasa                  LOW       ~40 FP
+   6.  Junior Tafa                  LOW       ~39 FP
+   7.  Jacob Malkoun                LOW       ~38 FP
+   8.  Jack Della Maddalena         LOW       ~34 FP
+   9.  Sean Sharaf                  LOW       ~33 FP
+  10.  Beneil Dariush               LOW       ~29 FP
+  11.  Steve Erceg                  LOW       ~26 FP
+  12.  Tim Elliott                  LOW       ~26 FP
+  13.  Gerald Meerschaert           LOW       ~18 FP
+  14.  Kevin Christian              LOW       ~7 FP
 
 ──────────────────────────────────────────────────────────────────────
   METHODOLOGY

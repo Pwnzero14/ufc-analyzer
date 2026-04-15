@@ -311,6 +311,22 @@ function scrapeUnderdog() {
       const cardText = cell.innerText || '';
       const cardLines = cardText.split('\n').map((l) => l.trim()).filter(Boolean);
 
+      // Parse opponent from matchup label (e.g. "Pico vs Pitbull", "Hokit vs Blaydes")
+      let opponent = null;
+      for (const line of cardLines) {
+        const vsMatch = line.match(/^(\S+)\s+vs\.?\s+(\S+)/i);
+        if (vsMatch) {
+          const nameParts = name.split(/\s+/);
+          const lastName = nameParts[nameParts.length - 1].toLowerCase();
+          const side1 = vsMatch[1].toLowerCase();
+          const side2 = vsMatch[2].toLowerCase();
+          // The other side of the matchup is the opponent's last name
+          if (side1 === lastName) opponent = vsMatch[2];
+          else if (side2 === lastName) opponent = vsMatch[1];
+          break;
+        }
+      }
+
       for (let i = 0; i < cardLines.length - 1; i++) {
         // Strip leading arrow/direction indicators (↑ ↓ ▲ ▼) that Underdog prepends
         // to lines that have moved — e.g. "↑ 27.5" → "27.5"
@@ -327,8 +343,9 @@ function scrapeUnderdog() {
         else if (label.includes('takedown')) lineType = 'td';
         if (!lineType) continue;
 
-        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null };
+        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
         fighters[name][`line_${lineType}`] = val;
+        if (opponent && !fighters[name].opponent) fighters[name].opponent = opponent;
       }
     });
 

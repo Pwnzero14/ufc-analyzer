@@ -64,7 +64,7 @@ export class StorageService {
 
   static async clearLines(): Promise<void> {
     try {
-      await this.chromeClear(['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks', 'lines_draftkings_sportsbook']);
+      await this.chromeClear(['lines_pick6', 'lines_underdog', 'lines_prizepicks', 'lines_draftkings_sportsbook']);
       this.log('Cleared all lines');
     } catch (error) {
       this.logError('Failed to clear lines', error);

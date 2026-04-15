@@ -1,127 +1,147 @@
 # Resume Checkpoint
 
-Last Saved: 2026-03-27 (Session 2)
+Last Saved: 2026-04-13 (Session bug-hunt: stale movement badges)
 Branch: feature/sleek-theme-v1
-HEAD: 91f3b50 (+ session 2 changes uncommitted)
-Snapshot: backups/full_project_snapshot_20260327_session2/
+HEAD: 90e58ac (+ uncommitted movement-badge fixes in src/analyzer.ts)
+Build: dist/analyzer.js rebuilt at 13:11 (794852 bytes)
 
 ---
 
 ## RESUME CODE (paste this at the start of a new session)
 
 ```
-Resuming UFC Fantasy Lines Grabber project.
+Resuming UFC Fantasy Lines Grabber — PICK UP MID-BUG.
 
 Repo: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-Stack: Chrome/Opera Extension — Manifest V3, TypeScript → compiled dist/
-Event context: UFC Fight Night: Israel Adesanya vs Joe Pyfer (March 28, 2026, Seattle)
+Today: 2026-04-13
 
-WHAT'S BUILT (all working, build is clean):
-1. Head-to-Head modal — ⚔ button on each fighter row, side-by-side comparison with UFC.com fighter images
-2. Moneyline-adjusted FP projection — calcMLAdjustedFP() blends win/loss history by implied win prob
-3. Stat trend chips — ↑/↓ L3 chips on Avg FP, Avg SS, TD panel
-4. Opening line movement tracker — lines_open_v1 in chrome.storage; ▲/▼ chips on line cells
-5. Betr manual line persistence — lines_betr_manual_v1 (PROTECTED, never cleared)
-6. Live auto-settling — LIVE_SETTLE_ALARM every 5 min during event window
-7. Pre-event Report Card modal — fight pairs ordered by UFCStats card order (main → prelims)
-8. Line Shopping Diff modal (🛒 Shop button) — all platforms side-by-side, lean-aware coloring
-   - OVER lean: lowest line = green/best (easiest to clear)
-   - UNDER lean: highest line = green/best (most room to go under)
-   - Platform labels on every cell (P6/UD/BT/PP/DK), lean chip per fighter
-9. Style Matchup panel (in expanded row detail)
-   - Matchup chip: STRIKER vs GRAPPLER etc. with color coding
-   - styleMatchupEdge() reasons for all 9 style pair combinations (incl. balanced cases)
-   - SS over rate by opponent style (when cached opponent data available)
-   - deriveStyle() fixed: slpm > 3.5 AND tdAvg < 1.5 → striker (catches kickboxers like Izzy)
-10. Injury/Weight Cut News Flag (⚠ NEWS badge)
-    - Fetches Google News RSS per fighter after data loads (30-min cache)
-    - Keywords: injur, withdraw, pull, weight cut, hospitali, surgery, fracture, etc.
-    - Pulsing badge on fighter row → click opens news modal with headlines + links
-11. KO/SUB/DEC Finish Split (in Career Data panel)
-    - Win methods: KO/TKO (red) · SUB (purple) · DEC (blue) mini bars
-    - Loss methods: KO/TKO losses highlighted with ⚠ count (chin exposure)
-12. Fight Time Breakdown panel (in expanded row detail)
-    - Win + loss method bars for both fighters
-    - Combined early-finish risk: 1 - (1-myFinish) × (1-oppFinish) → HIGH/MOD/LOW
-    - Direct FT signal: ↓ LEAN UNDER FT or ↑ LEAN OVER FT
-13. calcFTLean enhanced
-    - KO/TKO loss vulnerability: -0.7 when ≥50% losses by stoppage
-    - Opponent KO threat: -0.5 when opponent wins ≥40% by KO/TKO
-    - FT lean panel title now shows direction inline: FT Lean ▼ UNDER 72%
-14. Opponent Activity Context panel (in expanded row detail)
-    - Splits FP/SS over rates by opponent activity (oppStats.sigStr as proxy)
-    - vs active opp (>25 SS landed): X% over rate
-    - vs passive opp (<12 SS landed): X% over rate
-    - Quality flag when 25%+ drop vs active opponents
+THE UNRESOLVED BUG
+User sees movement badges (e.g. Malott +2.4, Burns -8.3, Jourdain -12.7,
+Phillips -15.0) on fresh platform lines for a NEW event. These are baselines
+with no real movement. The badges persist EVEN IMMEDIATELY AFTER clicking
+RESET LINES — the toast "Baselines re-anchored + Betr lines cleared (event
+over)" is visible alongside the badges in screenshots.
 
-KEY FILES:
-- src/analyzer.ts — main logic (~8600+ lines)
-- analyzer.html — UI + all CSS
-- manifest.json — MV3 config (host_permissions includes news.google.com)
-- src/background.ts — alarms, settling, storage, FIND_CARD_FOR_FIGHTERS handler
-- src/services/StorageService.ts — all chrome.storage wrappers
+Today is 2026-04-13. BETR_EVENT_DATE in src/background.ts is '2026-04-11'
+(past). initializeBetrLines has wiped betr storage. _currentBetrEventDate
+is '' in analyzer.ts.
 
-STORAGE KEYS:
-lines_pick6 / lines_underdog / lines_betr / lines_betr_manual_v1 (PROTECTED) / lines_prizepicks /
-lines_draftkings_sportsbook / lines_open_v1 / upcoming_ufc_card / last_completed_ufc_card /
-ufc_img_v1_{slug} / prop_archive_v1 / ai_lean_snapshots_v1
+ALL FIX ATTEMPTS IN THIS SESSION (all committed to src/, built to dist/)
+1. Removed prev-refresh fallback from snapshotOpeningLines new-key handler
+   (src/analyzer.ts:7591-7613). On new key, set baseline = current val. No
+   fallback to _prevRefreshLines. Comment: "prev-refresh is within-session
+   jitter, not authoritative opening."
+2. Added 3-min session grace period. Constants at src/analyzer.ts:7313-7314:
+   `let _sessionStartAt = Date.now();`
+   `const BASELINE_GRACE_PERIOD_MS = 3 * 60 * 1000;`
+   During grace, snapshotOpeningLines re-anchors existing baselines to
+   latest values instead of keeping old ones.
+3. Added final renderFighters()+renderLineMovementSummary() at end of
+   processData AFTER snapshotOpeningLines runs (src/analyzer.ts around
+   line 13221). Same fix in Betr save handler (around 15299).
+4. Narrowed detectAndRecordMovements to delta-0 baseline repair only —
+   does NOT create baselines from _prevRefreshLines anymore
+   (src/analyzer.ts:7635-7677).
+5. Suppressed movement badges in lineCell entirely during grace period
+   (src/analyzer.ts:11383-11390). During first 3 min of session, lineCell
+   returns movementHtml = '' regardless of baseline delta.
+6. RESET LINES handler now resets _sessionStartAt = Date.now()
+   (src/analyzer.ts:14796-14798). This restarts the 3-min grace window
+   so subsequent data waves suppress badges AND re-anchor baselines.
+7. Cross-event staleness wipe via forBetrEventDate tag on lines_open_v1
+   and line_history_v1 (already in place from prior session). Wipes when
+   stored tag ≠ _currentBetrEventDate. At src/analyzer.ts:7386-7403.
 
-NEW FUNCTIONS ADDED THIS SESSION:
-- fetchFighterNews(name) / fetchAllFighterNews() — Google News RSS, 30-min cache
-- generateLineShopModal() — lean-aware line shopping diff table
-- buildStyleMatchupPanel(db, oppDB, ssLine, tdLine) — matchup chip + edge reasons + SS hit rates
-- buildFightTimeSummaryPanel(db, oppDB, ftLine) — finish split bars + combined finish risk
-- buildOpponentQualityPanel(db, fpLine, ssLine) — active vs passive opponent over rate splits
-- styleMatchupEdge() — expanded to handle all 9 style pair combinations
+WHY IT SHOULD WORK IN THEORY
+- Fresh tab load at T=0: loadOpeningLines wipes stale baselines (if tag
+  mismatches) → _openingLines empty.
+- First data arrival: mergeAndEnrich's internal renderFighters calls paint
+  DOM between await boundaries. lineCell is WITHIN grace → movementHtml=''
+  → no badges visible.
+- snapshotOpeningLines runs → captures current values as baselines → final
+  renderFighters → still within grace → no badges.
+- User clicks RESET at any time: _sessionStartAt resets → next 3 min is a
+  fresh grace window → subsequent LINES_UPDATED messages don't paint badges.
 
-MODULE STATE:
-- _newsCache: Map<string, {items, fetchedAt}> — fighter news cache
-- _newsAlertFighters: Set<string> — fighters with injury/news alerts
-- NEWS_INJURY_KEYWORDS / NEWS_CACHE_TTL — news filtering constants
+LIKELY ROOT CAUSE IF STILL BROKEN
+Most likely: the extension isn't actually running the new dist/analyzer.js.
+Browser cached the old bundle, or user reloaded the analyzer tab without
+reloading the extension itself, or there's a service worker caching issue.
 
-SUGGESTED NEXT FEATURES:
-- Stack builder — which 2-3-pick combos from same fight have highest combined EV
-- Quick pick export — one-click copy of locked picks in platform-ready format
-- Side bet dedicated view — SS/TD/FT-only table with their own lean chips
-- Lock picks mode — mark picks as locked, float to top, dim rest
-- Confidence filter slider — show only fighters above X% confidence
+FIRST THING TO DO IN NEW SESSION — VERIFY THE NEW CODE IS LOADED
+Ask user to open DevTools on the analyzer tab and run in the console:
+  1. `typeof _withinBaselineGrace` — should be 'undefined' (it's a local const in lineCell scope) BUT this won't tell us anything. Better:
+  2. `document.querySelector('.line-movement')` — if null, no badges rendered at all (bug is not in lineCell).
+  3. `document.querySelectorAll('.line-movement').length` — how many badges are in DOM.
+  4. Search the running analyzer.js bundle for the string '_withinBaselineGrace'. In DevTools Sources tab, open dist/analyzer.js and Ctrl+F for '_withinBaselineGrace'. If NOT found → old bundle is loaded.
+  5. Ctrl+F for 'BASELINE_GRACE_PERIOD_MS' — should be present in the new bundle.
+  6. Check `_openingLines.size` and `_sessionStartAt` — these are NOT on window, so run: search the compiled bundle for them instead.
+
+OTHER HYPOTHESES TO INVESTIGATE IF THE NEW BUNDLE IS CONFIRMED LOADED
+- Are badges coming from a DIFFERENT CSS class or HTML path? Only known
+  renderer is lineCell at src/analyzer.ts:11373. Grep confirmed nothing
+  else uses `.line-movement` / `mv-up` / `mv-down`.
+- Is renderFighters actually being called after reset, or is there a
+  debouncer/throttle swallowing the call?
+- Does the user have a stale service-worker cached version of analyzer.js?
+  chrome://serviceworker-internals/ or check dist timestamp inside the
+  loaded extension folder.
+- Is `let _sessionStartAt = Date.now()` actually reassignable, or is TypeScript
+  compiling it to `const` somewhere? Double-check with: `grep _sessionStartAt dist/analyzer.js`
+- Is the badge rendered once in the initial HTML (server-rendered string) and
+  never re-rendered? Check that renderFighters() actually clears and rewrites
+  card HTML rather than appending.
+- Does anything hydrate badges from OUTSIDE renderFighters? Could be a
+  separate summary pass — check renderLineMovementSummary.
+
+KEY FILES
+- src/analyzer.ts:11373 — lineCell (the only badge renderer)
+- src/analyzer.ts:7295-7318 — opening line tracker module state
+- src/analyzer.ts:7515-7629 — snapshotOpeningLines
+- src/analyzer.ts:7635-7677 — detectAndRecordMovements
+- src/analyzer.ts:7367-7509 — loadOpeningLines (staleness wipe)
+- src/analyzer.ts:14758-14822 — RESET LINES handler
+- src/background.ts:108-182 — initializeBetrLines (BETR_EVENT_DATE='2026-04-11')
+
+RULES THAT MUST BE PRESERVED (see memory/feedback_betr_reset_rule.md)
+- RESET LINES clears Betr iff betr_event_date (from storage) is past.
+- During fight week, Betr lines + _openingLines betr baselines must be
+  preserved across RESET.
+- The rule is date-driven, never archive-driven, never upcomingEventTs-driven.
+
+THIS IS FIX ATTEMPT #4+ FOR THIS BUG. User has said "still not fixed"
+multiple times. Verify the new bundle is loaded BEFORE making more code
+changes. If the new bundle IS loaded and badges still show, instrument
+lineCell to log the grace-period check + what _sessionStartAt is + what
+delta values are being computed, then ask user to paste console output.
 ```
 
 ---
 
-## What Was Built This Session (2026-03-27, Session 2)
+## Recent Commits
+```
+90e58ac fix: stale-detect infinite loop + Betr modal shows stale lines after clear
+d6a8274 checkpoint: line shop diff, style matchup, news flag, FT suite, finish split, opp quality
+91f3b50 update RESUME_CHECKPOINT with paste-ready resume code block
+4bfb6da snapshot: add compiled analyzer.js and RESUME_CHECKPOINT.md
+43c6fa2 checkpoint: H2H modal, ML-adj FP, trend arrows, line movement tracker, Betr manual persist
+```
 
-### Line Shopping Diff (🛒 Shop button)
-- New modal comparing all platforms side-by-side per fighter
-- Platform labels on every cell (P6/UD/BT/PP/DK above each value)
-- Lean-aware coloring: OVER lean → lowest line = green/best; UNDER lean → highest = green/best
-- Lean chip per fighter row showing direction + confidence
-- Sorted by biggest spread descending
-
-### Style Matchup Panel
-- Added to expanded row detail
-- Matchup chip with color per pair (STRIKER vs GRAPPLER etc.)
-- Fixed deriveStyle(): lowered striker threshold to slpm > 3.5 AND tdAvg < 1.5
-- Added all 9 balanced matchup cases to styleMatchupEdge()
-- Removed empty "not enough cached data" message — panel only renders if content exists
-
-### Injury/Weight Cut News Flag
-- Google News RSS fetch per fighter (https://news.google.com/*)
-- 30-min in-memory cache, runs after data loads
-- ⚠ NEWS badge on fighter row, click → news modal with alert headlines + links
-
-### KO/SUB/DEC Finish Split + Fight Time Suite
-- Win/loss method breakdown bars in Career Data panel
-- Fight Time Breakdown panel: both fighters' finish profiles + combined risk score + FT signal
-- calcFTLean enhanced with KO-loss vulnerability and opponent KO threat scoring
-- Opponent Activity Context panel: active vs passive opponent over rate splits
-
----
+## Uncommitted changes in src/analyzer.ts
+- snapshotOpeningLines: removed prev-refresh fallback, added grace-period re-anchor (7589-7613)
+- lineCell: grace-period badge suppression (11383-11390)
+- _sessionStartAt declared `let` instead of `const` (7313)
+- RESET LINES handler: resets _sessionStartAt = Date.now() (14796-14798)
+- processData: renderFighters+renderLineMovementSummary after snapshot (~13221)
+- Betr save handler: same re-render after snapshot (~15299)
 
 ## Quick Commands
-```powershell
+```bash
 npm run build
 git log --oneline -5
 git status
+grep -n _withinBaselineGrace src/analyzer.ts
+grep -n _sessionStartAt src/analyzer.ts
+grep -n 'const _sessionStartAt\|let _sessionStartAt' dist/analyzer.js
 ```
