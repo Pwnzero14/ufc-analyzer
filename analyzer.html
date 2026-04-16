@@ -3969,6 +3969,13 @@ body.loading {
     <button class="btn btn-ghost" id="lineShopBtn" title="Compare lines across all platforms — biggest discrepancies first">
       <span>🛒</span> Shop
     </button>
+    <button class="btn btn-ghost" id="backupStorageBtn" title="Download a JSON backup of all extension storage (archive, snapshots, lines). Run before removing the extension in Opera.">
+      <span>💾</span> Backup
+    </button>
+    <button class="btn btn-ghost" id="restoreStorageBtn" title="Restore extension storage from a JSON backup file">
+      <span>📥</span> Restore
+    </button>
+    <input type="file" id="restoreStorageFile" accept="application/json,.json" style="display:none">
   </div>
 </div>
 

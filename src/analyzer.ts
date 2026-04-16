@@ -5791,12 +5791,14 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
     if (!allRows.length) return;
 
     const londonTs = Date.parse(UFC_LONDON_CUTOFF_ISO);
+    const nowTs = Date.now();
     const resolvedRows = allRows.filter((row) => {
       const ts = Date.parse(row.date);
       const line = Number(row.line);
       const result = Number(row.result);
       return Number.isFinite(ts)
         && ts >= londonTs
+        && ts <= nowTs
         && Number.isFinite(line)
         && Number.isFinite(result);
     });
@@ -14672,6 +14674,73 @@ function initAnalyzerCore(): void {
   });
   document.getElementById('reportCardBtn')?.addEventListener('click', generateReportCard);
   document.getElementById('lineShopBtn')?.addEventListener('click', generateLineShopModal);
+
+  document.getElementById('backupStorageBtn')?.addEventListener('click', async () => {
+    try {
+      const all = await new Promise<Record<string, unknown>>((res) =>
+        chrome.storage.local.get(null, (data) => res(data || {}))
+      );
+      const keys = Object.keys(all);
+      const payload = {
+        __ufcBackup: true,
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        keyCount: keys.length,
+        storage: all,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ufc-storage-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showToast(`✓ Backup: ${keys.length} keys saved`);
+    } catch (e) {
+      showToast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
+
+  const restoreFileInput = document.getElementById('restoreStorageFile') as HTMLInputElement | null;
+  document.getElementById('restoreStorageBtn')?.addEventListener('click', () => restoreFileInput?.click());
+  restoreFileInput?.addEventListener('change', async () => {
+    const file = restoreFileInput.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const storage = parsed?.storage && typeof parsed.storage === 'object' ? parsed.storage : null;
+      if (!parsed?.__ufcBackup || !storage) {
+        showToast('Restore failed: not a valid UFC backup file');
+        return;
+      }
+      const keys = Object.keys(storage);
+      if (!keys.length) {
+        showToast('Restore failed: backup is empty');
+        return;
+      }
+      const confirmed = confirm(
+        `Restore ${keys.length} storage keys from backup exported ${parsed.exportedAt || 'unknown'}?\n\nThis OVERWRITES existing data for those keys. Other keys are left alone.`
+      );
+      if (!confirmed) return;
+      await new Promise<void>((res, rej) =>
+        chrome.storage.local.set(storage, () => {
+          const err = chrome.runtime?.lastError;
+          if (err) rej(new Error(err.message));
+          else res();
+        })
+      );
+      showToast(`✓ Restored ${keys.length} keys — reloading…`);
+      setTimeout(() => location.reload(), 900);
+    } catch (e) {
+      showToast(`Restore failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      restoreFileInput.value = '';
+    }
+  });
   const lineShopModal = document.getElementById('lineShopModal');
   document.getElementById('lineShopClose')?.addEventListener('click', () => lineShopModal?.classList.add('is-hidden'));
   lineShopModal?.addEventListener('click', (e) => { if (e.target === lineShopModal) lineShopModal.classList.add('is-hidden'); });

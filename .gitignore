@@ -4,3 +4,16 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Runtime/debug state
+.checkpoint/
+.claude/worktrees/
+.opera-debug-profile/
+.opera-live-debug/
+backups/
+
+# Recovery/backup artifacts
+recover-storage.js
+storage-recovery-*.json
+ufc-auto-backup-*.json
+ufc-storage-backup-*.json
+

@@ -1241,6 +1241,72 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
   console.log(`[UFC] Applied startup cache migration: ${STARTUP_MIGRATION_VERSION}`);
 }
 
+// ── AUTO-BACKUP ON STARTUP ────────────────────────────────────────────
+// Silently saves a full chrome.storage.local snapshot to Downloads once
+// per 24 hours. Prevents catastrophic data loss from Opera Remove+Re-add.
+const AUTO_BACKUP_THROTTLE_KEY = '__autoBackupLastTs';
+const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const AUTO_BACKUP_MIN_ARCHIVE = 10; // skip if archive has fewer than this many records
+
+async function autoBackupOnStartup(): Promise<void> {
+  try {
+    const allData = await new Promise<Record<string, any>>((res) =>
+      chrome.storage.local.get(null, res)
+    );
+
+    // Skip if storage is trivially small (post-wipe state)
+    const archive: any[] = Array.isArray(allData.prop_archive_v1) ? allData.prop_archive_v1 : [];
+    if (archive.length < AUTO_BACKUP_MIN_ARCHIVE) {
+      console.log(`[UFC Auto-Backup] Skipped — only ${archive.length} archive records (min ${AUTO_BACKUP_MIN_ARCHIVE})`);
+      return;
+    }
+
+    // Throttle: once per 24h
+    const lastTs = typeof allData[AUTO_BACKUP_THROTTLE_KEY] === 'number' ? allData[AUTO_BACKUP_THROTTLE_KEY] : 0;
+    if (Date.now() - lastTs < AUTO_BACKUP_INTERVAL_MS) {
+      const hoursAgo = ((Date.now() - lastTs) / 3600000).toFixed(1);
+      console.log(`[UFC Auto-Backup] Skipped — last backup was ${hoursAgo}h ago`);
+      return;
+    }
+
+    // Build backup payload (same format as the manual 💾 Backup button)
+    const { [AUTO_BACKUP_THROTTLE_KEY]: _omit, ...storageWithoutThrottle } = allData;
+    const payload = JSON.stringify({
+      __ufcBackup: true,
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      autoBackup: true,
+      keyCount: Object.keys(storageWithoutThrottle).length,
+      archiveCount: archive.length,
+      storage: storageWithoutThrottle,
+    });
+
+    // Convert to data URL for chrome.downloads
+    const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(payload);
+    const dateStr = new Date().toISOString().slice(0, 10); // 2026-04-16
+    const filename = `ufc-auto-backup-${archive.length}rec-${dateStr}.json`;
+
+    await new Promise<void>((resolve, reject) => {
+      chrome.downloads.download(
+        { url: dataUrl, filename, conflictAction: 'overwrite', saveAs: false },
+        (downloadId) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    // Record timestamp so we don't re-backup within 24h
+    await setStorageRecord({ [AUTO_BACKUP_THROTTLE_KEY]: Date.now() });
+    console.log(`[UFC Auto-Backup] Saved ${filename} (${archive.length} archive records, ${Object.keys(storageWithoutThrottle).length} keys)`);
+  } catch (e) {
+    console.error('[UFC Auto-Backup] Failed:', e);
+  }
+}
+
 // ── RESTORE PERSISTED DATA ON STARTUP ──────────────────────────────────
 
 (async () => {
@@ -1339,6 +1405,9 @@ async function runStartupMigrationIfNeeded(): Promise<void> {
     } catch (e) {
       console.error('[UFC Settle] Startup catch-up error:', e);
     }
+
+    // Auto-backup runs last — after all data is restored and settled
+    await autoBackupOnStartup();
 
   } catch (error) {
     console.error('[UFC] Failed to restore lines:', error);
@@ -2178,6 +2247,66 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                     }
                   });
 
+                  // ── Subcategory-aware element scraper ─────────────────
+                  // On DK subcategory pages (?subcategory=significant-strikes-o-u),
+                  // the prop label is a section header at the top, NOT paired with
+                  // each fighter name. So Pass 1 (which expects "Name Sig Strikes"
+                  // in one element) finds nothing. This pass finds fighter-name
+                  // elements directly and walks up to grab Over/Under values.
+                  if (!Object.keys(out).length && (preferSS || preferTD || preferFT)) {
+                    const propJunk = /strikes|takedown|fight\s*time|over|under|more|less|odds|pick|parlay|sgp|boost|promo/i;
+                    const nameEls = allEls.filter((el) => {
+                      if ((el as HTMLElement).children.length > 0) return false;
+                      const t = (((el as HTMLElement).innerText || el.textContent || '') + '').trim();
+                      if (!t || t.length < 4 || t.length > 40) return false;
+                      if (!/^[A-Z]/.test(t)) return false;
+                      if (propJunk.test(t)) return false;
+                      if (/^\d|^[+-]\d/.test(t)) return false;
+                      // Must look like a person's name: at least two words, letters/spaces/hyphens/apostrophes
+                      if (!/^[A-Za-z][A-Za-z'\-]+\s+[A-Za-z][A-Za-z'\-]+/.test(t)) return false;
+                      return true;
+                    });
+
+                    for (const el of nameEls) {
+                      const name = (((el as HTMLElement).innerText || el.textContent || '') + '').trim();
+                      let container: HTMLElement = el as HTMLElement;
+                      for (let j = 0; j < 15; j++) {
+                        if (!container.parentElement) break;
+                        container = container.parentElement;
+                        const t = container.innerText || '';
+                        const over = t.match(/Over\s+([\d.]+)\s*([+-]?\d{2,4})?/i);
+                        if (!over) continue;
+                        const line = parseFloat(over[1]);
+                        const overOdds = over[2] ? parseInt(over[2], 10) : null;
+                        const under = t.match(/Under\s+[\d.]+\s*([+-]?\d{2,4})?/i);
+                        const underOdds = under && under[1] ? parseInt(under[1], 10) : null;
+
+                        if (preferSS && Number.isFinite(line) && line >= 4 && line < 220) {
+                          const f = ensure(name);
+                          f.line_ss = line;
+                          if (overOdds != null) f.ss_over_odds = overOdds;
+                          if (underOdds != null) f.ss_under_odds = underOdds;
+                          break;
+                        }
+                        if (preferTD && Number.isFinite(line) && line >= 0 && line < 20) {
+                          const f = ensure(name);
+                          f.line_td = line;
+                          if (overOdds != null) f.td_over_odds = overOdds;
+                          if (underOdds != null) f.td_under_odds = underOdds;
+                          break;
+                        }
+                        if (preferFT && Number.isFinite(line) && line > 0 && line <= 30) {
+                          const f = ensure(name);
+                          f.line_ft = line;
+                          if (overOdds != null) f.ft_over_odds = overOdds;
+                          if (underOdds != null) f.ft_under_odds = underOdds;
+                          break;
+                        }
+                        break;
+                      }
+                    }
+                  }
+
                   if (!Object.keys(out).length && pageText) {
                     const ssRegex = /([A-Z][a-zA-Z\s'\-]{2,40})\s+(?:Total\s+)?Significant\s+Strikes?(?:\s+Landed)?(?:\s+O\/U)?[\s\S]{0,220}?Over\s+([\d.]+)\s*([+-]?\d{2,4})?[\s\S]{0,150}?Under\s+[\d.]+\s*([+-]?\d{2,4})?/gi;
                     const tdRegex = /([A-Z][a-zA-Z\s'\-]{2,40})\s+(?:Total\s+)?Takedowns?(?:\s+Landed)?(?:\s+O\/U)?[\s\S]{0,220}?Over\s+([\d.]+)\s*([+-]?\d{2,4})?[\s\S]{0,150}?Under\s+[\d.]+\s*([+-]?\d{2,4})?/gi;
@@ -2211,13 +2340,15 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                       if (m[4]) f.ft_under_odds = parseInt(m[4], 10);
                     }
 
-                    // Subcategory-aware generic fallback for pages where prop label wording changes.
+                    // Subcategory-aware generic text fallback with junk-name filtering.
                     if (!Object.keys(out).length && (preferSS || preferTD || preferFT)) {
-                      const genericRegex = /([A-Z][a-zA-Z\s'\-]{2,40})[\s\S]{0,120}?Over\s+([\d.]+)\s*([+-]?\d{2,4})?[\s\S]{0,120}?Under\s+[\d.]+\s*([+-]?\d{2,4})?/gi;
+                      const propJunkText = /strikes|takedown|fight\s*time|significant|parlay|boost|sgp|promo|category|subcategory|ufc|mma|over|under|more|less/i;
+                      const genericRegex = /([A-Z][a-zA-Z'\-]+\s+[A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)[\s\S]{0,120}?Over\s+([\d.]+)\s*([+-]?\d{2,4})?[\s\S]{0,120}?Under\s+[\d.]+\s*([+-]?\d{2,4})?/g;
                       while ((m = genericRegex.exec(pageText)) !== null) {
                         const name = m[1].trim();
                         const line = parseFloat(m[2]);
                         if (!name || !Number.isFinite(line)) continue;
+                        if (propJunkText.test(name)) continue;
                         const f = ensure(name);
                         if (preferSS && line >= 4 && line < 220) {
                           f.line_ss = line;
