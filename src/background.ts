@@ -894,6 +894,17 @@ function getRosterNameSet(): Set<string> {
   return out;
 }
 
+async function getCancelledFighterNames(): Promise<Set<string>> {
+  try {
+    const data = await new Promise<Record<string, any>>(res => chrome.storage.local.get(['cancelled_fighters'], res));
+    const cf = data['cancelled_fighters'];
+    if (cf && typeof cf === 'object' && Array.isArray(cf.names)) {
+      return new Set(cf.names.map((n: string) => n.toLowerCase()));
+    }
+  } catch { /* non-fatal */ }
+  return new Set();
+}
+
 async function archivePlatformPropLines(
   platform: 'pick6' | 'underdog' | 'betr' | 'prizepicks' | 'draftkings_sportsbook',
   fighters: Array<any>,
@@ -925,6 +936,7 @@ async function archivePlatformPropLines(
   }
 
   const roster = getRosterNameSet();
+  const cancelled = await getCancelledFighterNames();
   const records: PropArchiveRecord[] = [];
   const dateIso = toIsoDate(card.date);
 
@@ -934,6 +946,9 @@ async function archivePlatformPropLines(
     const fighterKey = normalizeFighterName(fighter);
     const opponent = sanitizeOpponentName(f?.opponent, fighter) || String(f?.opponent || '').trim() || 'Unknown Opponent';
     const opponentKey = normalizeFighterName(opponent);
+
+    // Skip cancelled fighters
+    if (fighterKey && cancelled.has(fighterKey)) continue;
 
     const isRostered = fighterKey ? roster.has(fighterKey) : false;
     const isOpponentRostered = opponentKey ? roster.has(opponentKey) : false;

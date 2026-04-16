@@ -227,6 +227,10 @@ let upcomingCardPairs: Array<{ f1: string; f2: string; weightClass?: WeightClass
 let upcomingEventName: string = '';
 let upcomingEventTs: number = 0;
 let inferredEventNameFromLines: string = '';
+// Cancelled fighters — excluded from display/archival even if DFS sites still list them
+const CANCELLED_FIGHTERS_KEY = 'cancelled_fighters';
+let cancelledFighterNames = new Set<string>();
+let cancelledFightPairs: Array<{ f1: string; f2: string }> = [];
 // Maps normalized fighter name → scheduled rounds (3 or 5) from upcoming card scrape
 const scheduledRoundsMap = new Map<string, number>();
 
@@ -338,7 +342,66 @@ function findOpponentFromUpcomingCard(name: string): string|null {
 
 function isUpcomingCardFighter(name: string | null | undefined): boolean {
   if (!name || !upcomingCardPairs.length) return false;
+  if (cancelledFighterNames.has((normalizeName(name) || name).toLowerCase())) return false;
   return upcomingCardPairs.some((pair) => strictCardNameMatch(name, pair.f1) || strictCardNameMatch(name, pair.f2));
+}
+
+function isCancelledFighter(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return cancelledFighterNames.has((normalizeName(name) || name).toLowerCase());
+}
+
+async function loadCancelledFighters(): Promise<void> {
+  try {
+    const data = await storageGet<Record<string, any>>([CANCELLED_FIGHTERS_KEY]);
+    const cf = data[CANCELLED_FIGHTERS_KEY];
+    const eventKey = (upcomingEventName || inferredEventNameFromLines || '').toLowerCase();
+    if (cf && typeof cf === 'object' && Array.isArray(cf.names) && cf.event?.toLowerCase() === eventKey) {
+      cancelledFighterNames = new Set(cf.names.map((n: string) => n.toLowerCase()));
+      cancelledFightPairs = Array.isArray(cf.pairs) ? cf.pairs : [];
+    } else {
+      cancelledFighterNames = new Set();
+      cancelledFightPairs = [];
+    }
+  } catch {
+    cancelledFighterNames = new Set();
+    cancelledFightPairs = [];
+  }
+}
+
+async function saveCancelledFighters(): Promise<void> {
+  const eventKey = upcomingEventName || inferredEventNameFromLines || '';
+  if (!eventKey || cancelledFighterNames.size === 0) {
+    cancelledFightPairs = [];
+    try { await new Promise<void>(r => chrome.storage.local.remove([CANCELLED_FIGHTERS_KEY], r)); } catch {}
+    return;
+  }
+  const payload = { event: eventKey, names: Array.from(cancelledFighterNames), pairs: cancelledFightPairs };
+  await new Promise<void>((res) => chrome.storage.local.set({ [CANCELLED_FIGHTERS_KEY]: payload }, res));
+}
+
+async function cancelFight(f1: string, f2: string): Promise<void> {
+  const n1 = (normalizeName(f1) || f1).toLowerCase();
+  const n2 = (normalizeName(f2) || f2).toLowerCase();
+  if (n1) cancelledFighterNames.add(n1);
+  if (n2) cancelledFighterNames.add(n2);
+  cancelledFightPairs.push({ f1, f2 });
+  await saveCancelledFighters();
+  showToast(`Fight cancelled: ${f1} vs ${f2} — hidden from lines`);
+  requestDataReload();
+}
+
+async function restoreCancelledFight(f1: string, f2: string): Promise<void> {
+  const n1 = (normalizeName(f1) || f1).toLowerCase();
+  const n2 = (normalizeName(f2) || f2).toLowerCase();
+  cancelledFighterNames.delete(n1);
+  cancelledFighterNames.delete(n2);
+  cancelledFightPairs = cancelledFightPairs.filter(p =>
+    (normalizeName(p.f1) || p.f1).toLowerCase() !== n1 || (normalizeName(p.f2) || p.f2).toLowerCase() !== n2
+  );
+  await saveCancelledFighters();
+  showToast(`Restored: ${f1} vs ${f2}`);
+  requestDataReload();
 }
 
 function filterPayloadToUpcomingCard(payload: PlatformLinesPayload | null | undefined): PlatformLinesPayload | null {
@@ -10156,9 +10219,12 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   });
   return fallbackByReverse || null;
 }
-  const totalFights = Math.ceil(fighters.length / 2);
+  // Filter out cancelled fighters from the display list
+  const activeFighters = fighters.filter(f => !isCancelledFighter(f.name));
+
+  const totalFights = Math.ceil(activeFighters.length / 2);
   const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
-  fighters.forEach((f, i) => {
+  activeFighters.forEach((f, i) => {
     const explicitOpp = sanitizeOpponentName(f.opponent, f.name);
     const looseOpp = sanitizeLooseOpponentToken(f.opponent, f.name);
     const opp = explicitOpp || looseOpp;
@@ -10172,19 +10238,41 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       else { badgeText = 'PRELIM'; badgeCls = 'prelim'; }
       const header = document.createElement('div');
       header.className = 'fight-group-header';
-      header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><div class="fight-group-line"></div>`;
+      const f2Name = activeFighters[i + 1]?.name || opp || '';
+      header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled (hides both fighters)">CANCEL</button><div class="fight-group-line"></div>`;
+      const cancelBtn = header.querySelector('.fight-cancel-btn') as HTMLButtonElement;
+      cancelBtn?.addEventListener('click', () => { void cancelFight(f.name, f2Name); });
       container.appendChild(header);
     }
     debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
     const row = buildFighterRow(f, oppEntry ?? null, Math.floor(i / 2));
     row.style.setProperty('--row-index', String(i % 18));
     container.appendChild(row);
-    if (!showFightGroups && i % 2 === 1 && i < fighters.length - 1) {
+    if (!showFightGroups && i % 2 === 1 && i < activeFighters.length - 1) {
       const sp = document.createElement('div');
       sp.style.cssText = 'height:8px';
       container.appendChild(sp);
     }
   });
+
+  // Show cancelled fights at bottom with restore option
+  if (cancelledFightPairs.length > 0 && showFightGroups) {
+    const cancelHeader = document.createElement('div');
+    cancelHeader.className = 'fight-group-header';
+    cancelHeader.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge cancelled">CANCELLED</span><div class="fight-group-line"></div>`;
+    container.appendChild(cancelHeader);
+    for (const pair of cancelledFightPairs) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 8px;opacity:0.5;font-size:12px;color:var(--text3);';
+      row.innerHTML = `<span style="text-decoration:line-through">${pair.f1} vs ${pair.f2}</span>`;
+      const restoreBtn = document.createElement('button');
+      restoreBtn.className = 'fight-restore-btn';
+      restoreBtn.textContent = 'Restore';
+      restoreBtn.addEventListener('click', () => { void restoreCancelledFight(pair.f1, pair.f2); });
+      row.appendChild(restoreBtn);
+      container.appendChild(row);
+    }
+  }
 
   // ── Animate bars on scroll into view (IntersectionObserver) ─────────
   const fillBarsInElement = (el: Element) => {
@@ -13031,6 +13119,7 @@ async function loadData(): Promise<void> {
       if (scheduledRoundsMap.size === 0 && upcomingCardPairs.length > 0) {
         await syncUpcomingCardContext(true);
       }
+      await loadCancelledFighters();
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
