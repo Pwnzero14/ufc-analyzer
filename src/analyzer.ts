@@ -116,6 +116,9 @@ let _leanCache: Map<string, EffectiveLean> | null = null;
 let _fighterByNorm: Map<string, AnalyzerFighter> | null = null;
 // Fighter-level archive accuracy: normName → propType → {hits, total}
 let _fighterArchiveStats: Map<string, Record<string, { hits: number; total: number }>> | null = null;
+// Per-fighter open→current drift for unresolved archive rows. Keyed by lowercased normalized fighter name,
+// then propType, then lowercased platform. Used to apply a market-validation bump to live AI confidence.
+let _fighterClvDrift: Map<string, Record<string, Record<string, { openLine: number; line: number }>>> | null = null;
 const CONFIDENCE_MEMORY_VERSION = 1;
 
 interface ConfidenceMemoryBucket {
@@ -196,6 +199,29 @@ async function loadFighterArchiveStats(): Promise<void> {
     if (normalizeArchiveResult(pt, Number(r.result)) > Number(r.line)) entry[pt].hits++;
   }
   _fighterArchiveStats = map;
+}
+
+async function loadFighterClvDrift(): Promise<void> {
+  const payload = await storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY]);
+  const rows = Array.isArray(payload[STORAGE_PROP_ARCHIVE_KEY])
+    ? (payload[STORAGE_PROP_ARCHIVE_KEY] as PropArchiveRecord[])
+    : [];
+  const map = new Map<string, Record<string, Record<string, { openLine: number; line: number }>>>();
+  for (const r of rows) {
+    if (!r.fighter) continue;
+    if (Number.isFinite(Number(r.result))) continue; // resolved — not a live market
+    const openLine = Number(r.openLine);
+    const line = Number(r.line);
+    if (!Number.isFinite(openLine) || !Number.isFinite(line)) continue;
+    const key = (normalizeName(r.fighter) || r.fighter).toLowerCase();
+    const pt = String(r.propType || 'Unknown');
+    const plat = String(r.platform || '').toLowerCase();
+    if (!map.has(key)) map.set(key, {});
+    const byProp = map.get(key)!;
+    if (!byProp[pt]) byProp[pt] = {};
+    byProp[pt][plat] = { openLine, line };
+  }
+  _fighterClvDrift = map;
 }
 
 // ── NEWS CACHE ─────────────────────────────────────────────────────────────
@@ -9104,6 +9130,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         _confidenceMemoryCache = null;
         showToast(`✓ Settled ${res.settled} records from UFCStats${res.errors.length ? ` (${res.errors.length} events not found yet)` : ''}`);
         _fighterArchiveStats = null; // force reload so fighter cards reflect new results
+        _fighterClvDrift = null;
         void renderArchivePanel(container);
       } else {
         showToast('Settle failed — check console');
@@ -10163,6 +10190,8 @@ function renderFighters(): void {
 
   // Load archive stats once per session for per-fighter accuracy badges
   if (_fighterArchiveStats === null) { void loadFighterArchiveStats(); }
+  // Load open→current drift map (unresolved rows) for the AI×CLV confidence boost
+  if (_fighterClvDrift === null) { void loadFighterClvDrift(); }
 
   primeCaches();
   const _q = currentSearch.toLowerCase().trim();
@@ -11455,6 +11484,42 @@ function generateLineShopModal(): void {
   modal.classList.remove('is-hidden');
 }
 
+// AI × CLV Phase 2 — market-validation boost.
+// Reads the live open→current drift for this fighter/propType/platform (unresolved rows only).
+// If the market has moved in the AI lean's direction → +5 confidence (market validates the pick).
+// If the market has moved against the lean → −5 (market disagrees). Zero drift = no adjustment.
+// Returns null when no drift data is available or the lean has no direction.
+function getClvBoost(f: AnalyzerFighter, el: EffectiveLean): { delta: number; marketDelta: number; openLine: number; line: number; platform: string } | null {
+  if (!_fighterClvDrift) return null;
+  if (el.lean !== 'over' && el.lean !== 'under') return null;
+  const key = (normalizeName(f.name) || f.name).toLowerCase();
+  const byProp = _fighterClvDrift.get(key);
+  if (!byProp) return null;
+  const propType = el._source === 'fp' ? 'Fantasy' : el._source === 'ft' ? 'FightTime' : el._source.toUpperCase();
+  const byPlatform = byProp[propType];
+  if (!byPlatform) return null;
+  const platform = normalizeArchivePlatformLabel(activePlatformLabel(f)) || '';
+  // Prefer the active platform; fall back to any available platform entry for this prop.
+  let entry = platform ? byPlatform[platform] : undefined;
+  let usedPlatform = platform;
+  if (!entry) {
+    const first = Object.entries(byPlatform)[0];
+    if (!first) return null;
+    usedPlatform = first[0];
+    entry = first[1];
+  }
+  const marketDelta = entry.line - entry.openLine;
+  if (marketDelta === 0) return null;
+  const aligned = (el.lean === 'over' && marketDelta > 0) || (el.lean === 'under' && marketDelta < 0);
+  return {
+    delta: aligned ? 5 : -5,
+    marketDelta,
+    openLine: entry.openLine,
+    line: entry.line,
+    platform: usedPlatform,
+  };
+}
+
 function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fightIndex = 0): HTMLDivElement {
   _h2hFighterMap.set(f.name.toLowerCase(), f);
   const db = f.db || {} as FighterDB;
@@ -11466,17 +11531,33 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const leanSuffix = lean._label || '';
   const leanText  = lean.lean === 'over' ? `▲ OVER${leanSuffix}` : lean.lean === 'under' ? `▼ UNDER${leanSuffix}` : lean.lean === 'push' ? '~ PUSH' : db.loaded ? '—' : '⟳';
   const leanRGB = lean.lean === 'over' ? '0,232,122' : lean.lean === 'under' ? '255,58,96' : lean.lean === 'push' ? '240,192,64' : '50,58,88';
-  const confPct = lean.conf || 0;
+  const rawConfPct = lean.conf || 0;
+  const clvBoost = rawConfPct > 0 ? getClvBoost(f, lean) : null;
+  const confPct = clvBoost
+    ? Math.max(25, Math.min(90, rawConfPct + clvBoost.delta))
+    : rawConfPct;
   const recalConf = confPct > 0 ? getRecalibratedConfidence(confPct, lean._source) : null;
   const displayConf = recalConf != null ? recalConf : confPct;
   const leanGradStyle = lean.lean !== 'none' && displayConf > 0
     ? `background:linear-gradient(90deg,rgba(${leanRGB},0.22) ${displayConf}%,rgba(${leanRGB},0.05) ${displayConf}%);`
     : '';
   const displayGrade = displayConf > 0 ? ` ${getConfidenceGrade(displayConf)}` : '';
+  const clvTag = clvBoost
+    ? (() => {
+        const arrow = clvBoost.delta > 0 ? '↑' : '↓';
+        const signed = `${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}`;
+        const color = clvBoost.delta > 0 ? 'var(--green)' : 'var(--red)';
+        const driftStr = `${clvBoost.marketDelta > 0 ? '+' : ''}${clvBoost.marketDelta.toFixed(1)}`;
+        const note = clvBoost.delta > 0
+          ? `Market validates ${lean.lean?.toUpperCase()}: line drifted ${driftStr} from open (${clvBoost.openLine}→${clvBoost.line}) on ${clvBoost.platform}.`
+          : `Market disagrees with ${lean.lean?.toUpperCase()}: line drifted ${driftStr} from open (${clvBoost.openLine}→${clvBoost.line}) on ${clvBoost.platform}.`;
+        return ` <span style="color:${color};font-size:9px;font-weight:700" title="${note}">${arrow}${signed}</span>`;
+      })()
+    : '';
   const confInlineLabel = confPct > 0
     ? recalConf != null && recalConf !== confPct
-      ? `<span class="lean-conf-inline" title="Original: ${confPct}% ${lean.confidenceGrade || ''} · Recalibrated from historical accuracy">${displayConf}%${displayGrade} <span style="font-size:9px;opacity:0.6">↻</span></span>`
-      : `<span class="lean-conf-inline" title="Confidence${lean.confidenceGrade ? ' ' + lean.confidenceGrade : ''}: ${confPct}%">${confPct}%${displayGrade}</span>`
+      ? `<span class="lean-conf-inline" title="Original: ${rawConfPct}% ${lean.confidenceGrade || ''} · Recalibrated from historical accuracy${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${displayConf}%${displayGrade} <span style="font-size:9px;opacity:0.6">↻</span>${clvTag}</span>`
+      : `<span class="lean-conf-inline" title="Confidence${lean.confidenceGrade ? ' ' + lean.confidenceGrade : ''}: ${rawConfPct}%${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${confPct}%${displayGrade}${clvTag}</span>`
     : '';
   const activeLine = activePlatformLine(f);
   const platformLabel = activePlatformLabel(f);
