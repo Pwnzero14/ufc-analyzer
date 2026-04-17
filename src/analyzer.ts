@@ -12496,6 +12496,7 @@ const NAME_ALIASES: Record<string, string> = {
   'Christopher Padilla': 'Chris Padilla',
   'Azamat Murazakov':    'Azamat Murzakanov',
   'A Murazakov':         'Azamat Murzakanov',
+  'Darya Zheleznyakova': 'Daria Zhelezniakova',
 };
 
 function normalizeName(name: string|null|undefined): string|null {
