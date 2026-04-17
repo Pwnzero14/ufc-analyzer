@@ -2408,6 +2408,7 @@ function getSourceLineEntries(f: AnalyzerFighter, source: LeanSource): Array<{ p
 
   return pairs
     .map(([platform, value]) => {
+      if (value == null) return null;
       const num = Number(value);
       return Number.isFinite(num) ? { platform, value: num } : null;
     })
@@ -2440,6 +2441,38 @@ function getSourceActiveLine(f: AnalyzerFighter, source: LeanSource): number | n
   const platform = getSourceActivePlatformKey(f, source);
   if (!platform) return null;
   return getSourceLineEntries(f, source).find((entry) => entry.platform === platform)?.value ?? null;
+}
+
+// Pick6, Underdog Fantasy, and Betr offer Fantasy Points props as pick-em style plays
+// where underdogs are only given the OVER side (no UNDER button). Betr's underdog OVER
+// is additionally inflated to +money odds (not true pick-em value), so the user doesn't
+// take those bets. SS/TD/FT stat props still have both sides, and DK Sportsbook is a
+// standard book with both sides available.
+const PICKEM_UNDER_FORBIDDEN_PLATFORMS: Set<SourcePlatformKey> = new Set(['pick6', 'underdog', 'betr']);
+
+function isMoneylineUnderdog(f: AnalyzerFighter): boolean {
+  // Prefer the already-merged moneyline on the fighter, fall back to the odds map.
+  const own = f.moneyline ?? resolveMoneylineFromMap(f.name);
+  if (own != null && Number.isFinite(own)) return own > 0;
+  // Fallback: if opponent's moneyline is a known favorite (negative), this fighter is the underdog.
+  const opponentNorm = normalizeName(f.opponent || '')?.toLowerCase() || '';
+  if (!opponentNorm) return false;
+  const opp = _fighterByNorm?.get(opponentNorm)
+    || allFighters.find((entry) => (normalizeName(entry.name) || entry.name).toLowerCase() === opponentNorm)
+    || null;
+  const oppMl = opp?.moneyline ?? (opp ? resolveMoneylineFromMap(opp.name) : null);
+  if (oppMl != null && Number.isFinite(oppMl) && oppMl < 0) return true;
+  return false;
+}
+
+function shouldSkipFpSideForFighter(f: AnalyzerFighter, source: LeanSource, direction: 'over' | 'under'): boolean {
+  if (source !== 'fp') return false;
+  const platform = getSourceActivePlatformKey(f, source);
+  if (!platform) return false;
+  if (!isMoneylineUnderdog(f)) return false;
+  if (direction === 'under' && PICKEM_UNDER_FORBIDDEN_PLATFORMS.has(platform)) return true;
+  if (direction === 'over' && platform === 'betr') return true;
+  return false;
 }
 
 function formatSourcePlatformLabel(f: AnalyzerFighter, source: LeanSource): string {
@@ -6364,8 +6397,20 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // Populate each column independently: a fighter's best OVER lean goes to the
   // OVER column, and their best UNDER lean to the UNDER column.  A fighter can
   // appear on both sides when they have actionable leans in both directions.
-  const allOversRaw  = visibleFighters.filter(f => getBestPickLeanForDir(f, 'over') != null);
-  const allUndersRaw = visibleFighters.filter(f => getBestPickLeanForDir(f, 'under') != null);
+  const allOversRaw  = visibleFighters.filter(f => {
+    const el = getBestPickLeanForDir(f, 'over');
+    if (!el) return false;
+    // Skip Betr underdog FP OVERs — inflated +money odds, user doesn't take them.
+    if (shouldSkipFpSideForFighter(f, el._source, 'over')) return false;
+    return true;
+  });
+  const allUndersRaw = visibleFighters.filter(f => {
+    const el = getBestPickLeanForDir(f, 'under');
+    if (!el) return false;
+    // Drop unplaceable unders: underdogs have no UNDER side on pick-em FP props.
+    if (shouldSkipFpSideForFighter(f, el._source, 'under')) return false;
+    return true;
+  });
 
   // Temporarily override the bestPickLeanCache for sorting so confidence/tier
   // functions use the direction-specific lean when ranking each column.
@@ -7007,6 +7052,7 @@ function suggestParlays(
       const line = getSourceActiveLine(f, stat);
       if (line == null) return;
       if ((lean.conf || 0) < 55) return; // skip low confidence
+      if (shouldSkipFpSideForFighter(f, stat, lean.lean as 'over' | 'under')) return;
       available.push({
         leg: {
           fighter: f.name,
@@ -7090,6 +7136,7 @@ function renderParlayLab(container: HTMLElement): void {
       if (!lean || lean.lean === 'none' || lean.lean === 'push') return;
       const line = getSourceActiveLine(f, stat);
       if (line == null) return;
+      if (shouldSkipFpSideForFighter(f, stat, lean.lean as 'over' | 'under')) return;
       availableLegs.push({
         leg: {
           fighter: f.name,
@@ -10429,12 +10476,20 @@ async function fetchFighterNews(name: string): Promise<NewsItem[]> {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'text/xml');
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const items = Array.from(doc.querySelectorAll('item')).map(item => ({
-      title: (item.querySelector('title')?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
-      link: item.querySelector('link')?.nextSibling?.textContent?.trim() || item.querySelector('link')?.textContent?.trim() || '',
-      pubDate: item.querySelector('pubDate')?.textContent || '',
-      source: item.querySelector('source')?.textContent?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '',
-    })).filter(item => {
+    const items = Array.from(doc.querySelectorAll('item')).map(item => {
+      const rawLink = (item.querySelector('link')?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+      let link = rawLink;
+      if (link && !/^https?:\/\//i.test(link)) {
+        // Google News RSS sometimes yields only the article slug; rebuild absolute URL.
+        link = 'https://news.google.com/rss/articles/' + link.replace(/^\/+/, '');
+      }
+      return {
+        title: (item.querySelector('title')?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
+        link,
+        pubDate: item.querySelector('pubDate')?.textContent || '',
+        source: item.querySelector('source')?.textContent?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '',
+      };
+    }).filter(item => {
       const pub = item.pubDate ? new Date(item.pubDate).getTime() : 0;
       return pub > cutoff;
     });
@@ -15149,10 +15204,12 @@ function initAnalyzerCore(): void {
       if (!nm || !contentEl) return;
       if (titleEl) titleEl.textContent = `⚠ ${fighterName.toUpperCase()} — NEWS`;
       if (subEl) subEl.textContent = `${alertItems.length} alert headline${alertItems.length !== 1 ? 's' : ''} · ${cached.items.length} total in last 7 days`;
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      const safeHref = (url: string) => (url && /^https?:\/\//i.test(url) ? esc(url) : '#');
       const renderItem = (item: NewsItem, isAlert: boolean) =>
         `<div class="news-item${isAlert ? ' news-item-alert' : ''}">
-          <div class="news-item-title"><a href="${item.link || '#'}" target="_blank" rel="noopener">${item.title || '(no title)'}</a></div>
-          <div class="news-item-meta">${item.pubDate ? new Date(item.pubDate).toLocaleDateString() : ''}${item.source ? ` · ${item.source}` : ''}</div>
+          <div class="news-item-title"><a href="${safeHref(item.link)}" target="_blank" rel="noopener">${esc(item.title || '(no title)')}</a></div>
+          <div class="news-item-meta">${item.pubDate ? esc(new Date(item.pubDate).toLocaleDateString()) : ''}${item.source ? ` · ${esc(item.source)}` : ''}</div>
         </div>`;
       contentEl.innerHTML = [
         ...alertItems.map(item => renderItem(item, true)),
