@@ -295,6 +295,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true;
+  } else if (request.type === 'CLEANUP_ORPHAN_CARD_ROWS') {
+    // Remove archive rows whose fighter is NOT on the current UFC card.
+    // Scoped to the current event only. Saves a backup before deleting.
+    // Options:
+    //   dryRun=true → return what would be deleted without touching storage
+    //   platform='pick6' → restrict to one platform (optional)
+    const dryRun = Boolean(request.dryRun);
+    const platformFilter = request.platform ? String(request.platform).toLowerCase() : null;
+    (async () => {
+      try {
+        const card = await fetchUpcomingUFCCard(false);
+        if (!card || !Array.isArray(card.fighters) || card.fighters.length === 0) {
+          sendResponse({ ok: false, error: 'No upcoming UFC card available' });
+          return;
+        }
+        const cardNames = new Set<string>();
+        for (const bout of card.fighters) {
+          const a = normalizeFighterName(bout.f1);
+          const b = normalizeFighterName(bout.f2);
+          if (a) cardNames.add(a);
+          if (b) cardNames.add(b);
+        }
+        const normEvent = card.event.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const key = 'prop_archive_v1';
+        const payload = await new Promise<Record<string, any>>((res) => chrome.storage.local.get([key], r => res(r || {})));
+        const rows: any[] = Array.isArray(payload[key]) ? payload[key] : [];
+
+        const orphans: any[] = [];
+        const kept: any[] = [];
+        for (const r of rows) {
+          const ev = String(r?.event || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (ev !== normEvent) { kept.push(r); continue; }
+          if (platformFilter && String(r?.platform || '').toLowerCase() !== platformFilter) { kept.push(r); continue; }
+          const fname = normalizeFighterName(r?.fighter);
+          if (fname && cardNames.has(fname)) { kept.push(r); continue; }
+          orphans.push(r);
+        }
+
+        const orphanNames = Array.from(new Set(orphans.map(o => String(o?.fighter || '')))).sort();
+
+        if (dryRun) {
+          sendResponse({ ok: true, dryRun: true, wouldDelete: orphans.length, fighters: orphanNames, event: card.event });
+          return;
+        }
+
+        // Backup before delete (respecting line data is irreplaceable).
+        const backupKey = `prop_archive_orphan_backup_${Date.now()}`;
+        await new Promise<void>((res) => chrome.storage.local.set({ [backupKey]: orphans }, () => res()));
+        await new Promise<void>((res) => chrome.storage.local.set({ [key]: kept }, () => res()));
+        sendResponse({ ok: true, deleted: orphans.length, fighters: orphanNames, event: card.event, backupKey });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
   }
   return false;
 });
