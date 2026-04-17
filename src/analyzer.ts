@@ -8084,12 +8084,13 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   // ── Per-event breakdown ────────────────────────────────────────────────
   // key = dedup key, value includes display name, date, and counts
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-  const eventMap = new Map<string, { display: string; date: number; hits: number; total: number; unresolved: number; recordCount: number }>();
+  type BiggestMover = { fighter: string; propType: string; platform: string; openLine: number; line: number; delta: number };
+  const eventMap = new Map<string, { display: string; date: number; hits: number; total: number; unresolved: number; recordCount: number; clvMoved: number; clvTracked: number; clvAbsSum: number; biggestMover: BiggestMover | null }>();
   for (const r of allRows.filter(r => Number.isFinite(Date.parse(r.date)) && Date.parse(r.date) >= londonTs)) {
     const ev = r.event || 'Unknown';
     const key = eventDedupeKey(ev);
     const rDate = Date.parse(r.date);
-    const bucket = eventMap.get(key) || { display: ev, date: rDate, hits: 0, total: 0, unresolved: 0, recordCount: 0 };
+    const bucket = eventMap.get(key) || { display: ev, date: rDate, hits: 0, total: 0, unresolved: 0, recordCount: 0, clvMoved: 0, clvTracked: 0, clvAbsSum: 0, biggestMover: null as BiggestMover | null };
     // Prefer the longer, more descriptive event name as display name
     if (ev.length > bucket.display.length) bucket.display = ev;
     // Track earliest record date for this event
@@ -8100,6 +8101,27 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       if (normalizeArchiveResult(String(r.propType), Number(r.result)) > Number(r.line)) bucket.hits++;
     } else if (Number.isFinite(Number(r.line))) {
       bucket.unresolved++;
+    }
+    // Market CLV: capture line drift when openLine and line both present.
+    const openLine = Number(r.openLine);
+    const closeLine = Number(r.line);
+    if (Number.isFinite(openLine) && Number.isFinite(closeLine)) {
+      bucket.clvTracked++;
+      const delta = closeLine - openLine;
+      if (delta !== 0) {
+        bucket.clvMoved++;
+        bucket.clvAbsSum += Math.abs(delta);
+        if (!bucket.biggestMover || Math.abs(delta) > Math.abs(bucket.biggestMover.delta)) {
+          bucket.biggestMover = {
+            fighter: r.fighter,
+            propType: String(r.propType),
+            platform: String(r.platform || ''),
+            openLine,
+            line: closeLine,
+            delta,
+          };
+        }
+      }
     }
     eventMap.set(key, bucket);
   }
@@ -8344,9 +8366,18 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const aiStr = ai
           ? `<span style="color:${aiRate! >= 60 ? 'var(--green)' : aiRate! >= 45 ? 'var(--amber)' : 'var(--red)'};font-size:10px;margin-left:8px">AI picks: ${ai.hits}/${ai.total} (${aiRate}%)</span>`
           : '';
+        let clvStr = '';
+        if (d.clvTracked > 0) {
+          const avgAbs = d.clvMoved > 0 ? (d.clvAbsSum / d.clvMoved).toFixed(2) : '0.00';
+          const bm = d.biggestMover;
+          const biggestStr = bm
+            ? ` · biggest: ${bm.fighter} ${bm.propType} ${bm.openLine}→${bm.line} (${bm.delta > 0 ? '+' : ''}${bm.delta.toFixed(1)})`
+            : '';
+          clvStr = `<div class="best-pick-reason" style="font-size:10px;color:var(--text-muted)">CLV: ${d.clvMoved}/${d.clvTracked} moved · avg |Δ| ${avgAbs}${biggestStr}</div>`;
+        }
         return `<div class="best-pick-row">
           <div class="best-pick-rank" style="font-size:11px;min-width:44px">${rate !== null ? rate + '%' : '?'}</div>
-          <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${rateStr}${unresStr}${aiStr}</div></div>
+          <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${rateStr}${unresStr}${aiStr}</div>${clvStr}</div>
           ${deleteBtn(d.display)}
         </div>`;
       }).join('')

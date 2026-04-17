@@ -60,6 +60,10 @@ function normalizeRecord(record: PropArchiveRecord): PropArchiveRecord | null {
     const line = Number(record.line);
     if (Number.isFinite(line)) normalized.line = line;
   }
+  if (record.openLine != null) {
+    const openLine = Number(record.openLine);
+    if (Number.isFinite(openLine)) normalized.openLine = openLine;
+  }
   return normalized;
 }
 
@@ -146,8 +150,12 @@ export class PropArchiveService {
       const merged = { ...all[idx], ...normalized };
       if (all[idx].line != null && normalized.line == null) merged.line = all[idx].line;
       if (Number.isNaN(normalized.result) && Number.isFinite(all[idx].result)) merged.result = all[idx].result;
+      // openLine is captured once (first write with a line) and never overwritten.
+      if (all[idx].openLine != null) merged.openLine = all[idx].openLine;
+      else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
       all[idx] = merged;
     } else {
+      if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
       all.push(normalized);
     }
     await this.setAllRecords(all);
@@ -164,12 +172,15 @@ export class PropArchiveService {
       const key = recordKey(normalized);
       const prev = byKey.get(key);
       if (!prev) {
+        if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
         byKey.set(key, normalized);
         continue;
       }
       const merged = { ...prev, ...normalized };
       if (prev.line != null && normalized.line == null) merged.line = prev.line;
       if (Number.isNaN(normalized.result) && Number.isFinite(prev.result)) merged.result = prev.result;
+      if (prev.openLine != null) merged.openLine = prev.openLine;
+      else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
       byKey.set(key, merged);
     }
 

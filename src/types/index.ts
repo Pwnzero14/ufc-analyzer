@@ -281,6 +281,9 @@ export interface PropArchiveRecord {
   platform?: string;
   propType: PropType;
   line?: number;
+  // First line observed for this record (opening). Captured on first insert; never overwritten.
+  // Paired with `line` (closing / latest) to compute market CLV = line - openLine.
+  openLine?: number;
   result: number;
 }
 
