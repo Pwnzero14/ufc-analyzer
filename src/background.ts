@@ -1166,6 +1166,26 @@ async function handleLinesCaptured(platform: string, data: any): Promise<void> {
     const allStored = await StorageService.getLines();
     const stored = allStored[platformKey];
     const existing = stored?.fighters || [];
+
+    // Contamination guard: if a scrape returns fighters with zero overlap against the
+    // current UFC card AND we already have data, the capture is from a non-UFC page
+    // (e.g. a Pick6 category URL that redirected to the DK Fantasy home). Without this
+    // guard, shouldReplaceSlate sees the low overlap and wipes the existing good data.
+    if (existing.length > 0 && data.fighters.length > 0) {
+      try {
+        const card = await fetchUpcomingUFCCard(false);
+        if (card && Array.isArray(card.fighters) && card.fighters.length > 0) {
+          const overlap = countCardOverlap(card, data.fighters);
+          if (overlap === 0) {
+            console.warn(`[UFC] ${platform}: rejected capture of ${data.fighters.length} fighters — zero UFC card overlap (likely redirect contamination)`);
+            return;
+          }
+        }
+      } catch {
+        // Card fetch failure shouldn't block capture — fall through to merge.
+      }
+    }
+
     const mergedFighters = mergeOrReplaceFighters(existing, data.fighters, platform);
 
     console.log(`[UFC] Merged ${platform}: existing ${existing.length}, incoming ${data.fighters.length}, merged ${mergedFighters.length}`);
