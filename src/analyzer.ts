@@ -8178,6 +8178,53 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     if (acc.total > 0) aiAccuracyMap.set(key, acc);
   }
 
+  // Returns { aligned, total } for AI picks whose lean direction matches market drift.
+  // aligned: lean='over' && delta>0, or lean='under' && delta<0. Zero-drift excluded.
+  function computeAiClvAgreement(snap: any, eventArchiveRows: PropArchiveRecord[]): { aligned: number; total: number } {
+    let aligned = 0;
+    let total = 0;
+    for (const pick of (snap?.picks ?? []) as any[]) {
+      const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
+      const lean = String(pick?.lean || '');
+      const source = String(pick?.source || 'fp');
+      const activeLine = Number(pick?.activeLine);
+      const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
+      if (!fighter || (lean !== 'over' && lean !== 'under')) continue;
+      const propType = source === 'ss' ? 'SS' : source === 'td' ? 'TD' : source === 'ft' ? 'FightTime' : 'Fantasy';
+      const match = eventArchiveRows
+        .filter(r =>
+          normalizeName(r.fighter)?.toLowerCase() === fighter &&
+          String(r.propType) === propType &&
+          Number.isFinite(Number(r.openLine)) &&
+          Number.isFinite(Number(r.line))
+        )
+        .sort((a, b) => {
+          const aPlatformPenalty = activePlatform && String(a.platform || '').toLowerCase() === activePlatform ? 0 : 1;
+          const bPlatformPenalty = activePlatform && String(b.platform || '').toLowerCase() === activePlatform ? 0 : 1;
+          if (aPlatformPenalty !== bPlatformPenalty) return aPlatformPenalty - bPlatformPenalty;
+          if (!Number.isFinite(activeLine)) return 0;
+          return Math.abs(Number(a.line) - activeLine) - Math.abs(Number(b.line) - activeLine);
+        })[0];
+      if (!match) continue;
+      const delta = Number(match.line) - Number(match.openLine);
+      if (delta === 0) continue;
+      total++;
+      if (lean === 'over' && delta > 0) aligned++;
+      if (lean === 'under' && delta < 0) aligned++;
+    }
+    return { aligned, total };
+  }
+
+  // Map dedup key → AI × CLV agreement for that event
+  const aiClvAgreementMap = new Map<string, { aligned: number; total: number }>();
+  for (const snap of aiSnapshots) {
+    const key = eventDedupeKey(String(snap?.event || ''));
+    if (!key || aiClvAgreementMap.has(key)) continue;
+    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    const agg = computeAiClvAgreement(snap, eventArchiveRows);
+    if (agg.total > 0) aiClvAgreementMap.set(key, agg);
+  }
+
   // Split into past events (show results) and upcoming (show as pending only)
   const pastEventRows = Array.from(eventMap.values())
     .filter(d => d.date <= nowTs || d.total > 0) // treat settled events as past regardless of date
@@ -8373,7 +8420,14 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           const biggestStr = bm
             ? ` · biggest: ${bm.fighter} ${bm.propType} ${bm.openLine}→${bm.line} (${bm.delta > 0 ? '+' : ''}${bm.delta.toFixed(1)})`
             : '';
-          clvStr = `<div class="best-pick-reason" style="font-size:10px;color:var(--text-muted)">CLV: ${d.clvMoved}/${d.clvTracked} moved · avg |Δ| ${avgAbs}${biggestStr}</div>`;
+          const agreement = aiClvAgreementMap.get(key);
+          let agreementStr = '';
+          if (agreement) {
+            const pct = Math.round((agreement.aligned / agreement.total) * 100);
+            const color = pct >= 60 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red)';
+            agreementStr = ` · <span style="color:${color}">AI×CLV: ${agreement.aligned}/${agreement.total} aligned (${pct}%)</span>`;
+          }
+          clvStr = `<div class="best-pick-reason" style="font-size:10px;color:var(--text-muted)">CLV: ${d.clvMoved}/${d.clvTracked} moved · avg |Δ| ${avgAbs}${biggestStr}${agreementStr}</div>`;
         }
         return `<div class="best-pick-row">
           <div class="best-pick-rank" style="font-size:11px;min-width:44px">${rate !== null ? rate + '%' : '?'}</div>
