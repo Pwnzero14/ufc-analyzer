@@ -3948,6 +3948,99 @@ body.loading {
   box-shadow: 0 0 8px rgba(248,198,74,0.4);
 }
 
+/* =========================
+   DENSITY & RHYTHM PASS (2026-04)
+   Unifies card radius, section gutters, and card padding.
+   Additive — relies on cascade order to override earlier rules.
+   ========================= */
+
+/* Major cards/containers → md radius (10px) */
+.parlay-lab-header,
+.parlay-pool,
+.parlay-builder,
+.parlay-health,
+.best-picks-section,
+.rc-matchup,
+.rc-summary,
+.detail-panel,
+.h2h-modal-box {
+  border-radius: var(--radius-md);
+}
+
+/* Small inner chips/bars → sm radius (6px) */
+.parlay-leg-row,
+.parlay-slip-leg,
+.parlay-suggest-card,
+.parlay-corr-alert,
+.archive-stat-badge,
+.style-matchup-chip,
+.finish-bar-wrap,
+.finish-bar,
+.style-hit-bar-wrap,
+.style-hit-bar {
+  border-radius: var(--radius-sm);
+}
+
+/* Section rhythm — align ad-hoc sections with model-health/qa-panel gutter */
+.best-picks-section,
+.parlay-lab,
+.learning-diagnostics-grid,
+.movement-summary-grid {
+  margin-left: var(--space-6);
+  margin-right: var(--space-6);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+/* Tightened, consistent card padding */
+.parlay-pool,
+.parlay-builder,
+.detail-panel {
+  padding: var(--space-3);
+}
+.parlay-lab-header {
+  padding: var(--space-2) var(--space-3);
+}
+.best-picks-header {
+  padding: var(--space-3) var(--space-4);
+}
+.best-pick-row {
+  padding: var(--space-2) var(--space-4);
+}
+.parlay-health {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+/* =========================
+   COLOR-CODED LEAN SEVERITY (2026-04)
+   Best Picks rows tinted by conviction tier.
+   High = strong accent + gradient. Med = medium. Low = faint.
+   box-shadow inset left-bar survives :hover override.
+   ========================= */
+.best-pick-row.tier-high.over {
+  box-shadow: inset 3px 0 0 0 #1bdc88;
+  background: linear-gradient(90deg, rgba(0,232,122,0.10), transparent 55%);
+}
+.best-pick-row.tier-med.over {
+  box-shadow: inset 3px 0 0 0 rgba(27,220,136,0.5);
+  background: linear-gradient(90deg, rgba(0,232,122,0.05), transparent 55%);
+}
+.best-pick-row.tier-low.over {
+  box-shadow: inset 2px 0 0 0 rgba(27,220,136,0.22);
+}
+.best-pick-row.tier-high.under {
+  box-shadow: inset 3px 0 0 0 #ff6c88;
+  background: linear-gradient(90deg, rgba(255,58,96,0.10), transparent 55%);
+}
+.best-pick-row.tier-med.under {
+  box-shadow: inset 3px 0 0 0 rgba(255,108,136,0.5);
+  background: linear-gradient(90deg, rgba(255,58,96,0.05), transparent 55%);
+}
+.best-pick-row.tier-low.under {
+  box-shadow: inset 2px 0 0 0 rgba(255,108,136,0.22);
+}
+
 </style>
 </head>
 <body>

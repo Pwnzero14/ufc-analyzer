@@ -6627,7 +6627,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         }
       }
 
-      return `<div class="best-pick-row">
+      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}">
         <div class="best-pick-rank">#${i+1}</div>
         <div><div class="best-pick-name">${f.name}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reason}</div></div>
         <div class="best-pick-meta">
