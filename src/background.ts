@@ -110,7 +110,7 @@ async function refreshFightOddsFromBestFightOdds(reason: string): Promise<number
 // IMPORTANT: update BETR_EVENT_DATE below whenever you update the fighter list.
 // If the event date is in the past, this function refuses to seed and wipes any
 // leftover stale Betr data — that's how RESET LINES survives a Chrome restart.
-const BETR_EVENT_DATE = '2026-04-11';
+const BETR_EVENT_DATE = '2026-04-18';
 async function initializeBetrLines() {
   // Staleness gate: if the seed's event has already happened, don't re-seed.
   // Wipe any existing Betr storage so the next analyzer load starts clean.
@@ -118,14 +118,31 @@ async function initializeBetrLines() {
   if (Number.isFinite(seedEventMs) && Date.now() > seedEventMs) {
     try {
       await new Promise<void>((res) =>
-        chrome.storage.local.remove(['lines_betr', 'lines_betr_manual_v1', 'betr_seed_hash', 'betr_event_date'], () => res())
+        chrome.storage.local.remove(['lines_betr', 'betr_seed_hash', 'betr_event_date'], () => res())
       );
       store.betr = { fighters: [], capturedAt: Date.now() };
-      console.log(`[UFC] Betr seed skipped — event date ${BETR_EVENT_DATE} is past. Cleared stale Betr storage.`);
+      console.log(`[UFC] Betr seed skipped — event date ${BETR_EVENT_DATE} is past. Cleared stale lines_betr (manual overrides preserved).`);
     } catch (error) {
       console.error('[UFC] Failed to clear stale Betr lines:', error);
     }
     return;
+  }
+
+  // Skip the hardcoded seed if user already has manual Betr data.
+  // The seed was for an earlier workflow; user now enters lines via screenshots.
+  try {
+    const existing = await new Promise<Record<string, any>>((res) =>
+      chrome.storage.local.get(['lines_betr_manual_v1'], res)
+    );
+    const manualCount = existing?.lines_betr_manual_v1?.fighters?.length || 0;
+    if (manualCount > 0) {
+      const manual = existing.lines_betr_manual_v1;
+      store.betr = { fighters: manual.fighters, capturedAt: manual.capturedAt || Date.now() };
+      console.log(`[UFC] Betr seed skipped — user has ${manualCount} manual rows. Preserved.`);
+      return;
+    }
+  } catch (error) {
+    console.error('[UFC] Failed to check manual Betr data:', error);
   }
 
   const betrFighters = [

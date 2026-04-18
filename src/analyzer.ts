@@ -9422,14 +9422,6 @@ const SOURCE_TO_PLAT: Record<string, string> = { p6: 'pick6', ud: 'underdog', pp
 interface PlatformBiasEntry { platform: string; propType: string; hits: number; total: number; edgeSum: number; avgEdge: number; hitRate: number; }
 let _platformBiasCache: PlatformBiasEntry[] | null = null;
 
-/** Get bias entry for a specific platform + stat combo. */
-function getPlatformBias(sourceKey: 'p6'|'ud'|'pp'|'betr'|'dk', stat: 'fp'|'ss'|'td'|'ft'): PlatformBiasEntry | null {
-  if (!_platformBiasCache) return null;
-  const plat = SOURCE_TO_PLAT[sourceKey] || sourceKey;
-  const propType = stat === 'ss' ? 'SS' : stat === 'td' ? 'TD' : stat === 'ft' ? 'FightTime' : 'Fantasy';
-  return _platformBiasCache.find(b => b.platform === plat && b.propType === propType) || null;
-}
-
 /** For a given stat + lean direction, rank platforms by historical edge. Returns best platform source key. */
 function getBiasAdjustedBest(stat: 'ss'|'td'|'ft', leanDir: 'over'|'under', available: Array<'p6'|'ud'|'pp'|'betr'|'dk'>): 'p6'|'ud'|'pp'|'betr'|'dk' | null {
   if (!_platformBiasCache || available.length < 2) return null;
@@ -11677,19 +11669,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     const bestBadge = isBest
       ? `<div class="best-shop-badge" title="Best line for ${leanDir?.toUpperCase()} on ${sourceLabel}: ${value} vs other books">best</div>`
       : '';
-    // Bias edge tip — show when platform has meaningful historical bias for this stat
-    const bias = getPlatformBias(source, stat);
-    const biasEdgeTip = (bias && bias.total >= 8 && Math.abs(bias.avgEdge) >= 0.8 && Math.abs(bias.avgEdge) <= 15)
-      ? (() => {
-          const isPos = bias.avgEdge > 0;
-          const tipColor = isPos ? 'var(--green)' : 'var(--red)';
-          const tip = isPos
-            ? `${sourceLabel} ${stat.toUpperCase()} lines avg ${bias.avgEdge} below actual (soft for OVER) · n=${bias.total}`
-            : `${sourceLabel} ${stat.toUpperCase()} lines avg ${Math.abs(bias.avgEdge)} above actual (soft for UNDER) · n=${bias.total}`;
-          return `<div class="bias-edge-tip" title="${tip}" style="color:${tipColor}">${isPos ? '+' : ''}${bias.avgEdge}</div>`;
-        })()
-      : '';
-    return `<div class="line-cell ${stat} src-${source}${isBest?' best-line':''}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}${biasEdgeTip}</div>${bestBadge}</div>`;
+    return `<div class="line-cell ${stat} src-${source}${isBest?' best-line':''}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${bestBadge}</div>`;
   };
 
   function platformStatLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td' | 'ft'): number | null {
