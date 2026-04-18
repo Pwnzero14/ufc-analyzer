@@ -2842,6 +2842,36 @@ body.loading {
     gap: 12px;
   }
 
+  /* Pre-lock QA panel — slate health summary above the fighter cards */
+  .qa-panel {
+    margin: 12px 28px 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(150,150,170,0.25);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .qa-panel.qa-ok   { border-color: rgba(72,187,120,0.4);  background: linear-gradient(180deg, rgba(72,187,120,0.08),  rgba(72,187,120,0.02)); }
+  .qa-panel.qa-warn { border-color: rgba(248,198,74,0.4);  background: linear-gradient(180deg, rgba(248,198,74,0.08),  rgba(248,198,74,0.02)); }
+  .qa-panel.qa-err  { border-color: rgba(229,62,62,0.45);  background: linear-gradient(180deg, rgba(229,62,62,0.08),   rgba(229,62,62,0.02)); }
+  .qa-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .qa-panel-title  { font-weight:700; letter-spacing:0.5px; font-size:11px; color:var(--text-muted); text-transform:uppercase; }
+  .qa-pills        { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .qa-pill         { font-size:10px; padding:2px 8px; border-radius:999px; font-weight:600; display:inline-flex; gap:4px; align-items:center; }
+  .qa-pill.qa-pill-ok    { background: rgba(72,187,120,0.15); color:#68d391; }
+  .qa-pill.qa-pill-warn  { background: rgba(248,198,74,0.2);  color:#f6d55c; }
+  .qa-pill.qa-pill-err   { background: rgba(229,62,62,0.2);   color:#fc8181; }
+  .qa-pill.qa-pill-muted { background: rgba(150,150,170,0.15); color:var(--text-muted); }
+  .qa-summary      { font-size:12px; font-weight:600; }
+  .qa-issues       { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
+  .qa-issues li    { font-size:11px; color:var(--text-muted); padding-left:14px; position:relative; line-height:1.4; }
+  .qa-issues li::before { content:'•'; position:absolute; left:2px; color:var(--text-muted); }
+  .qa-issues li.qa-issue-err::before  { color:#fc8181; }
+  .qa-issues li.qa-issue-warn::before { color:#f6d55c; }
+
   .learning-diagnostics-grid {
     margin: 0 28px 10px;
     display: grid;
@@ -4074,6 +4104,9 @@ body.loading {
   <button id="historyDensityToggleBtn" class="density-btn" title="Toggle history panel readability">History: Compact</button>
   <button id="densityToggleBtn" class="density-btn" title="Toggle between compact and detailed fighter cards">Compact View</button>
 </div>
+
+<!-- PRE-LOCK QA PANEL -->
+<div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
 
 <div id="modelHealthWidget" class="model-health-grid" aria-live="polite">
   <div class="mh-card">

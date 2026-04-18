@@ -5855,7 +5855,133 @@ function sortFighters(fighters: AnalyzerFighter[], sortKey: string): AnalyzerFig
   }
 }
 
+async function renderQAPanel(): Promise<void> {
+  const panel = document.getElementById('qaPanel');
+  if (!panel) return;
+
+  // Only show on the main fighter-card views — archive/calibration/etc. have their own context.
+  const hideForView = currentView === 'archive' || currentView === 'calibration';
+  if (!allFighters.length || hideForView) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  const totalFighters = allFighters.length;
+
+  const [linesPayload, manualPayload] = await Promise.all([
+    storageGet<Record<string, any>>([...STORAGE_LINE_KEYS]),
+    storageGet<Record<string, any>>([STORAGE_BETR_MANUAL_KEY]),
+  ]);
+
+  // `manual: true` means the platform has no auto-scrape — staleness is informational only,
+  // thresholds are relaxed, and the platform never contributes to the top "stale/missing" error.
+  type PlatformInfo = { key: string; label: string; capturedAt: number; ageMin: number | null; manual: boolean };
+  const platformInfo: PlatformInfo[] = [
+    { key: 'lines_pick6',                 label: 'P6', capturedAt: 0, ageMin: null, manual: false },
+    { key: 'lines_underdog',              label: 'UD', capturedAt: 0, ageMin: null, manual: false },
+    { key: 'lines_betr',                  label: 'BT', capturedAt: 0, ageMin: null, manual: true  },
+    { key: 'lines_prizepicks',            label: 'PP', capturedAt: 0, ageMin: null, manual: false },
+    { key: 'lines_draftkings_sportsbook', label: 'DK', capturedAt: 0, ageMin: null, manual: false },
+  ];
+  // Apply the same manual-Betr overlay the main line loader uses — otherwise
+  // a fresh manual entry renders as "5h stale" because lines_betr.capturedAt
+  // is still the old seed timestamp.
+  const manualBetrForOverlay = manualPayload[STORAGE_BETR_MANUAL_KEY] as { fighters?: unknown[]; capturedAt?: number } | null;
+  if (manualBetrForOverlay?.fighters?.length) {
+    const effectiveBetrTs = Number(manualBetrForOverlay.capturedAt) || Date.now();
+    const betrRaw = linesPayload['lines_betr'] || {};
+    linesPayload['lines_betr'] = { ...betrRaw, capturedAt: effectiveBetrTs };
+  }
+  for (const p of platformInfo) {
+    const val = linesPayload[p.key];
+    const ts = Number(val?.capturedAt || 0);
+    p.capturedAt = ts;
+    p.ageMin = ts > 0 ? Math.floor((Date.now() - ts) / 60000) : null;
+  }
+
+  const hasPlatformLine = (f: AnalyzerFighter, plat: string): boolean => {
+    if (plat === 'lines_pick6')                 return f.line_p6 != null || f.line_p6_ss != null || f.line_p6_td != null || f.line_p6_ft != null;
+    if (plat === 'lines_underdog')              return f.line_ud != null || f.line_ud_ss != null || f.line_ud_td != null || f.line_ud_ft != null;
+    if (plat === 'lines_betr')                  return f.line_betr != null || f.line_betr_ss != null || f.line_betr_td != null || f.line_betr_ft != null;
+    if (plat === 'lines_prizepicks')            return f.line_pp != null || f.line_pp_ss != null || f.line_pp_td != null || f.line_pp_ft != null;
+    if (plat === 'lines_draftkings_sportsbook') return f.line_dk_ss != null || f.line_dk_td != null || f.line_dk_ft != null;
+    return false;
+  };
+  const missingByPlatform = new Map<string, number>();
+  for (const p of platformInfo) {
+    // Skip platforms with no data at all — staleness will already flag them.
+    if (p.ageMin == null) continue;
+    // DK Sportsbook posts fighter props progressively across the week — partial
+    // coverage is expected, not a data issue. Skip it from the missing-lines check.
+    if (p.key === 'lines_draftkings_sportsbook') continue;
+    const missing = allFighters.filter(f => !hasPlatformLine(f, p.key)).length;
+    if (missing > 0 && missing < totalFighters) missingByPlatform.set(p.label, missing);
+  }
+
+  const manualBetr = manualPayload[STORAGE_BETR_MANUAL_KEY];
+  const manualRowCount = manualBetr?.fighters?.length || 0;
+  const betrPlatformLoaded = platformInfo.find(p => p.key === 'lines_betr')?.ageMin != null;
+  const betrManualShort = betrPlatformLoaded && manualRowCount > 0 && manualRowCount < totalFighters;
+
+  type Issue = { level: 'err'|'warn'; text: string };
+  const issues: Issue[] = [];
+
+  // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
+  const autoPlatforms = platformInfo.filter(p => !p.manual);
+  const staleErr  = autoPlatforms.filter(p => p.ageMin == null || p.ageMin >= 60);
+  const staleWarn = autoPlatforms.filter(p => p.ageMin != null && p.ageMin >= 15 && p.ageMin < 60);
+  if (staleErr.length) {
+    const names = staleErr.map(p => p.ageMin == null ? `${p.label} (no data)` : `${p.label} (${p.ageMin}m)`).join(', ');
+    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}` });
+  }
+  if (staleWarn.length) {
+    const names = staleWarn.map(p => `${p.label} (${p.ageMin}m)`).join(', ');
+    issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh` });
+  }
+  for (const [label, missing] of missingByPlatform) {
+    issues.push({ level: 'warn', text: `${label}: ${missing} of ${totalFighters} fighters without lines` });
+  }
+  if (betrManualShort) {
+    issues.push({ level: 'err', text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows` });
+  }
+
+  const hasErr = issues.some(i => i.level === 'err');
+  const hasWarn = issues.some(i => i.level === 'warn');
+  const level: 'ok'|'warn'|'err' = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
+
+  const pillHtml = platformInfo.map(p => {
+    if (p.ageMin == null) return `<span class="qa-pill qa-pill-muted" title="${p.key}: no data captured">${p.label}: —</span>`;
+    // Manual platforms get relaxed thresholds (warn 12h, err 24h) since there's no auto-refresh.
+    const warnAt = p.manual ? 720 : 15;
+    const errAt  = p.manual ? 1440 : 60;
+    const pillClass = p.ageMin >= errAt ? 'qa-pill-err' : p.ageMin >= warnAt ? 'qa-pill-warn' : 'qa-pill-ok';
+    const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin/60)}h`;
+    const manualHint = p.manual ? ' (manual entry — no auto-scrape)' : '';
+    return `<span class="qa-pill ${pillClass}" title="${p.key} captured ${ageLabel} ago${manualHint}">${p.label}: ${ageLabel}</span>`;
+  }).join('');
+
+  const summary = level === 'ok'
+    ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
+    : `${level === 'err' ? '✕' : '⚠'} ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`;
+
+  const issuesHtml = issues.length
+    ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}">${i.text}</li>`).join('')}</ul>`
+    : '';
+
+  panel.className = `qa-panel qa-${level}`;
+  panel.style.display = '';
+  panel.innerHTML = `
+    <div class="qa-panel-header">
+      <span class="qa-panel-title">Slate Check</span>
+      <span class="qa-pills">${pillHtml}</span>
+    </div>
+    <div class="qa-summary">${summary}</div>
+    ${issuesHtml}
+  `;
+}
+
 function renderModelHealthWidget(): void {
+  void renderQAPanel();
   const leans = allFighters.map(getEffectiveLean).filter(l => l.lean !== 'none' && l.conf > 0);
   const setText = (id: string, value: string): void => {
     const el = document.getElementById(id);
