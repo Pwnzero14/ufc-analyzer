@@ -985,7 +985,7 @@ function parseFightHistoryLinks(html: string): UFCFightHistory[] {
     if (row.includes('<th')) continue;
     const fightLinkM = row.match(/href="(http[^"]*fight-details\/[a-f0-9]+)"/i);
     if (!fightLinkM) continue;
-    const resultM = row.match(/>\s*(win|loss)\s*</i);
+    const resultM = row.match(/>\s*(win|loss|draw|nc)\s*</i);
     if (!resultM) continue;
     const wl = resultM[1].toLowerCase();
     const oppLinks = [...row.matchAll(/fighter-details\/[a-f0-9]+[^>]*>\s*([^<]+)\s*<\/a>/gi)];
@@ -1154,7 +1154,7 @@ function parseFightDetailStatsOpponent(html: string, fighterName: string, fighte
 
 // ── UFC STATS FETCH ────────────────────────────────────────────────────────
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
-  const cacheKey = `ufcstats_v42_${name.toLowerCase().replace(/\s+/g,'_')}`;
+  const cacheKey = `ufcstats_v46_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
     if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
@@ -1182,9 +1182,24 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
         }
         cands.push({ char: last[0].toLowerCase(), first: first.toLowerCase(), last: last.toLowerCase() });
       }
-      if (cleanParts.length >= 3 && COMPOUND.has(cleanParts[cleanParts.length-2].toLowerCase())) {
+      if (cleanParts.length >= 3) {
+        // Mayra Bueno Silva: UFCStats lists her as first="Mayra", last="Bueno Silva" —
+        // indexed under 'b', not 's'. Without this candidate, the 's' page has no Mayra row
+        // and we fall through to a Silva-only match grabbing the wrong fighter.
         const compLast = cleanParts[cleanParts.length-2] + ' ' + cleanParts[cleanParts.length-1];
         cands.push({ char: cleanParts[cleanParts.length-2][0].toLowerCase(), first: cleanParts[0].toLowerCase(), last: compLast.toLowerCase() });
+        // Norma Dumont Viana: UFCStats drops the trailing Portuguese surname and
+        // lists her as just "Norma Dumont" — try the middle word as the last name.
+        const midLast = cleanParts[cleanParts.length-2].toLowerCase();
+        cands.push({ char: midLast[0], first: cleanParts[0].toLowerCase(), last: midLast });
+      }
+      if (cleanParts.length >= 4) {
+        // Ana Talita De Oliviera Alencar: UFCStats lists her as just "Talita Alencar" —
+        // platform names sometimes prepend extra given names UFCStats drops. Try the
+        // second word as first name + last word as last name.
+        const altFirst = cleanParts[1].toLowerCase();
+        const altLast = cleanParts[cleanParts.length-1].toLowerCase();
+        cands.push({ char: altLast[0], first: altFirst, last: altLast });
       }
       const firstLen = cleanParts[0].length;
       const lastLen  = cleanParts[cleanParts.length-1].length;
@@ -1216,6 +1231,8 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     }
 
     function findDetailUrl(html: string, firstLower: string, lastLower: string): string|null {
+      // Require BOTH the First and Last cells to match — prevents grabbing the wrong same-last-name
+      // fighter when the right one isn't on this page (e.g. Mayra Bueno Silva searched on 's' page).
       const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
       let m: RegExpExecArray|null;
       while ((m = trRegex.exec(html)) !== null) {
@@ -1223,21 +1240,12 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
         const link = row.match(/href="(http:\/\/(?:www\.)?ufcstats\.com\/fighter-details\/[a-f0-9]+)"/i);
         if (!link) continue;
         const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
-          .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase());
-        const rowText = cells.join(' ').replace(/-/g, ' ');
-        if (rowText.includes(firstLower) && rowText.includes(lastLower)) {
-          return link[1].replace('http://ufcstats.com/','http://www.ufcstats.com/');
-        }
-      }
-      const trRegex2 = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-      let m2: RegExpExecArray|null;
-      while ((m2 = trRegex2.exec(html)) !== null) {
-        const row = m2[1];
-        const link = row.match(/href="(http:\/\/(?:www\.)?ufcstats\.com\/fighter-details\/[a-f0-9]+)"/i);
-        if (!link) continue;
-        const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
-          .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase());
-        if (cells.some(t => t.replace(/-/g, ' ') === lastLower)) {
+          .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase().replace(/-/g, ' '));
+        const firstCell = cells[0] || '';
+        const lastCell  = cells[1] || '';
+        const firstOk = firstCell === firstLower || firstCell.startsWith(firstLower + ' ') || firstCell.endsWith(' ' + firstLower) || firstCell.includes(' ' + firstLower + ' ');
+        const lastOk  = lastCell  === lastLower  || lastCell.startsWith(lastLower + ' ')   || lastCell.endsWith(' ' + lastLower)   || lastCell.includes(' ' + lastLower + ' ');
+        if (firstOk && lastOk) {
           return link[1].replace('http://ufcstats.com/','http://www.ufcstats.com/');
         }
       }
