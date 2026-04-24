@@ -209,6 +209,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleLinesCaptured(request.platform, request.data).catch((e) => {
       console.error('[UFC] Message handler error:', e);
     });
+  } else if (request.type === 'PICK6_PICK_GROUP_DETECTED') {
+    // Cache the pickGroup so auto-fetch can construct working URLs (the bare /category/N URLs
+    // redirect to the DK homepage without pickGroup). Updates only if changed to avoid noise.
+    const pg = String(request.pickGroup || '').trim();
+    if (pg && /^\d+$/.test(pg)) {
+      chrome.storage.local.get(['pick6_active_pick_group'], (res) => {
+        if (res?.pick6_active_pick_group !== pg) {
+          chrome.storage.local.set({ pick6_active_pick_group: pg }, () => {
+            console.log(`[UFC] Cached Pick6 pickGroup=${pg} from ${request.url}`);
+          });
+        }
+      });
+    }
   } else if (request.type === 'GET_LINES') {
     sendResponse(store);
   } else if (request.type === 'CLEAR_LINES') {
@@ -1169,12 +1182,16 @@ function mergeFighters(
         const ftLine = normalizeFightTimeLineToMinutes(fighter.line_ft);
         if (ftLine != null) merged.line_ft = ftLine;
       }
+      if (fighter.line_ctrl != null) merged.line_ctrl = fighter.line_ctrl;
+      if (fighter.ctrl_under_available != null) merged.ctrl_under_available = fighter.ctrl_under_available;
       if (fighter.ss_over_odds != null) merged.ss_over_odds = fighter.ss_over_odds;
       if (fighter.ss_under_odds != null) merged.ss_under_odds = fighter.ss_under_odds;
       if (fighter.td_over_odds != null) merged.td_over_odds = fighter.td_over_odds;
       if (fighter.td_under_odds != null) merged.td_under_odds = fighter.td_under_odds;
       if (fighter.ft_over_odds != null) merged.ft_over_odds = fighter.ft_over_odds;
       if (fighter.ft_under_odds != null) merged.ft_under_odds = fighter.ft_under_odds;
+      if (fighter.ctrl_over_odds != null) merged.ctrl_over_odds = fighter.ctrl_over_odds;
+      if (fighter.ctrl_under_odds != null) merged.ctrl_under_odds = fighter.ctrl_under_odds;
       const cleanOpponent = sanitizeOpponentName(fighter.opponent, fighter.name);
       if (cleanOpponent != null) merged.opponent = cleanOpponent;
       map.set(key, merged);
@@ -1558,20 +1575,22 @@ interface UnderdogCoverage {
   fpCount: number;
   ssCount: number;
   tdCount: number;
+  ctrlCount: number;
   allThreeCount: number;
 }
 
 function getUnderdogStatCoverage(
-  fighters: Array<{ line_fp?: number | null; line_ss?: number | null; line_td?: number | null }>
+  fighters: Array<{ line_fp?: number | null; line_ss?: number | null; line_td?: number | null; line_ctrl?: number | null }>
 ): UnderdogCoverage {
-  let fpCount = 0, ssCount = 0, tdCount = 0, allThreeCount = 0;
+  let fpCount = 0, ssCount = 0, tdCount = 0, ctrlCount = 0, allThreeCount = 0;
   for (const f of fighters) {
     if (f.line_fp != null) fpCount++;
     if (f.line_ss != null) ssCount++;
     if (f.line_td != null) tdCount++;
+    if (f.line_ctrl != null) ctrlCount++;
     if (f.line_fp != null && f.line_ss != null && f.line_td != null) allThreeCount++;
   }
-  return { total: fighters.length, fpCount, ssCount, tdCount, allThreeCount };
+  return { total: fighters.length, fpCount, ssCount, tdCount, ctrlCount, allThreeCount };
 }
 
 function hasEnoughUnderdogStatCoverage(coverage: UnderdogCoverage, expectedFighters: number = 20): boolean {
@@ -2040,20 +2059,27 @@ async function scrapePick6UrlsConcurrently(
         lastChangeAt = Date.now();
       }
 
-      if (hasEnoughPick6StatCoverage(coverage, expectedFighters)) {
-        console.log(`[UFC Auto-Scrape] pick6 concurrent coverage complete at T+${Date.now() - globalStart}ms: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, all3=${coverage.allThreeCount}`);
+      const elapsedMs = Date.now() - started;
+      // CTRL is the LAST tab the content script clicks (Time → Control Time). If we've
+      // captured FP/SS/TD but not yet CTRL, give the scraper extra time to finish that pass
+      // before closing tabs. Some events don't offer CTRL on Pick6 — cap the extra wait so
+      // we don't hang forever on those.
+      const ctrlSeen = coverage.ctrlCount > 0;
+      const ctrlGraceMet = ctrlSeen || elapsedMs >= 9000;
+
+      if (hasEnoughPick6StatCoverage(coverage, expectedFighters) && ctrlGraceMet) {
+        console.log(`[UFC Auto-Scrape] pick6 concurrent coverage complete at T+${Date.now() - globalStart}ms: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, ctrl=${coverage.ctrlCount}, all3=${coverage.allThreeCount}`);
         break;
       }
 
-      const elapsedMs = Date.now() - started;
       const receivedAnyPayload = count > baselineCount || capturedAt > baselineCapturedAt;
       const quietLongEnough = receivedAnyPayload && lastChangeAt > 0 && (Date.now() - lastChangeAt >= 1500);
       // Only early-exit if we have multi-stat coverage — never on SS-only data
       const hasMultiStatCoverage = coverage.fpCount >= 4 || coverage.tdCount >= 4;
-      const enoughDataEarly = hasMultiStatCoverage && count >= 9 && elapsedMs >= 3000;
-      const quietExitAllowed = elapsedMs >= 4000 && count >= 7 && hasMultiStatCoverage;
+      const enoughDataEarly = hasMultiStatCoverage && count >= 9 && elapsedMs >= 3000 && ctrlGraceMet;
+      const quietExitAllowed = elapsedMs >= 4000 && count >= 7 && hasMultiStatCoverage && ctrlGraceMet;
       if ((quietLongEnough && quietExitAllowed) || enoughDataEarly) {
-        console.log(`[UFC Auto-Scrape] pick6 concurrent scrape settled at T+${Date.now() - globalStart}ms (${loopCount} loops): fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, all3=${coverage.allThreeCount} (${enoughDataEarly ? 'early exit' : 'quiet time'})`);
+        console.log(`[UFC Auto-Scrape] pick6 concurrent scrape settled at T+${Date.now() - globalStart}ms (${loopCount} loops): fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, ctrl=${coverage.ctrlCount}, all3=${coverage.allThreeCount} (${enoughDataEarly ? 'early exit' : 'quiet time'})`);
         break;
       }
 
@@ -2170,7 +2196,30 @@ async function autoScrapeAllPlatforms(): Promise<any> {
       store[platform] = null;
       try { await chrome.storage.local.remove([`lines_${platform}`]); } catch { /* ok */ }
 
-      const urls = AUTO_SCRAPE_URLS[platform];
+      let urls = AUTO_SCRAPE_URLS[platform];
+      // Pick6 /category/N URLs redirect to the homepage without pickGroup. Inject the
+      // cached pickGroup (set by content script when user visits a working URL) so the
+      // tabs land on the per-event view that has Time→Control Time tabs.
+      if (platform === 'pick6') {
+        try {
+          const cached = await new Promise<Record<string, any>>((res) =>
+            chrome.storage.local.get(['pick6_active_pick_group'], (r) => res(r || {}))
+          );
+          const pg = cached.pick6_active_pick_group;
+          if (pg && /^\d+$/.test(String(pg))) {
+            urls = urls.map((u) =>
+              u.includes('/category/') && !u.includes('pickGroup=')
+                ? `${u}&pickGroup=${pg}`
+                : u
+            );
+            console.log(`[UFC Auto-Scrape] Pick6 using cached pickGroup=${pg}`);
+          } else {
+            console.warn('[UFC Auto-Scrape] Pick6 has no cached pickGroup — open a Pick6 UFC URL once to populate it');
+          }
+        } catch (e) {
+          console.error('[UFC Auto-Scrape] Pick6 pickGroup lookup failed:', e);
+        }
+      }
       let bestCount = 0;
       attempts[platform] = [];
 

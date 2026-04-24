@@ -75,6 +75,28 @@ export class ScraperService {
             fighters[name].line_td = line;
           }
         }
+
+        // Control Time — stored in minutes. Matches either decimal minutes
+        // ("2.5 Control Time") or mm:ss ("2:30 Control"). Cap at 25 min guard.
+        const ctrlMatchMMSS = cardText.match(/(\d+):(\d{2})\s*\n?\s*Control(?:\s*Time)?/i);
+        const ctrlMatchDec  = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Control(?:\s*Time)?/i);
+        let ctrlLine: number | null = null;
+        if (ctrlMatchMMSS) {
+          const mins = parseInt(ctrlMatchMMSS[1], 10);
+          const secs = parseInt(ctrlMatchMMSS[2], 10);
+          if (!isNaN(mins) && !isNaN(secs)) ctrlLine = parseFloat((mins + secs / 60).toFixed(2));
+        } else if (ctrlMatchDec) {
+          const v = parseFloat(ctrlMatchDec[1]);
+          if (!isNaN(v)) ctrlLine = v;
+        }
+        if (ctrlLine != null && ctrlLine >= 0 && ctrlLine < 25) {
+          if (!fighters[name]) {
+            fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
+          }
+          fighters[name].line_ctrl = ctrlLine;
+          // Pick6 CTRL UNDERs are only sometimes offered — detect by presence of "Less" button.
+          fighters[name].ctrl_under_available = /\bLess\b/i.test(cardText);
+        }
       });
 
       // Fallback Strategy 2: Broader selector
@@ -85,8 +107,10 @@ export class ScraperService {
             || text.match(/(?:Fantasy|Fight)\s*(?:Points?|Score|Pts?\.?)\s*\n?\s*([\d]+\.?\d*)/i);
           const ssMatch = text.match(/([\d]+\.?\d*)\s*\n?\s*Significant Strikes/i);
           const tdMatch = text.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
+          const ctrlMatchMMSS = text.match(/(\d+):(\d{2})\s*\n?\s*Control(?:\s*Time)?/i);
+          const ctrlMatchDec  = text.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Control(?:\s*Time)?/i);
 
-          if (!fpMatch && !ssMatch && !tdMatch) return;
+          if (!fpMatch && !ssMatch && !tdMatch && !ctrlMatchMMSS && !ctrlMatchDec) return;
 
           const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
           const vsIdx = lines.findIndex((l) => /^vs\s/i.test(l));
@@ -101,11 +125,19 @@ export class ScraperService {
           if (fpMatch) fighters[name].line_fp = parseFloat(fpMatch[1]);
           if (ssMatch) fighters[name].line_ss = parseFloat(ssMatch[1]);
           if (tdMatch) fighters[name].line_td = parseFloat(tdMatch[1]);
+          if (ctrlMatchMMSS) {
+            const m = parseInt(ctrlMatchMMSS[1], 10);
+            const s = parseInt(ctrlMatchMMSS[2], 10);
+            if (!isNaN(m) && !isNaN(s)) fighters[name].line_ctrl = parseFloat((m + s / 60).toFixed(2));
+          } else if (ctrlMatchDec) {
+            const v = parseFloat(ctrlMatchDec[1]);
+            if (!isNaN(v) && v >= 0 && v < 25) fighters[name].line_ctrl = v;
+          }
         });
       }
 
       const result = Object.values(fighters).filter(
-        (f) => f.line_fp || f.line_ss || f.line_td
+        (f) => f.line_fp || f.line_ss || f.line_td || f.line_ctrl
       );
       this.log('pick6', `Found ${result.length} fighters`);
       return result;

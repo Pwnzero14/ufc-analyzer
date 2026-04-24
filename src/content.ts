@@ -124,6 +124,28 @@ function scrapePick6() {
           fighters[name].line_td = line;
         }
       }
+
+      // Control Time — minutes. Accepts "2:30 Control" or "2.5 Control Time".
+      const ctrlMMSS = cardText.match(/(\d+):(\d{2})\s*\n?\s*Control(?:\s*Time)?/i);
+      const ctrlDec  = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Control(?:\s*Time)?/i);
+      let ctrlLine = null;
+      if (ctrlMMSS) {
+        const mm = parseInt(ctrlMMSS[1], 10), ss = parseInt(ctrlMMSS[2], 10);
+        if (!isNaN(mm) && !isNaN(ss)) ctrlLine = parseFloat((mm + ss / 60).toFixed(2));
+      } else if (ctrlDec) {
+        const v = parseFloat(ctrlDec[1]);
+        if (!isNaN(v)) ctrlLine = v;
+      }
+      if (ctrlLine != null && ctrlLine >= 0 && ctrlLine < 25) {
+        if (!fighters[name]) {
+          fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
+        }
+        fighters[name].line_ctrl = ctrlLine;
+        // Pick6 sometimes only offers "More" (OVER) for Control Time — no Less/UNDER side.
+        // Detect by checking if the card has a visible "Less" button. Scraping CTRL
+        // happens on the Control Time tab, so Less-presence here reflects CTRL specifically.
+        fighters[name].ctrl_under_available = /\bLess\b/i.test(cardText);
+      }
     });
 
     // ── Secondary: Pick6 sports/props page (different card layout) ───────
@@ -196,7 +218,7 @@ function scrapePick6() {
       });
     }
 
-    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td);
+    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td || f.line_ctrl);
     log('pick6', `Found ${result.length} fighters`);
     return result;
   } catch (error) {
@@ -210,19 +232,26 @@ function getStatCoverage(fighters = []) {
   const fpCount = fighters.filter((f) => f.line_fp != null).length;
   const ssCount = fighters.filter((f) => f.line_ss != null).length;
   const tdCount = fighters.filter((f) => f.line_td != null).length;
-  return { total, fpCount, ssCount, tdCount };
+  const ctrlCount = fighters.filter((f) => f.line_ctrl != null).length;
+  return { total, fpCount, ssCount, tdCount, ctrlCount };
 }
 
 async function scrapePick6AllStats() {
   try {
     const merged = [];
     let lastSentCount = 0;
+    let lastSentCtrlCount = 0;
 
     // Send partial results immediately so the service worker can exit early.
+    // Fires when fighter count grows OR when new CTRL data arrives (count alone
+    // misses CTRL because it lands on an existing fighter, not a new row — which
+    // would otherwise leave CTRL stuck in the content script until the final send).
     const sendInterim = () => {
-      const valid = merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null);
-      if (valid.length > lastSentCount) {
+      const valid = merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null || f.line_ctrl != null);
+      const ctrlCount = valid.filter((f) => f.line_ctrl != null).length;
+      if (valid.length > lastSentCount || ctrlCount > lastSentCtrlCount) {
         lastSentCount = valid.length;
+        lastSentCtrlCount = ctrlCount;
         try {
           chrome.runtime.sendMessage({ type: 'LINES_CAPTURED', platform: 'pick6', data: { fighters: valid } });
         } catch { /* extension context may be invalidated; ignore */ }
@@ -239,9 +268,10 @@ async function scrapePick6AllStats() {
           continue;
         }
         const prev = map.get(key);
-        if (f.line_fp != null) prev.line_fp = f.line_fp;
-        if (f.line_ss != null) prev.line_ss = f.line_ss;
-        if (f.line_td != null) prev.line_td = f.line_td;
+        if (f.line_fp   != null) prev.line_fp   = f.line_fp;
+        if (f.line_ss   != null) prev.line_ss   = f.line_ss;
+        if (f.line_td   != null) prev.line_td   = f.line_td;
+        if (f.line_ctrl != null) prev.line_ctrl = f.line_ctrl;
         if (!prev.opponent && f.opponent) prev.opponent = f.opponent;
         map.set(key, prev);
       }
@@ -249,6 +279,7 @@ async function scrapePick6AllStats() {
       merged.push(...Array.from(map.values()));
     };
 
+    // Require FP/SS/TD breadth; CTRL is optional (Pick6 only offers it on some cards / some events).
     const hasEnoughCoverage = (c) => c.total >= 8 && c.fpCount >= 4 && c.ssCount >= 4 && c.tdCount >= 2;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -282,14 +313,32 @@ async function scrapePick6AllStats() {
         coverage = getStatCoverage(merged);
       }
 
-      log('pick6', `Coverage after attempt ${attempt}: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}`);
+      // Control Time — nested under the "Time" main tab. Must click "Time" first
+      // to expose the Fight Time / Control Time sub-tabs, then click "Control Time".
+      // Without the first click, the Control Time sub-tab isn't in the DOM.
+      // Pick6 markup: Time = <button role="tab">, Control Time = <button role="radio" data-testid="pill">.
+      const timeClicked = await clickButtonByLabels('pick6', ['time'], 700);
+      if (timeClicked) {
+        log('pick6', 'Clicked Time tab, looking for Control Time sub-tab');
+        const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 700);
+        if (ctrlClicked) {
+          log('pick6', 'Clicked Control Time sub-tab, scraping');
+          await scrollToLoadAll({ timeoutMs: 800, intervalMs: 200 });
+          mergeInto(scrapePick6());
+          sendInterim();
+          coverage = getStatCoverage(merged);
+          log('pick6', `CTRL coverage after click: ctrl=${coverage.ctrlCount}/${coverage.total}`);
+        }
+      }
+
+      log('pick6', `Coverage after attempt ${attempt}: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, ctrl=${coverage.ctrlCount}`);
       if (hasEnoughCoverage(coverage)) {
         break;
       }
       await sleep(150);
     }
 
-    return merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null);
+    return merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null || f.line_ctrl != null);
   } catch (error) {
     logError('pick6', 'Pick6 stat crawl failed, falling back to single-view scrape', error);
     return scrapePick6();
@@ -349,7 +398,7 @@ function scrapeUnderdog() {
       }
     });
 
-    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td);
+    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td || f.line_ctrl);
     log('underdog', `Found ${result.length} fighters`);
     return result;
   } catch (error) {
@@ -813,6 +862,42 @@ async function tryScrape(platform, scrapeFn) {
 
 // ── INJECT PAGE-CONTEXT SCRIPT FOR UNDERDOG ────────────────────────────
 // Underdog uses fetch interception to capture API data
+
+// Pick6: capture the current pickGroup as soon as we land on a working URL.
+// Auto-fetch URLs without pickGroup get redirected (DraftKings serves the homepage
+// first, then React SPA-navigates to the deep URL with pickGroup for logged-in users).
+// Poll window.location for ~15s so we catch the pickGroup whether it's in the initial
+// URL or only appears after the SPA navigation settles. Stops as soon as we find one.
+if (host.includes('pick6.draftkings.com')) {
+  let lastSentPickGroup: string | null = null;
+  const checkPickGroup = () => {
+    try {
+      const pickGroupMatch = window.location.search.match(/[?&]pickGroup=(\d+)/);
+      const sportMatch = window.location.search.match(/[?&]sport=([A-Za-z]+)/);
+      if (!pickGroupMatch || !sportMatch || sportMatch[1].toUpperCase() !== 'UFC') return false;
+      const pickGroup = pickGroupMatch[1];
+      if (pickGroup === lastSentPickGroup) return true;
+      lastSentPickGroup = pickGroup;
+      chrome.runtime.sendMessage({
+        type: 'PICK6_PICK_GROUP_DETECTED',
+        pickGroup,
+        url: window.location.href,
+      });
+      console.log('[UFC Ext] pick6: captured pickGroup=' + pickGroup);
+      return true;
+    } catch (e) {
+      console.error('[UFC Ext] pick6 pickGroup capture failed:', e);
+      return false;
+    }
+  };
+  if (!checkPickGroup()) {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (checkPickGroup() || attempts >= 15) clearInterval(interval);
+    }, 1000);
+  }
+}
 
 if (host.includes('underdogfantasy') || host.includes('underdogsports')) {
   try {

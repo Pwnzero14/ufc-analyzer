@@ -5,6 +5,8 @@ export interface Fighter {
   line_ss?: number | null;
   line_td?: number | null;
   line_ft?: number | null;
+  // Control time line, stored in minutes for parity with FT (UFCStats shows mm:ss)
+  line_ctrl?: number | null;
   opponent?: string | null;
   capturedAt?: number;
   // Side odds can be American (e.g., -110, +100) or payout multipliers (e.g., 0.66x, 1.34x)
@@ -14,6 +16,11 @@ export interface Fighter {
   td_under_odds?: number | null;
   ft_over_odds?: number | null;
   ft_under_odds?: number | null;
+  ctrl_over_odds?: number | null;
+  ctrl_under_odds?: number | null;
+  // Pick6-specific: whether the card offers a "Less" button for CTRL. Some fighters
+  // only get a More/OVER side. Default undefined = unknown (treat as unavailable).
+  ctrl_under_available?: boolean | null;
 }
 
 // ── PLATFORM LINES ────────────────────────────────────────────────────────
@@ -118,6 +125,7 @@ export interface FighterDB {
   fpMedian?: number | null;
   ssStdDev?: number | null;
   avgTimeMins?: number | null;
+  avgCtrlSecs?: number | null;
   avgFP_perRound?: number | null;
   streak?: Streak;
   fiveRoundRate?: number;
