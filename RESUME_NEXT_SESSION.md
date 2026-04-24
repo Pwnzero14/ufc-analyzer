@@ -75,6 +75,7 @@ Recommended start: option 1 (loosen strictCardNameMatch with suffix-match) since
 
 ## Snapshot tags for revert
 
+- `ctrl-autofetch-v1` (2026-04-24) — **latest.** Pick6 CTRL auto-fetch works end-to-end. Disappearing fighters fixed. Similar-opp panel shows FP/SS/TD/CTRL over-rates.
 - `ufcstats-matching-v3` (2026-04-20)
 - HEAD as of 2026-04-23 mid-session — has Fix 1a (CTRL when manual visit) but not Fix A or B working
 
@@ -89,4 +90,4 @@ Recommended start: option 1 (loosen strictCardNameMatch with suffix-match) since
 
 ## Resume prompt
 
-> Reading `RESUME_NEXT_SESSION.md`. Branch `feature/sleek-theme-v1`. **Two unresolved fixes — Pick6 CTRL auto-fetch (Fix A) and 3 disappearing fighters (Fix B).** Read both sections before doing anything. Do NOT re-attempt the same fixes that already shipped this session — they're listed under "What's already in code (didn't work)". Start with Fix B option 1 (loosen strictCardNameMatch) since it's surgical and may also help opponent resolution. Then for Fix A, investigate auto-fetch tab SPA navigation (likely option 1: force-navigate via chrome.tabs.update after waitForTabLoad).
+> Reading `RESUME_NEXT_SESSION.md`. Branch `feature/sleek-theme-v1`. Snapshot tag `ctrl-autofetch-v1` (2026-04-24) is the current known-good state — all major outstanding issues from the prior session are resolved: Pick6 CTRL auto-fetch works (verified `ctrl=15` in service worker log), the three disappearing fighters now appear (Norma Dumont / Victor Valenzuela / Talita Alencar), and the Similar Opponent History panel now shows FP/SS/TD/CTRL over-rates. No known blockers. Ask what's on deck before assuming work.
