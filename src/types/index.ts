@@ -187,6 +187,12 @@ export interface LineMovementEvent {
   stealth?: boolean;
   steam?: boolean;
   valueSpike?: boolean;
+  // Reverse line movement proxy. On pick-em platforms public money hammers
+  // OVER on FP/SS/TD/FT — so a line rising against that flow is a sharp-UNDER
+  // signal, and a line dropping hard on an unpopular UNDER side is a sharp-OVER
+  // signal. Set by LineDropService.detectEvents when the heuristic fires.
+  rlm?: 'under' | 'over';
+  rlmReason?: string;
   notes?: string;
 }
 

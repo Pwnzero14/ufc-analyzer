@@ -603,6 +603,7 @@ const STORAGE_ODDS_KEY = 'fight_odds_moneyline' as const;
 const STORAGE_PROP_ARCHIVE_KEY = 'prop_archive_v1' as const;
 const STORAGE_BEST_PICKS_SNAPSHOT_KEY = 'best_picks_snapshots_v1' as const;
 const STORAGE_AI_LEAN_SNAPSHOT_KEY = 'ai_lean_snapshots_v1' as const;
+const STORAGE_BAYESIAN_PRIORS_KEY = 'bayesian_priors_v1' as const;
 const UFC_LONDON_CUTOFF_ISO = '2026-03-01T00:00:00.000Z';
 const STORAGE_CORE_LINE_KEYS = ['lines_pick6', 'lines_underdog'] as const;
 const STORAGE_BETR_LINE_KEYS = ['lines_pick6', 'lines_underdog', 'lines_betr'] as const;
@@ -1811,9 +1812,35 @@ interface BayesianPredictor {
   posteriorProbability: number; // Updated probability after evidence
 }
 
-function calcBayesianLean(db: FighterDB, line: number, opponentDB: FighterDB|null, historicalAccuracy: number = 0.55): { probability: number; confidence: number; lean: 'over'|'under'|'push' } {
+// Measured per-source priors (lean-direction hit rate), derived from
+// ai_lean_snapshots_v1 × prop_archive_v1 during the post-event CLV audit.
+// Falls back to 0.55 when N is too small. Persisted to bayesian_priors_v1
+// so calcBayesianLean can use it from the very first render after startup.
+type BayesianPriorsMap = Partial<Record<'fp'|'ss'|'td'|'ft', number>>;
+let _bayesianPriors: BayesianPriorsMap = {};
+
+async function loadBayesianPriors(): Promise<void> {
+  const payload = await storageGet<Record<string, unknown>>([STORAGE_BAYESIAN_PRIORS_KEY]);
+  const raw = payload[STORAGE_BAYESIAN_PRIORS_KEY] as Record<string, unknown> | null | undefined;
+  if (!raw || typeof raw !== 'object') return;
+  const out: BayesianPriorsMap = {};
+  for (const src of ['fp', 'ss', 'td', 'ft'] as const) {
+    const v = Number((raw as Record<string, unknown>)[src]);
+    if (Number.isFinite(v) && v >= 0.25 && v <= 0.85) out[src] = v;
+  }
+  _bayesianPriors = out;
+}
+
+function getHistoricalPriorForSource(source: LeanSource | undefined): number {
+  if (!source || source === 'ctrl') return 0.55;
+  return _bayesianPriors[source] ?? 0.55;
+}
+
+function calcBayesianLean(db: FighterDB, line: number, opponentDB: FighterDB|null, historicalAccuracy?: number, source?: LeanSource): { probability: number; confidence: number; lean: 'over'|'under'|'push' } {
   // Prior: Base rate from historical over/under frequency (adjusted by our model's accuracy)
-  const prior = historicalAccuracy; // Start with our model's historical accuracy as prior
+  const prior = Number.isFinite(historicalAccuracy as number)
+    ? (historicalAccuracy as number)
+    : getHistoricalPriorForSource(source);
   
   // Calculate likelihood ratio from evidence strength
   const likelihoodRatio = calculateEvidenceStrength(db, line, opponentDB);
@@ -2192,7 +2219,7 @@ class EnsemblePredictor {
   }
   
   private bayesianModel(fighter: FighterDB, line: number, opponent: FighterDB|null): ModelPrediction {
-    const bayesian = calcBayesianLean(fighter, line, opponent);
+    const bayesian = calcBayesianLean(fighter, line, opponent, undefined, 'fp');
     return {
       lean: bayesian.lean,
       confidence: bayesian.confidence,
@@ -3078,7 +3105,7 @@ function buildModelRivalry(
     90,
   ));
 
-  const bayesian = calcBayesianLean(db, line, opponent);
+  const bayesian = calcBayesianLean(db, line, opponent, undefined, 'fp');
   const optimizedLine = optimizeLinePrediction(db, opponent);
   let marketSignal = (optimizedLine - line) * 0.50;
   marketSignal += (bayesian.probability - 0.5) * 26;
@@ -3276,7 +3303,7 @@ function calcEnhancedFPConfidence(
 ): FPConfidenceResult {
   const opponent = oppDB?.loaded ? oppDB : null;
   const ensemble = fpEnsemblePredictor.predict(db, line, opponent);
-  const bayesian = calcBayesianLean(db, line, opponent);
+  const bayesian = calcBayesianLean(db, line, opponent, undefined, 'fp');
   const optimizedLine = optimizeLinePrediction(db, opponent);
   const timeWeightedAvg = parseFloat(advancedTimeWeightedAverage(history, avgFP ?? effectiveFP ?? line).toFixed(1));
   const sampleSize = history.length;
@@ -8688,6 +8715,58 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     }
   }
 
+  // ── Entry-vs-close CLV (per-source) ────────────────────────────────────
+  // For each AI pick, compare activeLine (entry) to match.line (close).
+  // CLV for OVER = closeLine - entryLine (we want close to rise);
+  // CLV for UNDER = entryLine - closeLine (we want close to fall).
+  // Unlike aiAccuracyByType, CLV doesn't require a settled result — only a
+  // closing line — so pending past-event picks still contribute.
+  type EntryClvBucket = { picks: number; clvSum: number; clvPosCount: number; hitCount: number; resolvedCount: number };
+  const entryClvByType: Record<string, EntryClvBucket> = {};
+  for (const snap of aiSnapshots) {
+    const key = eventDedupeKey(String(snap?.event || ''));
+    if (!key || !pastEventKeys.has(key)) continue;
+    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    for (const pick of (snap?.picks ?? []) as any[]) {
+      const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
+      const lean = String(pick?.lean || '');
+      const source = String(pick?.source || 'fp');
+      const activeLine = Number(pick?.activeLine);
+      const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
+      if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine)) continue;
+      const propType = source === 'ss' ? 'SS' : source === 'td' ? 'TD' : source === 'ft' ? 'FightTime' : 'Fantasy';
+      const match = eventArchiveRows
+        .filter(r =>
+          normalizeName(r.fighter)?.toLowerCase() === fighter &&
+          String(r.propType) === propType &&
+          Number.isFinite(Number(r.line))
+        )
+        .sort((a, b) => {
+          const aP = activePlatform && String(a.platform || '').toLowerCase() === activePlatform ? 0 : 1;
+          const bP = activePlatform && String(b.platform || '').toLowerCase() === activePlatform ? 0 : 1;
+          if (aP !== bP) return aP - bP;
+          return Math.abs(Number(a.line) - activeLine) - Math.abs(Number(b.line) - activeLine);
+        })[0];
+      if (!match) continue;
+      const closeLine = Number(match.line);
+      if (!Number.isFinite(closeLine)) continue;
+      // Sanity-bound: a gap > 20 units is almost certainly a name/platform mismatch, not real CLV.
+      const raw = (lean === 'over' ? 1 : -1) * (closeLine - activeLine);
+      if (Math.abs(raw) > 20) continue;
+      if (!entryClvByType[propType]) entryClvByType[propType] = { picks: 0, clvSum: 0, clvPosCount: 0, hitCount: 0, resolvedCount: 0 };
+      const b = entryClvByType[propType];
+      b.picks++;
+      b.clvSum += raw;
+      if (raw > 0) b.clvPosCount++;
+      const res = Number(match.result);
+      if (Number.isFinite(res)) {
+        b.resolvedCount++;
+        if (lean === 'over' && res > activeLine) b.hitCount++;
+        if (lean === 'under' && res < activeLine) b.hitCount++;
+      }
+    }
+  }
+
   // ── Fantasy hit rate ───────────────────────────────────────────────────
   const fantasyRows = resolvedRows.filter(r => r.propType === 'Fantasy');
   const fantasyHits  = fantasyRows.filter(r => Number(r.result) > Number(r.line)).length;
@@ -8868,6 +8947,29 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       ${aiStatBadge('SS', 'SS')}
       ${aiStatBadge('TD', 'TD')}
       ${aiStatBadge('FT', 'FightTime')}
+    </div>`;
+
+  // ── Entry-vs-close CLV badges ─────────────────────────────────────────
+  const entryClvBadge = (label: string, propType: string): string => {
+    const d = entryClvByType[propType];
+    if (!d?.picks) {
+      return `<span class="archive-stat-badge archive-stat-empty"><span class="asb-label">${label}</span><span class="asb-val">—</span></span>`;
+    }
+    const avgClv = d.clvSum / d.picks;
+    const beatPct = Math.round((d.clvPosCount / d.picks) * 100);
+    const lowN = d.picks < 5;
+    const clvColor = lowN ? 'var(--text-muted)' : avgClv > 0.1 ? 'var(--green)' : avgClv < -0.1 ? 'var(--red)' : 'var(--amber)';
+    const beatColor = lowN ? 'var(--text-muted)' : beatPct >= 55 ? 'var(--green)' : beatPct >= 45 ? 'var(--amber)' : 'var(--red)';
+    const hitStr = d.resolvedCount > 0 ? ` · <span style="opacity:0.8">${Math.round((d.hitCount / d.resolvedCount) * 100)}% hit</span>` : '';
+    const nTag = lowN ? ` <span style="opacity:0.5;font-size:9px">(n=${d.picks})</span>` : ` <span style="opacity:0.5;font-size:9px">(n=${d.picks})</span>`;
+    return `<span class="archive-stat-badge"><span class="asb-label">${label}</span><span class="asb-val"><span style="color:${clvColor};font-weight:700">${avgClv > 0 ? '+' : ''}${avgClv.toFixed(2)}</span> <span style="opacity:0.7;font-size:9px">· <span style="color:${beatColor}">${beatPct}% beat</span>${hitStr}${nTag}</span></span></span>`;
+  };
+  const entryClvHtml = `
+    <div class="archive-stat-summary">
+      ${entryClvBadge('FP', 'Fantasy')}
+      ${entryClvBadge('SS', 'SS')}
+      ${entryClvBadge('TD', 'TD')}
+      ${entryClvBadge('FT', 'FightTime')}
     </div>`;
 
   // ── Per-platform summary ────────────────────────────────────────────────
@@ -9468,6 +9570,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     ${predictionsHtml}
     ${cSec('events', '', '', 'Per-Event Results', `${resolvedRows.length} resolved`, eventHtml, 'margin-bottom:12px')}
     ${cSec('ai-accuracy', '', '', 'AI Pick Accuracy by Stat Type', `<span style="font-size:10px;color:var(--text-muted)">lean direction correct (over + under)</span>`, statSummaryHtml, 'margin-bottom:12px')}
+    ${cSec('entry-clv', '', '', 'Your CLV (entry → close)', `<span style="font-size:10px;color:var(--text-muted)">avg Δ from entry line · positive = you beat the close</span>`, entryClvHtml, 'margin-bottom:12px')}
     <div class="best-picks-grid">
       ${cSec('fp-hitrate', 'over', 'takes', 'Fantasy Line Hit Rate (Current Roster)', `${fantasyHits}/${fantasyTotal} · ${fantasyHitRate}%`, topFantasyHtml)}
     </div>
@@ -13746,6 +13849,7 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
 
   void initRecalibrationMap();
   void initPlatformBiasCache();
+  void loadBayesianPriors();
   renderFighters();
   renderLineMovementSummary();
   void persistAiLeanSnapshot(allFighters);
@@ -13825,6 +13929,27 @@ async function initRecalibrationMap(): Promise<void> {
     _recalibrationMap = newMap;
     _recalibrationByType = newTypeMap;
     if (newMap.size >= 2) debugLog(`Recalibration map initialized: ${newMap.size} buckets`);
+
+    // Also derive Bayesian priors from typeB bucket totals. Summed across
+    // confidence buckets, typeB[pt] is the lean-direction hit rate for that
+    // source. Use a beta prior (alpha=5.5, beta=4.5 → mean 0.55, pseudo-count 10)
+    // so measured accuracy smoothly dominates 0.55 as N grows.
+    const PROP_TO_SOURCE: Record<string, 'fp'|'ss'|'td'|'ft'> = {
+      Fantasy: 'fp', SS: 'ss', TD: 'td', FightTime: 'ft',
+    };
+    const nextPriors: BayesianPriorsMap = {};
+    for (const [propType, buckets] of Object.entries(typeB)) {
+      const src = PROP_TO_SOURCE[propType];
+      if (!src) continue;
+      let hits = 0, total = 0;
+      for (const b of buckets) { hits += b.hits; total += b.total; }
+      // Beta(5.5, 4.5) prior — keeps N<~5 near 0.55 and tracks measured as N grows.
+      const smoothed = (hits + 5.5) / (total + 10);
+      const clamped = Math.max(0.30, Math.min(0.80, smoothed));
+      nextPriors[src] = Number(clamped.toFixed(4));
+    }
+    _bayesianPriors = nextPriors;
+    void storageSet({ [STORAGE_BAYESIAN_PRIORS_KEY]: nextPriors });
   } catch (e) {
     debugLog(`Recalibration init error: ${(e as Error).message}`);
   }
@@ -14450,9 +14575,12 @@ function renderLineMovementSummary(): void {
   const timeEl = document.getElementById('movementSummaryTime');
   if (!container || !body) return;
 
-  type SummaryEntry = { name: string; stat: string; delta: number; platforms: string[]; isSteam: boolean };
+  type SummaryEntry = { name: string; stat: string; delta: number; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
   const entries: SummaryEntry[] = [];
   const platLabels: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
+  // Pick-em platforms where "public hammers OVER" heuristic applies. DK is a
+  // sportsbook with juice, so its moves don't fit the same public-default model.
+  const PICKEM_PLATS = new Set(['p6', 'ud', 'pp', 'betr']);
 
   for (const f of allFighters) {
     const statChecks: Array<{ stat: string; lines: Array<[string, number | null | undefined]> }> = [
@@ -14464,6 +14592,8 @@ function renderLineMovementSummary(): void {
     for (const { stat, lines } of statChecks) {
       let maxDelta = 0;
       const movedPlats: string[] = [];
+      // RLM roll-up: count pick-em platforms moving against the public OVER flow.
+      let pickemRise = 0, pickemDrop = 0, maxPickemRise = 0, maxPickemDrop = 0;
       for (const [plat, current] of lines) {
         if (current == null) continue;
         const key = openingLineKey(plat, stat.toLowerCase(), f.name);
@@ -14475,7 +14605,17 @@ function renderLineMovementSummary(): void {
           movedPlats.push(platLabels[plat] || plat);
           if (Math.abs(delta) > Math.abs(maxDelta)) maxDelta = delta;
         }
+        if (delta != null && PICKEM_PLATS.has(plat)) {
+          if (delta >= 1.0) { pickemRise++; if (delta > maxPickemRise) maxPickemRise = delta; }
+          if (delta <= -2.0) { pickemDrop++; if (delta < maxPickemDrop) maxPickemDrop = delta; }
+        }
       }
+      let rlm: 'under' | 'over' | null = null;
+      // UNDER: line rose on any pick-em platform (against public OVER default).
+      // Stronger when multiple pick-em platforms agree on the rise.
+      if (pickemRise >= 1 && maxPickemRise >= 1.0) rlm = 'under';
+      // OVER: deep drop across ≥1 pick-em platform, plus magnitude meaningful.
+      else if (pickemDrop >= 1 && Math.abs(maxPickemDrop) >= 2.0) rlm = 'over';
       if (movedPlats.length > 0) {
         entries.push({
           name: f.name,
@@ -14483,6 +14623,7 @@ function renderLineMovementSummary(): void {
           delta: maxDelta,
           platforms: movedPlats,
           isSteam: movedPlats.length >= 2 && Math.abs(maxDelta) >= 2.0,
+          rlm,
         });
       }
     }
@@ -14501,12 +14642,15 @@ function renderLineMovementSummary(): void {
     const sign = e.delta > 0 ? '+' : '';
     const cls = e.delta > 0 ? 'rise' : 'drop';
     const steamTag = e.isSteam ? '<span class="movement-summary-steam">STEAM</span>' : '';
+    const rlmTag = e.rlm
+      ? `<span class="rlm-tag rlm-${e.rlm}" title="Reverse line movement — ${e.rlm === 'under' ? 'rising against public OVER default → sharp UNDER flow' : 'deep drop below open → heavy OVER action'}">RLM ${e.rlm.toUpperCase()}</span>`
+      : '';
     return `<div class="movement-summary-row">
       <span class="movement-summary-fighter">${e.name}</span>
       <span class="movement-summary-stat">${e.stat}</span>
       <span class="movement-summary-delta ${cls}">${arrow} ${sign}${e.delta}</span>
       <span class="movement-summary-platforms">${e.platforms.join(', ')}</span>
-      ${steamTag}
+      ${steamTag}${rlmTag}
     </div>`;
   }).join('');
 
@@ -14526,8 +14670,11 @@ function renderLineMoveFeed(): void {
     const deltaAbs = Math.abs(e.delta).toFixed(1);
     const deltaClass = e.direction === 'drop' ? 'drop' : 'rise';
     const spike = e.valueSpike ? '<span class="value-spike">VALUE SPIKE</span>' : '';
+    const rlmTag = e.rlm
+      ? `<span class="rlm-tag rlm-${e.rlm}" title="${(e.rlmReason || '').replace(/"/g, '&quot;')}">RLM ${e.rlm.toUpperCase()}</span>`
+      : '';
     const flags = [e.steam ? 'steam' : '', e.stealth ? 'stealth' : ''].filter(Boolean).join(' + ');
-    return `<div class="line-move-item"><div class="meta">${e.fighter} · ${e.platform.toUpperCase()} ${e.stat.toUpperCase()} · ${tm}${flags ? ` · ${flags}` : ''}</div><div class="delta ${deltaClass}">${e.direction === 'drop' ? '-' : '+'}${deltaAbs}</div><div>${spike}</div></div>`;
+    return `<div class="line-move-item"><div class="meta">${e.fighter} · ${e.platform.toUpperCase()} ${e.stat.toUpperCase()} · ${tm}${flags ? ` · ${flags}` : ''}</div><div class="delta ${deltaClass}">${e.direction === 'drop' ? '-' : '+'}${deltaAbs}</div><div>${rlmTag}${spike}</div></div>`;
   }).join('');
 }
 
@@ -14783,6 +14930,7 @@ class LineDropService {
       const steam = this.settings.detectSteam && steamMagnitude >= (this.settings.threshold * 2.2) && recentSame.length >= 1;
 
       const spike = this.isValueSpike(p.fighter, direction, absDelta);
+      const rlmInfo = this.classifyRLM(p, delta);
 
       events.push({
         id: `${key}|${now}`,
@@ -14797,11 +14945,45 @@ class LineDropService {
         stealth,
         steam,
         valueSpike: spike,
+        rlm: rlmInfo.rlm,
+        rlmReason: rlmInfo.rlmReason,
         notes: spike ? 'Value opportunity emerged after line move' : undefined,
       });
     });
 
     return events;
+  }
+
+  // Reverse-line-movement proxy. On pick-em platforms (p6/ud/pp/betr) the public
+  // default on fantasy-style props is OVER, so a line RISING against opening is
+  // a sharp-UNDER signal. A hard DROP well below opening is a sharp-OVER signal
+  // (heavy OVER action forcing the book down). We prefer the opening-anchored
+  // delta when available; otherwise fall back to within-session rises.
+  private classifyRLM(p: WatcherSnapshotPoint, delta: number): { rlm?: 'under' | 'over'; rlmReason?: string } {
+    const absDelta = Math.abs(delta);
+    if (absDelta < 1.0) return {};
+    const direction: 'drop' | 'rise' = delta < 0 ? 'drop' : 'rise';
+    const platMap: Partial<Record<WatchPlatform, string>> = { pick6: 'p6', underdog: 'ud', betr: 'betr', prizepicks: 'pp' };
+    const platShort = platMap[p.platform];
+    if (!platShort) return {};
+    const opening = _openingLines.get(`${platShort}|${p.stat}|${p.fighter.toLowerCase().trim()}`);
+    const openingDelta = (typeof opening === 'number' && Number.isFinite(opening)) ? (p.value - opening) : null;
+
+    if (direction === 'rise') {
+      if (openingDelta != null && openingDelta >= 1.0) {
+        return { rlm: 'under', rlmReason: `+${openingDelta.toFixed(1)} vs open · sharp UNDER flow` };
+      }
+      if (absDelta >= 1.5) {
+        return { rlm: 'under', rlmReason: `rising against public OVER flow` };
+      }
+      return {};
+    }
+    // drop direction: only flag as sharp OVER when current is deep under opening
+    // AND this single move was meaningful (not tiny drift).
+    if (openingDelta != null && openingDelta <= -2.0 && absDelta >= 1.5) {
+      return { rlm: 'over', rlmReason: `${openingDelta.toFixed(1)} vs open · heavy OVER action` };
+    }
+    return {};
   }
 
   private isValueSpike(fighter: string, direction: 'drop'|'rise', absDelta: number): boolean {
