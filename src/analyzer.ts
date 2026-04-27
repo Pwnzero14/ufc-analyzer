@@ -1,6 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
-import { FANTASY_SCORING } from './config/index.js';
+import { FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
 
@@ -60,11 +60,11 @@ interface LeanResult {
 type LeanSource = 'fp'|'ss'|'td'|'ft'|'ctrl';
 type SourcePlatformKey = 'pick6'|'underdog'|'prizepicks'|'betr'|'draftkings_sportsbook';
 interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string }
-interface OppStats { oppName?: string|null; kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; ctrlSecs?: number|null }
-interface UFCFightHistory { result: string; opponent: string; event: string; method: string; round: number|null; date: string|null; kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; oppStats?: OppStats|null; fightUrl?: string }
+interface OppStats { oppName?: string|null; kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; ctrlSecs?: number|null }
+interface UFCFightHistory { result: string; opponent: string; event: string; method: string; round: number|null; date: string|null; kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; oppStats?: OppStats|null; fightUrl?: string }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
-interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
+interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
 
 function createEmptyLean(verdict = ''): LeanResult {
   return { lean: 'none', conf: 0, reasons: [], verdict };
@@ -90,6 +90,7 @@ function createPlaceholderAnalyzerFighter(name: string, opponent: string): Analy
     line_betr_ctrl: null,
     line_pp: null,
     line_pp_ss: null,
+    line_pp_ss_r1: null,
     line_pp_td: null,
     line_pp_ft: null,
     line_pp_ctrl: null,
@@ -675,18 +676,22 @@ function debugLog(msg: string): void {
 }
 
 // ── FANTASY SCORING ────────────────────────────────────────────────────────
-function winBonus(won: boolean, method: string|null|undefined, round: number|null|undefined): number {
-  if (!won) return 0;
-  const isDec = /DEC/i.test(method || '');
-  if (isDec) return 30;
-  const r = round || 3;
-  if (r === 1) return 90;
-  if (r === 2) return 70;
-  if (r === 3) return 45;
-  return 40;
+type HistoricalScoringPlatform = 'pick6' | 'underdog' | 'prizepicks' | 'betr';
+
+function scoringFor(platform: HistoricalScoringPlatform) {
+  return platform === 'prizepicks' ? PRIZEPICKS_SCORING : FANTASY_SCORING;
 }
 
-type HistoricalScoringPlatform = 'pick6' | 'underdog' | 'prizepicks' | 'betr';
+function winBonusForPlatform(platform: HistoricalScoringPlatform, won: boolean, method: string|null|undefined, round: number|null|undefined): number {
+  if (!won) return 0;
+  const wb = scoringFor(platform).winBonus;
+  if (/DEC/i.test(method || '')) return wb.decision;
+  const r = round || 3;
+  if (r === 1) return wb.round1;
+  if (r === 2) return wb.round2;
+  if (r === 3) return wb.round3;
+  return wb.round4Plus;
+}
 
 function calcFPForPlatform(
   platform: HistoricalScoringPlatform,
@@ -697,27 +702,34 @@ function calcFPForPlatform(
   kd: number|null|undefined,
   td: number|null|undefined,
   rev: number|null|undefined,
+  sub: number|null|undefined,
   won: boolean,
   method: string|null|undefined,
   round: number|null|undefined,
 ): number {
+  const s = scoringFor(platform);
   const nonSig = Math.max(0, (totStr || 0) - (sigStr || 0));
-  let fp = (sigStr  || 0) * FANTASY_SCORING.sigStrike
-       + nonSig          * 0.2
-       + (ctrlSecs || 0) * FANTASY_SCORING.controlTimePerSec
-       + (kd  || 0)      * FANTASY_SCORING.knockdown
-       + (td  || 0)      * FANTASY_SCORING.takedown
-       + (rev || 0)      * FANTASY_SCORING.reversal
-       + winBonus(won, method, round);
+  let fp = (sigStr  || 0) * s.sigStrike
+       + nonSig          * s.nonSigStrike
+       + (ctrlSecs || 0) * s.controlTimePerSec
+       + (kd  || 0)      * s.knockdown
+       + (td  || 0)      * s.takedown
+       + (rev || 0)      * s.reversal
+       + winBonusForPlatform(platform, won, method, round);
 
-  if ((platform === 'pick6' || platform === 'underdog' || platform === 'betr') && won && isFinish(method) && (round || 0) === 1 && (timeSecs || 9999) <= 60) {
-    fp += 25;
+  // PrizePicks: submission attempts score 4pts each (other platforms: 0)
+  if (platform === 'prizepicks') {
+    fp += (sub || 0) * PRIZEPICKS_SCORING.submissionAttempt;
+  }
+
+  if (platform !== 'prizepicks' && won && isFinish(method) && (round || 0) === 1 && (timeSecs || 9999) <= 60) {
+    fp += FANTASY_SCORING.quickWinBonus;
   }
   return fp;
 }
 
 function calcFP(sigStr: number|null|undefined, totStr: number|null|undefined, ctrlSecs: number|null|undefined, kd: number|null|undefined, td: number|null|undefined, rev: number|null|undefined, won: boolean, method: string|null|undefined, round: number|null|undefined): number {
-  return calcFPForPlatform('pick6', sigStr, totStr, ctrlSecs, null, kd, td, rev, won, method, round);
+  return calcFPForPlatform('pick6', sigStr, totStr, ctrlSecs, null, kd, td, rev, null, won, method, round);
 }
 
 function getFightFantasyValueForPlatform(
@@ -733,6 +745,7 @@ function getFightFantasyValueForPlatform(
     kd?: number|null;
     td?: number|null;
     rev?: number|null;
+    sub?: number|null;
     method?: string|null;
     round?: number|null;
   },
@@ -742,7 +755,7 @@ function getFightFantasyValueForPlatform(
   const canReconstruct = h.sigStr != null || h.totStr != null || h.kd != null || h.td != null || h.ctrlSecs != null;
   if (platform === 'pick6') {
     if (canReconstruct) {
-      return calcFPForPlatform('pick6', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+      return calcFPForPlatform('pick6', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, h.sub, won, h.method, h.round);
     }
     if (h.fp_p6 != null) return h.fp_p6;
     if (h.fp != null) return h.fp;
@@ -750,19 +763,19 @@ function getFightFantasyValueForPlatform(
   }
   if (platform === 'underdog') {
     if (canReconstruct) {
-      return calcFPForPlatform('underdog', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+      return calcFPForPlatform('underdog', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, h.sub, won, h.method, h.round);
     }
     if (h.fp_ud != null) return h.fp_ud;
     return null;
   }
   if (platform === 'prizepicks') {
     if (canReconstruct) {
-      return calcFPForPlatform('prizepicks', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+      return calcFPForPlatform('prizepicks', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, h.sub, won, h.method, h.round);
     }
-    return h.fp ?? null;
+    return null;
   }
   if (canReconstruct) {
-    return calcFPForPlatform('betr', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, won, h.method, h.round);
+    return calcFPForPlatform('betr', h.sigStr, h.totStr, h.ctrlSecs, h.timeSecs, h.kd, h.td, h.rev, h.sub, won, h.method, h.round);
   }
   return h.fp ?? null;
 }
@@ -854,15 +867,15 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
   const history: FightResult[] = (fightHistory || []).map(f => {
     const won = f.result === 'win';
     const fpP6 = (f.sigStr != null)
-      ? calcFPForPlatform('pick6', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round)
+      ? calcFPForPlatform('pick6', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, f.sub, won, f.method, f.round)
       : null;
     const fpUd = (f.sigStr != null)
-      ? calcFPForPlatform('underdog', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round)
+      ? calcFPForPlatform('underdog', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, f.sub, won, f.method, f.round)
       : null;
     return {
       opp: f.opponent, fp: fpP6, fp_p6: fpP6, fp_ud: fpUd,
-      sigStr: f.sigStr, totStr: f.totStr, ctrlSecs: f.ctrlSecs, timeSecs: f.timeSecs,
-      td: f.td, kd: f.kd, rev: f.rev, method: f.method, result: f.result, date: f.date ?? undefined, round: f.round ?? undefined,
+      sigStr: f.sigStr, sigStrR1: f.sigStrR1, totStr: f.totStr, ctrlSecs: f.ctrlSecs, timeSecs: f.timeSecs,
+      td: f.td, kd: f.kd, rev: f.rev, sub: f.sub, method: f.method, result: f.result, date: f.date ?? undefined, round: f.round ?? undefined,
       oppStats: f.oppStats as FightStats | null | undefined,
     };
   }).filter(f => f.fp != null);
@@ -875,14 +888,14 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
     .map((f) => {
       const won = f.result === 'win';
       if (f.sigStr == null) return null;
-      return calcFPForPlatform('prizepicks', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round);
+      return calcFPForPlatform('prizepicks', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, f.sub, won, f.method, f.round);
     })
     .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   const betrSamples = (fightHistory || [])
     .map((f) => {
       const won = f.result === 'win';
       if (f.sigStr == null) return null;
-      return calcFPForPlatform('betr', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, won, f.method, f.round);
+      return calcFPForPlatform('betr', f.sigStr, f.totStr, f.ctrlSecs, f.timeSecs, f.kd, f.td, f.rev, f.sub, won, f.method, f.round);
     })
     .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   const avgFP_p6 = p6Samples.length ? parseFloat((p6Samples.reduce((s, v) => s + v, 0) / p6Samples.length).toFixed(1)) : null;
@@ -961,7 +974,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
         const os = f.oppStats as FightStats;
         const oppWon = f.result === 'loss';
         const fp = (os.sigStr != null)
-          ? calcFPForPlatform('pick6', os.sigStr, os.totStr, os.ctrlSecs, f.timeSecs, os.kd, os.td, null, oppWon, f.method, f.round)
+          ? calcFPForPlatform('pick6', os.sigStr, os.totStr, os.ctrlSecs, f.timeSecs, os.kd, os.td, null, os.sub, oppWon, f.method, f.round)
           : null;
         return {
           opp: f.opp,
@@ -969,10 +982,12 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
           fp: fp != null ? parseFloat(fp.toFixed(1)) : null,
           fp_p6: fp != null ? parseFloat(fp.toFixed(1)) : null,
           sigStr: os.sigStr ?? null,
+          sigStrR1: os.sigStrR1 ?? null,
           totStr: os.totStr ?? null,
           td: os.td ?? null,
           kd: os.kd ?? null,
           rev: null,
+          sub: os.sub ?? null,
           ctrlSecs: os.ctrlSecs ?? null,
           timeSecs: f.timeSecs ?? null,
           method: f.method ?? null,
@@ -1052,7 +1067,7 @@ function parseFightHistoryLinks(html: string): UFCFightHistory[] {
   return fights;
 }
 
-function parseFightDetailStats(html: string, fighterName: string, fighterDetailUrl: string|null): { kd?: number|null; sigStr?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; method?: string|null; round?: number|null } {
+function parseFightDetailStats(html: string, fighterName: string, fighterDetailUrl: string|null): { kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; method?: string|null; round?: number|null } {
   const clean = (s: string) => (s||'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
   const firstNum = (s: string) => { const m = (s||'').match(/(\d+)/); return m ? parseInt(m[1]) : null; };
 
@@ -1086,16 +1101,21 @@ function parseFightDetailStats(html: string, fighterName: string, fighterDetailU
     else detailTimeSecs = roundClockSecs;
   }
 
-  let totalsTable: string|null = null;
+  // UFCStats fight detail page has two tables matching kd+ctrl headers:
+  //   [0] Totals (one data row per fighter, aggregated across all rounds)
+  //   [1] Per-round Totals (multiple data rows per fighter — first row = Round 1)
+  const kdCtrlTables: string[] = [];
   for (const tableM of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
     const tableHtml = tableM[1];
     const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || '';
     const headers = [...thead.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)]
       .map(h => h[1].replace(/<[^>]+>/g,'').trim().toLowerCase());
     if (headers.some(h => h === 'kd') && headers.some(h => h.includes('ctrl'))) {
-      totalsTable = tableHtml; break;
+      kdCtrlTables.push(tableHtml);
     }
   }
+  const totalsTable = kdCtrlTables[0] || null;
+  const perRoundTable = kdCtrlTables[1] || null;
   if (!totalsTable) return { method: detailMethod, round: detailRound, timeSecs: detailTimeSecs };
 
   const rows = [...totalsTable.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
@@ -1135,23 +1155,42 @@ function parseFightDetailStats(html: string, fighterName: string, fighterDetailU
   let ctrlSecs: number|null = null;
   const ctrlM  = val(9).match(/(\d+):(\d{2})/);
   if (ctrlM) ctrlSecs = parseInt(ctrlM[1]) * 60 + parseInt(ctrlM[2]);
-  return { kd, sigStr, totStr, td, sub, rev, ctrlSecs, timeSecs: detailTimeSecs, method: detailMethod, round: detailRound };
+
+  // Per-round R1 sig strikes: parse first data row of the Per-round Totals table.
+  // Same column layout as Totals; same fIdx (fighter position within <p> tags).
+  let sigStrR1: number|null = null;
+  if (perRoundTable) {
+    const prRows = [...perRoundTable.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+      .filter(r => !r[1].includes('<th') && r[1].includes('<td'));
+    if (prRows.length > 0) {
+      const r1Tds = [...prRows[0][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => {
+        const ps = [...m[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => clean(p[1]));
+        return ps;
+      });
+      const r1Val = (colIdx: number) => r1Tds[colIdx]?.[fIdx] || r1Tds[colIdx]?.[0] || '';
+      sigStrR1 = firstNum(r1Val(2));
+    }
+  }
+
+  return { kd, sigStr, sigStrR1, totStr, td, sub, rev, ctrlSecs, timeSecs: detailTimeSecs, method: detailMethod, round: detailRound };
 }
 
 function parseFightDetailStatsOpponent(html: string, fighterName: string, fighterDetailUrl: string|null): OppStats|null {
   const clean = (s: string) => (s||'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
   const firstNum = (s: string) => { const m = (s||'').match(/(\d+)/); return m ? parseInt(m[1]) : null; };
 
-  let totalsTable: string|null = null;
+  const kdCtrlTables: string[] = [];
   for (const tableM of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
     const tableHtml = tableM[1];
     const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || '';
     const headers = [...thead.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)]
       .map(h => h[1].replace(/<[^>]+>/g,'').trim().toLowerCase());
     if (headers.some(h => h === 'kd') && headers.some(h => h.includes('ctrl'))) {
-      totalsTable = tableHtml; break;
+      kdCtrlTables.push(tableHtml);
     }
   }
+  const totalsTable = kdCtrlTables[0] || null;
+  const perRoundTable = kdCtrlTables[1] || null;
   if (!totalsTable) return null;
 
   const rows = [...totalsTable.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
@@ -1187,15 +1226,32 @@ function parseFightDetailStatsOpponent(html: string, fighterName: string, fighte
   const sigStr = firstNum(val(2));
   const totStr = firstNum(val(4));
   const td     = firstNum(val(5));
+  const sub    = firstNum(val(7));
   let ctrlSecs: number|null = null;
   const ctrlM  = val(9).match(/(\d+):(\d{2})/);
   if (ctrlM) ctrlSecs = parseInt(ctrlM[1]) * 60 + parseInt(ctrlM[2]);
-  return { oppName, kd, sigStr, totStr, td, ctrlSecs };
+
+  // R1 sig strikes for the opponent (= R1 SS allowed by the focal fighter).
+  let sigStrR1: number|null = null;
+  if (perRoundTable) {
+    const prRows = [...perRoundTable.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+      .filter(r => !r[1].includes('<th') && r[1].includes('<td'));
+    if (prRows.length > 0) {
+      const r1Tds = [...prRows[0][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => {
+        const ps = [...m[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => clean(p[1]));
+        return ps;
+      });
+      const r1Val = (colIdx: number) => r1Tds[colIdx]?.[oppIdx] || r1Tds[colIdx]?.[0] || '';
+      sigStrR1 = firstNum(r1Val(2));
+    }
+  }
+
+  return { oppName, kd, sigStr, sigStrR1, totStr, td, sub, ctrlSecs };
 }
 
 // ── UFC STATS FETCH ────────────────────────────────────────────────────────
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
-  const cacheKey = `ufcstats_v47_${name.toLowerCase().replace(/\s+/g,'_')}`;
+  const cacheKey = `ufcstats_v49_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
     if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
@@ -6309,7 +6365,7 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
     };
 
     const ssStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'SS'));
-    const fpStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'Fantasy'));
+    const fpStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'Fantasy' || String(row.propType) === 'Fantasy_PP'));
     const tdStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'TD'));
     const ftStats = computeOverRate(resolvedRows.filter((row) => String(row.propType) === 'FightTime'));
     const ssLabel = ssStats.pct == null ? '--%' : `${ssStats.pct}%`;
@@ -8271,6 +8327,9 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
 
   const weights = await PropLinePredictorService.getWeights();
   const trends = await PropLinePredictorService.getTrends();
+  // Load prop archive once — used for per-fighter bookmaker FP priors.
+  const archiveRaw = await new Promise<Record<string, any>>(res => chrome.storage.local.get(['prop_archive_v1'], res));
+  const propArchive: PropArchiveRecord[] = Array.isArray(archiveRaw.prop_archive_v1) ? archiveRaw.prop_archive_v1 as PropArchiveRecord[] : [];
   const predictions: PropPrediction[] = [];
 
   for (const pair of upcomingCardPairs) {
@@ -8288,11 +8347,14 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
     const f1Trend = PropLinePredictorService.findTrend(trends, pair.f1);
     const f2Trend = PropLinePredictorService.findTrend(trends, pair.f2);
 
+    const f1Book = PropLinePredictorService.computeBookPriorFP(propArchive, pair.f1);
+    const f2Book = PropLinePredictorService.computeBookPriorFP(propArchive, pair.f2);
+
     predictions.push(PropLinePredictorService.predictFighter(
-      pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass,
+      pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book,
     ));
     predictions.push(PropLinePredictorService.predictFighter(
-      pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass,
+      pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book,
     ));
   }
 
@@ -8403,7 +8465,21 @@ function renderPredictionsHtml(
         </div>`;
       }).join('');
 
-    learnBody = `<div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
+    // A past-event prediction that hasn't been learned from yet — surface the
+    // button even when prior learning history exists, so each settled event can
+    // be absorbed without re-checking whether the log is empty.
+    const pendingLearn = preds.find(p =>
+      !p.settled &&
+      p.event !== (upcomingEventName || '').trim() &&
+      p.event !== upcomingEventName
+    );
+    const pendingBanner = pendingLearn ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:10px;background:rgba(56,176,0,0.08);border:1px solid rgba(56,176,0,0.3);border-radius:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text);flex:1;min-width:160px">Predictions for "${pendingLearn.event}" ready for learning</span>
+      <button id="predictorLearnBtn" class="btn btn-sm" style="background:var(--green);color:#000;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600">▶ Run Learning Cycle</button>
+      <button id="predictorDeleteBtn" class="btn btn-sm" style="background:none;border:1px solid var(--text-muted);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:10px" title="Delete these predictions">✕ Delete</button>
+    </div>` : '';
+
+    learnBody = `${pendingBanner}<div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
       <div style="font-size:11px"><span style="color:var(--text-muted)">Avg |Δ|:</span> <span style="color:var(--amber)">SS ±${s.avgAbsDeltaSS.toFixed(1)}</span> · <span style="color:var(--amber)">TD ±${s.avgAbsDeltaTD.toFixed(1)}</span> · <span style="color:var(--amber)">FP ±${s.avgAbsDeltaFP.toFixed(1)}</span></div>
     </div>
     <div style="display:flex;gap:16px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
@@ -8768,7 +8844,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   }
 
   // ── Fantasy hit rate ───────────────────────────────────────────────────
-  const fantasyRows = resolvedRows.filter(r => r.propType === 'Fantasy');
+  const fantasyRows = resolvedRows.filter(r => r.propType === 'Fantasy' || r.propType === 'Fantasy_PP');
   const fantasyHits  = fantasyRows.filter(r => Number(r.result) > Number(r.line)).length;
   const fantasyTotal = fantasyRows.length;
   const fantasyHitRate = fantasyTotal ? Math.round((fantasyHits / fantasyTotal) * 100) : 0;
@@ -9365,7 +9441,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const match = eventArchiveRows
         .filter(r =>
           normalizeName(r.fighter)?.toLowerCase() === fighter &&
-          (String(r.propType) === propType || (propType === 'FP' && String(r.propType) === 'Fantasy') || (propType === 'FT' && String(r.propType) === 'FightTime')) &&
+          (String(r.propType) === propType || (propType === 'FP' && (String(r.propType) === 'Fantasy' || String(r.propType) === 'Fantasy_PP')) || (propType === 'FT' && String(r.propType) === 'FightTime')) &&
           Number.isFinite(Number(r.result))
         )
         .sort((a, b) => {
@@ -9691,7 +9767,11 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const raw = await new Promise<Record<string, any>>(res => chrome.storage.local.get(['prop_archive_v1'], res));
       const archive: PropArchiveRecord[] = Array.isArray(raw.prop_archive_v1) ? raw.prop_archive_v1 : [];
       const preds = await PropLinePredictorService.getPredictions();
-      const unsettled = preds.find(p => !p.settled);
+      const unsettled = preds.find(p =>
+        !p.settled &&
+        p.event !== (upcomingEventName || '').trim() &&
+        p.event !== upcomingEventName
+      );
       if (!unsettled) { showToast('No unsettled predictions to learn from'); return; }
       const result = await PropLinePredictorService.runLearningCycle(unsettled.event, archive);
       if (result) {
@@ -9712,13 +9792,21 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   container.querySelector<HTMLButtonElement>('#predictorDeleteBtn')?.addEventListener('click', async () => {
     const preds = await PropLinePredictorService.getPredictions();
-    const unsettled = preds.find(p => !p.settled);
+    const curEvent = (upcomingEventName || '').trim();
+    // Prefer past-event unsettled (the banner case); fall back to any unsettled.
+    const unsettled = preds.find(p =>
+      !p.settled && p.event !== curEvent && p.event !== upcomingEventName
+    ) ?? preds.find(p => !p.settled);
     if (!unsettled) return;
-    if (!confirm(`Delete predictions for "${unsettled.event}"?`)) return;
-    const filtered = preds.filter(p => p !== unsettled);
+    // Delete all UNSETTLED entries for this event — preserves the settled audit
+    // record (if any) but cleans up duplicates from re-generation.
+    const matches = preds.filter(p => p.event === unsettled.event && !p.settled);
+    const dupNote = matches.length > 1 ? ` (${matches.length} duplicates)` : '';
+    if (!confirm(`Delete predictions for "${unsettled.event}"${dupNote}?`)) return;
+    const filtered = preds.filter(p => !(p.event === unsettled.event && !p.settled));
     await PropLinePredictorService.savePredictions(filtered);
     _cachedPredictions = null;
-    showToast(`Deleted predictions for "${unsettled.event}"`);
+    showToast(`Deleted predictions for "${unsettled.event}"${dupNote}`);
     void renderArchivePanel(container);
   });
 
@@ -9782,7 +9870,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
         entry.target.querySelectorAll<HTMLElement>('[data-fill-width]').forEach((bar, idx) => {
-          setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, idx * 40);
+          setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, Math.min(idx * 6, 350));
         });
         archiveBarObserver.unobserve(entry.target);
       });
@@ -10635,10 +10723,30 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   });
 }
 
+// Coalesce multiple renderFighters() calls in the same frame into a single
+// render. Many code paths (mergeAndEnrich, line-move handlers, sort/filter,
+// news arrivals) fire renderFighters() back-to-back; without coalescing each
+// one rebuilds 26 rows from scratch.
+let _renderScheduled = false;
 function renderFighters(): void {
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  requestAnimationFrame(() => {
+    _renderScheduled = false;
+    _renderFightersImpl();
+  });
+}
+
+function _renderFightersImpl(): void {
+  const _perfStart = performance.now();
+  const _perfMarks: Record<string, number> = {};
+  const _mark = (label: string) => { _perfMarks[label] = performance.now() - _perfStart; };
+  // Reset per-section accumulators (populated by buildFighterRow).
+  for (const k of Object.keys(_bfrTimes)) delete _bfrTimes[k];
   const container = document.getElementById('cardContainer');
   if (!container) return;
   container.innerHTML = '';
+  _mark('clear');
   if (currentView === 'bestpicks') { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); return; }
   if (currentView === 'parlaylab') { renderParlayLab(container); return; }
   if (currentView === 'calibration') { void renderCalibrationPanel(container); return; }
@@ -10650,6 +10758,7 @@ function renderFighters(): void {
   if (_fighterClvDrift === null) { void loadFighterClvDrift(); }
 
   primeCaches();
+  _mark('primeCaches');
   const _q = currentSearch.toLowerCase().trim();
 
   // Parse advanced filter tags: conf:70+, lean:over, fp:under, ss:over, td:under, split:yes, ev:+
@@ -10792,6 +10901,13 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // Filter out cancelled fighters from the display list
   const activeFighters = fighters.filter(f => !isCancelledFighter(f.name));
 
+  // Build into a DocumentFragment so the browser only does layout/paint once
+  // when the fragment is committed at the end. Direct container.appendChild
+  // per row triggers a layout pass per row (~80 passes for a 26-fighter card).
+  const frag = document.createDocumentFragment();
+  _mark('filter+sort');
+
+  let _buildRowTotal = 0;
   const totalFights = Math.ceil(activeFighters.length / 2);
   const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
   activeFighters.forEach((f, i) => {
@@ -10812,16 +10928,18 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled (hides both fighters)">CANCEL</button><div class="fight-group-line"></div>`;
       const cancelBtn = header.querySelector('.fight-cancel-btn') as HTMLButtonElement;
       cancelBtn?.addEventListener('click', () => { void cancelFight(f.name, f2Name); });
-      container.appendChild(header);
+      frag.appendChild(header);
     }
     debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
+    const _rowStart = performance.now();
     const row = buildFighterRow(f, oppEntry ?? null, Math.floor(i / 2));
+    _buildRowTotal += performance.now() - _rowStart;
     row.style.setProperty('--row-index', String(i % 18));
-    container.appendChild(row);
+    frag.appendChild(row);
     if (!showFightGroups && i % 2 === 1 && i < activeFighters.length - 1) {
       const sp = document.createElement('div');
       sp.style.cssText = 'height:8px';
-      container.appendChild(sp);
+      frag.appendChild(sp);
     }
   });
 
@@ -10830,7 +10948,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
     const cancelHeader = document.createElement('div');
     cancelHeader.className = 'fight-group-header';
     cancelHeader.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge cancelled">CANCELLED</span><div class="fight-group-line"></div>`;
-    container.appendChild(cancelHeader);
+    frag.appendChild(cancelHeader);
     for (const pair of cancelledFightPairs) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 8px;opacity:0.5;font-size:12px;color:var(--text3);';
@@ -10840,16 +10958,30 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => { void restoreCancelledFight(pair.f1, pair.f2); });
       row.appendChild(restoreBtn);
-      container.appendChild(row);
+      frag.appendChild(row);
     }
   }
 
+  _mark('rows-built');
+
+  // Commit the entire fragment in one DOM operation.
+  container.appendChild(frag);
+  _mark('frag-committed');
+
   // ── Animate bars on scroll into view (IntersectionObserver) ─────────
+  // Skip bars inside .fighter-detail — those are hidden by default and get
+  // animated on toggleRow expand. Animating them here scheduled 100+ setTimeouts
+  // per row for invisible work, then toggleRow re-fired them on expand.
+  // Also cap stagger total at ~350ms so the wave doesn't drag for huge rows.
   const fillBarsInElement = (el: Element) => {
-    el.querySelectorAll<HTMLElement>('[data-fill-width]').forEach((bar, idx) => {
+    const bars = el.querySelectorAll<HTMLElement>('[data-fill-width]');
+    let visibleIdx = 0;
+    bars.forEach((bar) => {
+      if (bar.closest('.fighter-detail')) return;
       const target = bar.dataset.fillWidth!;
-      // Stagger each bar by 40ms for a cascade effect
-      setTimeout(() => { bar.style.width = target; }, idx * 40);
+      const delay = Math.min(visibleIdx * 6, 350);
+      visibleIdx++;
+      setTimeout(() => { bar.style.width = target; }, delay);
     });
   };
 
@@ -10869,6 +11001,20 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   }
 
   renderModelHealthWidget();
+  _mark('model-health');
+  const _perfEnd = performance.now();
+  const _fighterCount = container.querySelectorAll('.fighter-row').length;
+  const _avgRow = _fighterCount > 0 ? (_buildRowTotal / _fighterCount).toFixed(1) : '0';
+  const _bfrSorted = Object.entries(_bfrTimes)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k}: ${v.toFixed(0)}ms`)
+    .join(' · ');
+  console.log(
+    `[PERF renderFighters] ${(_perfEnd - _perfStart).toFixed(0)}ms for ${_fighterCount} rows`,
+    `\n  buildFighterRow total: ${_buildRowTotal.toFixed(0)}ms (avg ${_avgRow}ms/row)`,
+    `\n  sections (sorted): ${_bfrSorted}`,
+    `\n  marks:`, _perfMarks
+  );
 }
 
 // ── NEWS FETCHING ──────────────────────────────────────────────────────────
@@ -11469,7 +11615,7 @@ function findSimilarOpponentFights(
 
     // Calculate Betr FP for this fight
     const won = fight.result === 'win';
-    const betrFP = calcFPForPlatform('betr', fight.sigStr, fight.totStr, fight.ctrlSecs, fight.timeSecs, fight.kd, fight.td, fight.rev, won, fight.method, fight.round);
+    const betrFP = calcFPForPlatform('betr', fight.sigStr, fight.totStr, fight.ctrlSecs, fight.timeSecs, fight.kd, fight.td, fight.rev, fight.sub, won, fight.method, fight.round);
 
     matches.push({
       oppName: fight.opp,
@@ -11952,7 +12098,7 @@ function generateLineShopModal(): void {
       <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-right:4px;align-self:center">Platform Bias</span>
       ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 8).map(b => {
         const plat = PLAT_LABEL_MAP[b.platform] || b.platform.toUpperCase();
-        const st = b.propType === 'FightTime' ? 'FT' : b.propType === 'Fantasy' ? 'FP' : b.propType;
+        const st = b.propType === 'FightTime' ? 'FT' : b.propType === 'Fantasy' ? 'FP' : b.propType === 'Fantasy_PP' ? 'FP·PP' : b.propType;
         const col = b.avgEdge > 0 ? 'var(--green)' : 'var(--red)';
         const dir = b.avgEdge > 0 ? 'soft OVER' : 'soft UNDER';
         return `<span style="font-size:10px;padding:3px 7px;border-radius:4px;background:var(--surface)" title="${plat} ${st}: avg edge ${b.avgEdge > 0 ? '+' : ''}${b.avgEdge} (${dir}) · n=${b.total}"><span style="color:var(--text-muted)">${plat}</span> <span style="font-weight:700">${st}</span> <span style="color:${col};font-weight:700">${b.avgEdge > 0 ? '+' : ''}${b.avgEdge}</span></span>`;
@@ -12006,13 +12152,28 @@ function getClvBoost(f: AnalyzerFighter, el: EffectiveLean): { delta: number; ma
   };
 }
 
+// Module-level accumulators populated by buildFighterRow, summed across all 26
+// rows in a render, then logged by _renderFightersImpl. Reset by that caller.
+const _bfrTimes: Record<string, number> = {};
+// Lazy-render: the .fighter-detail HTML for each row is built on first expand
+// instead of at row creation. Builder closures captured here, keyed by row el.
+// Cuts initial render from ~1000ms to ~200ms by deferring 80% of innerHTML cost.
+const _pendingDetailBuilders = new WeakMap<HTMLElement, () => string>();
+function _bfrTime(label: string, fn: () => void): void {
+  const t = performance.now();
+  fn();
+  _bfrTimes[label] = (_bfrTimes[label] || 0) + (performance.now() - t);
+}
+
 function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fightIndex = 0): HTMLDivElement {
   _h2hFighterMap.set(f.name.toLowerCase(), f);
   const db = f.db || {} as FighterDB;
+  const _tLean = performance.now();
   const lean = getEffectiveLean(f);
   const leanEv = computeFighterEV(f, lean);
   const leanEvDetail = computeDetailedEV(f, lean);
   const perBookEv = computePerBookEV(f, lean);
+  _bfrTimes['lean+ev'] = (_bfrTimes['lean+ev'] || 0) + (performance.now() - _tLean);
   const leanClass = lean.lean === 'over' ? 'lean-over' : lean.lean === 'under' ? 'lean-under' : lean.lean === 'push' ? 'lean-push' : 'lean-none';
   const leanSuffix = lean._label || '';
   const leanText  = lean.lean === 'over' ? `▲ OVER${leanSuffix}` : lean.lean === 'under' ? `▼ UNDER${leanSuffix}` : lean.lean === 'push' ? '~ PUSH' : db.loaded ? '—' : '⟳';
@@ -12144,7 +12305,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const oppName   = oppEntry ? oppEntry.name : (f.opponent || null);
   debugLog(`SS/TD chart: ${f.name} → oppEntry="${oppEntry?.name ?? 'NOT FOUND'}" oppSsLine=${oppSsLine} oppTdLine=${oppTdLine} (opp ss p6=${oppEntry?.line_p6_ss ?? '—'} ud=${oppEntry?.line_ud_ss ?? '—'} pp=${oppEntry?.line_pp_ss ?? '—'} bt=${oppEntry?.line_betr_ss ?? '—'} | opp td p6=${oppEntry?.line_p6_td ?? '—'} ud=${oppEntry?.line_ud_td ?? '—'} pp=${oppEntry?.line_pp_td ?? '—'} bt=${oppEntry?.line_betr_td ?? '—'})`);
 
-  type HistoryRow = { opp?: string | null; fp?: number | null; sigStr?: number | null; td?: number | null; timeSecs?: number | null; ctrlSecs?: number | null };
+  type HistoryRow = { opp?: string | null; fp?: number | null; sigStr?: number | null; sigStrR1?: number | null; td?: number | null; timeSecs?: number | null; ctrlSecs?: number | null };
 
   function formatMinutesAsClock(minutes: number | null | undefined): string {
     if (minutes == null || !Number.isFinite(minutes)) return '—';
@@ -12310,8 +12471,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     currentPlatform === 'prizepicks' ? 'prizepicks' :
     'betr';
 
+  const _tBars = performance.now();
   const historyHTML   = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp');
   const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss');
+  const ssR1Line = f.line_pp_ss_r1 ?? null;
+  const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
   const tdHistoryHTML = buildHistoryBars(fights, h => h.td,     activeLine, ssLine, tdLine, ftLine, 'td');
   const ftHistoryHTML = buildHistoryBars(
     fights,
@@ -12336,8 +12500,10 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const oppCompareSsLine   = oppSsLine;
   const oppCompareTdLine   = oppTdLine;
   const oppCompareCtrlLine = platformStatLine(oppEntry, 'ctrl');
+  const oppCompareSsR1Line = oppEntry?.line_pp_ss_r1 ?? null;
   const oppFPHistory   = buildHistoryBars(oppFights, h => getFightFantasyValueForPlatform(h, historyPlatform), oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'fp');
   const oppSSHistory   = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ss');
+  const oppSSR1History = buildHistoryBars(oppFights, h => h.sigStrR1, oppCompareSsR1Line, oppCompareSsR1Line, null, null, 'ss');
   const oppTDHistory   = buildHistoryBars(oppFights, h => h.td,     oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'td');
   const oppCTRLHistory = buildHistoryBars(
     oppFights,
@@ -12349,6 +12515,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     'ctrl',
     oppCompareCtrlLine,
   );
+  _bfrTimes['history-bars'] = (_bfrTimes['history-bars'] || 0) + (performance.now() - _tBars);
 
   const leanReasons = lean.reasons || [];
   const proReasons = leanReasons.filter((r) => r.icon === 'pos');
@@ -12400,8 +12567,10 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const consistencyClass = fpConsistency != null ? (fpConsistency >= 70 ? 'consistency-high' : fpConsistency >= 45 ? 'consistency-mid' : 'consistency-low') : '';
   
   // #18: Peer Comparison Percentiles
+  const _tArch = performance.now();
   const peerPercentiles = calcPeerPercentileRanking(allFighters, f.name);
   const archetypeProfile = learnArchetypeProfile(f.name, db, oppEntry?.db || null, f.moneyline ?? null);
+  _bfrTimes['peer+archetype'] = (_bfrTimes['peer+archetype'] || 0) + (performance.now() - _tArch);
   const archetypeBadgeHtml = `<span class="style-matchup-chip style-chip-default" title="${archetypeProfile.summary}" style="margin-left:6px;font-size:9px;padding:1px 6px">${shortCareerArchetypeLabel(archetypeProfile.careerLabel)}</span>`;
   const archetypeAlertHtml = archetypeProfile.matchupAlert !== 'none'
     ? `<span class="style-matchup-chip" title="${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}" style="margin-left:4px;font-size:9px;padding:1px 6px;background:rgba(255,100,100,0.12);border-color:rgba(255,100,100,0.32);color:#ff8f8f">${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}</span>`
@@ -12726,6 +12895,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     return check1 && check2 && check3 && check4;
   }
 
+  const _tSsAnal = performance.now();
   let fighterSsAnalysis = buildSSAnalysis(f.name, db, fighterSsLineResolved.line, fighterSsLineResolved.source, oppEntry?.db || null);
   let opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentSsLineResolved.line, opponentSsLineResolved.source, db);
 
@@ -12738,6 +12908,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentFallbackLine, formatLineSource(oppEntry, 'ss', opponentFallbackLine), db);
     keyReasons = buildKeyReasons(fighterSsAnalysis, opponentSsAnalysis);
   }
+  _bfrTimes['ss-analysis'] = (_bfrTimes['ss-analysis'] || 0) + (performance.now() - _tSsAnal);
 
   const strongest = Math.abs(fighterSsAnalysis.edge) >= Math.abs(opponentSsAnalysis.edge)
     ? fighterSsAnalysis
@@ -12855,10 +13026,12 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     };
   }
 
+  const _tCtrlAnal = performance.now();
   const fighterCtrlLineResolved = resolveAnalysisLine(f, 'ctrl');
   const opponentCtrlLineResolved = resolveAnalysisLine(oppEntry, 'ctrl');
   const fighterCtrlAnalysis = buildCTRLAnalysis(f.name, db, fighterCtrlLineResolved.line, fighterCtrlLineResolved.source, oppEntry?.db || null);
   const opponentCtrlAnalysis = buildCTRLAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentCtrlLineResolved.line, opponentCtrlLineResolved.source, db);
+  _bfrTimes['ctrl-analysis'] = (_bfrTimes['ctrl-analysis'] || 0) + (performance.now() - _tCtrlAnal);
   const ctrlStrongest = Math.abs(fighterCtrlAnalysis.edge) >= Math.abs(opponentCtrlAnalysis.edge) ? fighterCtrlAnalysis : opponentCtrlAnalysis;
   const ctrlKeyReasons = [
     fighterCtrlAnalysis.available ? `${fighterCtrlAnalysis.name}: edge ${fighterCtrlAnalysis.edge >= 0 ? '+' : ''}${fighterCtrlAnalysis.edge.toFixed(1)}m vs line` : null,
@@ -12929,6 +13102,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
     </div>`;
 
+  const _tHtml = performance.now();
   const row = document.createElement('div') as HTMLDivElement;
   const rowLeanClass = lean.lean === 'over' ? ' lean-over-row' : lean.lean === 'under' ? ' lean-under-row' : '';
   row.className = 'fighter-row' + rowLeanClass;
@@ -12962,6 +13136,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('betr', 'ctrl', f.line_betr_ctrl)}
         ${lineCell('pp', 'fp', f.line_pp)}
         ${lineCell('pp', 'ss', f.line_pp_ss)}
+        ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div></div>` : ''}
         ${lineCell('pp', 'td', f.line_pp_td)}
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
@@ -13019,8 +13194,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
       <div class="row-expand-slot">${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<button class="h2h-btn" data-fighter="${f.name}" title="Head-to-head vs ${f.opponent || 'opponent'}">⚔</button><span class="expand-arrow">▼</span></div>
     </div>
-    <div class="fighter-detail">
-      <div class="detail-grid">
+    <div class="fighter-detail"></div>`;
+
+  // Lazy: defer building the detail panel HTML until the row is expanded.
+  // The closure captures all per-row state (db, oppEntry, history strings, etc).
+  _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
         <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine?`<div class="panel-meta"><div class="panel-meta-line"></div> Line: ${activeLine}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'} · BT: ${f.line_betr_ss||'—'}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
@@ -13028,6 +13206,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine!=null?` vs Line ${formatMinutesAsClock(ctrlLine)}`:''}${panelBadge(ctrlConf)}${f.line_p6_ctrl!=null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ctrl!=null?formatMinutesAsClock(f.line_p6_ctrl):'—'} · UD: ${f.line_ud_ctrl!=null?formatMinutesAsClock(f.line_ud_ctrl):'—'} · PP: ${f.line_pp_ctrl!=null?formatMinutesAsClock(f.line_pp_ctrl):'—'} · BT: ${f.line_betr_ctrl!=null?formatMinutesAsClock(f.line_betr_ctrl):'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">PP-only</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> PP R1 SS: ${ssR1Line}</div></div>` : ''}
+        ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">PP-only</span></div>${oppFights.length?oppSSR1History:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp CTRL Scored vs ${f.name}${oppCompareCtrlLine != null ? ` · ${oppName} CTRL line ${formatMinutesAsClock(oppCompareCtrlLine)}` : ''}${panelBadge(oppCtrlConf)}</div>${oppFights.length?oppCTRLHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         ${ssAnalysisHtml}
@@ -13097,8 +13277,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         </div>`:''}
         ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
-      </div>
-    </div>`;
+      </div>`);
+  _bfrTimes['html-template'] = (_bfrTimes['html-template'] || 0) + (performance.now() - _tHtml);
   return row;
 }
 
@@ -13106,17 +13286,26 @@ function toggleRow(row: HTMLElement): void {
   const wasExpanded = row.classList.contains('expanded');
   row.classList.toggle('expanded');
 
-  // Animate bars inside the detail panel when expanding
   if (!wasExpanded) {
-    const detail = row.querySelector('.fighter-detail');
+    const detail = row.querySelector('.fighter-detail') as HTMLElement | null;
     if (detail) {
-      // Reset bars to 0 first (in case of re-expand), then fill with stagger
+      // First expand: build the detail-panel HTML now (deferred from row creation).
+      const builder = _pendingDetailBuilders.get(row);
+      if (builder) {
+        detail.innerHTML = builder();
+        _pendingDetailBuilders.delete(row);
+      }
+      // Animate bars inside the detail panel when expanding.
+      // Reset bars to 0 first (in case of re-expand), then fill with stagger.
       detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach(bar => {
         bar.style.width = '0%';
       });
       requestAnimationFrame(() => {
         detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach((bar, idx) => {
-          setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, idx * 30);
+          // Cap stagger total at ~350ms — past that the wave is invisible and the
+          // last bar firing 3s late just feels like jank.
+          const delay = Math.min(idx * 4, 350);
+          setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, delay);
         });
       });
     }
@@ -13378,6 +13567,7 @@ interface RawLineFighter {
   name?: string;
   line_fp?: number | null;
   line_ss?: number | null;
+  line_ss_r1?: number | null;
   line_td?: number | null;
   line_ft?: number | null;
   line_ctrl?: number | null;
@@ -13408,6 +13598,7 @@ interface MergedLineEntry {
   line_ud_ctrl: number | null;
   line_pp: number | null;
   line_pp_ss: number | null;
+  line_pp_ss_r1: number | null;
   line_pp_td: number | null;
   line_pp_ft: number | null;
   line_pp_ctrl: number | null;
@@ -13448,6 +13639,7 @@ function createMergedLineEntry(name: string): MergedLineEntry {
     line_ud_ctrl: null,
     line_pp: null,
     line_pp_ss: null,
+    line_pp_ss_r1: null,
     line_pp_td: null,
     line_pp_ft: null,
     line_pp_ctrl: null,
@@ -13584,9 +13776,10 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
-    entry.line_pp      = f.line_fp ?? f.line ?? null;
-    entry.line_pp_ss   = f.line_ss ?? null;
-    entry.line_pp_td   = f.line_td ?? null;
+    entry.line_pp       = f.line_fp ?? f.line ?? null;
+    entry.line_pp_ss    = f.line_ss ?? null;
+    entry.line_pp_ss_r1 = f.line_ss_r1 ?? null;
+    entry.line_pp_td    = f.line_td ?? null;
     entry.line_pp_ft   = f.line_ft ?? null;
     entry.line_pp_ctrl = f.line_ctrl ?? null;
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
@@ -14480,14 +14673,17 @@ async function archivePerformanceForRosterFighter(name: string, ufcData: UFCStat
     const won = fight.result === 'win';
 
     if (fight.sigStr != null || fight.totStr != null || fight.kd != null || fight.td != null || fight.ctrlSecs != null) {
-      const fantasy = calcFPForPlatform('pick6', fight.sigStr, fight.totStr, fight.ctrlSecs, fight.timeSecs, fight.kd, fight.td, fight.rev, won, fight.method, fight.round);
+      const fantasy = calcFPForPlatform('pick6', fight.sigStr, fight.totStr, fight.ctrlSecs, fight.timeSecs, fight.kd, fight.td, fight.rev, fight.sub, won, fight.method, fight.round);
+      const fantasyPP = calcFPForPlatform('prizepicks', fight.sigStr, fight.totStr, fight.ctrlSecs, fight.timeSecs, fight.kd, fight.td, fight.rev, fight.sub, won, fight.method, fight.round);
       records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Fantasy', result: fantasy });
+      records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Fantasy_PP', result: fantasyPP });
       if (fight.sigStr != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'SS', result: Number(fight.sigStr) });
       if (fight.td != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'TD', result: Number(fight.td) });
       if (fight.ctrlSecs != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Control', result: Number(fight.ctrlSecs) });
       if (fight.timeSecs != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'FightTime', result: parseFloat((Number(fight.timeSecs) / 60).toFixed(2)) });
 
       await PropArchiveService.updateResult(fighterNorm, eventName, 'Fantasy', fantasy, { date: dateIso, opponent });
+      await PropArchiveService.updateResult(fighterNorm, eventName, 'Fantasy_PP', fantasyPP, { date: dateIso, opponent });
       if (fight.sigStr != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'SS', Number(fight.sigStr), { date: dateIso, opponent });
       if (fight.td != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'TD', Number(fight.td), { date: dateIso, opponent });
       if (fight.ctrlSecs != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'Control', Number(fight.ctrlSecs), { date: dateIso, opponent });
@@ -14498,14 +14694,17 @@ async function archivePerformanceForRosterFighter(name: string, ufcData: UFCStat
     const oppName = normalizeName(oppStats?.oppName || opponent) || String(oppStats?.oppName || opponent || 'Unknown Opponent');
     if (oppStats && (oppStats.sigStr != null || oppStats.td != null || oppStats.kd != null || oppStats.ctrlSecs != null)) {
       const oppWon = fight.result === 'loss';
-      const oppFantasy = calcFPForPlatform('pick6', oppStats.sigStr, oppStats.totStr, oppStats.ctrlSecs, fight.timeSecs, oppStats.kd, oppStats.td, null, oppWon, fight.method, fight.round);
+      const oppFantasy = calcFPForPlatform('pick6', oppStats.sigStr, oppStats.totStr, oppStats.ctrlSecs, fight.timeSecs, oppStats.kd, oppStats.td, null, oppStats.sub, oppWon, fight.method, fight.round);
+      const oppFantasyPP = calcFPForPlatform('prizepicks', oppStats.sigStr, oppStats.totStr, oppStats.ctrlSecs, fight.timeSecs, oppStats.kd, oppStats.td, null, oppStats.sub, oppWon, fight.method, fight.round);
       records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Fantasy', result: oppFantasy });
+      records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Fantasy_PP', result: oppFantasyPP });
       if (oppStats.sigStr != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'SS', result: Number(oppStats.sigStr) });
       if (oppStats.td != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'TD', result: Number(oppStats.td) });
       if (oppStats.ctrlSecs != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Control', result: Number(oppStats.ctrlSecs) });
       if (fight.timeSecs != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'FightTime', result: parseFloat((Number(fight.timeSecs) / 60).toFixed(2)) });
 
       await PropArchiveService.updateResult(oppName, eventName, 'Fantasy', oppFantasy, { date: dateIso, opponent: fighterNorm });
+      await PropArchiveService.updateResult(oppName, eventName, 'Fantasy_PP', oppFantasyPP, { date: dateIso, opponent: fighterNorm });
       if (oppStats.sigStr != null) await PropArchiveService.updateResult(oppName, eventName, 'SS', Number(oppStats.sigStr), { date: dateIso, opponent: fighterNorm });
       if (oppStats.td != null) await PropArchiveService.updateResult(oppName, eventName, 'TD', Number(oppStats.td), { date: dateIso, opponent: fighterNorm });
       if (oppStats.ctrlSecs != null) await PropArchiveService.updateResult(oppName, eventName, 'Control', Number(oppStats.ctrlSecs), { date: dateIso, opponent: fighterNorm });

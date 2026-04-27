@@ -173,6 +173,102 @@ export class PropLinePredictorService {
     return trends.find(t => normName(t.fighter) === key) ?? null;
   }
 
+  // ── Bookmaker prior from archived Betr FP lines ──────────────────────
+  //
+  // Past Betr fantasy lines for the same fighter are bookmaker-aggregated
+  // information — they incorporate signals (camp news, weight cut rumors,
+  // Vegas action) that the model can't see. Each individual line was set
+  // for a specific opponent, so the noise is high — but the median across
+  // many lines is a useful central-tendency estimate that regularizes
+  // wild model predictions.
+  //
+  // Returns `{ median, sampleCount }` if ≥ MIN_BOOK_SAMPLES recent records
+  // exist, else null. Recency window is 24 months — older lines reflect a
+  // different version of the fighter.
+  static computeBookPriorFP(
+    archive: PropArchiveRecord[],
+    fighter: string,
+  ): { median: number; sampleCount: number } | null {
+    const MIN_BOOK_SAMPLES = 5;
+    const RECENCY_DAYS = 730;
+    const cutoff = Date.now() - RECENCY_DAYS * 86400 * 1000;
+    const key = normName(fighter);
+
+    const lines: number[] = [];
+    for (const r of archive) {
+      if (normName(r.fighter) !== key) continue;
+      if (r.platform !== 'betr') continue;
+      if (r.propType !== 'Fantasy' && r.propType !== 'FP') continue;
+      const lineVal = Number(r.line);
+      if (!Number.isFinite(lineVal) || lineVal <= 0) continue;
+      const recordTs = Date.parse(r.date);
+      if (Number.isFinite(recordTs) && recordTs < cutoff) continue;
+      lines.push(lineVal);
+    }
+    if (lines.length < MIN_BOOK_SAMPLES) return null;
+
+    lines.sort((a, b) => a - b);
+    const median = lines.length % 2 === 0
+      ? (lines[lines.length / 2 - 1] + lines[lines.length / 2]) / 2
+      : lines[(lines.length - 1) / 2];
+    return { median, sampleCount: lines.length };
+  }
+
+  // ── Expected fight duration model ────────────────────────────────────
+  //
+  // Returns the expected actual length of this fight in minutes, alongside
+  // the fighter's own historical average for ratio scaling. Counting-stat
+  // predictions (SS, TD, FP base) should scale by `expectedMin / avgHistMin`
+  // — this is what fixes early-finish blowups like Davey Grant where the
+  // career average is built from 15-min fights but the matchup is highly
+  // finishable.
+  //
+  // P(finish) blends fighter's own finish rate with opponent's finish-loss
+  // rate; either side can end the fight early. E[finishMinute] is the mean
+  // total-fight-duration across the fighter's past finish wins (falls back
+  // to ~7.5 min when sample is too thin).
+  static estimateExpectedMinutes(
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+  ): { expectedMin: number; pFinish: number; avgHistMin: number; avgFinishMin: number } {
+    const fighterFinishRate = fighterDB.finishRate ?? 0.45;
+
+    let oppFinishLossRate = 0.45;
+    if (opponentDB) {
+      const oppLosses = opponentDB.history.filter(f => f.result === 'loss');
+      const oppFinishLosses = oppLosses.filter(f => /KO|TKO|SUB/i.test(f.method || ''));
+      oppFinishLossRate = oppLosses.length >= 2 ? oppFinishLosses.length / oppLosses.length : 0.45;
+    }
+    // Both fighters can end the fight; symmetric blend.
+    const pFinish = clamp((fighterFinishRate + oppFinishLossRate) / 2, 0.10, 0.85);
+
+    // E[finishMinute] from fighter's own finish wins (timeSecs is total fight duration).
+    const finishWins = fighterDB.history.filter(f =>
+      f.result === 'win' && /KO|TKO|SUB/i.test(f.method || '')
+      && Number.isFinite(Number(f.timeSecs)) && Number(f.timeSecs) > 0,
+    );
+    const avgFinishMin = finishWins.length >= 2
+      ? finishWins.reduce((s, f) => s + (Number(f.timeSecs) / 60), 0) / finishWins.length
+      : 7.5;
+
+    const fullLengthMin = scheduledRounds * 5;
+    const expectedMin = pFinish * avgFinishMin + (1 - pFinish) * fullLengthMin;
+
+    // Fighter's own historical avg fight duration — the denominator for ratio scaling.
+    let avgHistMin = fighterDB.avgTimeMins ?? NaN;
+    if (!Number.isFinite(avgHistMin) || avgHistMin < 1) {
+      const valid = fighterDB.history.filter(f =>
+        Number.isFinite(Number(f.timeSecs)) && Number(f.timeSecs) > 0,
+      );
+      avgHistMin = valid.length > 0
+        ? valid.reduce((s, f) => s + Number(f.timeSecs) / 60, 0) / valid.length
+        : (scheduledRounds === 5 ? 15 : 9); // league-typical fallback
+    }
+
+    return { expectedMin, pFinish, avgHistMin, avgFinishMin };
+  }
+
   // ── SS Prediction ───────────────────────────────────────────────────
 
   static predictSS(
@@ -193,13 +289,22 @@ export class PropLinePredictorService {
     const oppAbsorbedSS = opponentDB ? ((opponentDB.sapm ?? 3) * 15) : fighterAvgSS;
     if (opponentDB) reasons.push(`Opp absorbs: ${oppAbsorbedSS.toFixed(1)} SS/fight`);
 
-    // Rounds modifier (normalize to 3-round base)
-    const roundsModifier = scheduledRounds / 3;
-    if (scheduledRounds === 5) reasons.push('5-round fight (+67% base)');
+    // Expected-duration scaling replaces the naive scheduledRounds/3 multiplier.
+    // fighterAvgSS (per-fight) is divided out implicitly: we rebase to the
+    // fighter's own avg fight length, then re-scale to *this* fight's expected
+    // length. So if the fighter normally goes 13 min but the matchup expects
+    // 9 min (highly finishable opp), the SS line drops accordingly.
+    const { expectedMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    const durationModifier = avgHistMin > 0 ? expectedMin / avgHistMin : (scheduledRounds / 3);
+    if (Math.abs(durationModifier - 1) > 0.05) {
+      reasons.push(`Duration: ${expectedMin.toFixed(1)}min (P(fin) ${(pFinish * 100).toFixed(0)}%, ×${durationModifier.toFixed(2)})`);
+    } else if (scheduledRounds === 5) {
+      reasons.push('5-round fight');
+    }
 
     // Core formula — pace modifier is per-weight-class so flyweight error doesn't drift heavyweight calibration
     const ssMod = getMod(weights.ss_pace_modifier, weightClass);
-    let predicted = ((fighterAvgSS + oppAbsorbedSS) / 2) * ssMod * roundsModifier;
+    let predicted = ((fighterAvgSS + oppAbsorbedSS) / 2) * ssMod * durationModifier;
 
     // Style adjustments
     if (fighterDB.style === 'striker') {
@@ -250,12 +355,15 @@ export class PropLinePredictorService {
     const oppTdDef = opponentDB ? (opponentDB.tdDef ?? 50) / 100 : 0.5;
     if (opponentDB) reasons.push(`Opp TD Def: ${(oppTdDef * 100).toFixed(0)}%`);
 
-    const roundsModifier = scheduledRounds / 3;
+    // Expected-duration scaling — same logic as predictSS. TDs are time-distributed,
+    // so a finish-prone matchup truncates the TD count.
+    const { expectedMin, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    const durationModifier = avgHistMin > 0 ? expectedMin / avgHistMin : (scheduledRounds / 3);
     if (scheduledRounds === 5) reasons.push('5-round fight');
 
     // Core formula: attempts * success rate adjusted for opponent — per-class TD modifier
     const tdMod = getMod(weights.td_attempt_modifier, weightClass);
-    let predicted = tdPerFight * (1 - oppTdDef * 0.5) * roundsModifier * tdMod;
+    let predicted = tdPerFight * (1 - oppTdDef * 0.5) * durationModifier * tdMod;
 
     // Style adjustments
     if (fighterDB.style === 'grappler') {
@@ -330,6 +438,7 @@ export class PropLinePredictorService {
     ssLine: number,
     tdLine: number,
     weightClass?: WeightClass | null,
+    bookPriorFP?: { median: number; sampleCount: number } | null,
   ): StatPrediction {
     const reasons: string[] = [];
 
@@ -382,31 +491,35 @@ export class PropLinePredictorService {
       reasons.push('No history — component estimate');
     }
 
-    // ── Step 3: Scheduled rounds adjustment ─────────────────────────
-    // If most history is 3-round but this is a 5-round fight (or vice versa),
-    // adjust the counting-stat portion proportionally.
-    if (fightScores.length >= 2) {
-      const avgHistRounds = fightScores.reduce((s, f) => s + f.rounds, 0) / fightScores.length;
-      if (Math.abs(scheduledRounds - avgHistRounds) > 0.5) {
-        // Estimate what fraction of total FP is counting stats vs win bonus
-        const avgWinBonus = fightScores.filter(f => f.won).length > 0
-          ? fightScores.filter(f => f.won).reduce((s, f) => {
-              if (!f.isFinish) return s + FANTASY_SCORING.winBonus.decision;
-              if (f.round === 1) return s + FANTASY_SCORING.winBonus.round1;
-              if (f.round === 2) return s + FANTASY_SCORING.winBonus.round2;
-              if (f.round === 3) return s + FANTASY_SCORING.winBonus.round3;
-              return s + FANTASY_SCORING.winBonus.round4Plus;
-            }, 0) / fightScores.length
-          : 0;
-        const countingStatPortion = Math.max(0, baseline - avgWinBonus);
-        const roundsRatio = scheduledRounds / avgHistRounds;
-        const adjustedCounting = countingStatPortion * roundsRatio;
-        const oldBaseline = baseline;
-        baseline = adjustedCounting + avgWinBonus;
-        if (scheduledRounds === 5) {
-          reasons.push(`5-rd adj: ${oldBaseline.toFixed(1)} → ${baseline.toFixed(1)}`);
-        }
+    // ── Step 3: Expected-duration adjustment ─────────────────────────
+    // Replaces the older "scheduled rounds vs avg history rounds" scaling with
+    // a finish-aware duration estimate. Counting stats (sig strikes, ctrl time,
+    // TDs) scale by expectedMin/avgHistMin; the win-bonus portion is held flat
+    // since it's a step function of outcome, not a linear function of time.
+    const { expectedMin, pFinish, avgHistMin, avgFinishMin } =
+      this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    if (fightScores.length >= 2 && avgHistMin > 0 && Math.abs(expectedMin - avgHistMin) > 0.5) {
+      // Average historical win-bonus contribution to FP — this part doesn't scale with time.
+      const winners = fightScores.filter(f => f.won);
+      const avgWinBonus = winners.length > 0
+        ? winners.reduce((s, f) => {
+            if (!f.isFinish) return s + FANTASY_SCORING.winBonus.decision;
+            if (f.round === 1) return s + FANTASY_SCORING.winBonus.round1;
+            if (f.round === 2) return s + FANTASY_SCORING.winBonus.round2;
+            if (f.round === 3) return s + FANTASY_SCORING.winBonus.round3;
+            return s + FANTASY_SCORING.winBonus.round4Plus;
+          }, 0) / fightScores.length
+        : 0;
+      const countingStatPortion = Math.max(0, baseline - avgWinBonus);
+      const durationRatio = expectedMin / avgHistMin;
+      const oldBaseline = baseline;
+      baseline = countingStatPortion * durationRatio + avgWinBonus;
+      if (Math.abs(durationRatio - 1) > 0.05) {
+        reasons.push(`Duration adj: ${expectedMin.toFixed(1)}min vs avg ${avgHistMin.toFixed(1)}min (×${durationRatio.toFixed(2)}) → ${oldBaseline.toFixed(1)}→${baseline.toFixed(1)}`);
       }
+    }
+    if (pFinish > 0.6) {
+      reasons.push(`High P(finish) ${(pFinish * 100).toFixed(0)}% (E[finish] ${avgFinishMin.toFixed(1)}min)`);
     }
 
     // ── Step 4: Opponent matchup adjustments ────────────────────────
@@ -490,6 +603,22 @@ export class PropLinePredictorService {
       reasons.push(`FP cal (${weightClass ?? 'default'}): ×${fpMod.toFixed(3)}`);
     }
 
+    // ── Step 6c: Blend bookmaker prior (median past Betr FP lines) ───
+    // Bookmakers see signals the model doesn't (camp news, weight-cut chatter,
+    // late action). When we have ≥5 recent (≤24mo) Betr FP lines for this
+    // fighter, blend the median in as a 30% regularizer. This dampens wild
+    // model predictions and brings projections closer to market consensus
+    // when the fighter has a reasonable bookmaker history.
+    if (bookPriorFP && bookPriorFP.sampleCount >= 5) {
+      // Blend weight scales with sample size (5 → 0.20, 10 → 0.30, 20+ → 0.35).
+      const blendW = clamp(0.10 + bookPriorFP.sampleCount * 0.02, 0.20, 0.35);
+      const oldPredicted = predicted;
+      predicted = (1 - blendW) * predicted + blendW * bookPriorFP.median;
+      if (Math.abs(oldPredicted - predicted) > 1) {
+        reasons.push(`Book prior: ${bookPriorFP.median.toFixed(1)} (n=${bookPriorFP.sampleCount}, w=${blendW.toFixed(2)}) → ${oldPredicted.toFixed(1)}→${predicted.toFixed(1)}`);
+      }
+    }
+
     // ── Step 7: Floor/ceiling sanity from history ────────────────────
     if (fighterDB.fpFloor != null && fighterDB.fpCeiling != null && fightScores.length >= 3) {
       // Don't predict outside reasonable range unless opponent adjustments push it
@@ -530,10 +659,11 @@ export class PropLinePredictorService {
     weights: PredictorWeights,
     trend: FighterTrend | null,
     weightClass?: WeightClass | null,
+    bookPriorFP?: { median: number; sampleCount: number } | null,
   ): PropPrediction {
     const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
     const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
-    const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass);
+    const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
 
     return { fighter, opponent, scheduledRounds, weightClass: weightClass ?? undefined, ss, td, fantasy };
   }
@@ -545,9 +675,14 @@ export class PropLinePredictorService {
     archiveRecords: PropArchiveRecord[],
   ): Promise<LearningResult | null> {
     const predictions = await this.getPredictions();
-    const eventPred = predictions.find(p =>
+    // Match ALL unsettled entries for this event — duplicates can occur when
+    // predictions were re-generated under slightly different event-name strings
+    // or auto-corrected after the fact. Learn from the first, mark all settled
+    // so the duplicates don't double-update weights on subsequent clicks.
+    const eventMatches = predictions.filter(p =>
       !p.settled && normName(p.event).includes(normName(eventName).slice(0, 20))
     );
+    const eventPred = eventMatches[0];
     if (!eventPred) return null;
 
     const weights = await this.getWeights();
@@ -719,8 +854,8 @@ export class PropLinePredictorService {
     log.push(learningResult);
     await chromeSet({ [LEARNING_LOG_KEY]: log.slice(-20) });
 
-    // Mark settled
-    eventPred.settled = true;
+    // Mark settled — all duplicate entries, not just the one we learned from
+    for (const p of eventMatches) p.settled = true;
     await this.savePredictions(predictions);
 
     return learningResult;
