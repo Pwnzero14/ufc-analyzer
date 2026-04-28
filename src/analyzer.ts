@@ -10738,15 +10738,9 @@ function renderFighters(): void {
 }
 
 function _renderFightersImpl(): void {
-  const _perfStart = performance.now();
-  const _perfMarks: Record<string, number> = {};
-  const _mark = (label: string) => { _perfMarks[label] = performance.now() - _perfStart; };
-  // Reset per-section accumulators (populated by buildFighterRow).
-  for (const k of Object.keys(_bfrTimes)) delete _bfrTimes[k];
   const container = document.getElementById('cardContainer');
   if (!container) return;
   container.innerHTML = '';
-  _mark('clear');
   if (currentView === 'bestpicks') { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); return; }
   if (currentView === 'parlaylab') { renderParlayLab(container); return; }
   if (currentView === 'calibration') { void renderCalibrationPanel(container); return; }
@@ -10758,7 +10752,6 @@ function _renderFightersImpl(): void {
   if (_fighterClvDrift === null) { void loadFighterClvDrift(); }
 
   primeCaches();
-  _mark('primeCaches');
   const _q = currentSearch.toLowerCase().trim();
 
   // Parse advanced filter tags: conf:70+, lean:over, fp:under, ss:over, td:under, split:yes, ev:+
@@ -10905,9 +10898,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // when the fragment is committed at the end. Direct container.appendChild
   // per row triggers a layout pass per row (~80 passes for a 26-fighter card).
   const frag = document.createDocumentFragment();
-  _mark('filter+sort');
 
-  let _buildRowTotal = 0;
   const totalFights = Math.ceil(activeFighters.length / 2);
   const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
   activeFighters.forEach((f, i) => {
@@ -10931,9 +10922,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       frag.appendChild(header);
     }
     debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
-    const _rowStart = performance.now();
     const row = buildFighterRow(f, oppEntry ?? null, Math.floor(i / 2));
-    _buildRowTotal += performance.now() - _rowStart;
     row.style.setProperty('--row-index', String(i % 18));
     frag.appendChild(row);
     if (!showFightGroups && i % 2 === 1 && i < activeFighters.length - 1) {
@@ -10962,11 +10951,8 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
     }
   }
 
-  _mark('rows-built');
-
   // Commit the entire fragment in one DOM operation.
   container.appendChild(frag);
-  _mark('frag-committed');
 
   // ── Animate bars on scroll into view (IntersectionObserver) ─────────
   // Skip bars inside .fighter-detail — those are hidden by default and get
@@ -11001,20 +10987,6 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   }
 
   renderModelHealthWidget();
-  _mark('model-health');
-  const _perfEnd = performance.now();
-  const _fighterCount = container.querySelectorAll('.fighter-row').length;
-  const _avgRow = _fighterCount > 0 ? (_buildRowTotal / _fighterCount).toFixed(1) : '0';
-  const _bfrSorted = Object.entries(_bfrTimes)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${k}: ${v.toFixed(0)}ms`)
-    .join(' · ');
-  console.log(
-    `[PERF renderFighters] ${(_perfEnd - _perfStart).toFixed(0)}ms for ${_fighterCount} rows`,
-    `\n  buildFighterRow total: ${_buildRowTotal.toFixed(0)}ms (avg ${_avgRow}ms/row)`,
-    `\n  sections (sorted): ${_bfrSorted}`,
-    `\n  marks:`, _perfMarks
-  );
 }
 
 // ── NEWS FETCHING ──────────────────────────────────────────────────────────
@@ -12152,28 +12124,18 @@ function getClvBoost(f: AnalyzerFighter, el: EffectiveLean): { delta: number; ma
   };
 }
 
-// Module-level accumulators populated by buildFighterRow, summed across all 26
-// rows in a render, then logged by _renderFightersImpl. Reset by that caller.
-const _bfrTimes: Record<string, number> = {};
 // Lazy-render: the .fighter-detail HTML for each row is built on first expand
 // instead of at row creation. Builder closures captured here, keyed by row el.
-// Cuts initial render from ~1000ms to ~200ms by deferring 80% of innerHTML cost.
+// Cuts initial render from ~1000ms to ~250ms by deferring detail innerHTML.
 const _pendingDetailBuilders = new WeakMap<HTMLElement, () => string>();
-function _bfrTime(label: string, fn: () => void): void {
-  const t = performance.now();
-  fn();
-  _bfrTimes[label] = (_bfrTimes[label] || 0) + (performance.now() - t);
-}
 
 function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fightIndex = 0): HTMLDivElement {
   _h2hFighterMap.set(f.name.toLowerCase(), f);
   const db = f.db || {} as FighterDB;
-  const _tLean = performance.now();
   const lean = getEffectiveLean(f);
   const leanEv = computeFighterEV(f, lean);
   const leanEvDetail = computeDetailedEV(f, lean);
   const perBookEv = computePerBookEV(f, lean);
-  _bfrTimes['lean+ev'] = (_bfrTimes['lean+ev'] || 0) + (performance.now() - _tLean);
   const leanClass = lean.lean === 'over' ? 'lean-over' : lean.lean === 'under' ? 'lean-under' : lean.lean === 'push' ? 'lean-push' : 'lean-none';
   const leanSuffix = lean._label || '';
   const leanText  = lean.lean === 'over' ? `▲ OVER${leanSuffix}` : lean.lean === 'under' ? `▼ UNDER${leanSuffix}` : lean.lean === 'push' ? '~ PUSH' : db.loaded ? '—' : '⟳';
@@ -12471,7 +12433,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     currentPlatform === 'prizepicks' ? 'prizepicks' :
     'betr';
 
-  const _tBars = performance.now();
   const historyHTML   = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp');
   const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss');
   const ssR1Line = f.line_pp_ss_r1 ?? null;
@@ -12515,7 +12476,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     'ctrl',
     oppCompareCtrlLine,
   );
-  _bfrTimes['history-bars'] = (_bfrTimes['history-bars'] || 0) + (performance.now() - _tBars);
 
   const leanReasons = lean.reasons || [];
   const proReasons = leanReasons.filter((r) => r.icon === 'pos');
@@ -12567,10 +12527,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const consistencyClass = fpConsistency != null ? (fpConsistency >= 70 ? 'consistency-high' : fpConsistency >= 45 ? 'consistency-mid' : 'consistency-low') : '';
   
   // #18: Peer Comparison Percentiles
-  const _tArch = performance.now();
   const peerPercentiles = calcPeerPercentileRanking(allFighters, f.name);
   const archetypeProfile = learnArchetypeProfile(f.name, db, oppEntry?.db || null, f.moneyline ?? null);
-  _bfrTimes['peer+archetype'] = (_bfrTimes['peer+archetype'] || 0) + (performance.now() - _tArch);
   const archetypeBadgeHtml = `<span class="style-matchup-chip style-chip-default" title="${archetypeProfile.summary}" style="margin-left:6px;font-size:9px;padding:1px 6px">${shortCareerArchetypeLabel(archetypeProfile.careerLabel)}</span>`;
   const archetypeAlertHtml = archetypeProfile.matchupAlert !== 'none'
     ? `<span class="style-matchup-chip" title="${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}" style="margin-left:4px;font-size:9px;padding:1px 6px;background:rgba(255,100,100,0.12);border-color:rgba(255,100,100,0.32);color:#ff8f8f">${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}</span>`
@@ -12895,7 +12853,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     return check1 && check2 && check3 && check4;
   }
 
-  const _tSsAnal = performance.now();
   let fighterSsAnalysis = buildSSAnalysis(f.name, db, fighterSsLineResolved.line, fighterSsLineResolved.source, oppEntry?.db || null);
   let opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentSsLineResolved.line, opponentSsLineResolved.source, db);
 
@@ -12908,7 +12865,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     opponentSsAnalysis = buildSSAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentFallbackLine, formatLineSource(oppEntry, 'ss', opponentFallbackLine), db);
     keyReasons = buildKeyReasons(fighterSsAnalysis, opponentSsAnalysis);
   }
-  _bfrTimes['ss-analysis'] = (_bfrTimes['ss-analysis'] || 0) + (performance.now() - _tSsAnal);
 
   const strongest = Math.abs(fighterSsAnalysis.edge) >= Math.abs(opponentSsAnalysis.edge)
     ? fighterSsAnalysis
@@ -13026,12 +12982,10 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     };
   }
 
-  const _tCtrlAnal = performance.now();
   const fighterCtrlLineResolved = resolveAnalysisLine(f, 'ctrl');
   const opponentCtrlLineResolved = resolveAnalysisLine(oppEntry, 'ctrl');
   const fighterCtrlAnalysis = buildCTRLAnalysis(f.name, db, fighterCtrlLineResolved.line, fighterCtrlLineResolved.source, oppEntry?.db || null);
   const opponentCtrlAnalysis = buildCTRLAnalysis(oppEntry?.name || (f.opponent || 'Opponent'), oppEntry?.db || null, opponentCtrlLineResolved.line, opponentCtrlLineResolved.source, db);
-  _bfrTimes['ctrl-analysis'] = (_bfrTimes['ctrl-analysis'] || 0) + (performance.now() - _tCtrlAnal);
   const ctrlStrongest = Math.abs(fighterCtrlAnalysis.edge) >= Math.abs(opponentCtrlAnalysis.edge) ? fighterCtrlAnalysis : opponentCtrlAnalysis;
   const ctrlKeyReasons = [
     fighterCtrlAnalysis.available ? `${fighterCtrlAnalysis.name}: edge ${fighterCtrlAnalysis.edge >= 0 ? '+' : ''}${fighterCtrlAnalysis.edge.toFixed(1)}m vs line` : null,
@@ -13102,7 +13056,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
     </div>`;
 
-  const _tHtml = performance.now();
   const row = document.createElement('div') as HTMLDivElement;
   const rowLeanClass = lean.lean === 'over' ? ' lean-over-row' : lean.lean === 'under' ? ' lean-under-row' : '';
   row.className = 'fighter-row' + rowLeanClass;
@@ -13278,7 +13231,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
       </div>`);
-  _bfrTimes['html-template'] = (_bfrTimes['html-template'] || 0) + (performance.now() - _tHtml);
   return row;
 }
 
