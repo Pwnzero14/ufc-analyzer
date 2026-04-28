@@ -412,7 +412,7 @@ function scrapePrizePicksCurrentView() {
 
   const upsert = (name, type, value, opponent = null) => {
     if (!name || !type || value == null || isNaN(value)) return;
-    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
+    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, opponent };
     fighters[name][`line_${type}`] = value;
     if (opponent && !fighters[name].opponent) fighters[name].opponent = opponent;
   };
@@ -429,11 +429,19 @@ function scrapePrizePicksCurrentView() {
     const opponent = opponentLine ? opponentLine.replace(/^vs\.?\s+|^@\s*/i, '').replace(/\s+Sat.*$/i, '').trim() : null;
 
     const fpMatch = text.match(/([\d]+\.?\d*)\s*(?:\n|\s)*Fantasy\s*(?:Points|Score)/i);
-    const ssMatch = text.match(/([\d]+\.?\d*)\s*(?:\n|\s)*Significant\s*Strikes?/i);
+    // R1 SS regex must come BEFORE the generic SS regex — "RD 1 Significant Strikes"
+    // would otherwise be captured by /Significant Strikes/ as a regular SS line.
+    const ssR1Match = text.match(/([\d]+\.?\d*)\s*(?:\n|\s)*(?:RD\s*1|Round\s*1|R1)\s*Significant\s*Strikes?/i);
+    const ssGenericMatch = text.match(/([\d]+\.?\d*)\s*(?:\n|\s)*Significant\s*Strikes?/i);
     const tdMatch = text.match(/([\d]+\.?\d*)\s*(?:\n|\s)*Takedowns?/i);
 
     if (fpMatch) upsert(name, 'fp', parseFloat(fpMatch[1]), opponent);
-    if (ssMatch) upsert(name, 'ss', parseFloat(ssMatch[1]), opponent);
+    if (ssR1Match) {
+      upsert(name, 'ss_r1', parseFloat(ssR1Match[1]), opponent);
+    } else if (ssGenericMatch) {
+      // Only treat as regular SS if the line wasn't already matched as R1 SS
+      upsert(name, 'ss', parseFloat(ssGenericMatch[1]), opponent);
+    }
     if (tdMatch) upsert(name, 'td', parseFloat(tdMatch[1]), opponent);
   };
 
@@ -460,7 +468,7 @@ function scrapePrizePicksCurrentView() {
     });
   }
 
-  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null);
+  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null);
 }
 
 function findButtonByText(labels) {
@@ -560,6 +568,7 @@ async function scrapePrizePicksAllStats() {
           const prev = map.get(key);
           if (f.line_fp != null) prev.line_fp = f.line_fp;
           if (f.line_ss != null) prev.line_ss = f.line_ss;
+          if (f.line_ss_r1 != null) prev.line_ss_r1 = f.line_ss_r1;
           if (f.line_td != null) prev.line_td = f.line_td;
           if (!prev.opponent && f.opponent) prev.opponent = f.opponent;
           map.set(key, prev);
@@ -591,6 +600,13 @@ async function scrapePrizePicksAllStats() {
         mergeInto(ssPass);
       }
 
+      if (await clickPrizePicksButton(['rd 1 significant strikes', 'round 1 significant strikes', 'r1 significant strikes'], 1300)) {
+        await scrollToLoadAll({ timeoutMs: 5000, intervalMs: 400 });
+        const ssR1Pass = scrapePrizePicksCurrentView();
+        log('prizepicks', `RD1 SS tab pass: ${ssR1Pass.length} fighters`);
+        mergeInto(ssR1Pass);
+      }
+
       if (await clickPrizePicksButton(['takedowns', 'takedown'], 1300)) {
         await scrollToLoadAll({ timeoutMs: 5000, intervalMs: 400 });
         const tdPass = scrapePrizePicksCurrentView();
@@ -610,7 +626,7 @@ async function scrapePrizePicksAllStats() {
       await sleep(1200);
     }
 
-    const result = merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null);
+    const result = merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null);
     log('prizepicks', `Found ${result.length} fighters after MMA+stat tab crawl`);
     return result;
   } catch (error) {

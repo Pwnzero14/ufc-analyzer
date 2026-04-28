@@ -111,7 +111,7 @@ export const LINE_DROP_SCHEDULE = {
   friday: { window: 'lateWindow', label: 'Betr FP (latest), PrizePicks FP' },
 };
 
-// ── FANTASY SCORING (identical for Pick6 and Underdog) ──────────────────
+// ── FANTASY SCORING (identical for Pick6, Underdog, and Betr) ──────────
 // Source: pick6.draftkings.com/pick6-rules-and-scoring-ufc
 //         help.underdogfantasy.com/en/articles/10905385-pick-em-scoring-mma
 export const FANTASY_SCORING = {
@@ -128,5 +128,27 @@ export const FANTASY_SCORING = {
     round3: 45,
     round4Plus: 40,
     decision: 30,
+  },
+} as const;
+
+// ── PRIZEPICKS FANTASY SCORING (different from Pick6/UD/Betr) ───────────
+// Source: PrizePicks app → MMA Fantasy Score Breakdown
+// Notes: only sig strikes count (no non-sig, no control time, no reversals).
+//        No quick-finish bonus. Submission attempts score 4 each (parsed from
+//        UFCStats col 7 — the SUB. ATT column — during settlement).
+export const PRIZEPICKS_SCORING = {
+  sigStrike: 0.5,
+  nonSigStrike: 0,
+  controlTimePerSec: 0,
+  takedown: 5,
+  reversal: 0,
+  knockdown: 10,
+  submissionAttempt: 4,
+  winBonus: {
+    round1: 50,
+    round2: 40,
+    round3: 30,
+    round4Plus: 20,   // 4th and 5th round wins both score 20
+    decision: 10,
   },
 } as const;

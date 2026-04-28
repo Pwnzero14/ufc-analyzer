@@ -24,6 +24,7 @@ function normalizePropType(propType: unknown): PropType {
   if (!v) return 'Fantasy';
   if (/^ss$/i.test(v)) return 'SS';
   if (/^td$/i.test(v)) return 'TD';
+  if (/^fantasy_pp$/i.test(v) || /^fp_pp$/i.test(v)) return 'Fantasy_PP';
   if (/^fantasy$/i.test(v) || /^fp$/i.test(v)) return 'Fantasy';
   if (/^control$/i.test(v)) return 'Control';
   if (/^ft$/i.test(v) || /^fight\s*time$/i.test(v) || /^fighttime$/i.test(v)) return 'FightTime';
@@ -279,7 +280,7 @@ export class PropArchiveService {
 
   static async fighterHasFantasyLineHistory(fighter: string): Promise<boolean> {
     const rows = await this.getFighterHistory(fighter);
-    return rows.some((r) => r.propType === 'Fantasy' && r.line != null && Number.isFinite(r.line));
+    return rows.some((r) => (r.propType === 'Fantasy' || r.propType === 'Fantasy_PP') && r.line != null && Number.isFinite(r.line));
   }
 
   static async fighterHasPerformanceHistory(fighter: string): Promise<boolean> {

@@ -3,6 +3,7 @@ export interface Fighter {
   name: string;
   line_fp?: number | null;
   line_ss?: number | null;
+  line_ss_r1?: number | null;  // PrizePicks-only: Round 1 significant strikes
   line_td?: number | null;
   line_ft?: number | null;
   // Control time line, stored in minutes for parity with FT (UFCStats shows mm:ss)
@@ -44,12 +45,14 @@ export interface FightResult {
   fp_p6?: number | null;
   fp_ud?: number | null;
   sigStr?: number | null;
+  sigStrR1?: number | null; // sig strikes landed in round 1 only
   totStr?: number | null;
   ctrlSecs?: number | null;
   timeSecs?: number | null;
   td?: number | null;
   kd?: number | null;
   rev?: number | null;
+  sub?: number | null; // submission attempts (PrizePicks scoring: 4pts each)
   method?: string;
   result?: string; // 'win' | 'loss'
   date?: string;
@@ -59,11 +62,13 @@ export interface FightResult {
 
 export interface FightStats {
   sigStr?: number | null;
+  sigStrR1?: number | null;
   totStr?: number | null;
   ctrlSecs?: number | null;
   kd?: number | null;
   td?: number | null;
   rev?: number | null;
+  sub?: number | null;
 }
 
 export interface CareerStats {
@@ -90,9 +95,11 @@ export interface OppFightResult {
   opp: string | null;
   fp: number | null;
   sigStr: number | null;
+  sigStrR1?: number | null;
   totStr: number | null;
   td: number | null;
   kd: number | null;
+  sub?: number | null;
   ctrlSecs: number | null;
 }
 
@@ -280,8 +287,10 @@ export interface AppError {
 
 // ── PROP ARCHIVE ─────────────────────────────────────────────────────────
 export type PropType =
-  | 'Fantasy'
+  | 'Fantasy'      // Pick6/Underdog/Betr scoring (sigStr×0.4, td×5, kd×10, R1=90, dec=30, etc.)
+  | 'Fantasy_PP'   // PrizePicks scoring (sigStr×0.5, sub×4, td×5, kd×10, R1=50, dec=10, no quick-finish)
   | 'SS'
+  | 'SS_R1'        // PrizePicks-only: significant strikes in round 1 only
   | 'TD'
   | 'Control'
   | 'FightTime'

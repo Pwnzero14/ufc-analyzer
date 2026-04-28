@@ -8,7 +8,7 @@ import {
   PropArchiveRecord,
   WeightClass,
 } from './types/index.js';
-import { CONFIG, FANTASY_SCORING } from './config/index.js';
+import { CONFIG, FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
 
 // ── IN-MEMORY STORE ────────────────────────────────────────────────────
 const store = { pick6: null as any, underdog: null as any, betr: null as any, prizepicks: null as any, draftkings_sportsbook: null as any };
@@ -558,9 +558,35 @@ function computeFP(stats: {
   return Math.round(fp * 10) / 10;
 }
 
+// PrizePicks-specific FP: only sig strikes, no non-sig/control/reversal,
+// submission attempts score 4pts each, lower win bonuses, no quick-finish bonus.
+function computeFP_PP(stats: {
+  sigStrikes: number; td: number; kd: number; sub: number;
+  won: boolean; method: string; round: number;
+}): number {
+  const s = PRIZEPICKS_SCORING;
+  let fp = stats.sigStrikes * s.sigStrike
+    + stats.td * s.takedown
+    + stats.kd * s.knockdown
+    + stats.sub * s.submissionAttempt;
+  if (stats.won) {
+    const m = stats.method.toLowerCase();
+    const isFin = m.includes('ko') || m.includes('tko') || m.includes('sub');
+    if (isFin) {
+      if (stats.round === 1) fp += s.winBonus.round1;
+      else if (stats.round === 2) fp += s.winBonus.round2;
+      else if (stats.round === 3) fp += s.winBonus.round3;
+      else fp += s.winBonus.round4Plus;
+    } else {
+      fp += s.winBonus.decision;
+    }
+  }
+  return Math.round(fp * 10) / 10;
+}
+
 async function fetchFightDetails(url: string): Promise<Array<{
   name: string; won: boolean; ss: number; totalStr: number; td: number;
-  kd: number; rev: number; ctrlSecs: number; method: string; round: number;
+  kd: number; rev: number; sub: number; ctrlSecs: number; method: string; round: number;
   fightTimeMins: number;
 }>> {
   try {
@@ -615,9 +641,10 @@ async function fetchFightDetails(url: string): Promise<Array<{
       const totalStr = totM ? parseInt(totM[1]) : 0;
       const tdM     = cellVal(cells[5] ?? '', i).match(/(\d+)\s+of\s+\d+/);
       const td      = tdM ? parseInt(tdM[1]) : 0;
+      const sub     = parseInt(cellVal(cells[7] ?? '', i)) || 0;
       const rev     = parseInt(cellVal(cells[8] ?? '', i)) || 0;
       const ctrl    = parseCtrlTime(cellVal(cells[9] ?? '', i) || '0:00');
-      result.push({ name: names[i], won: statuses[i] === 'W', ss, totalStr, td, kd, rev, ctrlSecs: ctrl, method, round, fightTimeMins });
+      result.push({ name: names[i], won: statuses[i] === 'W', ss, totalStr, td, kd, rev, sub, ctrlSecs: ctrl, method, round, fightTimeMins });
     }
     return result;
   } catch {
@@ -788,6 +815,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
       for (const f of allFightResults) {
         if (!f.name) continue;
         const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
+        const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
 
         // Try exact name first, then abbreviated first-initial match (e.g. "M Aswell" → "Michael Aswell Jr")
         const namesToTry = new Set<string>([f.name]);
@@ -806,9 +834,10 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
         const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
                 + applyResult(nameVariants, archiveEvent, 'TD', f.td)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
+                + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
                 + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins);
         if (n > 0) {
-          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min (${f.won ? 'W' : 'L'} R${f.round})`);
+          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min (${f.won ? 'W' : 'L'} R${f.round})`);
           settled++;
         }
       }
@@ -899,9 +928,11 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           const f = last ? cardLastNameMap.get(last) : undefined;
           if (!f) { console.log(`[UFC Settle] Fallback: no card result for archive name "${archiveName}" (last="${last}")`); skipped++; continue; }
           const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
+          const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
           const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
                   + applyResult([archiveName], archiveEvent, 'TD', f.td)
                   + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
+                  + applyResult([archiveName], archiveEvent, 'Fantasy_PP', fpPP)
                   + applyResult([archiveName], archiveEvent, 'FightTime', f.fightTimeMins);
           if (n > 0) { console.log(`[UFC Settle] Fallback settled ${archiveName} (→${f.name}) under "${archiveEvent}"`); settled++; }
         }
@@ -958,10 +989,13 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
   return { settled, skipped, errors };
 }
 
-function toArchivePropTypeFromLineKey(lineKey: string): string {
+function toArchivePropTypeFromLineKey(lineKey: string, platform?: string): string {
   const key = lineKey.toLowerCase();
-  if (key === 'line_fp') return 'Fantasy';
+  if (key === 'line_fp') {
+    return platform === 'prizepicks' ? 'Fantasy_PP' : 'Fantasy';
+  }
   if (key === 'line_ss') return 'SS';
+  if (key === 'line_ss_r1') return 'SS_R1';
   if (key === 'line_td') return 'TD';
   if (key.includes('control')) return 'Control';
   if (key.includes('fighttime') || key.includes('fight_time')) return 'FightTime';
@@ -1050,7 +1084,7 @@ async function archivePlatformPropLines(
         event: archiveEventName,
         date: dateIso,
         platform,
-        propType: toArchivePropTypeFromLineKey(key),
+        propType: toArchivePropTypeFromLineKey(key, platform),
         line,
         result: Number.NaN,
       });
@@ -1177,6 +1211,7 @@ function mergeFighters(
       const merged = { ...prev };
       if (fighter.line_fp != null) merged.line_fp = fighter.line_fp;
       if (fighter.line_ss != null) merged.line_ss = fighter.line_ss;
+      if (fighter.line_ss_r1 != null) merged.line_ss_r1 = fighter.line_ss_r1;
       if (fighter.line_td != null) merged.line_td = fighter.line_td;
       if (fighter.line_ft != null) {
         const ftLine = normalizeFightTimeLineToMinutes(fighter.line_ft);
@@ -1824,8 +1859,8 @@ async function fetchUnderdogFromBackground(): Promise<UnderdogCoverage> {
   return getUnderdogStatCoverage(mergedFighters);
 }
 
-function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> {
-  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> = {};
+function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> {
+  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> = {};
   const projections = Array.isArray(data?.data) ? data.data : [];
   const included = Array.isArray(data?.included) ? data.included : [];
 
@@ -1846,11 +1881,12 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     }
   }
 
-  const upsert = (name: string, type: 'fp'|'ss'|'td'|'ft', value: number, opponent: string | null = null) => {
-    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, line_ft: null, opponent };
+  const upsert = (name: string, type: 'fp'|'ss'|'ss_r1'|'td'|'ft', value: number, opponent: string | null = null) => {
+    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, line_ft: null, opponent };
     const normalized = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
     // For SS and TD, keep the highest value seen — standard total-fight lines are always
-    // greater than any round-specific duplicate that may slip through.
+    // greater than any round-specific duplicate that may slip through. (ss_r1 is its own
+    // bucket and isn't subject to this dedup.)
     const existing = fighters[name][`line_${type}`];
     if ((type === 'ss' || type === 'td') && normalized != null && existing != null && normalized < existing) {
       // skip — existing value is higher (more likely to be the correct total-fight line)
@@ -1875,9 +1911,10 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     if (oddsType && oddsType !== 'standard') continue;
 
     const stat = String(attrs.stat_type || '').toLowerCase();
-    let lineType: 'fp'|'ss'|'td'|'ft'|null = null;
+    const isRound1 = /\brd\s*1\b|\bround\s*1\b|\br1\b|\b1st\s*round\b/.test(stat);
+    let lineType: 'fp'|'ss'|'ss_r1'|'td'|'ft'|null = null;
 
-    if (stat.includes('significant strike')) lineType = 'ss';
+    if (stat.includes('significant strike')) lineType = isRound1 ? 'ss_r1' : 'ss';
     else if (stat.includes('takedown')) lineType = 'td';
     else if (stat.includes('fight time') || stat.includes('fighttime') || stat.includes('fight duration') || stat.includes('rounds')) lineType = 'ft';
     else if (stat.includes('fantasy score') || stat.includes('fantasy points')) lineType = 'fp';
@@ -1907,7 +1944,7 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     upsert(name, lineType, line, opponent);
   }
 
-  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null || f.line_ft != null);
+  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null || f.line_ft != null);
 }
 
 async function fetchPrizePicksFromBackground(): Promise<UnderdogCoverage> {
