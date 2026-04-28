@@ -12482,6 +12482,20 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const riskReasons = leanReasons.filter((r) => r.icon === 'neg');
   const neutralReasons = leanReasons.filter((r) => r.icon !== 'pos' && r.icon !== 'neg');
 
+  // "Why this lean" — top 3 drivers in the direction of the lean. Pulls from
+  // proReasons for OVER and riskReasons for UNDER (risks against OVER are pros
+  // for UNDER). Position-in-array is the implicit ranking — each producer pushes
+  // its strongest reason first.
+  const driverReasons = lean.lean === 'over' ? proReasons
+                      : lean.lean === 'under' ? riskReasons
+                      : [];
+  const topDrivers = driverReasons.slice(0, 3);
+  const topDriversHTML = topDrivers.length > 0 ? `
+    <div class="top-drivers ${lean.lean}">
+      <div class="top-drivers-head">Why ${lean.lean === 'over' ? 'OVER' : 'UNDER'} · Top ${topDrivers.length} driver${topDrivers.length > 1 ? 's' : ''}</div>
+      ${topDrivers.map((r, i) => `<div class="top-driver"><span class="top-driver-rank">${i + 1}</span><span class="top-driver-text">${r.text}</span></div>`).join('')}
+    </div>` : '';
+
   const reasonRow = (r: LeanReason) => `<div class="lean-point">
     <span class="lean-point-icon ${r.icon==='pos'?'pos':r.icon==='neg'?'neg':''}">${r.icon==='pos'?'↑':r.icon==='neg'?'↓':'→'}</span>
     <span>${r.text}</span>
@@ -13204,7 +13218,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${buildArchetypeLearnerPanel(f.name, db, oppEntry?.db || null, f.moneyline ?? null)}
         <div class="detail-panel">
           <div class="detail-panel-title">Lean Analysis (FP)</div>
-          <div class="lean-reason">${groupedReasonsHTML}</div>
+          <div class="lean-reason">${topDriversHTML}${groupedReasonsHTML}</div>
           ${lean.verdict?`<div class="lean-verdict ${lean.lean}">${lean.verdict}</div>`:''}
         </div>
         ${buildModelRivalryPanel(lean)}
