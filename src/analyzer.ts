@@ -5970,14 +5970,102 @@ function ensureLineLeans(): void {
 }
 
 function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
-  if (f.lean?.lean && f.lean.lean !== 'none') return { ...f.lean, _source: 'fp', _label: '' };
-  if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push')
-    return { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
-  if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push')
-    return { ...f.lean_td, _source: 'td', _label: ' (TD)' };
-  if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push')
-    return { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
-  return { ...(f.lean || { lean: 'none', conf: 0, reasons: [], verdict: '' }), _source: 'fp', _label: '' };
+  let base: EffectiveLean;
+  if (f.lean?.lean && f.lean.lean !== 'none') base = { ...f.lean, _source: 'fp', _label: '' };
+  else if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push') base = { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
+  else if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push') base = { ...f.lean_td, _source: 'td', _label: ' (TD)' };
+  else if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push') base = { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
+  else base = { ...(f.lean || { lean: 'none', conf: 0, reasons: [], verdict: '' }), _source: 'fp', _label: '' };
+  return applyWeightMissAdjustment(base, f);
+}
+
+// Adjusts an effective lean based on a missed-weight signal. Severity-tiered:
+//   small (<1lb)     drained, no upside           → clear UNDER nudge
+//   moderate (1-2lb) drained, mild cardio risk    → mild UNDER nudge
+//   big (2-5lb)      MIXED: size advantage + cardio risk
+//                      → grappler on TD/CTRL gets OVER signal (size wins exchanges)
+//                      → striker/balanced gets UNDER nudge (cardio dominates)
+//   extreme (5+lb)   major cut failure red flag   → strong UNDER (with grappler-on-TD nuance)
+//   unknown amount   conservative moderate UNDER nudge
+// Also flips the lean direction if the projection (avg) crosses the line after
+// the adjustment — large weight misses can be enough to invert a marginal lean.
+function applyWeightMissAdjustment(lean: EffectiveLean, fighter: AnalyzerFighter): EffectiveLean {
+  const sig = _weightMissSignals.get(fighter.name.toLowerCase());
+  if (!sig) return lean;
+  const style = fighter.db?.style;
+  const isGrappler = style === 'grappler';
+  const source = lean._source;
+  const lbsLabel = sig.lbsOver != null
+    ? `${sig.lbsOver % 1 === 0 ? sig.lbsOver : sig.lbsOver.toFixed(1)} lb`
+    : 'unknown amount';
+
+  const newReasons: LeanReason[] = [...(lean.reasons || [])];
+  let confDelta = 0;
+  let avgDelta = 0;
+
+  switch (sig.severity) {
+    case 'small':
+      newReasons.unshift({ icon: 'neg', text: `Missed weight by ${lbsLabel} — completed cut, drained, no size upside` });
+      confDelta = -10;
+      avgDelta = source === 'fp' ? -8 : source === 'ss' ? -7 : source === 'ft' ? -1.5 : source === 'td' ? -0.3 : 0;
+      break;
+    case 'moderate':
+      newReasons.unshift({ icon: 'neg', text: `Missed weight by ${lbsLabel} — failed cut, mild cardio risk` });
+      confDelta = -7;
+      avgDelta = source === 'fp' ? -5 : source === 'ss' ? -4 : source === 'ft' ? -1.0 : source === 'td' ? -0.2 : 0;
+      break;
+    case 'big':
+      if (isGrappler && (source === 'td' || source === 'ctrl')) {
+        newReasons.unshift({ icon: 'pos', text: `Missed weight by ${lbsLabel} — likely size/control advantage in grappling exchanges` });
+        newReasons.push({ icon: 'neg', text: `Big miss also signals possible cardio fade in later rounds` });
+        confDelta = +5;
+        avgDelta = source === 'td' ? +0.5 : +25; // ctrl in seconds
+      } else if (isGrappler) {
+        newReasons.unshift({ icon: 'pos', text: `Missed weight by ${lbsLabel} — possible size edge` });
+        newReasons.push({ icon: 'neg', text: `Big miss also signals cardio risk` });
+        confDelta = -3;
+        avgDelta = source === 'fp' ? -3 : source === 'ss' ? -3 : 0;
+      } else {
+        newReasons.unshift({ icon: 'neg', text: `Missed weight by ${lbsLabel} — failed cut + cardio collapse risk` });
+        confDelta = -8;
+        avgDelta = source === 'fp' ? -7 : source === 'ss' ? -6 : source === 'ft' ? -1.2 : 0;
+      }
+      break;
+    case 'extreme':
+      if (isGrappler && (source === 'td' || source === 'ctrl')) {
+        newReasons.unshift({ icon: 'pos', text: `Massive miss (${lbsLabel}) — major size advantage but extreme cardio risk` });
+        confDelta = -3;
+        avgDelta = source === 'td' ? +0.3 : +15;
+      } else {
+        newReasons.unshift({ icon: 'neg', text: `Massive miss (${lbsLabel}) — major cut failure, severe cardio + prep red flag` });
+        confDelta = -15;
+        avgDelta = source === 'fp' ? -12 : source === 'ss' ? -10 : source === 'ft' ? -2.0 : source === 'td' ? -0.5 : 0;
+      }
+      break;
+    case 'unknown':
+      newReasons.unshift({ icon: 'neg', text: `Missed weight (amount unconfirmed) — likely failed cut, conservative UNDER nudge` });
+      confDelta = -5;
+      avgDelta = source === 'fp' ? -4 : source === 'ss' ? -3 : source === 'ft' ? -0.7 : 0;
+      break;
+  }
+
+  const newConf = Math.max(0, Math.min(95, lean.conf + confDelta));
+  const newAvg = lean.avg != null ? lean.avg + avgDelta : lean.avg;
+
+  // Flip direction if the adjusted projection crosses the line (large misses
+  // can invert a marginal lean). Only applies when both avg and line are known.
+  let newLean = lean.lean;
+  if (newAvg != null && lean.line != null) {
+    if (newLean === 'over' && newAvg < lean.line) {
+      newLean = 'under';
+      newReasons.push({ icon: 'neg', text: `Adjusted projection ${newAvg.toFixed(1)} now below line ${lean.line} — lean flipped to UNDER` });
+    } else if (newLean === 'under' && newAvg > lean.line) {
+      newLean = 'over';
+      newReasons.push({ icon: 'pos', text: `Adjusted projection ${newAvg.toFixed(1)} now above line ${lean.line} — lean flipped to OVER` });
+    }
+  }
+
+  return { ...lean, lean: newLean, conf: newConf, avg: newAvg ?? lean.avg, reasons: newReasons };
 }
 function getEffectiveLean(f: AnalyzerFighter): EffectiveLean {
   return _leanCache?.get(f.name) ?? _computeEffectiveLean(f);
