@@ -3531,6 +3531,16 @@ body.loading {
 
 /* ── NEWS BADGE & MODAL ── */
 .news-warn-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(255,60,60,0.15); color: #ff6060; border: 1px solid rgba(255,60,60,0.28); cursor: pointer; white-space: nowrap; animation: pulse-warn 2s ease-in-out infinite; }
+
+/* ── WEIGHT-MISS BADGE ── */
+/* Severity-tiered: small/moderate are clear negatives (drained, no upside),
+   big is mixed (size advantage + cardio risk), extreme is major red flag. */
+.weight-miss-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; margin-right: 4px; letter-spacing: 0.02em; }
+.weight-miss-small    { background: rgba(255,140,60,0.15);  color: #ff9d4a; border: 1px solid rgba(255,140,60,0.32); }
+.weight-miss-moderate { background: rgba(255,170,60,0.15);  color: #ffb24a; border: 1px solid rgba(255,170,60,0.32); }
+.weight-miss-big      { background: rgba(240,192,64,0.15);  color: #f0c040; border: 1px solid rgba(240,192,64,0.32); }
+.weight-miss-extreme  { background: rgba(255,60,60,0.18);   color: #ff7070; border: 1px solid rgba(255,60,60,0.36); animation: pulse-warn 2s ease-in-out infinite; }
+.weight-miss-unknown  { background: rgba(160,170,200,0.12); color: #b0b8cc; border: 1px solid rgba(160,170,200,0.28); }
 .conflict-warn { font-size: 9px; font-weight: 600; color: #f0c040; opacity: 0.85; margin-top: 3px; letter-spacing: 0.02em; cursor: default; }
 @keyframes pulse-warn { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
 .news-modal-box { max-width: 560px; }

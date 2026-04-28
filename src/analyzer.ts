@@ -236,6 +236,60 @@ const _newsCache = new Map<string, { items: NewsItem[]; fetchedAt: number }>();
 const _newsAlertFighters = new Set<string>();
 const NEWS_INJURY_KEYWORDS = ['injur', 'withdraw', 'pull', 'weight cut', 'hospitali', 'surgery', 'fracture', 'concussion', 'illness', 'sick', 'off the card', 'cancel', 'won\'t fight', 'replac', 'medic'];
 const NEWS_CACHE_TTL = 30 * 60 * 1000;
+
+// ── WEIGHT-MISS DETECTION ──────────────────────────────────────────────────
+// Severity buckets: small <1lb, moderate 1-2lb, big 2-5lb, extreme 5+lb.
+// Each tier has different lean implications (small = drained no upside,
+// big = mixed size-advantage + cardio risk, extreme = major red flag).
+type WeightMissSeverity = 'small' | 'moderate' | 'big' | 'extreme' | 'unknown';
+interface WeightMissSignal { lbsOver: number | null; severity: WeightMissSeverity; source: string }
+const _weightMissSignals = new Map<string, WeightMissSignal>();
+
+function severityFromLbs(lbs: number | null): WeightMissSeverity {
+  if (lbs == null) return 'unknown';
+  if (lbs < 1) return 'small';
+  if (lbs < 2) return 'moderate';
+  if (lbs < 5) return 'big';
+  return 'extreme';
+}
+
+function parseWeightMissFromTitle(title: string, fighterName: string): WeightMissSignal | null {
+  const lower = title.toLowerCase();
+  const fLower = fighterName.toLowerCase();
+  const lastName = fLower.split(' ').pop() || fLower;
+  // Title must reference this fighter (full name OR last name)
+  if (!lower.includes(fLower) && !lower.includes(lastName)) return null;
+  // Reject negations: "never missed weight", "didn't miss weight", "won't miss"
+  if (/\b(never|didn'?t|did\s+not|won'?t|will\s+not|hasn'?t|has\s+not)\s+miss(?:ed)?\s+weight\b/i.test(title)) return null;
+  // Positive miss indicators
+  const missPatterns = [
+    /miss(?:ed|es|ing)?\s+weight/i,
+    /fail(?:ed|s|ing)?\s+to\s+(?:make|hit)\s+weight/i,
+    /(?:came|comes|coming|came in|comes in|coming in)\s+(?:in\s+)?(?:heavy|over)/i,
+    /(?:weighs?|weighed)\s+in\s+(?:heavy|over)/i,
+    /overweight/i,
+    /over\s+the\s+(?:weight\s+)?limit/i,
+    /\bover\s+by\s+[\d.]+\s*(?:lbs?|pounds?)/i,
+    /[\d.]+\s*(?:lbs?|pounds?)\s+(?:over|heavy|overweight)/i,
+  ];
+  if (!missPatterns.some(p => p.test(title))) return null;
+  // Extract pounds-over amount; take the most plausible match
+  const lbsPatterns = [
+    /by\s+([\d.]+)\s*(?:lbs?|pounds?)/i,
+    /([\d.]+)\s*(?:lbs?|pounds?)\s+(?:over|heavy|overweight)/i,
+    /over\s+by\s+([\d.]+)/i,
+  ];
+  let lbsOver: number | null = null;
+  for (const re of lbsPatterns) {
+    const m = title.match(re);
+    if (m) {
+      const v = parseFloat(m[1]);
+      // Reject implausible values (e.g., "scale weight 187" matched by greedy pattern)
+      if (v > 0 && v < 30) { lbsOver = v; break; }
+    }
+  }
+  return { lbsOver, severity: severityFromLbs(lbsOver), source: title };
+}
 let fightOddsMoneylineByName: Record<string, number> = {};
 let currentSearch = '';
 let currentSort = 'default';
@@ -11030,12 +11084,25 @@ async function fetchFighterNews(name: string): Promise<NewsItem[]> {
 
 async function fetchAllFighterNews(): Promise<void> {
   _newsAlertFighters.clear();
+  _weightMissSignals.clear();
   await Promise.all(allFighters.map(async (f) => {
     const items = await fetchFighterNews(f.name);
     const hasAlert = items.some(item =>
       NEWS_INJURY_KEYWORDS.some(kw => item.title.toLowerCase().includes(kw))
     );
     if (hasAlert) _newsAlertFighters.add(f.name.toLowerCase());
+    // Weight-miss detection — separate signal channel. Prefer a known-amount
+    // signal over an unknown one; among known, prefer the larger value (more
+    // authoritative — outlets often round up in headlines).
+    for (const item of items) {
+      const sig = parseWeightMissFromTitle(item.title, f.name);
+      if (!sig) continue;
+      const key = f.name.toLowerCase();
+      const prev = _weightMissSignals.get(key);
+      if (!prev) { _weightMissSignals.set(key, sig); continue; }
+      if (prev.severity === 'unknown' && sig.severity !== 'unknown') { _weightMissSignals.set(key, sig); continue; }
+      if (prev.lbsOver != null && sig.lbsOver != null && sig.lbsOver > prev.lbsOver) { _weightMissSignals.set(key, sig); }
+    }
   }));
   renderFighters();
 }
@@ -13159,7 +13226,13 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           return `<div class="fair-value-chip" style="font-size:9px;padding:2px 7px;border-radius:6px;background:${bg};border:1px solid ${col}40;color:${col};letter-spacing:0.04em" title="Fair value ${fvVal.toFixed(1)} — edge ${fvEdge > 0 ? '+' : ''}${fvEdge.toFixed(1)} pts vs active line">FV ${fvEdge > 0 ? '+' : ''}${fvEdge.toFixed(1)}</div>`;
         })()}
       </div>
-      <div class="row-expand-slot">${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<button class="h2h-btn" data-fighter="${f.name}" title="Head-to-head vs ${f.opponent || 'opponent'}">⚔</button><span class="expand-arrow">▼</span></div>
+      <div class="row-expand-slot">${(() => {
+        const wm = _weightMissSignals.get(f.name.toLowerCase());
+        if (!wm) return '';
+        const lbsLabel = wm.lbsOver != null ? `${wm.lbsOver % 1 === 0 ? wm.lbsOver : wm.lbsOver.toFixed(1)} LB` : '';
+        const tip = wm.source.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
+      })()}${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<button class="h2h-btn" data-fighter="${f.name}" title="Head-to-head vs ${f.opponent || 'opponent'}">⚔</button><span class="expand-arrow">▼</span></div>
     </div>
     <div class="fighter-detail"></div>`;
 
