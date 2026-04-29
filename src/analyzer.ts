@@ -5,6 +5,13 @@ import { PropArchiveService, PropLinePredictorService } from './services/index.j
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
 import { _weightMissSignals, parseWeightMissFromTitle } from './analyzer/weight-miss.js';
 import type { WeightMissSignal } from './analyzer/weight-miss.js';
+import {
+  _newsCache,
+  _newsAlertFighters,
+  NEWS_INJURY_KEYWORDS,
+  fetchFighterNews,
+} from './analyzer/news.js';
+import type { NewsItem } from './analyzer/news.js';
 
 // ── LOCAL TYPES ────────────────────────────────────────────────────────────
 interface LeanReason { icon: 'pos' | 'neg' | 'neu'; text: string }
@@ -233,11 +240,8 @@ async function loadFighterClvDrift(): Promise<void> {
 }
 
 // ── NEWS CACHE ─────────────────────────────────────────────────────────────
-interface NewsItem { title: string; link: string; pubDate: string; source: string }
-const _newsCache = new Map<string, { items: NewsItem[]; fetchedAt: number }>();
-const _newsAlertFighters = new Set<string>();
-const NEWS_INJURY_KEYWORDS = ['injur', 'withdraw', 'pull', 'weight cut', 'hospitali', 'surgery', 'fracture', 'concussion', 'illness', 'sick', 'off the card', 'cancel', 'won\'t fight', 'replac', 'medic'];
-const NEWS_CACHE_TTL = 30 * 60 * 1000;
+// NewsItem, _newsCache, _newsAlertFighters, NEWS_INJURY_KEYWORDS, fetchFighterNews
+// extracted to ./analyzer/news.ts — re-imported via the import block above.
 
 // ── WEIGHT-MISS DETECTION ──────────────────────────────────────────────────
 // Extracted to ./analyzer/weight-miss.ts — re-exported via the import above.
@@ -11170,44 +11174,8 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 }
 
 // ── NEWS FETCHING ──────────────────────────────────────────────────────────
-async function fetchFighterNews(name: string): Promise<NewsItem[]> {
-  const key = name.toLowerCase();
-  const cached = _newsCache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < NEWS_CACHE_TTL) return cached.items;
-  try {
-    const query = encodeURIComponent(`"${name}" UFC`);
-    const url = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
-    const resp = await fetch(url);
-    if (!resp.ok) { _newsCache.set(key, { items: [], fetchedAt: Date.now() }); return []; }
-    const xml = await resp.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'text/xml');
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const items = Array.from(doc.querySelectorAll('item')).map(item => {
-      const rawLink = (item.querySelector('link')?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
-      let link = rawLink;
-      if (link && !/^https?:\/\//i.test(link)) {
-        // Google News RSS sometimes yields only the article slug; rebuild absolute URL.
-        link = 'https://news.google.com/rss/articles/' + link.replace(/^\/+/, '');
-      }
-      return {
-        title: (item.querySelector('title')?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
-        link,
-        pubDate: item.querySelector('pubDate')?.textContent || '',
-        source: item.querySelector('source')?.textContent?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '',
-      };
-    }).filter(item => {
-      const pub = item.pubDate ? new Date(item.pubDate).getTime() : 0;
-      return pub > cutoff;
-    });
-    _newsCache.set(key, { items, fetchedAt: Date.now() });
-    return items;
-  } catch {
-    _newsCache.set(key, { items: [], fetchedAt: Date.now() });
-    return [];
-  }
-}
-
+// fetchFighterNews moved to ./analyzer/news.ts. fetchAllFighterNews stays here
+// because it orchestrates module-scoped state (allFighters, renderFighters).
 async function fetchAllFighterNews(): Promise<void> {
   _newsAlertFighters.clear();
   _weightMissSignals.clear();
