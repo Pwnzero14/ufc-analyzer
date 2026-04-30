@@ -5593,6 +5593,37 @@ function primeCaches(): void {
   }
 }
 
+// Reorder fighters so they appear in UFCStats card order with each fight's two
+// fighters adjacent. This is what the fight-group badge logic in renderFighters
+// (Math.floor(i / 2) → fightIndex) assumes; without it, fighters end up paired
+// by whatever order allFighters happens to be in (typically Pick6/UD scrape
+// order) and adjacent rows can be from different fights entirely.
+function orderFightersByCard(fighters: AnalyzerFighter[]): AnalyzerFighter[] {
+  if (!upcomingCardPairs.length) return fighters;
+  const normCache = new Map<AnalyzerFighter, string>();
+  for (const f of fighters) {
+    const n = normalizeName(f.name);
+    if (n) normCache.set(f, n);
+  }
+  const findFighter = (cardName: string): AnalyzerFighter | undefined => {
+    for (const [f, n] of normCache) if (n === cardName) return f;
+    for (const [f, n] of normCache) {
+      if (namesMatch(n, cardName) || strictCardNameMatch(n, cardName)) return f;
+    }
+    return undefined;
+  };
+  const ordered: AnalyzerFighter[] = [];
+  const used = new Set<AnalyzerFighter>();
+  for (const cp of upcomingCardPairs) {
+    const f1 = findFighter(cp.f1);
+    const f2 = findFighter(cp.f2);
+    if (f1 && !used.has(f1)) { ordered.push(f1); used.add(f1); }
+    if (f2 && !used.has(f2)) { ordered.push(f2); used.add(f2); }
+  }
+  for (const f of fighters) if (!used.has(f)) ordered.push(f);
+  return ordered;
+}
+
 function sortFighters(fighters: AnalyzerFighter[], sortKey: string): AnalyzerFighter[] {
   const copy = [...fighters];
   const primarySSLine = (f: AnalyzerFighter): number => {
@@ -10292,6 +10323,12 @@ function _renderFightersImpl(): void {
   });
   fighters = applySourceVisibilityFilter(fighters);
   fighters = sortFighters(fighters, currentSort);
+  // Default sort = card-order display with fight badges. Reorder so each fight's
+  // two fighters land at adjacent indices (i, i+1) in UFCStats card sequence;
+  // the badge logic downstream is positional (Math.floor(i / 2) = fightIndex).
+  if (currentSort === 'default') {
+    fighters = orderFightersByCard(fighters);
+  }
 
   if (fighters.length === 0) {
     container.innerHTML = '<div class="inline-empty-msg">No fighters match this filter</div>';
