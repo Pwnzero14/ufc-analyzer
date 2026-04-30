@@ -530,6 +530,30 @@ function applyUpcomingCardContext(card: UpcomingCard | null): void {
   debugLog(`Venue: "${currentVenueLabel}" alt=${currentVenueFactor.altitudeMeters}m cage=${currentVenueFactor.cageSizeFt}ft`);
 }
 
+// Locate the headliner (main event) pair by parsing the event title rather than
+// relying on positional inference. UFCStats event-page fight ordering is not
+// reliably "prelims first, main event last" for upcoming events, so we identify
+// the main event by matching "X vs Y" in the event name against upcomingCardPairs.
+// Returns null if no title is set, the regex doesn't match, or no pair lines up.
+function findHeadlinerPair(): { f1: string; f2: string } | null {
+  if (!upcomingCardPairs.length) return null;
+  const title = upcomingEventName || inferredEventNameFromLines;
+  if (!title) return null;
+  const m = title.match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
+  if (!m) return null;
+  const h1 = m[1].trim();
+  const h2 = m[2].trim();
+  for (const pair of upcomingCardPairs) {
+    const matches = (raw: string): boolean =>
+      strictCardNameMatch(raw, pair.f1) || strictCardNameMatch(raw, pair.f2) ||
+      namesMatch(normalizeName(raw) || raw, pair.f1) || namesMatch(normalizeName(raw) || raw, pair.f2);
+    if (matches(h1) && matches(h2)) {
+      return { f1: pair.f1, f2: pair.f2 };
+    }
+  }
+  return null;
+}
+
 async function syncUpcomingCardContext(forceRefresh = false): Promise<UpcomingCard | null> {
   if (typeof chrome === 'undefined' || !chrome.runtime) return null;
   const resp = await runtimeSendMessage<UpcomingCardResponse>({ type: 'GET_UPCOMING_CARD', forceRefresh });
@@ -1772,15 +1796,17 @@ function getScheduledRoundsContext(
   if (!normalizedName) return { rounds: null, source: 'unknown' };
 
   const cardRounds = scheduledRoundsMap.get(normalizedName);
-  if (cardRounds === 3 || cardRounds === 5) {
-    return { rounds: cardRounds, source: 'card' };
-  }
+  // Trust scrape only when it found 5R (literal "5" cell). Scrape defaults to 3 for
+  // upcoming events because round-count isn't exposed on UFCStats pre-fight pages,
+  // so a "3" from scrape is meaningless — fall through to main-event inference first.
+  if (cardRounds === 5) return { rounds: 5, source: 'card' };
 
-  const mainEventPair = upcomingCardPairs.length > 0 ? upcomingCardPairs[upcomingCardPairs.length - 1] : null;
-  if (mainEventPair && (mainEventPair.f1 === normalizedName || mainEventPair.f2 === normalizedName)) {
+  const headliner = findHeadlinerPair();
+  if (headliner && (headliner.f1 === normalizedName || headliner.f2 === normalizedName)) {
     return { rounds: 5, source: 'inferred_main_event' };
   }
 
+  if (cardRounds === 3) return { rounds: 3, source: 'card' };
   return { rounds: null, source: 'unknown' };
 }
 
@@ -7809,8 +7835,13 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
   const propArchive: PropArchiveRecord[] = Array.isArray(archiveRaw.prop_archive_v1) ? archiveRaw.prop_archive_v1 as PropArchiveRecord[] : [];
   const predictions: PropPrediction[] = [];
 
+  const headliner = findHeadlinerPair();
   for (const pair of upcomingCardPairs) {
-    const rounds = scheduledRoundsMap.get(pair.f1) ?? scheduledRoundsMap.get(pair.f2) ?? 3;
+    const scrapedRounds = scheduledRoundsMap.get(pair.f1) ?? scheduledRoundsMap.get(pair.f2);
+    // Trust scrape's 5 if present; otherwise title-based main-event match wins
+    // over scrape's default of 3 (round count isn't exposed on UFCStats pre-fight).
+    const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
+    const rounds = scrapedRounds === 5 ? 5 : (isMainEvent ? 5 : (scrapedRounds ?? 3));
 
     // Fetch UFCStats data for both fighters (uses 24h cache)
     const [f1Stats, f2Stats] = await Promise.all([
@@ -11810,12 +11841,14 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const _ftLine = platformStatLine(f, 'ft');
   const _normFighterName = normalizeName(f.name);
   const _cardRounds = _normFighterName ? scheduledRoundsMap.get(_normFighterName) : undefined;
-  // Fallback when scheduledRoundsMap not yet populated (cache predates scrape change):
-  // UFCStats lists fights prelims-first, main event last — so last pair = main event = 5R
-  const _mainEventPair = upcomingCardPairs.length > 0 ? upcomingCardPairs[upcomingCardPairs.length - 1] : null;
-  const _isMainEventFighter = _normFighterName != null && _mainEventPair != null &&
-    (_mainEventPair.f1 === _normFighterName || _mainEventPair.f2 === _normFighterName);
-  const isFiveRound = _cardRounds != null ? _cardRounds === 5 : _isMainEventFighter;
+  // Title-based main-event lookup (UFCStats event-page fight order is not reliable
+  // for upcoming cards, so we identify the headliner by parsing the event title).
+  const _headliner = findHeadlinerPair();
+  const _isMainEventFighter = _normFighterName != null && _headliner != null &&
+    (_headliner.f1 === _normFighterName || _headliner.f2 === _normFighterName);
+  // Scrape defaults to 3 for upcoming events (round count isn't exposed pre-fight),
+  // so trust it only when it found 5; otherwise main-event inference wins.
+  const isFiveRound = _cardRounds === 5 || _isMainEventFighter;
   // Expected average actual fight durations (accounting for all finish rates in that format)
   const FIVE_ROUND_MINS  = 15.0;
   const THREE_ROUND_MINS = 9.0;
