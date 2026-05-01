@@ -1,150 +1,182 @@
-**Last session:** 2026-04-29 (mid fight-week — DM vs Prates Sat May 2). Branch: `feature/sleek-theme-v1`. Build: clean. **State:** weight-miss opp-pace amplification + sub-lean adjustment shipped. Phase 1 of analyzer.ts split started — weight-miss, news, fantasy-scoring extracted into `src/analyzer/`. Della Maddalena vs Prates still pending settle.
+**Last session:** 2026-04-30 (mid fight-week — DM vs Prates Sat May 2, weigh-ins Fri May 1). Branch: `feature/sleek-theme-v1`. Build: clean. **State:** two main-event-related fixes shipped (5R math + row pairing) + Learning Summary visual polish; UFC 314 Betr lines entered (24 fighters). Branch is now **37 ahead of origin**. Project snapshot saved to `backups/full_project_snapshot_20260430_135140/`. Analyzer-only snapshot (post-polish) saved to `backups/analyzer_snapshot_20260430_220052/`.
 
 ---
 
-## ✅ Done this session — four commits on `feature/sleek-theme-v1`
+## ✅ Done this session — four commits
 
 | Hash | What | Files |
 |---|---|---|
-| `b26e893` | feat: weight-miss opp-pace amplification + sub-lean adjustment | analyzer.ts |
-| `948212c` | refactor: extract weight-miss detection into src/analyzer/weight-miss.ts | analyzer.ts, analyzer/weight-miss.ts |
-| `f737bcf` | refactor: extract news fetch + cache into src/analyzer/news.ts | analyzer.ts, analyzer/news.ts |
-| `21b62bf` | refactor: extract fantasy scoring + style derivation into module | analyzer.ts, analyzer/fantasy-scoring.ts |
+| `7d0dfa4` | fix: detect main event by parsing event title, not card position | analyzer.ts |
+| `35a9291` | fix: order fighter rows by UFCStats card sequence so badges land correctly | analyzer.ts |
+| `40a3e9a` | feat: polish learning summary with stat chips and magnitude bars | analyzer.ts |
+| (uncommitted) | Betr lines entered for UFC 314 via `lines_betr_manual_v1` | (storage only, no source change) |
 
-### 1. Weight-miss opp-pace amp + sub-lean adjustment (`b26e893`)
+### Polish — Learning Summary panel (`40a3e9a`)
 
-Two on-deck items from previous session shipped together. Refactored shared delta computation into `_computeWeightMissDeltas`.
+Cosmetic only, post-fight verification surface. Avg |Δ| triplet → 3 stat cards with color-coded left-border (green <8, amber <16, red ≥16). Best/Worst → pill badges. Per-fighter delta rows get a magnitude bar (width = totalErr/45 × 100% capped) plus tabular-nums alignment + subtle hover background. Two edits in `renderPredictionsHtml` around `analyzer.ts` ~L7990 and ~L8021. Will see it Sat post-DM/Prates settle when ▶ Run Learning Cycle fires.
 
-- **Sub-lean adjustment** — new `applyWeightMissToFighter(f)` mutates `f.lean / lean_ss / lean_td / lean_ft / lean_ctrl` in place using a shadow-copy snapshot keyed by signal (idempotent across re-priming). SS/TD/FT/CTRL panel displays now reflect the weight-miss signal, not just the priority-picked effective lean. The `applyWeightMissAdjustment` call inside `_computeEffectiveLean` was removed (sub-leans are pre-adjusted now).
-- **Opponent-style amplification** — `_getOppPace(fighter)` looks up opponent via `_fighterByNorm`; if `slpm + sapm ≥ 8.5`, multiplies negative `confDelta`/`avgDelta` by 1.2 and adds a "high-pace opponent amplifies cardio drain" reason. Positive (size-advantage) deltas in the grappler-on-TD branches are NOT amplified.
-- **`primeCaches()` reordered** — fighter-by-name index built FIRST so opp lookups always succeed during weight-miss apply (was previously partially failing due to in-loop population order).
+### Fix #1 — title-based main-event detection (`7d0dfa4`)
 
-### 2-4. Analyzer.ts split — Phase 1a-1c (`948212c`, `f737bcf`, `21b62bf`)
+Three call sites previously used `upcomingCardPairs[length-1]` as "main event". UFCStats event-page fight ordering is not reliably "prelims first, main event last" for upcoming events, so JDM/Prates was incorrectly tagged 3R despite being UFC 314's main event. New helper [`findHeadlinerPair()`](src/analyzer.ts#L533-L555) parses `"X vs Y"` from `upcomingEventName || inferredEventNameFromLines` and matches against `upcomingCardPairs` using `strictCardNameMatch` / `namesMatch`. Replaces positional inference at:
+- [`getScheduledRoundsContext`](src/analyzer.ts#L1799-L1801)
+- [`generatePredictions` loop](src/analyzer.ts#L7838-L7844)
+- [`buildFighterRow`](src/analyzer.ts#L11843-L11848)
 
-Pure relocation, no behavior change. Established `src/analyzer/<module>.ts` convention matching `src/services/`, `src/types/`, `src/config/`.
+### Fix #2 — card-order row pairing (`35a9291`)
 
-| Module | LOC | What |
-|---|---|---|
-| `src/analyzer/weight-miss.ts` | 55 | WeightMissSeverity/Signal types, `_weightMissSignals` shared map, `severityFromLbs`, `parseWeightMissFromTitle` |
-| `src/analyzer/news.ts` | 53 | NewsItem type, `_newsCache` + `_newsAlertFighters` shared state, `NEWS_INJURY_KEYWORDS`, `fetchFighterNews` (kept `fetchAllFighterNews` in analyzer.ts — orchestrates module state) |
-| `src/analyzer/fantasy-scoring.ts` | 122 | HistoricalScoringPlatform type, `scoringFor`/`winBonusForPlatform`/`calcFPForPlatform`/`calcFP`/`getFightFantasyValueForPlatform`/`isFinish`/`deriveStyle` |
+Badge logic in `renderFighters` is positional (`Math.floor(i / 2)` → fight index). Assumes `activeFighters` arrives card-ordered with each fight's two fighters at adjacent indices, but the upstream sort produced Pick6/UD scrape order. Result: Tim Elliott + Wes Schultz (don't fight each other) appeared as MAIN EVENT pair. New helper [`orderFightersByCard`](src/analyzer.ts#L5596-L5625) reorders by `upcomingCardPairs` (UFCStats source of truth) using namesMatch fallback for naming variants like Cam vs Cameron Rowston. Applied only when `currentSort === 'default'` ([analyzer.ts:10295-10300](src/analyzer.ts#L10295-L10300)).
 
-analyzer.ts: 17,063 → 16,874 lines. ~230 lines moved into modules (some net growth from b26e893 feature commit before the splits).
+### Betr UFC 314 lines
+
+24 fighters in `lines_betr_manual_v1` — 22 SS, 7 FP, 0 TD, 0 FT. Workflow followed correctly: BACKUP → read-only diagnostic → confirmed `lines_open_v1` betr opener count was 0 → mutation snippet → F5. JDM/Prates SS only (FP not posted at write time — edit via row-edit modal if/when posted).
 
 ---
 
-## Step 1 next session — verify predictor v2 lift + weight-miss outcomes (carries from 2026-04-27/28)
+## 🚨 START NEXT SESSION HERE — depends on timing
 
-**Prereq:** Della Maddalena vs Prates must finish + settle first (Sat May 2 ~11 AM EST main card end).
+### If user reports DM vs Prates is over and ready to settle (Sat May 2 ~11 AM EST or later)
 
-1. 💾 backup → Settle from UFCStats → DISMISS residuals → ▶ Run Learning Cycle on the banner
-2. New LEARNING SUMMARY shows avg |Δ| FP for the card
-3. **Compare to Sterling/Zalal's ±31.5 baseline.** If FP |Δ| drops to ~±25 or lower, predictor v2 #1+#2 paid off.
-4. **Weight-miss outcome check** — if any `⚖ MISS` badges fired during the week:
+1. 💾 BACKUP first (always)
+2. Settle from UFCStats → DISMISS residuals → ▶ Run Learning Cycle
+3. New LEARNING SUMMARY shows avg |Δ| FP for the card
+4. **Compare to Sterling/Zalal's ±31.5 baseline.** If FP |Δ| drops to ~±25 or lower, predictor v2 #1+#2 (duration model + book prior) paid off.
+5. **Weight-miss outcome check** — if any `⚖ MISS` badges fired during the week:
    - Verify severity tier was correct (small/moderate/big/extreme)
    - Did the lean direction match outcome?
-   - Did the opp-pace amplification (if it triggered, look for "High-pace opponent..." reason in row detail) help or hurt?
-   - If wildly off → tune deltas in `_computeWeightMissDeltas` at [src/analyzer.ts](src/analyzer.ts) (search for the function name).
+   - Did the opp-pace amplification ("High-pace opponent..." reason) help or hurt?
+   - If wildly off → tune deltas in `_computeWeightMissDeltas` at [src/analyzer.ts](src/analyzer.ts).
+6. If predictor v2 verified → queue **#3 RLM-as-calibration + #4 adaptive trend rate** from `project_predictor_improvements_remaining.md` (~35 lines combined).
 
-If predictor v2 verified → queue #3 (RLM-as-calibration) + #4 (adaptive trend rate) from `project_predictor_improvements_remaining.md`.
+### If user reports it's Friday/Saturday morning but fight hasn't happened yet
 
-## Step 2 next session — verify weight-miss in fight week
-
-**Prereq:** Friday May 1 weigh-ins post + Google News indexes "missed weight" headlines.
-
-1. Reload extension → analyzer page
+1. Check whether weigh-ins have posted on Google News
 2. Look for `⚖ MISS X.X LB` badges on fighter rows
-3. Click the badge → news modal should open with the source headline
-4. Expand the fighter's row → "Why OVER/UNDER" Top 3 Drivers should mention weight miss
-5. SS / TD / FT sub-panels (if displayed for that fighter) should ALSO reflect adjusted conf/avg from `applyWeightMissToFighter` (new this session)
-6. Look for the "High-pace opponent (X.X SLpM+SApM) amplifies cardio drain risk" reason — only fires when opp's slpm+sapm ≥ 8.5
+3. Click badge → news modal should open with source headline
+4. Expand row → Top 3 Drivers should mention weight miss
+5. SS / TD / FT sub-panels should ALSO reflect adjusted conf/avg (sub-leans pre-adjusted, not just effective lean)
+6. Look for "High-pace opponent (X.X SLpM+SApM) amplifies cardio drain risk" reason (only fires when opp's slpm+sapm ≥ 8.5)
 
-**False positives:** "X infamously missed weight at UFC 200" (historical), "never missed weight" (denial), "will miss weight" (prediction). The negation regex catches obvious ones but new patterns may appear → add to `parseWeightMissFromTitle` at [src/analyzer/weight-miss.ts](src/analyzer/weight-miss.ts).
+**False positives:** "X infamously missed weight at UFC 200" (historical), "never missed weight" (denial), "will miss weight" (prediction). Add new patterns to `parseWeightMissFromTitle` at [src/analyzer/weight-miss.ts](src/analyzer/weight-miss.ts).
 
-## Step 3 next session — finish Phase 1 of analyzer split
+### If user reports Betr line movement during fight week
 
-Only `venue-factors` left in Phase 1 (Betr screenshot reader was deferred to Phase 2 — too coupled, ~20 module-state dependencies).
+Use **BETR LINES modal row-edit** (preserves openLine for movement chips). Do NOT re-run the bulk write snippet — that resets openLines.
 
-**Phase 1d — `src/analyzer/venue-factors.ts`** (~67 lines):
+### If event hasn't happened and it's not yet fight week (post-DM/Prates session, before next event)
 
-- Extract `VenueFactorEntry` interface, `VENUE_DB` const, `DEFAULT_VENUE` const, `resolveVenueFactor` function from [src/analyzer.ts:292-356](src/analyzer.ts#L292-L356).
-- **DO NOT extract** `currentVenueFactor` / `currentVenueLabel` mutable state — many sites mutate/read them ([src/analyzer.ts:573](src/analyzer.ts#L573), 4217-4220, 4720-4726, 5194-5200, 5363-5369, 15389-15396). Stays in analyzer.ts.
-- The "VENUE FACTOR DATABASE" banner spans well past the venue stuff — only lines 292-356 are actually about venues. The rest (361-682) is event display name building, name matching, cancelled fighters, storage helpers, etc. — different concerns, leave alone.
+Phase 1 of analyzer.ts split is done (8 modules out, no pure-relocation chunks left worth grabbing). Next on-deck:
 
-After Phase 1d, analyzer.ts should be ~16,810 lines.
+**Phase 2 (post-fight territory):**
+- Betr screenshot reader IIFE (~230 LOC, lines ~16,082-16,312) — refactor into `init(ctx)` factory taking `storageGet/Set`, `mergeAndEnrich`, `openingLineKey`, `syncUpcomingCardContext`, `runtimeSendMessage` + ~20 module-state vars as deps. **High risk** — touches irreplaceable Betr line data flow.
+- UI panels into `src/analyzer/panels/` — line-shop modal alone is ~1,300 lines. DOM-coupled.
 
-## What's on deck after Phase 1 (untouched)
+**Phase 3 (later):** lean-engine.ts (~1,100 LOC), prop-predictor.ts (~2,700 LOC), prediction-enhancers.ts (~1,500 LOC), fair-value.ts (~1,400 LOC).
 
-1. **Predictor v2 #3 + #4** — see `project_predictor_improvements_remaining.md`. ~35 lines combined. Order matters: only after #1+#2 verified.
-2. **Phase 2 split** — UI panels into `src/analyzer/panels/` (line-shop modal is 1,300 LOC), Betr screenshot reader IIFE → `init(ctx)` factory.
-3. **Phase 3 split** — lean-engine, prop-predictor, prediction-enhancers, fair-value.
-4. **Phase 4 split** — analyzer.ts becomes entry point only.
-5. **SS_R1 settlement** — UFCStats parser pulls totals only; would need per-round splits.
-6. **Weight-miss number tuning** — heuristic conf/avg deltas, calibrate after 5-10 real cases.
-7. **iOS / iPhone access** — Orion Browser path or static dashboard path.
+**Medium-risk targets (deferrable, post-fight):**
+- UFC STATS FETCH (~187 LOC, lines 853-1040) — `fetchFromUFCStats` + `fetchFighterStats`, has cache + reads `window.fighterStatsCache`
+- CANCELLED FIGHTERS subsystem (~150 LOC, lines 290-446) — discrete subsystem but mutates module-state Set + writes `chrome.storage`
 
-**❌ Off the list permanently:** Kelly stake sizing — user declined twice (2026-04-28 and 2026-04-29). Saved as feedback memory `feedback_no_kelly_stakes.md`. Do not propose.
+### If user reports empty analyzer / "predictions look weird"
+
+Check data first (no upcoming card, stale FighterDB, missing `avgTimeMins` reverts predictor v2). The sub-lean weight-miss path mutates leans during `primeCaches` — if those mutations stack across renders, the shadow-copy idempotency in `applyWeightMissToFighter` is broken, look at `_wmKey` / `_wmOrig` snapshot logic.
+
+### If user reports false-positive weight-miss badge
+
+Update negation regex in `parseWeightMissFromTitle` at [src/analyzer/weight-miss.ts](src/analyzer/weight-miss.ts).
+
+### If user reports a regression in main-event handling
+
+The fix at `7d0dfa4` depends on `upcomingEventName || inferredEventNameFromLines` containing the `"X vs Y"` suffix. If `findHeadlinerPair()` returns null for an actual main event, the title may not match the regex `/:\s*(.+?)\s+vs\.?\s+(.+)$/i`. Diagnose with `console.log(findHeadlinerPair(), upcomingEventName, inferredEventNameFromLines)` in the analyzer console.
+
+### If user reports row pairing regression
+
+The fix at `35a9291` depends on `upcomingCardPairs` being populated. If the analyzer shows fighters not in card order, check `upcomingCardPairs.length` and that `currentSort === 'default'` (user-selected sorts intentionally bypass card-order).
 
 ---
 
-## Pre-existing context (carried forward, persistent)
+## Current commit ladder ahead of `origin/feature/sleek-theme-v1` (newest first)
 
-**Recent commits ahead of `origin/feature/sleek-theme-v1`** (newest first):
-
-- `21b62bf refactor: extract fantasy scoring + style derivation` (this session)
-- `f737bcf refactor: extract news fetch + cache` (this session)
-- `948212c refactor: extract weight-miss detection` (this session)
-- `b26e893 feat: weight-miss opp-pace amplification + sub-lean adjustment` (this session)
+- `40a3e9a feat: polish learning summary with stat chips and magnitude bars` *(this session)*
+- `35a9291 fix: order fighter rows by UFCStats card sequence so badges land correctly` *(this session)*
+- `7d0dfa4 fix: detect main event by parsing event title, not card position` *(this session)*
+- `0323a41 refactor: extract analytics helpers (Phase 1h)` (2026-04-30)
+- `0b03af2 refactor: extract HTML parsers (Phase 1g)` (2026-04-30)
+- `1a518ec refactor: extract style matchup matrix (Phase 1f)` (2026-04-29)
+- `c648ad7 refactor: extract fighter image fetcher (Phase 1e)` (2026-04-29)
+- `43f0fc2 refactor: extract venue factors (Phase 1d)` (2026-04-29)
+- `8e73d41 docs: refresh resume for 2026-04-29 session` (2026-04-29)
+- `21b62bf refactor: extract fantasy scoring + style derivation (Phase 1c)` (2026-04-29)
+- `f737bcf refactor: extract news fetch + cache (Phase 1b)` (2026-04-29)
+- `948212c refactor: extract weight-miss detection (Phase 1a)` (2026-04-29)
+- `b26e893 feat: weight-miss opp-pace amplification + sub-lean adjustment` (2026-04-29)
 - `e068189 feat: weight-miss feeds into lean projection + confidence` (2026-04-28)
 - `482ecc6 feat: weight-miss badge with severity tiers from news headlines` (2026-04-28)
 - `81dbc1e feat: top-3 lean drivers callout in row detail panel` (2026-04-28)
 - `9062b8d perf: strip render instrumentation, keep lazy-render fix` (2026-04-28)
 - `836b698 feat: PrizePicks-specific scoring + Round-1 SS line plumbing` (2026-04-28)
 - `ea8dac2 feat: predictor v2 — duration model + book prior + learning UX` (2026-04-27)
-- `2de0dda feat: post-event CLV audit loop + RLM signal` (2026-04-26, battle-tested)
 
-**Snapshot tags for revert:**
-- `clv-rlm-v1` (2026-04-24)
-- `ctrl-autofetch-v1` (2026-04-24)
-- `ufcstats-matching-v3` (2026-04-20)
+**Snapshot tags for revert:** `clv-rlm-v1` (2026-04-24), `ctrl-autofetch-v1` (2026-04-24), `ufcstats-matching-v3` (2026-04-20).
+
+**Project directory snapshot (this session):** `backups/full_project_snapshot_20260430_135140/`
 
 **Cache key:** `ufcstats_v49` (unchanged — no FighterDB schema changes this session).
 
-**Working tree status:** clean except for `RESUME_NEXT_SESSION.md` (this file) and `.claude/settings.local.json`. All source-code changes committed.
+**Working tree status at session end:** clean except for `RESUME_NEXT_SESSION.md` (this file) and `.claude/settings.local.json`. All source-code changes committed.
 
-**Mid-fight-week timeline:**
-- Wed 4/29 (today, end of session) — pre-weigh-in, no weight-miss signals will fire
-- Fri 5/1 — ceremonial weigh-ins; Google News will start indexing "missed weight" headlines after
-- Sat 5/2 — fight day, 4 AM start, main card ends ~11 AM EST → settlement window
-- Lines status today: UD/Pick6/PrizePicks SS/TD/FT only. No FP lines anywhere yet, no Betr yet, no DK either.
+---
+
+## Mid-fight-week timeline (carry-forward)
+
+- ✅ Thu 4/30 EOD — pre-weigh-in, no weight-miss signals can fire yet. Two fixes shipped, Betr lines entered.
+- 🔜 **Fri 5/1** — ceremonial weigh-ins; Google News starts indexing "missed weight" headlines. **First chance to verify weight-miss in production.**
+- 🔜 **Sat 5/2** — fight day, ~4 AM start, main card ends ~11 AM EST → settlement window. **First real predictor v2 outcome data.**
+
+Lines status as of session end: P6 24 · UD 26 · Betr 24 · PP 15 · DK (no data). 132 stored / 132 matched. Slate has 4 issues (DK no data + lines aging — both expected mid-week).
+
+---
+
+## On deck (post-fight)
+
+1. **Predictor v2 #3 + #4** — see `project_predictor_improvements_remaining.md`. ~35 lines combined. Order matters: only after #1+#2 verified.
+2. **Phase 2 + 3 splits** above.
+3. **SS_R1 settlement** — UFCStats parser pulls totals only; would need per-round splits.
+4. **Weight-miss number tuning** — heuristic conf/avg deltas, calibrate after 5-10 real cases.
+5. **iOS / iPhone access** — Orion Browser path or static dashboard path.
+
+**❌ Off the list permanently:** Kelly stake sizing — user declined twice. See `feedback_no_kelly_stakes.md`. Do not propose.
 
 ## Loose ends (still not blocking)
 
-- Pick6 CTRL settlement label mismatch (`Control` vs `ctrl`) at [src/analyzer.ts:14650](src/analyzer.ts#L14650). Low-priority.
+- Pick6 CTRL settlement label mismatch (`Control` vs `ctrl`) — low-priority.
 - `?`-platform records (138 unstamped) in `prop_archive_v1`. Pollutes per-platform analytics, doesn't affect display.
 - Banner-vs-storage unresolved-count mismatch — **user said "don't worry about this."**
 - Pick6 pickGroup polling auto-fetch still misses CTRL — see `project_pick6_pickgroup_polling_pending.md`.
+- MAIN EVENT badge fix only applies when `currentSort === 'default'` and `upcomingCardPairs.length > 0`. If neither is true, falls back to scrape-order pairing (which may still misalign).
 
 ## Don'ts (persistent)
 
 - **LINE DATA IS IRREPLACEABLE.** Backup BEFORE any storage-mutating snippet.
-- **NEVER bump `BETR_EVENT_DATE` or edit the hardcoded seed** to enter Betr lines.
+- **NEVER bump `BETR_EVENT_DATE` or edit the hardcoded seed** to enter Betr lines. Use `lines_betr_manual_v1` console snippet path.
 - User is in **Chrome**. ↻ reload flushes cache.
-- Betr entry: screenshot → Claude writes console snippet targeting `lines_betr_manual_v1` only.
+- Betr entry: screenshot → diagnostic first → backup → snippet → F5 the analyzer tab (NOT the extension).
 - **DK partial coverage is normal** — not a scraper bug.
 - **Skip Pick6 CTRL UNDER unless `ctrl_under_available === true`.**
 - **Do not propose Kelly stakes** — user declined twice, persistent feedback memory.
 
 ---
 
-## Resume prompt
+## Resume prompt (copy/paste at start of next session)
 
-> Reading `RESUME_NEXT_SESSION.md`. Branch `feature/sleek-theme-v1`. **State:** four commits this session — weight-miss opp-pace amp + sub-lean adjustment, plus Phase 1a-1c of analyzer.ts split (weight-miss / news / fantasy-scoring extracted into `src/analyzer/`). Della Maddalena vs Prates Sat May 2 — both predictor v2 lift validation AND first real weight-miss data still pending settle.
+> Reading `RESUME_NEXT_SESSION.md`. Branch `feature/sleek-theme-v1`. **State:** twelve commits ahead of origin (Phase 1a-1h analyzer split + 2 main-event fixes shipped today). Build clean. UFC 314 Betr lines entered (24 fighters in `lines_betr_manual_v1`); JDM/Prates SS only, no FP at write time. Della Maddalena vs Prates Sat May 2 ~11 AM EST settle is gating both predictor v2 lift verification AND first real weight-miss outcome data.
 >
 > **Branch in conversation:**
 >
-> - **If user reports DM vs Prates is over and ready to settle** → backup, settle, DISMISS, ▶ Run Learning Cycle. Verify (a) predictor v2 FP |Δ| vs ±31.5 baseline — target ±25 or lower; (b) any `⚖ MISS` badges that fired — severity correct, lean direction matched outcome, opp-pace amplification reason fired/helped where appropriate. If predictor v2 verified, queue #3 + #4 from `project_predictor_improvements_remaining.md`. If weight-miss numbers off, tune deltas in `_computeWeightMissDeltas`.
-> - **If user reports event hasn't happened yet but it's Friday/Saturday morning** → check whether weigh-ins have posted, look for `⚖ MISS` badges, expand row to verify Top 3 Drivers + SS/TD/FT sub-panels reflect weight-miss (new this session — sub-leans are now adjusted, not just effective lean).
-> - **If user reports event hasn't happened and it's not yet fight week** → on-deck: Phase 1d venue-factors split (~67 lines, queued), then Phase 2 split, then predictor #3+#4. Don't propose Kelly stakes.
-> - **If user reports empty analyzer / "predictions look weird"** → check data first (no upcoming card, stale FighterDB, missing `avgTimeMins` reverts predictor v2). The new sub-lean weight-miss path mutates leans during `primeCaches` — if those mutations stack across renders, the shadow-copy idempotency in `applyWeightMissToFighter` is broken, look at `_wmKey` / `_wmOrig` snapshot logic.
-> - **If user reports false-positive weight-miss badge** → update negation regex in `parseWeightMissFromTitle` — moved this session to [src/analyzer/weight-miss.ts](src/analyzer/weight-miss.ts).
+> - **If DM vs Prates is over and ready to settle** → backup → settle from UFCStats → DISMISS residuals → ▶ Run Learning Cycle. Verify (a) FP |Δ| vs Sterling/Zalal ±31.5 baseline (target ±25 or lower), (b) any `⚖ MISS` badges fired correctly. If predictor v2 verified, queue #3 + #4 from `project_predictor_improvements_remaining.md`.
+> - **If event hasn't happened but it's Friday/Saturday morning** → check whether weigh-ins posted, look for `⚖ MISS` badges, expand row to verify Top 3 Drivers + SS/TD/FT sub-panels reflect weight-miss.
+> - **If user reports Betr line movement during fight week** → BETR LINES modal row-edit (preserves openLine). NEVER re-run the bulk snippet.
+> - **If event hasn't happened and it's not fight week yet** → Phase 1 done (8 modules). Next is Phase 2 (Betr IIFE → factory, ~230 LOC, **high risk**, or UI panels). Both post-fight territory. Predictor #3+#4 (~35 lines) want DM vs Prates settle data first. Don't propose Kelly stakes.
+> - **If user reports empty analyzer / weird predictions** → check data first (upcoming card, stale FighterDB, missing `avgTimeMins`).
+> - **If user reports main-event regression** → diagnose `findHeadlinerPair()` — check `upcomingEventName`/`inferredEventNameFromLines` contains `"X vs Y"` suffix that matches the regex.
+> - **If user reports row pairing regression** → check `upcomingCardPairs.length > 0` and `currentSort === 'default'`.
+> - **If user reports false-positive weight-miss badge** → update negation regex in `parseWeightMissFromTitle` at [src/analyzer/weight-miss.ts](src/analyzer/weight-miss.ts).
