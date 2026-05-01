@@ -10556,25 +10556,91 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 async function fetchAllFighterNews(): Promise<void> {
   _newsAlertFighters.clear();
   _weightMissSignals.clear();
+  // Pass 1 — fetch all per-fighter results in parallel, set alert flags, and
+  // collect weight-miss candidates per fighter. Outlets often use generic
+  // clickbait titles ("Longtime veteran misses weight at UFC Perth") that
+  // never name the misser in title or description, so a strict name-in-haystack
+  // gate would miss them. Instead we collect candidates broadly here and let
+  // Pass 2 attribute by counting articles per fighter within the fight pair —
+  // the misser's name appears in the article body (so Google News surfaces
+  // multiple matching articles in their search) while the opponent's search
+  // returns at most a single tangential card-recap mention.
+  type WMCandidate = { sig: WeightMissSignal; index: number; namesSelf: boolean };
+  const candidatesByFighter = new Map<string, WMCandidate[]>();
   await Promise.all(allFighters.map(async (f) => {
     const items = await fetchFighterNews(f.name);
     const hasAlert = items.some(item =>
       NEWS_INJURY_KEYWORDS.some(kw => item.title.toLowerCase().includes(kw))
     );
     if (hasAlert) _newsAlertFighters.add(f.name.toLowerCase());
-    // Weight-miss detection — separate signal channel. Prefer a known-amount
-    // signal over an unknown one; among known, prefer the larger value (more
-    // authoritative — outlets often round up in headlines).
-    for (const item of items) {
+    const fLower = f.name.toLowerCase();
+    const fLast = fLower.split(' ').pop() || fLower;
+    // Cross-fighter guard: outlets sometimes name a different fighter on the
+    // same card ("JDM and Prates make weight"); reject those for f.
+    const otherLastNames = allFighters
+      .filter(o => o.name.toLowerCase() !== fLower)
+      .map(o => (o.name.toLowerCase().split(' ').pop() || ''))
+      .filter(ln => ln.length >= 4 && ln !== fLast);
+    const fCands: WMCandidate[] = [];
+    items.forEach((item, idx) => {
       const sig = parseWeightMissFromTitle(item.title, f.name);
-      if (!sig) continue;
-      const key = f.name.toLowerCase();
-      const prev = _weightMissSignals.get(key);
-      if (!prev) { _weightMissSignals.set(key, sig); continue; }
-      if (prev.severity === 'unknown' && sig.severity !== 'unknown') { _weightMissSignals.set(key, sig); continue; }
-      if (prev.lbsOver != null && sig.lbsOver != null && sig.lbsOver > prev.lbsOver) { _weightMissSignals.set(key, sig); }
-    }
+      if (!sig) return;
+      const haystack = (item.title + ' ' + (item.description || '')).toLowerCase();
+      const namesSelf = haystack.includes(fLower) || new RegExp(`\\b${fLast}\\b`).test(haystack);
+      const namesOther = otherLastNames.some(ln => new RegExp(`\\b${ln}\\b`).test(haystack));
+      // Reject only if another fighter is explicitly named — those are about
+      // someone else, not us. Articles that name no one are kept as candidates;
+      // Pass 2 disambiguates them via per-pair count comparison.
+      if (namesOther) return;
+      fCands.push({ sig, index: idx, namesSelf });
+    });
+    if (fCands.length > 0) candidatesByFighter.set(fLower, fCands);
   }));
+
+  // Pass 2 — within each fight pair, compare candidate counts. The actual
+  // misser has 2+ matching articles (their name is in the article body so
+  // Google News surfaces multiple weight-miss articles in their search); the
+  // opponent has 0–1 tangential card-recap mentions. A clear margin attributes
+  // the signal; ambiguity (both sides similar) skips. As a tiebreaker for
+  // close cases, prefer a fighter explicitly named in title/description.
+  const applyBestSignal = (key: string, cands: WMCandidate[]): void => {
+    let best: WMCandidate | null = null;
+    for (const c of cands) {
+      if (!best) { best = c; continue; }
+      // Prefer higher severity; then higher lbsOver; then namesSelf; then lower index.
+      if (best.sig.severity === 'unknown' && c.sig.severity !== 'unknown') { best = c; continue; }
+      if (c.sig.severity === 'unknown' && best.sig.severity !== 'unknown') continue;
+      if (c.sig.lbsOver != null && best.sig.lbsOver != null && c.sig.lbsOver > best.sig.lbsOver) { best = c; continue; }
+      if (c.sig.lbsOver != null && best.sig.lbsOver == null) { best = c; continue; }
+      if (c.namesSelf && !best.namesSelf) { best = c; continue; }
+      if (c.index < best.index && c.namesSelf === best.namesSelf) best = c;
+    }
+    if (best) _weightMissSignals.set(key, best.sig);
+  };
+  const processed = new Set<string>();
+  for (const f of allFighters) {
+    const fLower = f.name.toLowerCase();
+    if (processed.has(fLower)) continue;
+    const oppLower = (f.opponent || '').toLowerCase();
+    const fCands = candidatesByFighter.get(fLower) || [];
+    const oCands = oppLower ? (candidatesByFighter.get(oppLower) || []) : [];
+    processed.add(fLower);
+    if (oppLower) processed.add(oppLower);
+    if (fCands.length === 0 && oCands.length === 0) continue;
+    const fCount = fCands.length;
+    const oCount = oCands.length;
+    // Clear margin: 2+ articles AND at least 2 more than the opponent.
+    if (fCount >= 2 && fCount - oCount >= 2) { applyBestSignal(fLower, fCands); continue; }
+    if (oCount >= 2 && oCount - fCount >= 2) { applyBestSignal(oppLower, oCands); continue; }
+    // Close counts: fall back to the explicit-name gate. If exactly one side
+    // has a candidate that names them in title/description, fire for them.
+    const fNamed = fCands.filter(c => c.namesSelf);
+    const oNamed = oCands.filter(c => c.namesSelf);
+    if (fNamed.length > 0 && oNamed.length === 0) applyBestSignal(fLower, fNamed);
+    else if (oNamed.length > 0 && fNamed.length === 0) applyBestSignal(oppLower, oNamed);
+    // else: ambiguous — both sides named or neither, similar counts → skip.
+  }
+
   renderFighters();
 }
 
