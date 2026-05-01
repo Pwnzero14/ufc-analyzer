@@ -7995,12 +7995,16 @@ function renderPredictionsHtml(
         const fpDelta = Number.isFinite(p.delta.fp) ? `${p.delta.fp > 0 ? '+' : ''}${p.delta.fp.toFixed(1)}` : '—';
         const totalErr = Math.abs(p.delta.ss || 0) + Math.abs(p.delta.td || 0) + Math.abs(p.delta.fp || 0);
         const errColor = totalErr < 15 ? 'var(--green)' : totalErr < 30 ? 'var(--amber)' : 'var(--red)';
-        return `<div style="display:flex;gap:8px;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.03)">
-          <span style="min-width:100px;color:var(--text)">${p.fighter}</span>
-          <span style="min-width:50px;color:var(--text-muted)">SS: ${ssDelta}</span>
-          <span style="min-width:50px;color:var(--text-muted)">TD: ${tdDelta}</span>
-          <span style="min-width:50px;color:var(--text-muted)">FP: ${fpDelta}</span>
-          <span style="color:${errColor}">|Δ| ${totalErr.toFixed(1)}</span>
+        const barPct = Math.min(100, (totalErr / 45) * 100);
+        return `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);border-radius:4px;transition:background 120ms" onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='transparent'">
+          <span style="min-width:100px;color:var(--text);font-weight:500">${p.fighter}</span>
+          <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">SS ${ssDelta}</span>
+          <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">TD ${tdDelta}</span>
+          <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">FP ${fpDelta}</span>
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;min-width:36px" title="|Δ| magnitude">
+            <div style="height:100%;width:${barPct.toFixed(0)}%;background:${errColor};border-radius:2px"></div>
+          </div>
+          <span style="color:${errColor};font-variant-numeric:tabular-nums;min-width:42px;text-align:right;font-weight:600">±${totalErr.toFixed(1)}</span>
         </div>`;
       }).join('');
 
@@ -8018,14 +8022,26 @@ function renderPredictionsHtml(
       <button id="predictorDeleteBtn" class="btn btn-sm" style="background:none;border:1px solid var(--text-muted);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:10px" title="Delete these predictions">✕ Delete</button>
     </div>` : '';
 
-    learnBody = `${pendingBanner}<div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">
-      <div style="font-size:11px"><span style="color:var(--text-muted)">Avg |Δ|:</span> <span style="color:var(--amber)">SS ±${s.avgAbsDeltaSS.toFixed(1)}</span> · <span style="color:var(--amber)">TD ±${s.avgAbsDeltaTD.toFixed(1)}</span> · <span style="color:var(--amber)">FP ±${s.avgAbsDeltaFP.toFixed(1)}</span></div>
+    const chipColor = (v: number) => v < 8 ? 'var(--green)' : v < 16 ? 'var(--amber)' : 'var(--red)';
+    const statChip = (label: string, val: number) => {
+      const c = chipColor(val);
+      return `<div style="flex:1;min-width:78px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:2px solid ${c};border-radius:6px;display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Avg |Δ| ${label}</span>
+        <span style="font-size:15px;font-weight:600;color:${c};font-variant-numeric:tabular-nums">±${val.toFixed(1)}</span>
+      </div>`;
+    };
+    learnBody = `${pendingBanner}<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      ${statChip('SS', s.avgAbsDeltaSS)}
+      ${statChip('TD', s.avgAbsDeltaTD)}
+      ${statChip('FP', s.avgAbsDeltaFP)}
     </div>
-    <div style="display:flex;gap:16px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
-      <span><span style="color:var(--green)">Best:</span> ${s.bestPrediction}</span>
-      <span><span style="color:var(--red)">Worst:</span> ${s.worstPrediction}</span>
-      <span><span style="color:var(--text-muted)">Weights:</span> ${wAdj}</span>
-      <span><span style="color:var(--text-muted)">Trends updated:</span> ${s.trendUpdates}</span>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;font-size:10px">
+      <span style="padding:3px 9px;background:rgba(56,176,0,0.1);border:1px solid rgba(56,176,0,0.28);border-radius:10px;color:var(--green);font-weight:500">▲ Best · ${s.bestPrediction}</span>
+      <span style="padding:3px 9px;background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.28);border-radius:10px;color:var(--red);font-weight:500">▼ Worst · ${s.worstPrediction}</span>
+    </div>
+    <div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px;color:var(--text-muted);flex-wrap:wrap">
+      <span><span style="text-transform:uppercase;letter-spacing:0.08em;font-size:9px;opacity:0.75">Weights</span> ${wAdj}</span>
+      <span><span style="text-transform:uppercase;letter-spacing:0.08em;font-size:9px;opacity:0.75">Trends</span> ${s.trendUpdates}</span>
     </div>
     ${deltaRows}`;
   } else {
