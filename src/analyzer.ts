@@ -99,10 +99,10 @@ interface LeanResult {
 }
 type LeanSource = 'fp'|'ss'|'td'|'ft'|'ctrl';
 type SourcePlatformKey = 'pick6'|'underdog'|'prizepicks'|'betr'|'draftkings_sportsbook';
-interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string }
+interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string; _platform?: SourcePlatformKey }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
-interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
+interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
 
 function createEmptyLean(verdict = ''): LeanResult {
   return { lean: 'none', conf: 0, reasons: [], verdict };
@@ -1939,10 +1939,15 @@ function shouldSkipFpSideForFighter(f: AnalyzerFighter, source: LeanSource, dire
   return false;
 }
 
-function formatSourcePlatformLabel(f: AnalyzerFighter, source: LeanSource): string {
-  const platform = getSourceActivePlatformKey(f, source);
-  const line = getSourceActiveLine(f, source);
-  if (!platform || line == null) return '—';
+function formatSourcePlatformLabel(f: AnalyzerFighter, source: LeanSource, platformOverride?: SourcePlatformKey): string {
+  const platform = platformOverride ?? getSourceActivePlatformKey(f, source);
+  if (!platform) return '—';
+  // When an override is provided, look up the line for that specific book
+  // rather than priority-walking. Used by Best Picks to show PP-specific picks.
+  const line = platformOverride
+    ? (getSourceLineEntries(f, source).find((entry) => entry.platform === platformOverride)?.value ?? null)
+    : getSourceActiveLine(f, source);
+  if (line == null) return '—';
   const label = platform === 'pick6'
     ? 'Pick6'
     : platform === 'underdog'
@@ -4083,44 +4088,65 @@ function calcLean(
   oppLine_pp: number|null = null,
   oppLine_betr: number|null = null,
   oppMoneyline: number|null = null,
+  platformOverride?: SourcePlatformKey,
 ): LeanResult {
+  // platformOverride lets Best Picks evaluate a fighter's FP lean against a
+  // specific book (e.g., PrizePicks) rather than the user's active platform.
+  // This matters for FP because PP uses a different scoring formula — its line
+  // can't be compared to the P6/UD line directly, the lean must be recomputed
+  // against PP's projection.
+  const platform = platformOverride ?? currentPlatform;
   const availableLines = ([line_p6, line_ud, line_pp, line_betr].filter(l => l != null) as number[]);
   const avgLine = availableLines.length ? parseFloat((availableLines.reduce((s,l) => s+l, 0) / availableLines.length).toFixed(1)) : null;
   const selectedLine =
-    currentPlatform === 'pick6' ? line_p6 :
-    currentPlatform === 'underdog' ? line_ud :
-    currentPlatform === 'prizepicks' ? line_pp :
-    currentPlatform === 'draftkings_sportsbook' ? line_p6 :
+    platform === 'pick6' ? line_p6 :
+    platform === 'underdog' ? line_ud :
+    platform === 'prizepicks' ? line_pp :
+    platform === 'draftkings_sportsbook' ? line_p6 :
     line_betr;
   const oppAvailableLines = ([oppLine_p6, oppLine_ud, oppLine_pp, oppLine_betr].filter(l => l != null) as number[]);
   const oppAvgLine = oppAvailableLines.length
     ? parseFloat((oppAvailableLines.reduce((s, l) => s + l, 0) / oppAvailableLines.length).toFixed(1))
     : null;
   const oppSelectedLine =
-    currentPlatform === 'pick6' ? oppLine_p6 :
-    currentPlatform === 'underdog' ? oppLine_ud :
-    currentPlatform === 'prizepicks' ? oppLine_pp :
-    currentPlatform === 'draftkings_sportsbook' ? oppLine_p6 :
+    platform === 'pick6' ? oppLine_p6 :
+    platform === 'underdog' ? oppLine_ud :
+    platform === 'prizepicks' ? oppLine_pp :
+    platform === 'draftkings_sportsbook' ? oppLine_p6 :
     oppLine_betr;
   const oppLine = oppSelectedLine ?? oppAvgLine;
   const line = selectedLine ?? avgLine;
   if (!line || !db || !db.loaded) return { lean: 'none', conf: 0, reasons: [], verdict: 'Loading stats...' };
 
+  // When called with an explicit platformOverride (Best Picks per-book pass),
+  // use ONLY that platform's avgFP. PP scoring differs materially from P6/UD
+  // (sub attempts +4pt, no quick-win bonus), so averaging across books would
+  // pull the PP projection toward the P6/UD scale and mis-evaluate the lean.
+  // Default behavior (no override) keeps the cross-platform average for
+  // robustness when the user-facing display can't commit to one book.
+  const platformSpecificAvg =
+    platformOverride === 'pick6' ? db.avgFP_p6 ?? null :
+    platformOverride === 'underdog' ? db.avgFP_ud ?? null :
+    platformOverride === 'prizepicks' ? db.avgFP_pp ?? null :
+    platformOverride === 'betr' ? db.avgFP_betr ?? null :
+    null;
   const platformAvgCandidates = [
     line_p6 != null ? db.avgFP_p6 ?? null : null,
     line_ud != null ? db.avgFP_ud ?? null : null,
     line_pp != null ? db.avgFP_pp ?? null : null,
     line_betr != null ? db.avgFP_betr ?? null : null,
   ].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const avgFP = platformAvgCandidates.length
-    ? parseFloat((platformAvgCandidates.reduce((s, v) => s + v, 0) / platformAvgCandidates.length).toFixed(1))
-    : (db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_pp ?? db.avgFP_betr ?? db.avgFP);
+  const avgFP = platformSpecificAvg != null
+    ? platformSpecificAvg
+    : platformAvgCandidates.length
+      ? parseFloat((platformAvgCandidates.reduce((s, v) => s + v, 0) / platformAvgCandidates.length).toFixed(1))
+      : (db.avgFP_p6 ?? db.avgFP_ud ?? db.avgFP_pp ?? db.avgFP_betr ?? db.avgFP);
   const history = db.history || [];
   const historyPlatform: 'pick6'|'underdog'|'prizepicks'|'betr' =
-    currentPlatform === 'pick6' ? 'pick6' :
-    currentPlatform === 'underdog' ? 'underdog' :
-    currentPlatform === 'prizepicks' ? 'prizepicks' :
-    currentPlatform === 'draftkings_sportsbook' ? 'pick6' :
+    platform === 'pick6' ? 'pick6' :
+    platform === 'underdog' ? 'underdog' :
+    platform === 'prizepicks' ? 'prizepicks' :
+    platform === 'draftkings_sportsbook' ? 'pick6' :
     'betr';
   const historyFP = history.map(h => getFightFantasyValueForPlatform(h, historyPlatform));
   const mlAdjFP = calcMLAdjustedFP(history, moneyline);
@@ -4171,7 +4197,7 @@ function calcLean(
       const parts = ([['P6', line_p6], ['UD', line_ud], ['PP', line_pp], ['BTR', line_betr]] as [string, number|null][]) 
         .filter(([, v]) => v != null).map(([lbl, v]) => `${lbl} ${v}`).join(' / ');
       if (selectedLine != null) {
-        const src = currentPlatform === 'pick6' ? 'P6' : currentPlatform === 'underdog' ? 'UD' : currentPlatform === 'prizepicks' ? 'PP' : currentPlatform === 'draftkings_sportsbook' ? 'DK' : 'BTR';
+        const src = platform === 'pick6' ? 'P6' : platform === 'underdog' ? 'UD' : platform === 'prizepicks' ? 'PP' : platform === 'draftkings_sportsbook' ? 'DK' : 'BTR';
         reasons.push({ icon: 'neu', text: `Books diverge: ${parts} — using ${src} ${selectedLine} for analysis` });
       } else {
         reasons.push({ icon: 'neu', text: `Books diverge: ${parts} — using avg ${line} for analysis` });
@@ -4541,7 +4567,7 @@ function calcLean(
   }
 
   const lineStr = selectedLine != null
-    ? `${currentPlatform === 'pick6' ? 'P6' : currentPlatform === 'underdog' ? 'UD' : currentPlatform === 'prizepicks' ? 'PP' : currentPlatform === 'draftkings_sportsbook' ? 'DK' : 'BTR'} ${selectedLine}`
+    ? `${platform === 'pick6' ? 'P6' : platform === 'underdog' ? 'UD' : platform === 'prizepicks' ? 'PP' : platform === 'draftkings_sportsbook' ? 'DK' : 'BTR'} ${selectedLine}`
     : (availableLines.length > 1 ? `avg ${line}` : line_p6 ? `P6 ${line_p6}` : line_ud ? `UD ${line_ud}` : line_pp ? `PP ${line_pp}` : `BTR ${line_betr}`);
   const avgStr  = avgFP != null ? ` (avg ${avgFP.toFixed(1)})` : '';
   const verdict = lean === 'over'
@@ -6062,9 +6088,23 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   const bestPickReasonCache = new Map<string, string | null>();
   const bestPickLeanCache = new Map<string, EffectiveLean>();
 
-  const lineForLeanSource = (f: AnalyzerFighter, source: EffectiveLean['_source']): number | null => {
-    if (source === 'fp') return activePlatformLine(f);
+  // Best Picks lookups can target a specific book via the optional `platform`
+  // arg — used when a candidate carries `_platform` (e.g., a PrizePicks-specific
+  // FP candidate). Without it, falls back to the user's active-platform priority.
+  const lineForLeanSource = (f: AnalyzerFighter, source: EffectiveLean['_source'], platform?: SourcePlatformKey): number | null => {
+    if (source === 'fp') {
+      if (platform === 'pick6') return f.line_p6 ?? null;
+      if (platform === 'underdog') return f.line_ud ?? null;
+      if (platform === 'prizepicks') return f.line_pp ?? null;
+      if (platform === 'betr') return f.line_betr ?? null;
+      return activePlatformLine(f);
+    }
     if (source === 'ss') {
+      if (platform === 'pick6') return f.line_p6_ss ?? null;
+      if (platform === 'underdog') return f.line_ud_ss ?? null;
+      if (platform === 'prizepicks') return f.line_pp_ss ?? null;
+      if (platform === 'betr') return f.line_betr_ss ?? null;
+      if (platform === 'draftkings_sportsbook') return f.line_dk_ss ?? null;
       if (currentPlatform === 'pick6') return f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_betr_ss ?? f.line_dk_ss ?? null;
       if (currentPlatform === 'underdog') return f.line_ud_ss ?? f.line_p6_ss ?? f.line_pp_ss ?? f.line_betr_ss ?? f.line_dk_ss ?? null;
       if (currentPlatform === 'prizepicks') return f.line_pp_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_betr_ss ?? f.line_dk_ss ?? null;
@@ -6072,6 +6112,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return f.line_betr_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_dk_ss ?? null;
     }
     if (source === 'td') {
+      if (platform === 'pick6') return f.line_p6_td ?? null;
+      if (platform === 'underdog') return f.line_ud_td ?? null;
+      if (platform === 'prizepicks') return f.line_pp_td ?? null;
+      if (platform === 'betr') return f.line_betr_td ?? null;
+      if (platform === 'draftkings_sportsbook') return f.line_dk_td ?? null;
       if (currentPlatform === 'pick6') return f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? f.line_dk_td ?? null;
       if (currentPlatform === 'underdog') return f.line_ud_td ?? f.line_p6_td ?? f.line_pp_td ?? f.line_betr_td ?? f.line_dk_td ?? null;
       if (currentPlatform === 'prizepicks') return f.line_pp_td ?? f.line_p6_td ?? f.line_ud_td ?? f.line_betr_td ?? f.line_dk_td ?? null;
@@ -6079,6 +6124,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return f.line_betr_td ?? f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_dk_td ?? null;
     }
     if (source === 'ft') {
+      if (platform === 'pick6') return f.line_p6_ft ?? null;
+      if (platform === 'underdog') return f.line_ud_ft ?? null;
+      if (platform === 'prizepicks') return f.line_pp_ft ?? null;
+      if (platform === 'betr') return f.line_betr_ft ?? null;
+      if (platform === 'draftkings_sportsbook') return f.line_dk_ft ?? null;
       if (currentPlatform === 'pick6') return f.line_p6_ft ?? f.line_ud_ft ?? f.line_pp_ft ?? f.line_betr_ft ?? f.line_dk_ft ?? null;
       if (currentPlatform === 'underdog') return f.line_ud_ft ?? f.line_p6_ft ?? f.line_pp_ft ?? f.line_betr_ft ?? f.line_dk_ft ?? null;
       if (currentPlatform === 'prizepicks') return f.line_pp_ft ?? f.line_p6_ft ?? f.line_ud_ft ?? f.line_betr_ft ?? f.line_dk_ft ?? null;
@@ -6094,11 +6144,110 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return 0;
   };
 
+  // Per-book FP lean: PrizePicks uses a different scoring formula, so its line
+  // can't be evaluated against the P6/UD projection — calcLean must be re-run
+  // with the explicit book so projection, history, and platform-tagged reasons
+  // all line up. We generate one FP candidate per book that has a line; if a
+  // book's lean is "none" or "push" it's filtered out and won't dilute the pool.
+  const FP_BOOKS_FOR_BEST_PICKS: SourcePlatformKey[] = ['pick6', 'underdog', 'prizepicks', 'betr'];
+  const computeFpLeanForBook = (f: AnalyzerFighter, platform: SourcePlatformKey): LeanResult | null => {
+    const book = lineForLeanSource(f, 'fp', platform);
+    if (book == null) return null;
+    if (!f.db?.loaded) return null;
+    const opp = f.opponent ? allFighters.find(x => x.name === f.opponent) : null;
+    return calcLean(
+      f.name, f.db,
+      f.line_p6 ?? null, f.line_ud ?? null, f.line_pp ?? null, f.line_betr ?? null,
+      f.moneyline ?? null,
+      opp?.db ?? null,
+      opp?.line_p6 ?? null, opp?.line_ud ?? null, opp?.line_pp ?? null, opp?.line_betr ?? null,
+      opp?.moneyline ?? null,
+      platform,
+    );
+  };
+
+  // Chalk filter: reject sides priced > 0.667 implied probability (= worse than
+  // -200 American or below 0.5x payout). User wants to avoid "to-end-inside-the-
+  // distance" -300 lines and similar — they hit often but pay nothing, so even
+  // a confident lean isn't actually +EV after juice. FT UNDERs are tightened
+  // further (0.6 = -150) because finish-inside-distance is structurally chalk-
+  // prone for power punchers and the looser threshold lets juiced FT unders slip.
+  const CHALK_IMPLIED_PROB_LIMIT = 0.667;
+  // FT UNDER threshold tightened to 0.55 (~-122 American). Finish-inside-distance
+  // markets are structurally chalk-prone; -150 is still too juiced once the
+  // model's edge gets eaten by the payout.
+  const CHALK_IMPLIED_PROB_LIMIT_FT_UNDER = 0.55;
+  const impliedProbInline = (odds: number | null | undefined): number | null => {
+    if (odds == null || !Number.isFinite(odds)) return null;
+    if (Math.abs(odds) >= 100) return odds < 0 ? Math.abs(odds) / (Math.abs(odds) + 100) : 100 / (odds + 100);
+    if (odds > 0) return 1 / (1 + odds);
+    return null;
+  };
+  const sideOddsFor = (f: AnalyzerFighter, source: LeanSource, dir: 'over' | 'under'): number | null => {
+    if (source === 'ss') return dir === 'over' ? (f.ss_over_odds ?? null) : (f.ss_under_odds ?? null);
+    if (source === 'td') return dir === 'over' ? (f.td_over_odds ?? null) : (f.td_under_odds ?? null);
+    if (source === 'ft') return dir === 'over' ? (f.ft_over_odds ?? null) : (f.ft_under_odds ?? null);
+    return null;
+  };
+  // UD pick-em is often one-sided. Returns true=UD offered this side, false=UD has
+  // the line but didn't offer this side, null=no UD line / unknown. The merged
+  // ft_under_odds field can't be used for this check because DK chalk odds will
+  // overwrite it even when UD didn't offer the side.
+  const udSideAvailable = (f: AnalyzerFighter, source: LeanSource, dir: 'over' | 'under'): boolean | null => {
+    if (source === 'ss') return dir === 'over' ? (f.ud_ss_over_avail ?? null) : (f.ud_ss_under_avail ?? null);
+    if (source === 'td') return dir === 'over' ? (f.ud_td_over_avail ?? null) : (f.ud_td_under_avail ?? null);
+    if (source === 'ft') return dir === 'over' ? (f.ud_ft_over_avail ?? null) : (f.ud_ft_under_avail ?? null);
+    return null;
+  };
+  const isCandidateUsable = (f: AnalyzerFighter, c: EffectiveLean): boolean => {
+    // Existing FP pick-em rules (UD/P6/Betr underdog UNDER not offered, Betr OVER inflated).
+    if (shouldSkipFpSideForFighter(f, c._source, c.lean as 'over' | 'under')) return false;
+    if (c._source === 'fp') return true;
+    const dir = c.lean as 'over' | 'under';
+    const sideOdds = sideOddsFor(f, c._source, dir);
+    const platform = c._platform ?? getSourceActivePlatformKey(f, c._source);
+    // Per-platform side availability for Underdog: when UD shows "—" for a side,
+    // we can't use the merged sideOdds field as a proxy because DK may have
+    // overwritten it with chalk odds for the same prop. The ud_*_avail flags
+    // are recorded at UD ingest from Underdog's actual response. Falls back to
+    // the merged sideOdds null-check for stale data captured before the flags
+    // were added (avail === null means the flag was never populated).
+    if (platform === 'underdog') {
+      const avail = udSideAvailable(f, c._source, dir);
+      if (avail === false) return false;
+      if (avail == null && sideOdds == null) return false;
+    } else if (platform === 'draftkings_sportsbook' && sideOdds == null) {
+      // DK posts both sides explicitly; null odds means the side wasn't scraped.
+      return false;
+    }
+    // Chalk reject: implied prob > 0.667 means -200+ American — line hits often
+    // but pays so little that even a strong lean isn't worth taking. FT UNDER
+    // uses a tighter 0.55 threshold (~-122).
+    const implied = impliedProbInline(sideOdds);
+    const chalkLimit = c._source === 'ft' && dir === 'under' ? CHALK_IMPLIED_PROB_LIMIT_FT_UNDER : CHALK_IMPLIED_PROB_LIMIT;
+    if (implied != null && implied > chalkLimit) return false;
+    // UD pick-em FT UNDER +money disagreement: when UD prices UNDER as the
+    // unlikely side (implied < 0.45 = +money), the market is contradicting our
+    // strong UNDER lean by a wide margin. Historically that signals model error
+    // rather than value — drop the pick rather than recommend against the book.
+    if (platform === 'underdog' && c._source === 'ft' && dir === 'under' && implied != null && implied < 0.45) {
+      return false;
+    }
+    return true;
+  };
+
   const collectLeanCandidates = (f: AnalyzerFighter): EffectiveLean[] => {
     const candidates: EffectiveLean[] = [];
-    if (f.lean?.lean && f.lean.lean !== 'none' && f.lean.lean !== 'push' && lineForLeanSource(f, 'fp') != null) {
-      candidates.push({ ...f.lean, _source: 'fp', _label: '' });
+    // FP: one candidate per book that has a line. Lets PP-specific leans
+    // surface even when a P6/UD line also exists for the same fighter.
+    for (const book of FP_BOOKS_FOR_BEST_PICKS) {
+      if (lineForLeanSource(f, 'fp', book) == null) continue;
+      const lean = computeFpLeanForBook(f, book);
+      if (!lean || !lean.lean || lean.lean === 'none' || lean.lean === 'push') continue;
+      candidates.push({ ...lean, _source: 'fp', _label: '', _platform: book });
     }
+    // SS/TD/FT: scoring is identical across books (same underlying stat).
+    // Stick with the existing single-lean approach; line variance is small.
     if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push' && lineForLeanSource(f, 'ss') != null) {
       candidates.push({ ...f.lean_ss, _source: 'ss', _label: ' (SS line)' });
     }
@@ -6108,7 +6257,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push' && lineForLeanSource(f, 'ft') != null) {
       candidates.push({ ...f.lean_ft, _source: 'ft', _label: ' (FT line)' });
     }
-    return candidates;
+    return candidates.filter(c => isCandidateUsable(f, c));
   };
 
   const sortCandidates = (candidates: EffectiveLean[]): void => {
@@ -6204,7 +6353,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const el = getBestPickLean(f);
     const baseConfidence = el.conf || 0;
     const propType = el._source === 'fp' ? 'Fantasy' : el._source.toUpperCase();
-    const platform = normalizeArchivePlatformLabel(activePlatformLabel(f));
+    // Archive lookup: when the candidate carries a specific book (e.g., a PP FP
+    // candidate), validate against THAT book's archive — its hit rate, not the
+    // active platform's. Falls back to the active platform label for non-FP.
+    const platform = el._platform ?? normalizeArchivePlatformLabel(activePlatformLabel(f));
     const matchingRows = recentResolvedRows.filter((row) => {
       if (String(row.propType) !== propType) return false;
       if (platform && String(row.platform || '').toLowerCase() !== platform) return false;
@@ -6281,7 +6433,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   const pickTier = (f: AnalyzerFighter): { label: Tier; rank: number } => {
     const el = getBestPickLean(f);
     const db = f.db;
-    const line = lineForLeanSource(f, el._source);
+    const line = lineForLeanSource(f, el._source, el._platform);
     const samples = db?.history?.length || 0;
     const conf = getAdjustedBestPickConfidence(f);
     const statLean = el._source === 'ss' || el._source === 'td' || el._source === 'ft';
@@ -6396,7 +6548,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     bestPickReasonCache.clear();
     const rows = fighters.map((f, i) => {
       const el = getBestPickLeanForDir(f, type) || getBestPickLean(f);
-      const line = lineForLeanSource(f, el._source);
+      const line = lineForLeanSource(f, el._source, el._platform);
       const tier = pickTier(f);
       const archiveNote = getBestPickArchiveNote(f);
       const reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
@@ -6437,7 +6589,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label||''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform">${formatSourcePlatformLabel(f, el._source)}</span>
+          <span class="best-pick-platform">${formatSourcePlatformLabel(f, el._source, el._platform)}</span>
         </div>
         <div class="best-pick-line">${line || '—'}</div>
       </div>`;
@@ -13094,6 +13246,12 @@ interface RawLineFighter {
   ctrl_over_odds?: number | null;
   ctrl_under_odds?: number | null;
   ctrl_under_available?: boolean | null;
+  ud_ss_over_avail?: boolean | null;
+  ud_ss_under_avail?: boolean | null;
+  ud_td_over_avail?: boolean | null;
+  ud_td_under_avail?: boolean | null;
+  ud_ft_over_avail?: boolean | null;
+  ud_ft_under_avail?: boolean | null;
 }
 
 interface MergedLineEntry {
@@ -13127,6 +13285,12 @@ interface MergedLineEntry {
   ctrl_over_odds: number | null;
   ctrl_under_odds: number | null;
   ctrl_under_available: boolean | null;
+  ud_ss_over_avail: boolean | null;
+  ud_ss_under_avail: boolean | null;
+  ud_td_over_avail: boolean | null;
+  ud_td_under_avail: boolean | null;
+  ud_ft_over_avail: boolean | null;
+  ud_ft_under_avail: boolean | null;
   line_betr: number | null;
   line_betr_ss: number | null;
   line_betr_td: number | null;
@@ -13168,6 +13332,12 @@ function createMergedLineEntry(name: string): MergedLineEntry {
     ctrl_over_odds: null,
     ctrl_under_odds: null,
     ctrl_under_available: null,
+    ud_ss_over_avail: null,
+    ud_ss_under_avail: null,
+    ud_td_over_avail: null,
+    ud_td_under_avail: null,
+    ud_ft_over_avail: null,
+    ud_ft_under_avail: null,
     line_betr: null,
     line_betr_ss: null,
     line_betr_td: null,
@@ -13254,6 +13424,12 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (f.ft_under_odds != null) entry.ft_under_odds = f.ft_under_odds;
     if (f.ctrl_over_odds != null) entry.ctrl_over_odds = f.ctrl_over_odds;
     if (f.ctrl_under_odds != null) entry.ctrl_under_odds = f.ctrl_under_odds;
+    if (f.ud_ss_over_avail != null) entry.ud_ss_over_avail = f.ud_ss_over_avail;
+    if (f.ud_ss_under_avail != null) entry.ud_ss_under_avail = f.ud_ss_under_avail;
+    if (f.ud_td_over_avail != null) entry.ud_td_over_avail = f.ud_td_over_avail;
+    if (f.ud_td_under_avail != null) entry.ud_td_under_avail = f.ud_td_under_avail;
+    if (f.ud_ft_over_avail != null) entry.ud_ft_over_avail = f.ud_ft_over_avail;
+    if (f.ud_ft_under_avail != null) entry.ud_ft_under_avail = f.ud_ft_under_avail;
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
   });
 

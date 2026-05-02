@@ -80,7 +80,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(awk 'NR==16080,/^}\\)\\\\\\(\\\\\\)/{print NR\": \"$0; if \\(/^}\\\\\\)\\\\\\(\\\\\\);?$/\\) exit}' src/analyzer.ts)",
       "Bash(awk '/^\\\\\\(function\\\\\\(\\\\\\) \\\\{/{start=NR} /^}\\\\\\)\\\\\\(\\\\\\);?$/{if\\(start\\){print \"IIFE at lines \"start\"-\"NR\" \\(\"NR-start+1\" lines\\)\"; start=0}}' src/analyzer.ts)",
-      "Bash(cat C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-abdir-Downloads-ufc-project-v2\\\\\\\\4a7e447a-3ba2-40d3-a7da-f0717fb6c19b\\\\\\\\tasks\\\\\\\\b0bwzwdvu.output)"
+      "Bash(cat C:\\\\\\\\Users\\\\\\\\abdir\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-abdir-Downloads-ufc-project-v2\\\\\\\\4a7e447a-3ba2-40d3-a7da-f0717fb6c19b\\\\\\\\tasks\\\\\\\\b0bwzwdvu.output)",
+      "Bash(awk -F: '$1 > 4072 && $1 < 5300')"
     ],
     "defaultMode": "acceptEdits"
   },

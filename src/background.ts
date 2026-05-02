@@ -422,14 +422,22 @@ function normalizeFighterFightTimeLine<T extends Record<string, any>>(fighter: T
 }
 
 function parseOddsValue(raw: unknown): number | null {
-  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    // 0 means "no payout" — Underdog API returns 0 (or omits) the multiplier
+    // for sides that aren't offered. Treat as null so the caller doesn't think
+    // the side is available. Real odds are either |american| >= 100 or
+    // multipliers > 0 (typically 0.4x–2.5x range).
+    if (raw === 0) return null;
+    return raw;
+  }
   if (typeof raw !== 'string') return null;
   const cleaned = raw.trim().toLowerCase();
   if (!cleaned) return null;
   const m = cleaned.match(/[+-]?\d+(?:\.\d+)?/);
   if (!m) return null;
   const value = Number(m[0]);
-  return Number.isFinite(value) ? value : null;
+  if (!Number.isFinite(value) || value === 0) return null;
+  return value;
 }
 
 function readOddsField(obj: any, keys: string[]): number | null {
@@ -1227,6 +1235,12 @@ function mergeFighters(
       if (fighter.ft_under_odds != null) merged.ft_under_odds = fighter.ft_under_odds;
       if (fighter.ctrl_over_odds != null) merged.ctrl_over_odds = fighter.ctrl_over_odds;
       if (fighter.ctrl_under_odds != null) merged.ctrl_under_odds = fighter.ctrl_under_odds;
+      if (fighter.ud_ss_over_avail != null) merged.ud_ss_over_avail = fighter.ud_ss_over_avail;
+      if (fighter.ud_ss_under_avail != null) merged.ud_ss_under_avail = fighter.ud_ss_under_avail;
+      if (fighter.ud_td_over_avail != null) merged.ud_td_over_avail = fighter.ud_td_over_avail;
+      if (fighter.ud_td_under_avail != null) merged.ud_td_under_avail = fighter.ud_td_under_avail;
+      if (fighter.ud_ft_over_avail != null) merged.ud_ft_over_avail = fighter.ud_ft_over_avail;
+      if (fighter.ud_ft_under_avail != null) merged.ud_ft_under_avail = fighter.ud_ft_under_avail;
       const cleanOpponent = sanitizeOpponentName(fighter.opponent, fighter.name);
       if (cleanOpponent != null) merged.opponent = cleanOpponent;
       map.set(key, merged);
@@ -1671,8 +1685,8 @@ function hasEnoughPrizePicksStatCoverage(coverage: UnderdogCoverage, expectedFig
   );
 }
 
-function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null }> {
-  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null }> = {};
+function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> {
+  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> = {};
   const linesRaw = data?.over_under_lines || {};
   const lines = Array.isArray(linesRaw) ? linesRaw : Object.values(linesRaw);
   const appearancesRaw = data?.appearances || {};
@@ -1790,6 +1804,12 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
         td_under_odds: null,
         ft_over_odds: null,
         ft_under_odds: null,
+        ud_ss_over_avail: null,
+        ud_ss_under_avail: null,
+        ud_td_over_avail: null,
+        ud_td_under_avail: null,
+        ud_ft_over_avail: null,
+        ud_ft_under_avail: null,
       };
     }
     const normalizedStatValue = lineType === 'ft' ? normalizeFightTimeLineToMinutes(statValue) : statValue;
@@ -1805,15 +1825,26 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
       fighters[name][`line_${lineType}`] = normalizedStatValue;
     }
     const sideOdds = extractUnderdogSideOdds(line);
+    // UD pick-em is one-sided for many props (only Higher button shows when the
+    // Lower side isn't offered). Track which side UD actually surfaced so the
+    // analyzer's Best Picks filter can drop UD-tagged candidates whose side
+    // isn't tappable. true = UD offered this side, false = UD has the line but
+    // didn't offer this side, null = no UD line for this stat at all.
     if (lineType === 'ss') {
       if (sideOdds.overOdds != null) fighters[name].ss_over_odds = sideOdds.overOdds;
       if (sideOdds.underOdds != null) fighters[name].ss_under_odds = sideOdds.underOdds;
+      fighters[name].ud_ss_over_avail = sideOdds.overOdds != null;
+      fighters[name].ud_ss_under_avail = sideOdds.underOdds != null;
     } else if (lineType === 'td') {
       if (sideOdds.overOdds != null) fighters[name].td_over_odds = sideOdds.overOdds;
       if (sideOdds.underOdds != null) fighters[name].td_under_odds = sideOdds.underOdds;
+      fighters[name].ud_td_over_avail = sideOdds.overOdds != null;
+      fighters[name].ud_td_under_avail = sideOdds.underOdds != null;
     } else if (lineType === 'ft') {
       if (sideOdds.overOdds != null) fighters[name].ft_over_odds = sideOdds.overOdds;
       if (sideOdds.underOdds != null) fighters[name].ft_under_odds = sideOdds.underOdds;
+      fighters[name].ud_ft_over_avail = sideOdds.overOdds != null;
+      fighters[name].ud_ft_under_avail = sideOdds.underOdds != null;
     }
     if (opponent) fighters[name].opponent = opponent;
   }

@@ -22,6 +22,16 @@ export interface Fighter {
   // Pick6-specific: whether the card offers a "Less" button for CTRL. Some fighters
   // only get a More/OVER side. Default undefined = unknown (treat as unavailable).
   ctrl_under_available?: boolean | null;
+  // Underdog-specific: per-side availability for SS/TD/FT lines. UD pick-em is
+  // often one-sided (only Higher offered). true = UD surfaced this side,
+  // false = UD has the line but didn't offer this side, null = no UD line at all.
+  // Used by Best Picks to drop UD-tagged candidates for sides that aren't tappable.
+  ud_ss_over_avail?: boolean | null;
+  ud_ss_under_avail?: boolean | null;
+  ud_td_over_avail?: boolean | null;
+  ud_td_under_avail?: boolean | null;
+  ud_ft_over_avail?: boolean | null;
+  ud_ft_under_avail?: boolean | null;
 }
 
 // ── PLATFORM LINES ────────────────────────────────────────────────────────
