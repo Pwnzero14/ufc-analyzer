@@ -689,6 +689,33 @@ export class PropLinePredictorService {
     const trends = await this.getTrends();
     const results: LearningPredictionResult[] = [];
 
+    // RLM-as-calibration: when the closing line moved meaningfully from open
+    // on a prop, sharp action says the model was off by the RLM amount. Blend
+    // the closing line into the truth target as a partial signal:
+    //   effectiveActual = 0.7 × actual + 0.3 × closingLine  (only if |rlm| > threshold)
+    // Trend EWMA + per-class weight updates use the resulting effectiveDelta.
+    const RLM_FP = 5, RLM_SS = 3, RLM_TD = 0.5;
+    const getMarketSignal = (fighter: string, propType: string): { closingLine: number; rlm: number } | null => {
+      const fkey = normName(fighter);
+      const matching = archiveRecords.filter(r =>
+        normName(r.fighter) === fkey &&
+        r.propType === propType &&
+        Number.isFinite(Number(r.openLine)) &&
+        Number.isFinite(Number(r.line))
+      );
+      if (matching.length === 0) return null;
+      const closes = matching.map(r => Number(r.line)).sort((a, b) => a - b);
+      const drifts = matching.map(r => Number(r.line) - Number(r.openLine)).sort((a, b) => a - b);
+      return {
+        closingLine: closes[Math.floor(closes.length / 2)],
+        rlm: drifts[Math.floor(drifts.length / 2)],
+      };
+    };
+    const blendActual = (raw: number, market: { closingLine: number; rlm: number } | null, threshold: number): number => {
+      if (!Number.isFinite(raw) || !market || Math.abs(market.rlm) <= threshold) return raw;
+      return 0.7 * raw + 0.3 * market.closingLine;
+    };
+
     for (const pred of eventPred.predictions) {
       const key = normName(pred.fighter);
 
@@ -715,7 +742,21 @@ export class PropLinePredictorService {
         fp: actual.fp - predicted.fp,
       };
 
-      results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta });
+      const ssMarket = getMarketSignal(pred.fighter, 'SS');
+      const tdMarket = getMarketSignal(pred.fighter, 'TD');
+      const fpMarket = getMarketSignal(pred.fighter, 'Fantasy');
+      const effectiveActual = {
+        ss: blendActual(actual.ss, ssMarket, RLM_SS),
+        td: blendActual(actual.td, tdMarket, RLM_TD),
+        fp: blendActual(actual.fp, fpMarket, RLM_FP),
+      };
+      const effectiveDelta = {
+        ss: effectiveActual.ss - predicted.ss,
+        td: effectiveActual.td - predicted.td,
+        fp: effectiveActual.fp - predicted.fp,
+      };
+
+      results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta, effectiveDelta });
 
       // Update fighter trend with sample-count-adaptive learning rate.
       // α = clamp(1 / (n+2), 0.10, 0.50) where n is pre-update sampleCount.
@@ -726,9 +767,9 @@ export class PropLinePredictorService {
         trends.push(fighterTrend);
       }
       const alpha = clamp(1 / (fighterTrend.sampleCount + 2), 0.10, 0.50);
-      if (Number.isFinite(delta.ss)) fighterTrend.ss_trend = fighterTrend.ss_trend * (1 - alpha) + delta.ss * alpha;
-      if (Number.isFinite(delta.td)) fighterTrend.td_trend = fighterTrend.td_trend * (1 - alpha) + delta.td * alpha;
-      if (Number.isFinite(delta.fp)) fighterTrend.fp_trend = fighterTrend.fp_trend * (1 - alpha) + delta.fp * alpha;
+      if (Number.isFinite(effectiveDelta.ss)) fighterTrend.ss_trend = fighterTrend.ss_trend * (1 - alpha) + effectiveDelta.ss * alpha;
+      if (Number.isFinite(effectiveDelta.td)) fighterTrend.td_trend = fighterTrend.td_trend * (1 - alpha) + effectiveDelta.td * alpha;
+      if (Number.isFinite(effectiveDelta.fp)) fighterTrend.fp_trend = fighterTrend.fp_trend * (1 - alpha) + effectiveDelta.fp * alpha;
       fighterTrend.sampleCount++;
       fighterTrend.lastUpdated = Date.now();
     }
@@ -773,9 +814,9 @@ export class PropLinePredictorService {
       pickDelta: (r: LearningPredictionResult) => number;
       minActual: number;
     }> = [
-      { mod: 'ss_pace_modifier',   label: 'ss', pickActual: r => r.actual.ss, pickDelta: r => r.delta.ss, minActual: 1   },
-      { mod: 'td_attempt_modifier',label: 'td', pickActual: r => r.actual.td, pickDelta: r => r.delta.td, minActual: 0.3 },
-      { mod: 'fp_global_modifier', label: 'fp', pickActual: r => r.actual.fp, pickDelta: r => r.delta.fp, minActual: 5   },
+      { mod: 'ss_pace_modifier',   label: 'ss', pickActual: r => r.actual.ss, pickDelta: r => r.effectiveDelta?.ss ?? r.delta.ss, minActual: 1   },
+      { mod: 'td_attempt_modifier',label: 'td', pickActual: r => r.actual.td, pickDelta: r => r.effectiveDelta?.td ?? r.delta.td, minActual: 0.3 },
+      { mod: 'fp_global_modifier', label: 'fp', pickActual: r => r.actual.fp, pickDelta: r => r.effectiveDelta?.fp ?? r.delta.fp, minActual: 5   },
     ];
 
     for (const cfg of statConfigs) {

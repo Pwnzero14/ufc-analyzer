@@ -393,6 +393,10 @@ export interface LearningPredictionResult {
   predicted: { ss: number; td: number; fp: number };
   actual: { ss: number; td: number; fp: number };
   delta: { ss: number; td: number; fp: number };
+  // RLM-blended delta used by calibration when the closing line moved meaningfully
+  // from open. Equals `delta` when no significant RLM was observed. UI should
+  // display `actual` and `delta` (raw); calibration code reads `effectiveDelta`.
+  effectiveDelta?: { ss: number; td: number; fp: number };
 }
 
 export interface LearningSummary {
