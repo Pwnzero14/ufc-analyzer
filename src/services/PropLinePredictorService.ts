@@ -717,15 +717,18 @@ export class PropLinePredictorService {
 
       results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta });
 
-      // Update fighter trend: trend = trend * 0.8 + delta * 0.2
+      // Update fighter trend with sample-count-adaptive learning rate.
+      // α = clamp(1 / (n+2), 0.10, 0.50) where n is pre-update sampleCount.
+      // First sample → α=0.50 (absorb half), n=3 → 0.20, n=8+ → 0.10 (stabilize).
       let fighterTrend = this.findTrend(trends, pred.fighter);
       if (!fighterTrend) {
         fighterTrend = { fighter: pred.fighter, ss_trend: 0, td_trend: 0, fp_trend: 0, sampleCount: 0, lastUpdated: 0 };
         trends.push(fighterTrend);
       }
-      if (Number.isFinite(delta.ss)) fighterTrend.ss_trend = fighterTrend.ss_trend * 0.8 + delta.ss * 0.2;
-      if (Number.isFinite(delta.td)) fighterTrend.td_trend = fighterTrend.td_trend * 0.8 + delta.td * 0.2;
-      if (Number.isFinite(delta.fp)) fighterTrend.fp_trend = fighterTrend.fp_trend * 0.8 + delta.fp * 0.2;
+      const alpha = clamp(1 / (fighterTrend.sampleCount + 2), 0.10, 0.50);
+      if (Number.isFinite(delta.ss)) fighterTrend.ss_trend = fighterTrend.ss_trend * (1 - alpha) + delta.ss * alpha;
+      if (Number.isFinite(delta.td)) fighterTrend.td_trend = fighterTrend.td_trend * (1 - alpha) + delta.td * alpha;
+      if (Number.isFinite(delta.fp)) fighterTrend.fp_trend = fighterTrend.fp_trend * (1 - alpha) + delta.fp * alpha;
       fighterTrend.sampleCount++;
       fighterTrend.lastUpdated = Date.now();
     }
