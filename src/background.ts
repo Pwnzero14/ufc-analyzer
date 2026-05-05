@@ -820,6 +820,22 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
         lastNameMap.set(last, f.name);
       }
 
+      // Map archive-side last-name → archive fighter names for this event. Catches the case where
+      // archive holds the long form ("Cameron Rowston", "Wesley Schultz") but UFCStats uses the
+      // short form ("Cam Rowston", "Wes Schultz"). The analyzer canonicalizes live via fuzzy merge,
+      // but archive rows written before that canonicalization keep the original platform spelling.
+      const archiveLastNameMap = new Map<string, Set<string>>();
+      for (const r of unresolved) {
+        if (r.event !== archiveEvent) continue;
+        const an = String(r.fighter || '').trim();
+        if (!an) continue;
+        const last = an.split(/\s+/).pop()!.toLowerCase();
+        if (!last) continue;
+        let bucket = archiveLastNameMap.get(last);
+        if (!bucket) { bucket = new Set(); archiveLastNameMap.set(last, bucket); }
+        bucket.add(an);
+      }
+
       for (const f of allFightResults) {
         if (!f.name) continue;
         const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
@@ -837,15 +853,25 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           // "Lance Gibson Jr." → archive may store as "Lance Jr" (first + suffix, no middle)
           namesToTry.add(`${parts[0]} ${parts[parts.length - 1]}`); // "Lance Jr."
         }
+        // Reverse direction: archive may hold a longer first-name variant than UFCStats.
+        // Pull every unresolved-archive name on this card whose last name matches.
+        const lastForArchive = parts[parts.length - 1]?.toLowerCase();
+        if (lastForArchive) {
+          const archiveNames = archiveLastNameMap.get(lastForArchive);
+          if (archiveNames) for (const an of archiveNames) namesToTry.add(an);
+        }
 
         const nameVariants = [f.name, ...Array.from(namesToTry)];
+        // Pick6 'ctrl' lines are in minutes; UFCStats provides ctrlSecs.
+        const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
         const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
                 + applyResult(nameVariants, archiveEvent, 'TD', f.td)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
-                + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins);
+                + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins)
+                + applyResult(nameVariants, archiveEvent, 'ctrl', ctrlMins);
         if (n > 0) {
-          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min (${f.won ? 'W' : 'L'} R${f.round})`);
+          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min CTRL=${ctrlMins}min (${f.won ? 'W' : 'L'} R${f.round})`);
           settled++;
         }
       }
@@ -937,11 +963,13 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           if (!f) { console.log(`[UFC Settle] Fallback: no card result for archive name "${archiveName}" (last="${last}")`); skipped++; continue; }
           const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
           const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
+          const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
           const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
                   + applyResult([archiveName], archiveEvent, 'TD', f.td)
                   + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
                   + applyResult([archiveName], archiveEvent, 'Fantasy_PP', fpPP)
-                  + applyResult([archiveName], archiveEvent, 'FightTime', f.fightTimeMins);
+                  + applyResult([archiveName], archiveEvent, 'FightTime', f.fightTimeMins)
+                  + applyResult([archiveName], archiveEvent, 'ctrl', ctrlMins);
           if (n > 0) { console.log(`[UFC Settle] Fallback settled ${archiveName} (→${f.name}) under "${archiveEvent}"`); settled++; }
         }
       }
