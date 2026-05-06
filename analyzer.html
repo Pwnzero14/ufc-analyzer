@@ -153,17 +153,74 @@ body {
 
 .ext-label-muted { color: var(--text3); }
 
-.auto-fetch-btn {
-  background: rgba(0,232,122,0.10);
-  color: var(--green);
-  border: 1px solid rgba(0,232,122,0.3);
+.status-chunk {
+  display: inline-block;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+.status-chunk:first-child { padding-left: 10px; }
+
+.btn.auto-fetch-btn {
+  background: var(--green);
+  color: #001b0e;
+  border: 1px solid var(--green);
+  box-shadow: 0 0 14px rgba(32,223,143,0.45);
+  font-weight: 800;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
   padding: 5px 12px;
   border-radius: 5px;
   cursor: pointer;
+  text-shadow: none;
+}
+.btn.auto-fetch-btn:hover {
+  background: #2af49d;
+  filter: none;
+}
+
+.header-overflow {
+  position: relative;
+  display: inline-block;
+}
+.header-overflow-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.header-overflow-panel[hidden] { display: none; }
+.overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
   font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+.overflow-item:hover {
+  background: var(--border);
+  color: var(--text);
 }
 
 .watcher-toggle-btn {
@@ -413,13 +470,13 @@ body {
   min-width: 138px;
   text-align: center;
 }
-.lean-over  { background: rgba(0,232,122,0.09);  color: var(--green); border: 1px solid rgba(0,232,122,0.22); }
-.lean-under { background: rgba(255,58,96,0.09);  color: var(--red);   border: 1px solid rgba(255,58,96,0.22); }
-.lean-push  { background: rgba(240,192,64,0.07); color: var(--gold);  border: 1px solid rgba(240,192,64,0.18); }
+.lean-over  { background: rgba(0,232,122,0.18);  color: var(--green); border: 1px solid rgba(0,232,122,0.50); box-shadow: 0 0 10px rgba(0,232,122,0.15); }
+.lean-under { background: rgba(255,58,96,0.18);  color: var(--red);   border: 1px solid rgba(255,58,96,0.50); box-shadow: 0 0 10px rgba(255,58,96,0.15); }
+.lean-push  { background: rgba(240,192,64,0.14); color: var(--gold);  border: 1px solid rgba(240,192,64,0.40); }
 .lean-none  { background: rgba(50,58,88,0.1);    color: var(--text3); border: 1px solid var(--border); }
 
-.confidence-meter { width: 138px; height: 4px; background: var(--border2); border-radius: 3px; overflow: hidden; margin-top: 2px; }
-.confidence-fill { height: 100%; border-radius: 2px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.confidence-meter { width: 138px; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden; margin-top: 2px; }
+.confidence-fill { height: 100%; border-radius: 2px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 6px currentColor; }
 
 .ev-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text2); margin-top: 1px; }
 .weighted-avg-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text2); margin-top: 1px; }
@@ -1337,7 +1394,8 @@ body {
 .movement-summary-row:last-child { border-bottom: none; }
 .movement-summary-fighter { color: var(--text); font-weight: 600; min-width: 120px; }
 .movement-summary-stat { color: var(--text2); min-width: 24px; }
-.movement-summary-delta { font-weight: 700; min-width: 50px; }
+.movement-summary-line { color: var(--text3); font-variant-numeric: tabular-nums; min-width: 100px; font-size: 9px; }
+.movement-summary-delta { font-weight: 700; min-width: 44px; font-variant-numeric: tabular-nums; }
 .movement-summary-delta.drop { color: var(--red); }
 .movement-summary-delta.rise { color: var(--green); }
 .movement-summary-platforms { color: var(--text3); font-size: 8px; }
@@ -1595,24 +1653,28 @@ body {
 .fight-group-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 2px 4px;
+  gap: 12px;
+  padding: 18px 2px 10px;
 }
-.fight-group-line { flex: 1; height: 1px; background: var(--border); }
+.fight-group-line { flex: 1; height: 1px; background: var(--border); border-radius: 2px; }
+.fgh-main   .fight-group-line { height: 2px; background: rgba(240,192,64,0.45); box-shadow: 0 0 6px rgba(240,192,64,0.25); }
+.fgh-co     .fight-group-line { height: 2px; background: rgba(77,176,255,0.40); box-shadow: 0 0 6px rgba(77,176,255,0.20); }
+.fgh-card   .fight-group-line { background: var(--border2); }
+.fgh-prelim .fight-group-line { background: var(--border); opacity: 0.5; }
 .fight-badge {
   font-family: 'Oswald', sans-serif;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 3px;
+  padding: 5px 14px;
+  border-radius: 4px;
   white-space: nowrap;
 }
-.fight-badge.main   { background: rgba(240,192,64,0.12);  color: var(--gold);   border: 1px solid rgba(240,192,64,0.28); }
-.fight-badge.co     { background: rgba(77,176,255,0.08);  color: var(--blue);   border: 1px solid rgba(77,176,255,0.2); }
-.fight-badge.card   { background: rgba(50,58,88,0.2);     color: var(--text2);  border: 1px solid var(--border2); }
-.fight-badge.prelim { background: rgba(30,36,58,0.3);     color: var(--text3);  border: 1px solid var(--border); opacity: 0.75; }
+.fight-badge.main   { background: rgba(240,192,64,0.20); color: var(--gold);  border: 1px solid rgba(240,192,64,0.50); box-shadow: 0 0 10px rgba(240,192,64,0.18); }
+.fight-badge.co     { background: rgba(77,176,255,0.16); color: var(--blue);  border: 1px solid rgba(77,176,255,0.45); box-shadow: 0 0 10px rgba(77,176,255,0.15); }
+.fight-badge.card   { background: rgba(50,58,88,0.28);   color: var(--text2); border: 1px solid var(--border2); }
+.fight-badge.prelim { background: rgba(30,36,58,0.36);   color: var(--text3); border: 1px solid var(--border); opacity: 0.75; }
 .fight-badge.cancelled { background: rgba(255,58,96,0.10); color: var(--red, #ff3a60); border: 1px solid rgba(255,58,96,0.25); text-decoration: line-through; opacity: 0.6; }
 .fight-cancel-btn {
   background: none; border: 1px solid rgba(255,58,96,0.25); color: var(--red, #ff3a60); cursor: pointer;
@@ -1930,24 +1992,24 @@ body {
 .lean-badge {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  padding: 5px 10px;
-  border-radius: 4px;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  padding: 7px 12px;
+  border-radius: 5px;
   text-transform: uppercase;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-width: 128px;
+  min-width: 150px;
   width: 100%;
   transition: background 0.4s;
 }
 .lean-conf-inline {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  font-weight: 400;
-  opacity: 0.7;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.92;
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -3072,8 +3134,8 @@ body.loading {
     padding: 11px 12px;
   }
 
-  .fight-group-header { padding: 7px 2px 3px; }
-  .fight-badge { font-size: 8px; letter-spacing: 0.12em; }
+  .fight-group-header { padding: 18px 2px 10px; gap: 12px; }
+  .fight-badge { font-size: 12px; letter-spacing: 0.18em; padding: 5px 14px; }
 
   .platform-lines { gap: 4px; }
 
@@ -3530,7 +3592,7 @@ body.loading {
 .ls-lean-under { background: rgba(255,58,96,0.12); color: #ff3a60; }
 
 /* ── NEWS BADGE & MODAL ── */
-.news-warn-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(255,60,60,0.15); color: #ff6060; border: 1px solid rgba(255,60,60,0.28); cursor: pointer; white-space: nowrap; animation: pulse-warn 2s ease-in-out infinite; }
+.news-warn-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(255,170,60,0.14); color: #ffb24a; border: 1px solid rgba(255,170,60,0.32); cursor: pointer; white-space: nowrap; }
 
 /* ── WEIGHT-MISS BADGE ── */
 /* Severity-tiered: small/moderate are clear negatives (drained, no upside),
@@ -4172,21 +4234,28 @@ body.loading {
     <button class="btn btn-ghost refresh-btn" id="refreshBtn">
       <span id="refreshIcon">↻</span> Refresh
     </button>
-    <button class="btn btn-ghost" id="exportBtn" title="Export current leans to CSV">
-      <span>📄</span> Export
-    </button>
-    <button class="btn btn-ghost" id="reportCardBtn" title="Generate pre-event report card with all leans, lines, and matchup summaries">
-      <span>📊</span> Report
-    </button>
-    <button class="btn btn-ghost" id="lineShopBtn" title="Compare lines across all platforms — biggest discrepancies first">
-      <span>🛒</span> Shop
-    </button>
-    <button class="btn btn-ghost" id="backupStorageBtn" title="Download a JSON backup of all extension storage (archive, snapshots, lines). Run before removing the extension in Opera.">
-      <span>💾</span> Backup
-    </button>
-    <button class="btn btn-ghost" id="restoreStorageBtn" title="Restore extension storage from a JSON backup file">
-      <span>📥</span> Restore
-    </button>
+    <div class="header-overflow">
+      <button class="btn btn-ghost overflow-trigger" id="headerOverflowBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="More actions">
+        <span>⋯</span> More
+      </button>
+      <div class="header-overflow-panel" id="headerOverflowPanel" role="menu" hidden>
+        <button class="overflow-item" id="exportBtn" title="Export current leans to CSV">
+          <span>📄</span> Export
+        </button>
+        <button class="overflow-item" id="reportCardBtn" title="Generate pre-event report card with all leans, lines, and matchup summaries">
+          <span>📊</span> Report
+        </button>
+        <button class="overflow-item" id="lineShopBtn" title="Compare lines across all platforms — biggest discrepancies first">
+          <span>🛒</span> Shop
+        </button>
+        <button class="overflow-item" id="backupStorageBtn" title="Download a JSON backup of all extension storage (archive, snapshots, lines). Run before removing the extension in Opera.">
+          <span>💾</span> Backup
+        </button>
+        <button class="overflow-item" id="restoreStorageBtn" title="Restore extension storage from a JSON backup file">
+          <span>📥</span> Restore
+        </button>
+      </div>
+    </div>
     <input type="file" id="restoreStorageFile" accept="application/json,.json" style="display:none">
   </div>
 </div>

@@ -5952,21 +5952,27 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
 
       if (topHit) {
         setText('ldPatternWin', `Top hit tag: ${hitLabel} (${Math.round(topHit.hitRate * 100)}% · ${topHit.total} rows)`);
-        setText('ldDrilldownTitle', `${hitLabel} is leading`);
-        setText('ldDrilldownMeta', `Memory engine: ${Math.round(topHit.hitRate * 100)}% over ${topHit.total} settled spots (${memoryProfile.taggedSamples} tagged samples tracked)`);
       } else {
         setText('ldPatternWin', 'Top hit tag: Need >=3 settled tagged rows');
-        setText('ldDrilldownTitle', 'Memory engine warming up');
-        setText('ldDrilldownMeta', `${memoryProfile.taggedSamples} tagged samples tracked`);
       }
 
       if (topMiss) {
         setText('ldPatternMiss', `Top miss tag: ${missLabel} (${Math.round(topMiss.hitRate * 100)}% · ${topMiss.total} rows)`);
-        setText('ldDrilldownBody', `Weakest memory lane: ${missLabel} is only ${Math.round(topMiss.hitRate * 100)}% on ${topMiss.total} settled spots. Confidence should stay lighter when similar setups show up.`);
       } else {
         setText('ldPatternMiss', 'Top miss tag: Need >=3 settled tagged rows');
-        setText('ldDrilldownBody', 'Keep grading events to unlock stronger spot-memory tags.');
       }
+
+      if (topHit && topMiss) {
+        setText('ldDrilldownTitle', `Lean into ${hitLabel}`);
+        setText('ldDrilldownMeta', `Fade ${missLabel}`);
+      } else if (topHit) {
+        setText('ldDrilldownTitle', `Lean into ${hitLabel}`);
+        setText('ldDrilldownMeta', 'No clear fade yet');
+      } else {
+        setText('ldDrilldownTitle', 'No clear lean yet');
+        setText('ldDrilldownMeta', `Fade ${missLabel}`);
+      }
+      setText('ldDrilldownBody', `Based on ${memoryProfile.taggedSamples} tagged samples tracked.`);
       return;
     }
 
@@ -6024,13 +6030,13 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
 
     setText('ldPatternWin', `Top hit tag: ${topHit.label} (${hitPct}% · ${topHit.wins}/${topHit.total})`);
     setText('ldPatternMiss', `Top miss tag: ${topMiss.label} (${missPct}% · ${topMiss.wins}/${topMiss.total})`);
-    setText('ldDrilldownTitle', `${topHit.label} is leading`);
-    setText('ldDrilldownMeta', `Best tendency: ${hitPct}% over ${topHit.total} settled rows`);
+    setText('ldDrilldownTitle', `Lean into ${topHit.label}`);
+    setText('ldDrilldownMeta', `Fade ${topMiss.label}`);
     setText(
       'ldDrilldownBody',
       missPct <= 45
-        ? `Caution zone: ${topMiss.label} is only ${missPct}% on ${topMiss.total} rows. Lower confidence or fade similar setups.`
-        : `Weakest tendency is ${topMiss.label} at ${missPct}% on ${topMiss.total} rows. Keep this tag in moderate-confidence territory.`
+        ? `${topMiss.label} hits only ${missPct}% on ${topMiss.total} rows — strong fade.`
+        : `${topMiss.label} hits ${missPct}% on ${topMiss.total} rows — soft fade.`
     );
   } catch (e) {
     debugLog(`learning diagnostics render failed: ${(e as Error).message}`);
@@ -10607,6 +10613,27 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // Filter out cancelled fighters from the display list
   const activeFighters = fighters.filter(f => !isCancelledFighter(f.name));
 
+  // Compute which (platform, stat) slots have data for at least one fighter on
+  // this slate. lineCell skips emitting cells (placeholder or real) for slots
+  // outside this set, so dead columns don't take horizontal space across cards.
+  _slatePresentSlots = (() => {
+    const present = new Set<string>();
+    const platforms: Array<'p6'|'ud'|'pp'|'betr'|'dk'> = ['p6','ud','pp','betr','dk'];
+    const stats: Array<'fp'|'ss'|'td'|'ft'|'ctrl'> = ['fp','ss','td','ft','ctrl'];
+    for (const f of activeFighters) {
+      for (const p of platforms) {
+        for (const s of stats) {
+          if (p === 'dk' && s === 'fp') continue;
+          const key = (s === 'fp' ? `line_${p}` : `line_${p}_${s}`) as keyof AnalyzerFighter;
+          if ((f as unknown as Record<string, unknown>)[key as string] != null) {
+            present.add(`${p}:${s}`);
+          }
+        }
+      }
+    }
+    return present;
+  })();
+
   // Build into a DocumentFragment so the browser only does layout/paint once
   // when the fragment is committed at the end. Direct container.appendChild
   // per row triggers a layout pass per row (~80 passes for a 26-fighter card).
@@ -10627,7 +10654,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       else if (fightIndex < Math.ceil(totalFights * 0.55)) { badgeText = 'MAIN CARD'; badgeCls = 'card'; }
       else { badgeText = 'PRELIM'; badgeCls = 'prelim'; }
       const header = document.createElement('div');
-      header.className = 'fight-group-header';
+      header.className = `fight-group-header fgh-${badgeCls}`;
       const f2Name = activeFighters[i + 1]?.name || opp || '';
       header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled (hides both fighters)">CANCEL</button><div class="fight-group-line"></div>`;
       const cancelBtn = header.querySelector('.fight-cancel-btn') as HTMLButtonElement;
@@ -11885,6 +11912,11 @@ function getClvBoost(f: AnalyzerFighter, el: EffectiveLean): { delta: number; ma
 // Cuts initial render from ~1000ms to ~250ms by deferring detail innerHTML.
 const _pendingDetailBuilders = new WeakMap<HTMLElement, () => string>();
 
+// Set of "platform:stat" keys present somewhere on the active slate. Populated
+// by the render loop before iterating fighters; lineCell skips slots not in
+// this set so dead columns don't take horizontal space.
+let _slatePresentSlots: Set<string> | null = null;
+
 function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fightIndex = 0): HTMLDivElement {
   _h2hFighterMap.set(f.name.toLowerCase(), f);
   const db = f.db || {} as FighterDB;
@@ -11979,7 +12011,9 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
 
   const lineCell = (source: 'p6'|'ud'|'pp'|'betr'|'dk', stat: 'fp'|'ss'|'td'|'ft'|'ctrl', value: number | null | undefined): string => {
-    if (value == null || !showSource(source)) return '';
+    if (!showSource(source)) return '';
+    if (value == null) return '';
+    if (_slatePresentSlots && !_slatePresentSlots.has(`${source}:${stat}`)) return '';
     const sourceLabel = source === 'p6' ? 'P6' : source === 'ud' ? 'UD' : source === 'pp' ? 'PP' : source === 'dk' ? 'DK' : 'BT';
     const _key = openingLineKey(source, stat, f.name);
     const openVal = _openingLines.get(_key);
@@ -12884,7 +12918,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
       <div class="lean-cell">
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
-        ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgba(${leanRGB}, 0.8);"></div></div>` : ''}
+        ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgb(${leanRGB}); color: rgb(${leanRGB});"></div></div>` : ''}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
         ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b">⚔ Rivalry split</div>` : ''}
@@ -14143,7 +14177,10 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
     }
     const ageH = _baselineCapturedAt > 0 ? ((Date.now() - _baselineCapturedAt) / 3600000).toFixed(1) : '?';
     const prevInfo = _prevRefreshLines.size > 0 ? ` · ↻${_prevMatchCount} prev · Δ${_maxPrevDelta.toFixed(1)}` : '';
-    _oc.textContent = ` · 📍${_openingLines.size} stored / ${_matchCount} matched · max Δ${_maxDelta.toFixed(1)} · ${ageH}h old${prevInfo}`;
+    _oc.innerHTML =
+      `<span class="status-chunk">📍 ${_openingLines.size} stored / ${_matchCount} matched</span>` +
+      `<span class="status-chunk">🕒 ${ageH}h old</span>` +
+      `<span class="status-chunk">max Δ${_maxDelta.toFixed(1)}${prevInfo}</span>`;
     // Show reset button when baselines exist
     const _rb = document.getElementById('resetBaselinesBtn');
     if (_rb) (_rb as HTMLElement).style.display = 'inline';
@@ -14462,7 +14499,7 @@ function renderLineMovementSummary(): void {
   const timeEl = document.getElementById('movementSummaryTime');
   if (!container || !body) return;
 
-  type SummaryEntry = { name: string; stat: string; delta: number; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
+  type SummaryEntry = { name: string; stat: string; delta: number; open: number; close: number; sourcePlat: string; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
   const entries: SummaryEntry[] = [];
   const platLabels: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
   // Pick-em platforms where "public hammers OVER" heuristic applies. DK is a
@@ -14478,6 +14515,9 @@ function renderLineMovementSummary(): void {
     ];
     for (const { stat, lines } of statChecks) {
       let maxDelta = 0;
+      let maxOpen: number | null = null;
+      let maxClose: number | null = null;
+      let maxPlatLabel = '';
       const movedPlats: string[] = [];
       // RLM roll-up: count pick-em platforms moving against the public OVER flow.
       let pickemRise = 0, pickemDrop = 0, maxPickemRise = 0, maxPickemDrop = 0;
@@ -14489,8 +14529,14 @@ function renderLineMovementSummary(): void {
         const deltaRaw = parseFloat((current - opening).toFixed(1));
         const delta = sanitizeDelta(stat.toLowerCase(), deltaRaw);
         if (delta != null && Math.abs(delta) >= 1.0) {
-          movedPlats.push(platLabels[plat] || plat);
-          if (Math.abs(delta) > Math.abs(maxDelta)) maxDelta = delta;
+          const platLabel = platLabels[plat] || plat;
+          movedPlats.push(platLabel);
+          if (Math.abs(delta) > Math.abs(maxDelta)) {
+            maxDelta = delta;
+            maxOpen = opening;
+            maxClose = current;
+            maxPlatLabel = platLabel;
+          }
         }
         if (delta != null && PICKEM_PLATS.has(plat)) {
           if (delta >= 1.0) { pickemRise++; if (delta > maxPickemRise) maxPickemRise = delta; }
@@ -14503,11 +14549,14 @@ function renderLineMovementSummary(): void {
       if (pickemRise >= 1 && maxPickemRise >= 1.0) rlm = 'under';
       // OVER: deep drop across ≥1 pick-em platform, plus magnitude meaningful.
       else if (pickemDrop >= 1 && Math.abs(maxPickemDrop) >= 2.0) rlm = 'over';
-      if (movedPlats.length > 0) {
+      if (movedPlats.length > 0 && maxOpen != null && maxClose != null) {
         entries.push({
           name: f.name,
           stat,
           delta: maxDelta,
+          open: maxOpen,
+          close: maxClose,
+          sourcePlat: maxPlatLabel,
           platforms: movedPlats,
           isSteam: movedPlats.length >= 2 && Math.abs(maxDelta) >= 2.0,
           rlm,
@@ -14526,7 +14575,6 @@ function renderLineMovementSummary(): void {
 
   const rows = entries.slice(0, 20).map(e => {
     const arrow = e.delta > 0 ? '▲' : '▼';
-    const sign = e.delta > 0 ? '+' : '';
     const cls = e.delta > 0 ? 'rise' : 'drop';
     const steamTag = e.isSteam ? '<span class="movement-summary-steam">STEAM</span>' : '';
     const rlmTag = e.rlm
@@ -14535,7 +14583,8 @@ function renderLineMovementSummary(): void {
     return `<div class="movement-summary-row">
       <span class="movement-summary-fighter">${e.name}</span>
       <span class="movement-summary-stat">${e.stat}</span>
-      <span class="movement-summary-delta ${cls}">${arrow} ${sign}${e.delta}</span>
+      <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
+      <span class="movement-summary-delta ${cls}">${arrow}${Math.abs(e.delta)}</span>
       <span class="movement-summary-platforms">${e.platforms.join(', ')}</span>
       ${steamTag}${rlmTag}
     </div>`;
@@ -15635,6 +15684,36 @@ function initAnalyzerCore(): void {
 
   document.getElementById('autoScrapeBtn')?.addEventListener('click', triggerAutoScrape);
   document.getElementById('exportBtn')?.addEventListener('click', exportToCSV);
+
+  // Header overflow ("More" dropdown) for rare actions
+  const overflowBtn = document.getElementById('headerOverflowBtn');
+  const overflowPanel = document.getElementById('headerOverflowPanel') as HTMLElement | null;
+  if (overflowBtn && overflowPanel) {
+    const closeOverflow = (): void => {
+      overflowPanel.hidden = true;
+      overflowBtn.setAttribute('aria-expanded', 'false');
+    };
+    overflowBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const willOpen = overflowPanel.hidden;
+      overflowPanel.hidden = !willOpen;
+      overflowBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    document.addEventListener('click', (ev) => {
+      if (overflowPanel.hidden) return;
+      const target = ev.target as Node | null;
+      if (target && !overflowPanel.contains(target) && target !== overflowBtn && !overflowBtn.contains(target)) {
+        closeOverflow();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !overflowPanel.hidden) closeOverflow();
+    });
+    overflowPanel.addEventListener('click', (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (target?.closest('.overflow-item')) closeOverflow();
+    });
+  }
   // Line Movement Summary toggle
   document.getElementById('movementSummaryHeader')?.addEventListener('click', () => {
     const body = document.getElementById('movementSummaryBody');
