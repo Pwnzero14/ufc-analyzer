@@ -318,6 +318,21 @@ body {
 .platform-pill.dk   { color: #f59e0b; }
 .pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .pill-count { font-weight: 600; }
+.pill-age {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  background: rgba(150,150,170,0.12);
+}
+.pill-age:empty { display: none; }
+.pill-age.fresh { color: #68d391; background: rgba(72,187,120,0.14); }
+.pill-age.aging { color: #f6d55c; background: rgba(248,198,74,0.18); }
+.pill-age.stale { color: #fc8181; background: rgba(229,62,62,0.18); }
 
 .platform-bar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
@@ -1228,6 +1243,66 @@ body {
 
 /* ── TREND WINDOW TOGGLE ── */
 .trend-window-group { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+
+/* ── SORT & TREND POPOVER ── */
+.sort-trend-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.sort-trend-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sort-trend-trigger:hover {
+  color: var(--text);
+  border-color: var(--border3);
+}
+.sort-trend-trigger[aria-expanded="true"] {
+  border-color: var(--gold);
+  color: var(--text);
+}
+.sort-trend-summary { color: var(--gold); font-weight: 600; }
+.sort-trend-caret { color: var(--text3); font-size: 8px; }
+
+.sort-trend-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  min-width: 280px;
+  max-width: 460px;
+}
+.sort-trend-popover[hidden] { display: none; }
+.sort-trend-section { display: flex; flex-direction: column; gap: 6px; }
+.sort-trend-section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
 /* Sharp line movement badge */
 .sharp-move-badge {
   font-family: 'JetBrains Mono', monospace;
@@ -1561,19 +1636,19 @@ body {
   gap: 8px;
   align-items: center;
 }
-.platform-active-label {
+.pill-active-badge {
+  display: none;
   font-family: 'JetBrains Mono', monospace;
   font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text3);
-  margin-left: 6px;
-  padding: 3px 9px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 1px 5px;
+  margin-left: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+  color: #000;
 }
-.platform-active-label span { color: var(--text2); font-weight: 700; }
+.platform-pill.platform-selected .pill-active-badge { display: inline-block; }
 
 .source-toggle-row {
   display: inline-flex;
@@ -2909,11 +2984,16 @@ body.loading {
     --text-lg: 18px;
   }
 
-  .model-health-grid {
+  .model-health-strip {
     margin: 12px 28px 10px;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(160px, 1fr));
-    gap: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: 10px 18px;
+    border: 1px solid var(--border2);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius: var(--radius-md);
   }
 
   /* Pre-lock QA panel — slate health summary above the fighter cards */
@@ -2933,12 +3013,6 @@ body.loading {
   .qa-panel.qa-err  { border-color: rgba(229,62,62,0.45);  background: linear-gradient(180deg, rgba(229,62,62,0.08),   rgba(229,62,62,0.02)); }
   .qa-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .qa-panel-title  { font-weight:700; letter-spacing:0.5px; font-size:11px; color:var(--text-muted); text-transform:uppercase; }
-  .qa-pills        { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-  .qa-pill         { font-size:10px; padding:2px 8px; border-radius:999px; font-weight:600; display:inline-flex; gap:4px; align-items:center; }
-  .qa-pill.qa-pill-ok    { background: rgba(72,187,120,0.15); color:#68d391; }
-  .qa-pill.qa-pill-warn  { background: rgba(248,198,74,0.2);  color:#f6d55c; }
-  .qa-pill.qa-pill-err   { background: rgba(229,62,62,0.2);   color:#fc8181; }
-  .qa-pill.qa-pill-muted { background: rgba(150,150,170,0.15); color:var(--text-muted); }
   .qa-summary      { font-size:12px; font-weight:600; }
   .qa-issues       { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
   .qa-issues li    { font-size:11px; color:var(--text-muted); padding-left:14px; position:relative; line-height:1.4; }
@@ -3019,11 +3093,12 @@ body.loading {
     line-height: 1.5;
   }
 
-  .mh-card {
-    border: 1px solid var(--border2);
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
+  .mh-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex: 1 1 240px;
+    min-width: 0;
   }
 
   .mh-label {
@@ -3032,21 +3107,35 @@ body.loading {
     color: var(--text3);
     letter-spacing: 0.12em;
     text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .mh-value {
-    margin-top: 5px;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: var(--text-lg);
+    font-size: 22px;
+    line-height: 1;
     font-weight: 700;
     color: var(--text);
+    flex-shrink: 0;
   }
 
   .mh-trend {
-    margin-top: 4px;
     font-size: var(--text-xs);
     color: var(--text2);
     font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .mh-divider {
+    width: 1px;
+    align-self: stretch;
+    min-height: 24px;
+    background: var(--border2);
+    flex-shrink: 0;
   }
 
   .filter-bar {
@@ -3087,6 +3176,54 @@ body.loading {
     border-color: rgba(248,198,74,0.55);
     background: rgba(248,198,74,0.08);
   }
+
+  .density-control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .density-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .density-trigger:hover { color: var(--text); border-color: var(--border3); }
+  .density-trigger[aria-expanded="true"] { border-color: var(--gold); color: var(--text); }
+  .density-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    min-width: 200px;
+  }
+  .density-popover[hidden] { display: none; }
+  .density-popover-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .density-popover-item { text-align: left; width: 100%; }
 
   #cardContainer {
     padding: 14px 28px 20px;
@@ -3529,7 +3666,7 @@ body.loading {
   }
 
   @media (max-width: 1100px) {
-    .model-health-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .model-health-strip .mh-divider { display: none; }
     .learning-diagnostics-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
     .fighter-main { grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr); }
     .fighter-main > .stats-mini,
@@ -3544,7 +3681,7 @@ body.loading {
   @media (max-width: 760px) {
     .filter-bar,
     #cardContainer,
-    .model-health-grid,
+    .model-health-strip,
     .learning-diagnostics-grid { margin-left: 10px; margin-right: 10px; padding-left: 10px; padding-right: 10px; }
     .filter-bar-top,
     .filter-bar-bottom { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -4277,28 +4414,37 @@ body.loading {
       <div class="pill-dot"></div>
       <span>Pick6</span>
       <span class="pill-count" id="countP6">—</span>
+      <span class="pill-age" id="ageP6"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
     <div class="platform-pill ud" id="pillUD" data-platform="underdog" title="Click to prioritize Underdog lines">
       <div class="pill-dot"></div>
       <span>Underdog</span>
       <span class="pill-count" id="countUD">—</span>
+      <span class="pill-age" id="ageUD"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
     <div class="platform-pill betr" id="pillBetr" data-platform="betr" title="Click to prioritize Betr lines">
       <div class="pill-dot"></div>
       <span>Betr</span>
       <span class="pill-count" id="countBetr">—</span>
+      <span class="pill-age" id="ageBetr"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
     <div class="platform-pill dk" id="pillDK" data-platform="draftkings_sportsbook" title="Click to prioritize DraftKings Sportsbook lines">
       <div class="pill-dot"></div>
       <span>DK Sportsbook</span>
       <span class="pill-count" id="countDK">—</span>
+      <span class="pill-age" id="ageDK"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
     <div class="platform-pill pp" id="pillPP" data-platform="prizepicks" title="Click to prioritize PrizePicks lines">
       <div class="pill-dot"></div>
       <span>PrizePicks</span>
       <span class="pill-count" id="countPP">—</span>
+      <span class="pill-age" id="agePP"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
-    <div class="platform-active-label" id="platformActiveLabel">Showing <span id="platformActiveName">Pick6</span> lines</div>
     <div class="source-toggle-row" id="sourceToggleRow" title="Show or hide each sportsbook source">
       <span class="source-toggle-label">Sources</span>
       <button class="source-toggle p6 active" data-source="p6">P6</button>
@@ -4317,19 +4463,38 @@ body.loading {
 </div>
 <!-- FILTER ROW 2: Sort buttons + view tabs -->
 <div class="filter-bar filter-bar-bottom">
-  <div class="sort-group" id="sortGroup">
-    <span class="sort-label">Sort:</span>
-    <button class="sort-btn active" data-sort="default">Card Order</button>
-    <button class="sort-btn" data-sort="line">Line ↓</button>
-    <button class="sort-btn" data-sort="ssline" title="Sort by active SS line">SS Line</button>
-    <button class="sort-btn" data-sort="ftline" title="Sort by active fight-time line">FT Line</button>
-    <button class="sort-btn" data-sort="avgss" title="Sort by average significant strikes">Avg SS</button>
-    <button class="sort-btn" data-sort="delta" title="Sort by SS delta (Avg SS - Line)">SS Delta</button>
-    <button class="sort-btn" data-sort="conf">Confidence</button>
-    <button class="sort-btn" data-sort="avgfp">Avg FP</button>
-    <button class="sort-btn" data-sort="floor">Floor</button>
-    <button class="sort-btn" data-sort="ceil">Ceiling</button>
-    <button class="sort-btn" data-sort="consistency">Consistency</button>
+  <div class="sort-trend-control">
+    <button id="sortTrendTrigger" class="sort-trend-trigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Configure sort order and trend window">
+      <span class="sort-label">Sort &amp; Trend</span>
+      <span class="sort-trend-summary"><span id="sortTrendActiveSort">Card Order</span> · <span id="sortTrendActiveTrend">L3</span></span>
+      <span class="sort-trend-caret" aria-hidden="true">▾</span>
+    </button>
+    <div id="sortTrendPopover" class="sort-trend-popover" role="menu" hidden>
+      <div class="sort-trend-section">
+        <span class="sort-trend-section-label">Sort by</span>
+        <div class="sort-group" id="sortGroup">
+          <button class="sort-btn active" data-sort="default">Card Order</button>
+          <button class="sort-btn" data-sort="line">Line ↓</button>
+          <button class="sort-btn" data-sort="ssline" title="Sort by active SS line">SS Line</button>
+          <button class="sort-btn" data-sort="ftline" title="Sort by active fight-time line">FT Line</button>
+          <button class="sort-btn" data-sort="avgss" title="Sort by average significant strikes">Avg SS</button>
+          <button class="sort-btn" data-sort="delta" title="Sort by SS delta (Avg SS - Line)">SS Delta</button>
+          <button class="sort-btn" data-sort="conf">Confidence</button>
+          <button class="sort-btn" data-sort="avgfp">Avg FP</button>
+          <button class="sort-btn" data-sort="floor">Floor</button>
+          <button class="sort-btn" data-sort="ceil">Ceiling</button>
+          <button class="sort-btn" data-sort="consistency">Consistency</button>
+        </div>
+      </div>
+      <div class="sort-trend-section">
+        <span class="sort-trend-section-label" title="Compare recent N fights vs career average">Trend window</span>
+        <div class="trend-window-group">
+          <button class="trend-btn active" data-window="3">L3</button>
+          <button class="trend-btn" data-window="5">L5</button>
+          <button class="trend-btn" data-window="0">Career</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="view-tabs">
     <button class="tab-btn active" data-view="all">All Fighters</button>
@@ -4340,34 +4505,38 @@ body.loading {
     <button class="tab-btn" data-view="calibration">📈 Calibration</button>
     <button class="tab-btn" data-view="archive">Archive</button>
   </div>
-  <div class="trend-window-group" title="Trend window: compare recent N fights vs career average">
-    <span class="sort-label">Trend:</span>
-    <button class="trend-btn active" data-window="3">L3</button>
-    <button class="trend-btn" data-window="5">L5</button>
-    <button class="trend-btn" data-window="0">Career</button>
+  <div class="density-control">
+    <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
+      <span aria-hidden="true">⚙</span>
+    </button>
+    <div id="densityPopover" class="density-popover" role="menu" hidden>
+      <span class="density-popover-label">Display density</span>
+      <button id="densityToggleBtn" class="density-btn density-popover-item" title="Toggle between compact and detailed fighter cards">Compact View</button>
+      <button id="historyDensityToggleBtn" class="density-btn density-popover-item" title="Toggle history panel readability">History: Compact</button>
+    </div>
   </div>
-  <button id="historyDensityToggleBtn" class="density-btn" title="Toggle history panel readability">History: Compact</button>
-  <button id="densityToggleBtn" class="density-btn" title="Toggle between compact and detailed fighter cards">Compact View</button>
 </div>
 
 <!-- PRE-LOCK QA PANEL -->
 <div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
 
-<div id="modelHealthWidget" class="model-health-grid" aria-live="polite">
-  <div class="mh-card">
-    <div class="mh-label">Calibrated Hit Rate</div>
-    <div class="mh-value" id="mhHitRate">--%</div>
-    <div class="mh-trend" id="mhHitTrend">Waiting for model data</div>
+<div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
+  <div class="mh-stat">
+    <span class="mh-label">Calibrated Hit Rate</span>
+    <span class="mh-value" id="mhHitRate">--%</span>
+    <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
   </div>
-  <div class="mh-card">
-    <div class="mh-label">Avg Confidence</div>
-    <div class="mh-value" id="mhConfidence">--%</div>
-    <div class="mh-trend" id="mhConfidenceTrend">No active leans</div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Avg Confidence</span>
+    <span class="mh-value" id="mhConfidence">--%</span>
+    <span class="mh-trend" id="mhConfidenceTrend">No active leans</span>
   </div>
-  <div class="mh-card">
-    <div class="mh-label">Actionable Leans</div>
-    <div class="mh-value" id="mhCoverage">0</div>
-    <div class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Actionable Leans</span>
+    <span class="mh-value" id="mhCoverage">0</span>
+    <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
   </div>
 </div>
 

@@ -5729,6 +5729,32 @@ async function renderQAPanel(): Promise<void> {
     p.ageMin = ts > 0 ? Math.floor((Date.now() - ts) / 60000) : null;
   }
 
+  // Co-locate freshness with the top-of-page platform pills (Pick6/UD/Betr/DK/PP).
+  const PILL_AGE_IDS: Record<string, string> = {
+    'lines_pick6':                 'ageP6',
+    'lines_underdog':              'ageUD',
+    'lines_betr':                  'ageBetr',
+    'lines_prizepicks':            'agePP',
+    'lines_draftkings_sportsbook': 'ageDK',
+  };
+  for (const p of platformInfo) {
+    const ageEl = document.getElementById(PILL_AGE_IDS[p.key]);
+    if (!ageEl) continue;
+    if (p.ageMin == null) {
+      ageEl.textContent = '';
+      ageEl.className = 'pill-age';
+      ageEl.removeAttribute('title');
+      continue;
+    }
+    const warnAt = p.manual ? 720 : 15;
+    const errAt  = p.manual ? 1440 : 60;
+    const cls = p.ageMin >= errAt ? 'stale' : p.ageMin >= warnAt ? 'aging' : 'fresh';
+    const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin/60)}h`;
+    ageEl.textContent = ageLabel;
+    ageEl.className = `pill-age ${cls}`;
+    ageEl.title = `${p.label} captured ${ageLabel} ago${p.manual ? ' (manual entry — no auto-scrape)' : ''}`;
+  }
+
   const hasPlatformLine = (f: AnalyzerFighter, plat: string): boolean => {
     if (plat === 'lines_pick6')                 return f.line_p6 != null || f.line_p6_ss != null || f.line_p6_td != null || f.line_p6_ft != null;
     if (plat === 'lines_underdog')              return f.line_ud != null || f.line_ud_ss != null || f.line_ud_td != null || f.line_ud_ft != null;
@@ -5779,17 +5805,6 @@ async function renderQAPanel(): Promise<void> {
   const hasWarn = issues.some(i => i.level === 'warn');
   const level: 'ok'|'warn'|'err' = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
 
-  const pillHtml = platformInfo.map(p => {
-    if (p.ageMin == null) return `<span class="qa-pill qa-pill-muted" title="${p.key}: no data captured">${p.label}: —</span>`;
-    // Manual platforms get relaxed thresholds (warn 12h, err 24h) since there's no auto-refresh.
-    const warnAt = p.manual ? 720 : 15;
-    const errAt  = p.manual ? 1440 : 60;
-    const pillClass = p.ageMin >= errAt ? 'qa-pill-err' : p.ageMin >= warnAt ? 'qa-pill-warn' : 'qa-pill-ok';
-    const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin/60)}h`;
-    const manualHint = p.manual ? ' (manual entry — no auto-scrape)' : '';
-    return `<span class="qa-pill ${pillClass}" title="${p.key} captured ${ageLabel} ago${manualHint}">${p.label}: ${ageLabel}</span>`;
-  }).join('');
-
   const summary = level === 'ok'
     ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
     : `${level === 'err' ? '✕' : '⚠'} ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`;
@@ -5803,7 +5818,6 @@ async function renderQAPanel(): Promise<void> {
   panel.innerHTML = `
     <div class="qa-panel-header">
       <span class="qa-panel-title">Slate Check</span>
-      <span class="qa-pills">${pillHtml}</span>
     </div>
     <div class="qa-summary">${summary}</div>
     ${issuesHtml}
@@ -13910,18 +13924,13 @@ function updatePlatformBar(data: AnalyzerDataPayload): void {
 
   // ── When no lines loaded, hide pills and show "ready for next event" state ──
   const pillsRow = document.querySelector('.platform-pills-row') as HTMLElement | null;
-  const activeLabel = el('platformActiveLabel');
   const sourceRow = el('sourceToggleRow');
 
   if (total === 0) {
-    // Hide individual pills, active label, and source toggles
     if (pillsRow) pillsRow.style.display = 'none';
-    if (activeLabel) activeLabel.style.display = 'none';
     if (sourceRow) sourceRow.style.display = 'none';
   } else {
-    // Restore visibility
     if (pillsRow) pillsRow.style.display = '';
-    if (activeLabel) activeLabel.style.display = '';
     if (sourceRow) sourceRow.style.display = '';
   }
 
@@ -14065,10 +14074,8 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
   // IMPORTANT: don't hide the whole .filter-bar-bottom — it contains .view-tabs, which
   // must stay clickable so users can reach Archive / Best Picks / Parlay Lab / Calibration
   // (and the Line Predictor inside Archive) between events.
-  const sortGroup = document.getElementById('sortGroup');
-  const trendGroup = document.querySelector('.filter-bar.filter-bar-bottom .trend-window-group') as HTMLElement | null;
-  const historyDensityBtn = document.getElementById('historyDensityToggleBtn');
-  const densityBtn = document.getElementById('densityToggleBtn');
+  const sortTrendCtrl = document.querySelector('.filter-bar.filter-bar-bottom .sort-trend-control') as HTMLElement | null;
+  const densityCtrl = document.querySelector('.filter-bar.filter-bar-bottom .density-control') as HTMLElement | null;
   const modelHealth = document.getElementById('modelHealthWidget');
   const learningDash = document.getElementById('learningDiagnosticsWidget');
 
@@ -14114,10 +14121,8 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
     }
     if (container) container.style.display = 'none';
     if (fhr) fhr.classList.add('is-hidden');
-    if (sortGroup) sortGroup.style.display = 'none';
-    if (trendGroup) trendGroup.style.display = 'none';
-    if (historyDensityBtn) historyDensityBtn.style.display = 'none';
-    if (densityBtn) densityBtn.style.display = 'none';
+    if (sortTrendCtrl) sortTrendCtrl.style.display = 'none';
+    if (densityCtrl) densityCtrl.style.display = 'none';
     if (modelHealth) modelHealth.style.display = 'none';
     if (learningDash) learningDash.style.display = 'none';
     return;
@@ -14130,10 +14135,8 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
     if (title) title.textContent = 'Ready to Auto-Fetch Lines';
   }
   // Restore hidden elements when lines arrive
-  if (sortGroup) sortGroup.style.display = '';
-  if (trendGroup) trendGroup.style.display = '';
-  if (historyDensityBtn) historyDensityBtn.style.display = '';
-  if (densityBtn) densityBtn.style.display = '';
+  if (sortTrendCtrl) sortTrendCtrl.style.display = '';
+  if (densityCtrl) densityCtrl.style.display = '';
   if (modelHealth) modelHealth.style.display = '';
   if (learningDash) learningDash.style.display = '';
   if (empty) empty.style.display = 'none';
@@ -15147,8 +15150,6 @@ function setActivePlatform(platform: string): void {
   document.querySelectorAll('[data-platform]').forEach(b => b.classList.remove('platform-selected'));
   const target = document.querySelector(`[data-platform="${platform}"]`);
   if (target) target.classList.add('platform-selected');
-  const nameEl = document.getElementById('platformActiveName');
-  if (nameEl) nameEl.textContent = platform === 'pick6' ? 'Pick6' : platform === 'underdog' ? 'Underdog' : platform === 'prizepicks' ? 'PrizePicks' : platform === 'draftkings_sportsbook' ? 'DK Sportsbook' : 'Betr';
   renderFighters();
 }
 
@@ -15156,7 +15157,21 @@ function setTrendWindow(w: 3 | 5 | 0): void {
   trendWindow = w;
   document.querySelectorAll('.trend-btn[data-window]').forEach(b => b.classList.remove('active'));
   document.querySelector(`.trend-btn[data-window="${w}"]`)?.classList.add('active');
+  updateSortTrendTriggerLabel();
   renderFighters();
+}
+
+function updateSortTrendTriggerLabel(): void {
+  const sortEl = document.getElementById('sortTrendActiveSort');
+  const trendEl = document.getElementById('sortTrendActiveTrend');
+  if (sortEl) {
+    const activeSort = document.querySelector('.sort-btn.active') as HTMLElement | null;
+    if (activeSort) sortEl.textContent = (activeSort.textContent || '').trim();
+  }
+  if (trendEl) {
+    const activeTrend = document.querySelector('.trend-btn.active') as HTMLElement | null;
+    if (activeTrend) trendEl.textContent = (activeTrend.textContent || '').trim();
+  }
 }
 
 function bindSourceToggles(): void {
@@ -15829,6 +15844,32 @@ function initAnalyzerCore(): void {
   applyDensityMode();
   applyHistoryDensityMode();
 
+  // Display-density gear popover
+  const densityTrigger = document.getElementById('densityTrigger');
+  const densityPopover = document.getElementById('densityPopover') as HTMLElement | null;
+  if (densityTrigger && densityPopover) {
+    const closeDensityPopover = (): void => {
+      densityPopover.hidden = true;
+      densityTrigger.setAttribute('aria-expanded', 'false');
+    };
+    densityTrigger.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const willOpen = densityPopover.hidden;
+      densityPopover.hidden = !willOpen;
+      densityTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    document.addEventListener('click', (ev) => {
+      if (densityPopover.hidden) return;
+      const target = ev.target as Node | null;
+      if (target && !densityPopover.contains(target) && target !== densityTrigger && !densityTrigger.contains(target)) {
+        closeDensityPopover();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !densityPopover.hidden) closeDensityPopover();
+    });
+  }
+
   // Line drop / empty-state buttons
   document.getElementById('emptyStateAutoFetchBtn')?.addEventListener('click', triggerAutoScrape);
 
@@ -15993,8 +16034,40 @@ function initAnalyzerCore(): void {
   // Sort
   bindExclusiveButtons('.sort-btn[data-sort]', (btn) => {
     currentSort = btn.dataset['sort'] || 'default';
+    updateSortTrendTriggerLabel();
     renderFighters();
   });
+
+  // Sort & Trend popover
+  const sortTrendTrigger = document.getElementById('sortTrendTrigger');
+  const sortTrendPopover = document.getElementById('sortTrendPopover') as HTMLElement | null;
+  if (sortTrendTrigger && sortTrendPopover) {
+    const closePopover = (): void => {
+      sortTrendPopover.hidden = true;
+      sortTrendTrigger.setAttribute('aria-expanded', 'false');
+    };
+    sortTrendTrigger.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const willOpen = sortTrendPopover.hidden;
+      sortTrendPopover.hidden = !willOpen;
+      sortTrendTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    document.addEventListener('click', (ev) => {
+      if (sortTrendPopover.hidden) return;
+      const target = ev.target as Node | null;
+      if (target && !sortTrendPopover.contains(target) && target !== sortTrendTrigger && !sortTrendTrigger.contains(target)) {
+        closePopover();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !sortTrendPopover.hidden) closePopover();
+    });
+    sortTrendPopover.addEventListener('click', (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (target?.closest('.sort-btn, .trend-btn')) closePopover();
+    });
+  }
+  updateSortTrendTriggerLabel();
 
   // Initial data load
   requestDataReload();
