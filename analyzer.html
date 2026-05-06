@@ -1467,6 +1467,36 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .movement-summary-row:last-child { border-bottom: none; }
+.movement-summary-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.movement-summary-section-header:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+.movement-summary-section-header.rise { color: var(--green); }
+.movement-summary-section-header.drop { color: var(--red); }
+.movement-summary-section-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text2);
+}
 .movement-summary-fighter { color: var(--text); font-weight: 600; min-width: 120px; }
 .movement-summary-stat { color: var(--text2); min-width: 24px; }
 .movement-summary-line { color: var(--text3); font-variant-numeric: tabular-nums; min-width: 100px; font-size: 9px; }
@@ -2139,6 +2169,22 @@ body {
 .view-tabs .tab-btn:last-child { border-right: none; }
 .view-tabs .tab-btn.active { background: var(--gold); color: #000; }
 .view-tabs .tab-btn:hover:not(.active) { color: var(--text); background: var(--bg4); }
+.view-tabs .tab-count {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text3);
+  min-width: 14px;
+  text-align: center;
+}
+.view-tabs .tab-btn.active .tab-count { background: rgba(0,0,0,0.18); color: rgba(0,0,0,0.7); }
+.view-tabs .tab-btn:hover:not(.active) .tab-count { color: var(--text2); }
 
 /* ── DEBUG PANEL ── */
 .debug-panel-hidden { display: none; }
@@ -3014,6 +3060,14 @@ body.loading {
   .qa-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .qa-panel-title  { font-weight:700; letter-spacing:0.5px; font-size:11px; color:var(--text-muted); text-transform:uppercase; }
   .qa-summary      { font-size:12px; font-weight:600; }
+
+  .qa-panel.qa-compact {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 14px;
+  }
+  .qa-panel.qa-compact .qa-summary { font-size: 11px; font-weight: 500; color: var(--text2); }
   .qa-issues       { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
   .qa-issues li    { font-size:11px; color:var(--text-muted); padding-left:14px; position:relative; line-height:1.4; }
   .qa-issues li::before { content:'•'; position:absolute; left:2px; color:var(--text-muted); }
@@ -4497,9 +4551,9 @@ body.loading {
     </div>
   </div>
   <div class="view-tabs">
-    <button class="tab-btn active" data-view="all">All Fighters</button>
-    <button class="tab-btn" data-view="over">▲ Lean Over</button>
-    <button class="tab-btn" data-view="under">▼ Lean Under</button>
+    <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
+    <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
+    <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
     <button class="tab-btn" data-view="bestpicks">⚡ AI Best Picks</button>
     <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
     <button class="tab-btn" data-view="calibration">📈 Calibration</button>

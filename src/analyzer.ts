@@ -5813,7 +5813,7 @@ async function renderQAPanel(): Promise<void> {
     ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}">${i.text}</li>`).join('')}</ul>`
     : '';
 
-  panel.className = `qa-panel qa-${level}`;
+  panel.className = `qa-panel qa-${level}${level === 'ok' ? ' qa-compact' : ''}`;
   panel.style.display = '';
   panel.innerHTML = `
     <div class="qa-panel-header">
@@ -10464,9 +10464,26 @@ function renderFighters(): void {
   });
 }
 
+function updateViewTabCounts(): void {
+  let over = 0, under = 0;
+  for (const f of allFighters) {
+    const lean = getEffectiveLean(f).lean;
+    if (lean === 'over') over++;
+    else if (lean === 'under') under++;
+  }
+  const setText = (id: string, n: number): void => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(n);
+  };
+  setText('tabCountAll', allFighters.length);
+  setText('tabCountOver', over);
+  setText('tabCountUnder', under);
+}
+
 function _renderFightersImpl(): void {
   const container = document.getElementById('cardContainer');
   if (!container) return;
+  updateViewTabCounts();
   container.innerHTML = '';
   if (currentView === 'bestpicks') { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); return; }
   if (currentView === 'parlaylab') { renderParlayLab(container); return; }
@@ -14179,11 +14196,23 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
       }
     }
     const ageH = _baselineCapturedAt > 0 ? ((Date.now() - _baselineCapturedAt) / 3600000).toFixed(1) : '?';
-    const prevInfo = _prevRefreshLines.size > 0 ? ` · ↻${_prevMatchCount} prev · Δ${_maxPrevDelta.toFixed(1)}` : '';
+    const stored = _openingLines.size;
+    const archiveText = stored === _matchCount
+      ? `📍 ${stored} archived`
+      : `📍 ${stored} stored · ${_matchCount} matched`;
+    const archiveTitle = stored === _matchCount
+      ? `${stored} fighters with stored opening lines, all matched against current slate`
+      : `${stored} stored opening lines · ${_matchCount} matched against current slate · ${stored - _matchCount} not present this slate`;
+    const recentMoveTrail = _prevRefreshLines.size > 0 && _maxPrevDelta > 0
+      ? ` · ↻Δ${_maxPrevDelta.toFixed(1)}`
+      : '';
+    const movementTitle = _prevRefreshLines.size > 0
+      ? `Max line delta from opening: ${_maxDelta.toFixed(1)} — Since last refresh: ${_prevMatchCount} fighters tracked, max prev-delta ${_maxPrevDelta.toFixed(1)}`
+      : `Max line delta from opening: ${_maxDelta.toFixed(1)}`;
     _oc.innerHTML =
-      `<span class="status-chunk">📍 ${_openingLines.size} stored / ${_matchCount} matched</span>` +
+      `<span class="status-chunk" title="${archiveTitle}">${archiveText}</span>` +
       `<span class="status-chunk">🕒 ${ageH}h old</span>` +
-      `<span class="status-chunk">max Δ${_maxDelta.toFixed(1)}${prevInfo}</span>`;
+      `<span class="status-chunk" title="${movementTitle}">max Δ${_maxDelta.toFixed(1)}${recentMoveTrail}</span>`;
     // Show reset button when baselines exist
     const _rb = document.getElementById('resetBaselinesBtn');
     if (_rb) (_rb as HTMLElement).style.display = 'inline';
@@ -14576,7 +14605,11 @@ function renderLineMovementSummary(): void {
   entries.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   container.style.display = '';
 
-  const rows = entries.slice(0, 20).map(e => {
+  const top = entries.slice(0, 20);
+  const steamers = top.filter(e => e.delta > 0);
+  const drifters = top.filter(e => e.delta < 0);
+
+  const rowHtml = (e: SummaryEntry): string => {
     const arrow = e.delta > 0 ? '▲' : '▼';
     const cls = e.delta > 0 ? 'rise' : 'drop';
     const steamTag = e.isSteam ? '<span class="movement-summary-steam">STEAM</span>' : '';
@@ -14591,9 +14624,15 @@ function renderLineMovementSummary(): void {
       <span class="movement-summary-platforms">${e.platforms.join(', ')}</span>
       ${steamTag}${rlmTag}
     </div>`;
-  }).join('');
+  };
 
-  body.innerHTML = rows;
+  const sectionHtml = (label: string, dirClass: 'rise'|'drop', list: SummaryEntry[]): string => {
+    if (list.length === 0) return '';
+    return `<div class="movement-summary-section-header ${dirClass}">${label} <span class="movement-summary-section-count">${list.length}</span></div>` +
+      list.map(rowHtml).join('');
+  };
+
+  body.innerHTML = sectionHtml('▲ Steamers', 'rise', steamers) + sectionHtml('▼ Drifters', 'drop', drifters);
   if (timeEl) timeEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
