@@ -120,9 +120,13 @@ body {
   background: var(--text3);
   transition: all 0.3s;
 }
-.ext-dot.live    { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2.2s infinite; }
+.ext-dot.live    { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse-live 2.4s ease-in-out infinite; }
 .ext-dot.partial { background: var(--orange); box-shadow: 0 0 7px var(--orange); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+  50%      { opacity: 0.75; box-shadow: 0 0 14px var(--green); }
+}
 
 .btn {
   font-family: 'Space Grotesk', sans-serif;
@@ -318,6 +322,8 @@ body {
   transition: all 0.2s; letter-spacing: 0.06em;
 }
 .platform-pill.active { background: rgba(255,255,255,0.025); border-color: currentColor; }
+.platform-pill:not(.active) { opacity: 0.4; }
+.platform-pill:not(.active):hover { opacity: 0.7; }
 .platform-pill.p6   { color: var(--blue); }
 .platform-pill.ud   { color: var(--purple); }
 .platform-pill.betr { color: var(--orange); }
