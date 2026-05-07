@@ -3080,18 +3080,25 @@ body.loading {
   .qa-issues li.qa-issue-err::before  { color:#fc8181; }
   .qa-issues li.qa-issue-warn::before { color:#f6d55c; }
 
-  .learning-diagnostics-grid {
+  .learning-diagnostics-strip {
     margin: 0 28px 10px;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(160px, 1fr));
-    gap: 12px;
-  }
-
-  .ld-card {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: 10px 18px;
     border: 1px solid rgba(44,212,208,0.35);
     background: linear-gradient(180deg, rgba(44,212,208,0.08), rgba(44,212,208,0.03));
     border-radius: var(--radius-md);
-    padding: 10px 14px;
+  }
+
+  .ld-stat {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 10px;
+    flex: 1 1 220px;
+    min-width: 0;
   }
 
   .ld-label {
@@ -3100,33 +3107,52 @@ body.loading {
     color: var(--text3);
     letter-spacing: 0.12em;
     text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .ld-value {
-    margin-top: 4px;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--cyan);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .ld-meta {
-    margin-top: 3px;
+    flex-basis: 100%;
     font-size: var(--text-xs);
     color: var(--text2);
     font-family: 'JetBrains Mono', monospace;
+    line-height: 1.4;
+    min-width: 0;
   }
 
-  .ld-detail {
-    margin-top: 6px;
+  .ld-meta-extra {
+    flex-basis: 100%;
     font-size: 10px;
-    color: var(--text2);
+    color: var(--text3);
     font-family: 'JetBrains Mono', monospace;
-    line-height: 1.45;
-    max-height: 90px;
-    overflow: auto;
-    border-top: 1px dashed rgba(44,212,208,0.3);
-    padding-top: 6px;
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .ld-meta-extra::before {
+    content: '·';
+    margin-right: 4px;
+    color: var(--text3);
+  }
+
+  .ld-divider {
+    width: 1px;
+    align-self: stretch;
+    min-height: 24px;
+    background: rgba(44,212,208,0.25);
+    flex-shrink: 0;
   }
 
   .best-picks-slip {
@@ -3727,7 +3753,7 @@ body.loading {
 
   @media (max-width: 1100px) {
     .model-health-strip .mh-divider { display: none; }
-    .learning-diagnostics-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .learning-diagnostics-strip .ld-divider { display: none; }
     .fighter-main { grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr); }
     .fighter-main > .stats-mini,
     .fighter-main > .lean-cell,
@@ -3742,7 +3768,7 @@ body.loading {
     .filter-bar,
     #cardContainer,
     .model-health-strip,
-    .learning-diagnostics-grid { margin-left: 10px; margin-right: 10px; padding-left: 10px; padding-right: 10px; }
+    .learning-diagnostics-strip { margin-left: 10px; margin-right: 10px; padding-left: 10px; padding-right: 10px; }
     .filter-bar-top,
     .filter-bar-bottom { flex-direction: column; align-items: stretch; gap: 8px; }
     .platform-pills-row { overflow-x: auto; padding-bottom: 4px; }
@@ -4326,7 +4352,7 @@ body.loading {
 /* Section rhythm — align ad-hoc sections with model-health/qa-panel gutter */
 .best-picks-section,
 .parlay-lab,
-.learning-diagnostics-grid,
+.learning-diagnostics-strip,
 .movement-summary-grid {
   margin-left: var(--space-6);
   margin-right: var(--space-6);
@@ -4600,27 +4626,30 @@ body.loading {
   </div>
 </div>
 
-<div id="learningDiagnosticsWidget" class="learning-diagnostics-grid" aria-live="polite">
-  <div class="ld-card">
-    <div class="ld-label">Learning Memory</div>
-    <div class="ld-value" id="ldResolved">0 resolved</div>
-    <div class="ld-meta" id="ldCoverage">No settled outcomes yet</div>
+<div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
+  <div class="ld-stat">
+    <span class="ld-label">Learning Memory</span>
+    <span class="ld-value" id="ldResolved">0 resolved</span>
+    <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
   </div>
-  <div class="ld-card">
-    <div class="ld-label">Market Accuracy</div>
-    <div class="ld-value" id="ldMarketAcc">SS --% · FP --%</div>
-    <div class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</div>
+  <div class="ld-divider" aria-hidden="true"></div>
+  <div class="ld-stat">
+    <span class="ld-label">Market Accuracy</span>
+    <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
+    <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
   </div>
-  <div class="ld-card">
-    <div class="ld-label">Pattern Tracker</div>
-    <div class="ld-value" id="ldPatternWin">Top hit tag: --</div>
-    <div class="ld-meta" id="ldPatternMiss">Top miss tag: --</div>
+  <div class="ld-divider" aria-hidden="true"></div>
+  <div class="ld-stat">
+    <span class="ld-label">Pattern Tracker</span>
+    <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
+    <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
   </div>
-  <div class="ld-card">
-    <div class="ld-label">Learning Drilldown</div>
-    <div class="ld-value" id="ldDrilldownTitle">No drilldown yet</div>
-    <div class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</div>
-    <div class="ld-detail" id="ldDrilldownBody">No settled picks yet.</div>
+  <div class="ld-divider" aria-hidden="true"></div>
+  <div class="ld-stat">
+    <span class="ld-label">Learning Drilldown</span>
+    <span class="ld-value" id="ldDrilldownTitle">No drilldown yet</span>
+    <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
+    <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
   </div>
 </div>
 <!-- LINE MOVEMENT SUMMARY -->
