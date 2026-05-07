@@ -101,14 +101,6 @@ body {
   color: var(--gold);
   line-height: 1;
 }
-.logo-sub {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text3);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  margin-top: 3px;
-}
 
 .header-right { display: flex; align-items: center; gap: 10px; }
 
@@ -221,6 +213,20 @@ body {
 .overflow-item:hover {
   background: var(--border);
   color: var(--text);
+}
+.overflow-item-danger {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 11px;
+  color: var(--red);
+}
+.overflow-item-danger:hover {
+  background: rgba(229,62,62,0.12);
+  color: #fc8181;
+}
+.overflow-item-success {
+  color: var(--green) !important;
+  background: rgba(72,187,120,0.12) !important;
 }
 
 .watcher-toggle-btn {
@@ -4409,15 +4415,12 @@ body.loading {
 <div class="header">
   <div class="logo">
     <div class="logo-icon">🥊</div>
-    <div>
-      <div class="logo-text">UFC Analyzer</div>
-      <div class="logo-sub">Fantasy Lines · History · Leans</div>
-    </div>
+    <div class="logo-text">UFC Analyzer</div>
   </div>
   <div class="header-right">
     <div class="ext-status">
       <div class="ext-dot" id="extDot"></div>
-      <span id="extLabel" class="ext-label-muted">No extension data</span><span id="openingLinesCount" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span><button id="resetBaselinesBtn" title="Clear all movement baselines and bias tips" style="display:none;font-size:10px;margin-left:6px;padding:3px 8px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600">RESET LINES</button>
+      <span id="extLabel" class="ext-label-muted">No extension data</span><span id="openingLinesCount" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span>
     </div>
     <button class="btn btn-ghost auto-fetch-btn" id="autoScrapeBtn" title="Auto-opens Pick6 + Underdog tabs, scrapes lines, and loads them automatically">
       <span id="autoScrapeIcon">⚡</span> AUTO-FETCH LINES
@@ -4444,6 +4447,9 @@ body.loading {
         </button>
         <button class="overflow-item" id="restoreStorageBtn" title="Restore extension storage from a JSON backup file">
           <span>📥</span> Restore
+        </button>
+        <button class="overflow-item overflow-item-danger" id="resetBaselinesBtn" title="Clear all movement baselines and bias tips" style="display:none">
+          <span>⚠</span> <span class="overflow-item-label">RESET LINES</span>
         </button>
       </div>
     </div>

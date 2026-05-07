@@ -14215,7 +14215,7 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
       `<span class="status-chunk" title="${movementTitle}">max Δ${_maxDelta.toFixed(1)}${recentMoveTrail}</span>`;
     // Show reset button when baselines exist
     const _rb = document.getElementById('resetBaselinesBtn');
-    if (_rb) (_rb as HTMLElement).style.display = 'inline';
+    if (_rb) (_rb as HTMLElement).style.display = '';
   } else if (_oc) {
     _oc.textContent = _openingLines.size === 0 ? ' · 📍awaiting baseline' : '';
   }
@@ -15935,7 +15935,15 @@ function initAnalyzerCore(): void {
   document.getElementById('resetBaselinesBtn')?.addEventListener('click', async () => {
     console.log('[UFC Analyzer] RESET LINES clicked — clearing all baselines and re-anchoring');
     const resetBtn = document.getElementById('resetBaselinesBtn') as HTMLButtonElement | null;
-    if (resetBtn) { resetBtn.textContent = 'DONE!'; resetBtn.style.background = 'var(--green)'; setTimeout(() => { resetBtn.textContent = 'RESET LINES'; resetBtn.style.background = 'var(--red)'; }, 2000); }
+    const resetLabel = resetBtn?.querySelector('.overflow-item-label') as HTMLElement | null;
+    if (resetBtn && resetLabel) {
+      resetLabel.textContent = 'DONE!';
+      resetBtn.classList.add('overflow-item-success');
+      setTimeout(() => {
+        resetLabel.textContent = 'RESET LINES';
+        resetBtn.classList.remove('overflow-item-success');
+      }, 2000);
+    }
     // Betr-clear rule: the Betr seed itself carries its event date (written by
     // initializeBetrLines in background.ts via BETR_EVENT_DATE). Read that directly
     // so the rule doesn't depend on upcomingEventTs, which can drift if the analyzer
