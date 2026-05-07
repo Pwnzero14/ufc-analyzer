@@ -2114,11 +2114,12 @@ body {
   display: grid;
   grid-template-columns: 200px 1fr 160px 155px 22px;
   align-items: center;
-  padding: 4px 14px;
+  padding: 6px 14px;
   gap: 10px;
-  background: rgba(6,7,16,0.95);
-  backdrop-filter: blur(4px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(6,7,16,0.96);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border2);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.28);
   position: sticky;
   top: 54px;
   z-index: 50;
@@ -2130,6 +2131,10 @@ body {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text3);
+}
+.fhr-label + .fhr-label {
+  padding-left: 10px;
+  border-left: 1px solid rgba(150,150,170,0.14);
 }
 
 /* ── LEAN BADGE (gradient confidence pill) ── */
