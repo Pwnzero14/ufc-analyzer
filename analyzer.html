@@ -3298,6 +3298,7 @@ body.loading {
     flex-shrink: 0;
   }
   .density-trigger {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3313,6 +3314,18 @@ body.loading {
   }
   .density-trigger:hover { color: var(--text); border-color: var(--border3); }
   .density-trigger[aria-expanded="true"] { border-color: var(--gold); color: var(--text); }
+  .density-trigger-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 4px rgba(255,200,80,0.55);
+    pointer-events: none;
+  }
+  .density-trigger-dot[hidden] { display: none; }
   .density-popover {
     position: absolute;
     top: calc(100% + 6px);
@@ -4627,6 +4640,7 @@ body.loading {
   <div class="density-control">
     <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
       <span aria-hidden="true">⚙</span>
+      <span id="densityTriggerDot" class="density-trigger-dot" aria-hidden="true" hidden></span>
     </button>
     <div id="densityPopover" class="density-popover" role="menu" hidden>
       <span class="density-popover-label">Display density</span>

@@ -15260,6 +15260,22 @@ function bindSourceToggles(): void {
   updateSourceToggleUI();
 }
 
+function updateDensityTriggerDot(): void {
+  const dot = document.getElementById('densityTriggerDot');
+  const trigger = document.getElementById('densityTrigger');
+  if (!dot || !trigger) return;
+  const nonDefault = currentDensity === 'compact' || currentHistoryDensity === 'readable';
+  dot.hidden = !nonDefault;
+  if (nonDefault) {
+    const labels: string[] = [];
+    if (currentDensity === 'compact') labels.push('Compact View');
+    if (currentHistoryDensity === 'readable') labels.push('History: Readable');
+    trigger.title = `Active: ${labels.join(' · ')}`;
+  } else {
+    trigger.title = 'Display density options';
+  }
+}
+
 function applyDensityMode(): void {
   const compact = currentDensity === 'compact';
   document.body.classList.toggle('compact-view', compact);
@@ -15268,6 +15284,7 @@ function applyDensityMode(): void {
     btn.textContent = compact ? 'Detailed View' : 'Compact View';
     btn.classList.toggle('active', compact);
   }
+  updateDensityTriggerDot();
 }
 
 function applyHistoryDensityMode(): void {
@@ -15278,6 +15295,7 @@ function applyHistoryDensityMode(): void {
     btn.textContent = readable ? 'History: Readable' : 'History: Compact';
     btn.classList.toggle('active', readable);
   }
+  updateDensityTriggerDot();
 }
 
 function exportToCSV(): void {
