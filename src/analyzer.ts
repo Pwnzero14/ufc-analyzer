@@ -596,6 +596,31 @@ function updateSourceToggleUI(): void {
   });
 }
 
+let sourceButtonsExpanded = false;
+
+function updateSourceRowVisibility(hasLines: boolean): void {
+  const sourceRow = document.getElementById('sourceToggleRow');
+  if (!sourceRow) return;
+  if (!hasLines) {
+    sourceRow.style.display = 'none';
+    return;
+  }
+  sourceRow.style.display = '';
+  const trigger = document.getElementById('sourceToggleTrigger');
+  const buttons = document.getElementById('sourceToggleButtons');
+  const text = document.getElementById('sourceTriggerText');
+  const caret = document.getElementById('sourceTriggerCaret');
+  if (!trigger || !buttons || !text || !caret) return;
+  const enabled = Object.values(sourceVisibility).filter(Boolean).length;
+  const allActive = enabled === 5;
+  const showButtons = sourceButtonsExpanded || !allActive;
+  buttons.style.display = showButtons ? '' : 'none';
+  text.textContent = `Sources ${enabled}/5`;
+  caret.textContent = showButtons ? '▴' : '▾';
+  trigger.setAttribute('aria-expanded', showButtons ? 'true' : 'false');
+  trigger.classList.toggle('is-filtered', !allActive);
+}
+
 const STORAGE_LINE_KEYS = ['lines_pick6', 'lines_underdog', 'lines_betr', 'lines_prizepicks', 'lines_draftkings_sportsbook'] as const;
 const STORAGE_BETR_MANUAL_KEY = 'lines_betr_manual_v1' as const;
 const STORAGE_ODDS_KEY = 'fight_odds_moneyline' as const;
@@ -13941,15 +13966,12 @@ function updatePlatformBar(data: AnalyzerDataPayload): void {
 
   // ── When no lines loaded, hide pills and show "ready for next event" state ──
   const pillsRow = document.querySelector('.platform-pills-row') as HTMLElement | null;
-  const sourceRow = el('sourceToggleRow');
-
   if (total === 0) {
     if (pillsRow) pillsRow.style.display = 'none';
-    if (sourceRow) sourceRow.style.display = 'none';
   } else {
     if (pillsRow) pillsRow.style.display = '';
-    if (sourceRow) sourceRow.style.display = '';
   }
+  updateSourceRowVisibility(total > 0);
 
   const countP6 = el('countP6'), countUD = el('countUD'), countBetr = el('countBetr'), countPP = el('countPP'), countDK = el('countDK');
   if (countP6)   countP6.textContent   = p6.length   ? `${p6.length}`   : '—';
@@ -15226,8 +15248,14 @@ function bindSourceToggles(): void {
       }
 
       updateSourceToggleUI();
+      updateSourceRowVisibility(true);
       renderFighters();
     });
+  });
+  const trigger = document.getElementById('sourceToggleTrigger');
+  trigger?.addEventListener('click', () => {
+    sourceButtonsExpanded = !sourceButtonsExpanded;
+    updateSourceRowVisibility(true);
   });
   updateSourceToggleUI();
 }

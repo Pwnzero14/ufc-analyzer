@@ -1697,10 +1697,38 @@ body {
 
 .source-toggle-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text3);
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+.source-toggle-label:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--border);
+  color: var(--text);
+}
+.source-toggle-label.is-filtered {
+  color: var(--gold);
+  border-color: rgba(255,200,80,0.3);
+  background: rgba(255,200,80,0.06);
+}
+.source-trigger-caret {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.source-toggle-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .source-toggle {
@@ -4531,13 +4559,18 @@ body.loading {
       <span class="pill-age" id="agePP"></span>
       <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
     </div>
-    <div class="source-toggle-row" id="sourceToggleRow" title="Show or hide each sportsbook source">
-      <span class="source-toggle-label">Sources</span>
-      <button class="source-toggle p6 active" data-source="p6">P6</button>
-      <button class="source-toggle ud active" data-source="ud">UD</button>
-      <button class="source-toggle" style="color:#f59e0b;border-color:rgba(245,158,11,0.3)" data-source="dk">DK</button>
-      <button class="source-toggle pp active" data-source="pp">PP</button>
-      <button class="source-toggle betr active" data-source="betr">BT</button>
+    <div class="source-toggle-row" id="sourceToggleRow">
+      <button type="button" class="source-toggle-label" id="sourceToggleTrigger" aria-haspopup="true" aria-expanded="false" title="Show or hide each sportsbook source">
+        <span id="sourceTriggerText">Sources 5/5</span>
+        <span class="source-trigger-caret" id="sourceTriggerCaret" aria-hidden="true">▾</span>
+      </button>
+      <div class="source-toggle-buttons" id="sourceToggleButtons" style="display:none">
+        <button class="source-toggle p6 active" data-source="p6">P6</button>
+        <button class="source-toggle ud active" data-source="ud">UD</button>
+        <button class="source-toggle" style="color:#f59e0b;border-color:rgba(245,158,11,0.3)" data-source="dk">DK</button>
+        <button class="source-toggle pp active" data-source="pp">PP</button>
+        <button class="source-toggle betr active" data-source="betr">BT</button>
+      </div>
     </div>
   </div>
   <div class="filter-bar-center">
