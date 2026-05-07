@@ -3118,6 +3118,33 @@ body.loading {
   .qa-issues li.qa-issue-err::before  { color:#fc8181; }
   .qa-issues li.qa-issue-warn::before { color:#f6d55c; }
 
+  .qa-issue-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .qa-issue-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    cursor: help;
+  }
+  .qa-issue-chip.qa-issue-err {
+    border-color: rgba(229,62,62,0.45);
+    background: rgba(229,62,62,0.10);
+    color: #fc8181;
+  }
+  .qa-issue-chip.qa-issue-warn {
+    border-color: rgba(248,198,74,0.45);
+    background: rgba(248,198,74,0.10);
+    color: #f6d55c;
+  }
+
   .learning-diagnostics-strip {
     margin: 0 28px 10px;
     display: flex;

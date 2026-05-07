@@ -5808,7 +5808,7 @@ async function renderQAPanel(): Promise<void> {
   const betrPlatformLoaded = platformInfo.find(p => p.key === 'lines_betr')?.ageMin != null;
   const betrManualShort = betrPlatformLoaded && manualRowCount > 0 && manualRowCount < totalFighters;
 
-  type Issue = { level: 'err'|'warn'; text: string };
+  type Issue = { level: 'err'|'warn'; text: string; chip: string };
   const issues: Issue[] = [];
 
   // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
@@ -5817,38 +5817,59 @@ async function renderQAPanel(): Promise<void> {
   const staleWarn = autoPlatforms.filter(p => p.ageMin != null && p.ageMin >= 15 && p.ageMin < 60);
   if (staleErr.length) {
     const names = staleErr.map(p => p.ageMin == null ? `${p.label} (no data)` : `${p.label} (${p.ageMin}m)`).join(', ');
-    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}` });
+    const chip = staleErr.length === 1
+      ? `${staleErr[0].label} ${staleErr[0].ageMin == null ? 'no data' : 'stale'}`
+      : `${staleErr.length} books stale`;
+    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}`, chip });
   }
   if (staleWarn.length) {
     const names = staleWarn.map(p => `${p.label} (${p.ageMin}m)`).join(', ');
-    issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh` });
+    const chip = staleWarn.length === 1
+      ? `${staleWarn[0].label} ${staleWarn[0].ageMin}m`
+      : `${staleWarn.length} books aging`;
+    issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh`, chip });
   }
   for (const [label, missing] of missingByPlatform) {
-    issues.push({ level: 'warn', text: `${label}: ${missing} of ${totalFighters} fighters without lines` });
+    issues.push({
+      level: 'warn',
+      text: `${label}: ${missing} of ${totalFighters} fighters without lines`,
+      chip: `${label} missing ${missing}`,
+    });
   }
   if (betrManualShort) {
-    issues.push({ level: 'err', text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows` });
+    issues.push({
+      level: 'err',
+      text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows`,
+      chip: `Betr ${manualRowCount}/${totalFighters}`,
+    });
   }
 
   const hasErr = issues.some(i => i.level === 'err');
   const hasWarn = issues.some(i => i.level === 'warn');
   const level: 'ok'|'warn'|'err' = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
+  const chipMode = issues.length > 0 && issues.length <= 3;
 
   const summary = level === 'ok'
     ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
     : `${level === 'err' ? '✕' : '⚠'} ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`;
 
-  const issuesHtml = issues.length
+  const chipsHtml = chipMode
+    ? `<div class="qa-issue-chips">${issues.map(i =>
+        `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`
+      ).join('')}</div>`
+    : '';
+  const issuesHtml = (!chipMode && issues.length)
     ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}">${i.text}</li>`).join('')}</ul>`
     : '';
 
-  panel.className = `qa-panel qa-${level}${level === 'ok' ? ' qa-compact' : ''}`;
+  panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
   panel.style.display = '';
   panel.innerHTML = `
     <div class="qa-panel-header">
       <span class="qa-panel-title">Slate Check</span>
     </div>
     <div class="qa-summary">${summary}</div>
+    ${chipsHtml}
     ${issuesHtml}
   `;
 }
