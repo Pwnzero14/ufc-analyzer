@@ -5849,6 +5849,16 @@ async function renderQAPanel(): Promise<void> {
   const level: 'ok'|'warn'|'err' = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
   const chipMode = issues.length > 0 && issues.length <= 3;
 
+  const fetchBtn = document.getElementById('autoScrapeBtn');
+  if (fetchBtn) {
+    const freshness = staleErr.length > 0 ? 'stale'
+      : staleWarn.length > 0 ? 'aging'
+      : autoPlatforms.every(p => p.ageMin != null) ? 'fresh'
+      : '';
+    if (freshness) fetchBtn.setAttribute('data-freshness', freshness);
+    else fetchBtn.removeAttribute('data-freshness');
+  }
+
   const summary = level === 'ok'
     ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
     : `${level === 'err' ? '✕' : '⚠'} ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`;
@@ -6206,6 +6216,29 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return f.line_betr_ft ?? f.line_p6_ft ?? f.line_ud_ft ?? f.line_pp_ft ?? f.line_dk_ft ?? null;
     }
     return null;
+  };
+
+  // For SS/TD/FT/CTRL picks: pick the easiest line for the lean direction
+  // across all books that have a value (lowest for OVER, highest for UNDER).
+  // FP already runs per-book candidate generation and carries _platform on the
+  // chosen candidate; FP and push/none directions short-circuit to null here.
+  const bestSideLineForPick = (
+    f: AnalyzerFighter,
+    source: EffectiveLean['_source'] | undefined,
+    dir: 'over' | 'under' | 'push' | 'none' | undefined
+  ): { line: number | null; book: SourcePlatformKey | null } => {
+    if (!source || source === 'fp' || dir !== 'over' && dir !== 'under') {
+      return { line: null, book: null };
+    }
+    const books: SourcePlatformKey[] = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
+    const candidates: Array<{ line: number; book: SourcePlatformKey }> = [];
+    for (const b of books) {
+      const v = lineForLeanSource(f, source, b);
+      if (v != null) candidates.push({ line: v, book: b });
+    }
+    if (!candidates.length) return { line: null, book: null };
+    candidates.sort((a, b) => dir === 'over' ? a.line - b.line : b.line - a.line);
+    return { line: candidates[0].line, book: candidates[0].book };
   };
 
   const sourceBonus = (source: EffectiveLean['_source']): number => {
@@ -6593,8 +6626,47 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   bestPickConfidenceCache.clear();
   bestPickReasonCache.clear();
 
-  const overs  = allOversSorted.slice(0, 8);
-  const unders = allUndersSorted.slice(0, 8);
+  // Drop negatively-correlated same-fight pairs: when two fighters from one
+  // fight appear in the same section on DIFFERENT stat types, only one is kept.
+  // FP wins cross-stat ties (FP captures total fight outcome — the favorite's
+  // FP-OVER is the better bet to keep than the dog's high-edge SS/TD/FT pick
+  // that depends on a non-dominant fight). Mechanism: e.g. grappler FP-OVER
+  // suppresses opponent SS, so picking both is fighting yourself. Same-stat
+  // both fighters in section is allowed (positive correlation, high-volume
+  // fight scenario).
+  const dedupeNegCorrelatedSameFight = (sorted: AnalyzerFighter[], dir: 'over'|'under', limit: number): AnalyzerFighter[] => {
+    // Pre-scan: identify fights that have an FP pick somewhere in the sorted list.
+    // If a fight has an FP pick, we prefer it over any non-FP cross-stat conflict.
+    const fightHasFpPick = new Set<string>();
+    for (const f of sorted) {
+      const oppName = (f.opponent || '').toLowerCase();
+      const fightKey = oppName ? [f.name.toLowerCase(), oppName].sort().join('|') : '';
+      if (!fightKey) continue;
+      const lean = getBestPickLeanForDir(f, dir);
+      if (lean?._source === 'fp') fightHasFpPick.add(fightKey);
+    }
+    const result: AnalyzerFighter[] = [];
+    const fightFirstStat = new Map<string, string>();
+    for (const f of sorted) {
+      if (result.length >= limit) break;
+      const oppName = (f.opponent || '').toLowerCase();
+      const fightKey = oppName ? [f.name.toLowerCase(), oppName].sort().join('|') : '';
+      const lean = getBestPickLeanForDir(f, dir);
+      const source = lean?._source || 'fp';
+      if (fightKey) {
+        // Cross-stat conflict resolution: if this fight has an FP pick, only
+        // accept FP source for this fight. Drops non-FP picks that would conflict.
+        if (fightHasFpPick.has(fightKey) && source !== 'fp') continue;
+        const existing = fightFirstStat.get(fightKey);
+        if (existing && existing !== source) continue;
+        if (!existing) fightFirstStat.set(fightKey, source);
+      }
+      result.push(f);
+    }
+    return result;
+  };
+  const overs  = dedupeNegCorrelatedSameFight(allOversSorted, 'over', 8);
+  const unders = dedupeNegCorrelatedSameFight(allUndersSorted, 'under', 8);
   void persistBestPicksSnapshot(overs, unders);
 
   // Flag fighters whose opponent is still in the SAME section after demotion
@@ -6618,10 +6690,35 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     bestPickReasonCache.clear();
     const rows = fighters.map((f, i) => {
       const el = getBestPickLeanForDir(f, type) || getBestPickLean(f);
-      const line = lineForLeanSource(f, el._source, el._platform);
+      // For SS/TD/FT/CTRL: override the displayed line with the easiest one
+      // for the lean direction (lowest for OVER, highest for UNDER). FP keeps
+      // its per-book _platform from candidate generation.
+      const originalLine = lineForLeanSource(f, el._source, el._platform);
+      let line = originalLine;
+      let displayPlatform: SourcePlatformKey | undefined = el._platform;
+      if (el._source !== 'fp' && (el.lean === 'over' || el.lean === 'under')) {
+        const best = bestSideLineForPick(f, el._source, el.lean);
+        if (best.line != null && best.book != null) {
+          line = best.line;
+          displayPlatform = best.book;
+        }
+      }
       const tier = pickTier(f);
       const archiveNote = getBestPickArchiveNote(f);
-      const reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
+      let reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
+      // If we overrode the displayed line, sync the line value embedded in
+      // the verdict prefix (e.g. "SS OVER 46.5 (proj 69.3) — ...") so the
+      // reason stays consistent with the displayed line/book.
+      if (line != null && originalLine != null && line !== originalLine && el._source && (el.lean === 'over' || el.lean === 'under')) {
+        const prefix = `${el._source.toUpperCase()} ${el.lean.toUpperCase()} `;
+        if (reason.startsWith(prefix)) {
+          const tail = reason.slice(prefix.length);
+          const m = tail.match(/^(\d+(?:\.\d+)?)/);
+          if (m && Math.abs(parseFloat(m[1]) - originalLine) < 0.01) {
+            reason = prefix + line + tail.slice(m[1].length);
+          }
+        }
+      }
       const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source">(${el._source?.toUpperCase()} line)</span>` : '';
 
       // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts show ⚡ corr
@@ -6632,24 +6729,25 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">⚡ corr</span>`
         : '';
 
-      // Feature 1: show best available line across platforms if a better one exists
+      // Lineshop badge: only meaningful for FP picks now — SS/TD/FT/CTRL
+      // displayed line is already the best-side across all books.
       const src = el._source;
-      const n = (v: number|null|undefined): number|null => v ?? null;
-      const allLines: [string, number|null][] = src === 'fp'
-        ? [['P6', n(f.line_p6)], ['UD', n(f.line_ud)], ['PP', n(f.line_pp)], ['BTR', n(f.line_betr)]]
-        : src === 'ss'
-        ? [['P6', n(f.line_p6_ss)], ['UD', n(f.line_ud_ss)], ['PP', n(f.line_pp_ss)], ['BTR', n(f.line_betr_ss)], ['DK', n(f.line_dk_ss)]]
-        : src === 'td'
-        ? [['P6', n(f.line_p6_td)], ['UD', n(f.line_ud_td)], ['PP', n(f.line_pp_td)], ['BTR', n(f.line_betr_td)], ['DK', n(f.line_dk_td)]]
-        : [['P6', n(f.line_p6_ft)], ['UD', n(f.line_ud_ft)], ['PP', n(f.line_pp_ft)], ['BTR', n(f.line_betr_ft)], ['DK', n(f.line_dk_ft)]];
-      const available = allLines.filter((x): x is [string, number] => x[1] != null);
       let lineShopTag = '';
-      if (available.length > 1 && line != null) {
-        const best = el.lean === 'over'
-          ? available.reduce((a, b) => b[1] < a[1] ? b : a)
-          : available.reduce((a, b) => b[1] > a[1] ? b : a);
-        if (Math.abs(best[1] - line) >= 1.5) {
-          lineShopTag = ` <span class="best-pick-lineshop" title="Better line on ${best[0]}">🏪 ${best[0]} ${best[1]}</span>`;
+      if (src === 'fp' && line != null) {
+        const allFp: [string, number|null][] = [
+          ['P6', f.line_p6 ?? null],
+          ['UD', f.line_ud ?? null],
+          ['PP', f.line_pp ?? null],
+          ['BTR', f.line_betr ?? null],
+        ];
+        const available = allFp.filter((x): x is [string, number] => x[1] != null);
+        if (available.length > 1) {
+          const best = el.lean === 'over'
+            ? available.reduce((a, b) => b[1] < a[1] ? b : a)
+            : available.reduce((a, b) => b[1] > a[1] ? b : a);
+          if (Math.abs(best[1] - line) >= 1.5) {
+            lineShopTag = ` <span class="best-pick-lineshop" title="Better line on ${best[0]}">🏪 ${best[0]} ${best[1]}</span>`;
+          }
         }
       }
 
@@ -6659,7 +6757,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label||''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform">${formatSourcePlatformLabel(f, el._source, el._platform)}</span>
+          <span class="best-pick-platform">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
         </div>
         <div class="best-pick-line">${line || '—'}</div>
       </div>`;

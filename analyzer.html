@@ -180,6 +180,26 @@ body {
   background: #2af49d;
   filter: none;
 }
+.btn.auto-fetch-btn[data-freshness="fresh"] {
+  background: rgba(32,223,143,0.10);
+  color: var(--green);
+  border-color: rgba(32,223,143,0.35);
+  box-shadow: none;
+  text-shadow: none;
+}
+.btn.auto-fetch-btn[data-freshness="fresh"]:hover {
+  background: var(--green);
+  color: #001b0e;
+  border-color: var(--green);
+  box-shadow: 0 0 14px rgba(32,223,143,0.45);
+}
+.btn.auto-fetch-btn[data-freshness="stale"] {
+  animation: fetch-alert 2.4s ease-in-out infinite;
+}
+@keyframes fetch-alert {
+  0%, 100% { box-shadow: 0 0 14px rgba(32,223,143,0.45); }
+  50%      { box-shadow: 0 0 22px rgba(32,223,143,0.85); }
+}
 
 .header-overflow {
   position: relative;
