@@ -150,12 +150,17 @@ body {
 .ext-label-muted { color: var(--text3); }
 
 .status-chunk {
-  display: inline-block;
-  padding: 0 10px;
-  border-left: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border2);
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
-.status-chunk:first-child { padding-left: 10px; }
+.status-chunk:first-child { margin-left: 6px; }
 
 .btn.auto-fetch-btn {
   background: var(--green);
