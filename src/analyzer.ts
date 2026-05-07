@@ -5777,6 +5777,10 @@ async function renderQAPanel(): Promise<void> {
     const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin/60)}h`;
     ageEl.textContent = ageLabel;
     ageEl.className = `pill-age ${cls}`;
+    const staleIntensity = cls === 'stale'
+      ? Math.min(1, Math.max(0, (p.ageMin - errAt) / 600))
+      : 0;
+    ageEl.style.setProperty('--stale-intensity', staleIntensity.toFixed(2));
     ageEl.title = `${p.label} captured ${ageLabel} ago${p.manual ? ' (manual entry — no auto-scrape)' : ''}`;
   }
 
