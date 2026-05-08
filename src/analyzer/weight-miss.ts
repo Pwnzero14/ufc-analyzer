@@ -8,13 +8,25 @@ export interface WeightMissSignal { lbsOver: number | null; severity: WeightMiss
 // fighter names. The lean engine reads this; the news fetcher writes it.
 export const _weightMissSignals = new Map<string, WeightMissSignal>();
 
-function severityFromLbs(lbs: number | null): WeightMissSeverity {
+export function severityFromLbs(lbs: number | null): WeightMissSeverity {
   if (lbs == null) return 'unknown';
   if (lbs < 1) return 'small';
   if (lbs < 2) return 'moderate';
   if (lbs < 5) return 'big';
   return 'extreme';
 }
+
+// ── MANUAL OVERRIDE LAYER ─────────────────────────────────────────────────
+// Auto-detection (Google News mining) fails when outlets use generic
+// descriptors ("MMA legend", "longtime veteran") that don't name the misser
+// in title or description. The manual override lets the user flag a fighter
+// directly via console: window.markMissedWeight('Jeremy Stephens', 4).
+// Persists to chrome.storage.local under MANUAL_WEIGHT_MISS_KEY and is
+// re-applied after every fetchAllFighterNews completion (which clears the
+// auto-signals map first).
+export const MANUAL_WEIGHT_MISS_KEY = 'weight_miss_manual_v1';
+export interface ManualWeightMissEntry { lbsOver: number; addedAt: number }
+export type ManualWeightMissMap = Record<string, ManualWeightMissEntry>;
 
 // Word-form numbers up through twelve — covers all plausible weight-miss
 // magnitudes (anything bigger usually gets reported as digits).

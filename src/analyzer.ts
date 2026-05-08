@@ -3,8 +3,8 @@ import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatTy
 import { FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
-import { _weightMissSignals, parseWeightMissFromTitle } from './analyzer/weight-miss.js';
-import type { WeightMissSignal } from './analyzer/weight-miss.js';
+import { _weightMissSignals, parseWeightMissFromTitle, severityFromLbs, MANUAL_WEIGHT_MISS_KEY } from './analyzer/weight-miss.js';
+import type { WeightMissSignal, ManualWeightMissMap } from './analyzer/weight-miss.js';
 import {
   _newsCache,
   _newsAlertFighters,
@@ -10950,6 +10950,71 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 }
 
 // ── NEWS FETCHING ──────────────────────────────────────────────────────────
+// ── MANUAL WEIGHT-MISS OVERRIDE ────────────────────────────────────────────
+// Used when Google News auto-detection can't disambiguate (e.g., headline
+// uses "MMA legend" instead of fighter name). User flags via console:
+//   window.markMissedWeight('Jeremy Stephens', 4)
+//   window.clearMissedWeight('Jeremy Stephens')
+// Manual entries persist in chrome.storage.local and are re-applied after
+// every fetchAllFighterNews (which clears auto-signals first).
+async function loadManualWeightMisses(): Promise<ManualWeightMissMap> {
+  try {
+    const data = await storageGet<Record<string, unknown>>([MANUAL_WEIGHT_MISS_KEY]);
+    const raw = data[MANUAL_WEIGHT_MISS_KEY];
+    return (raw && typeof raw === 'object') ? (raw as ManualWeightMissMap) : {};
+  } catch { return {}; }
+}
+async function saveManualWeightMisses(map: ManualWeightMissMap): Promise<void> {
+  await new Promise<void>((res) => chrome.storage.local.set({ [MANUAL_WEIGHT_MISS_KEY]: map }, res));
+}
+async function applyManualWeightMisses(): Promise<void> {
+  const map = await loadManualWeightMisses();
+  for (const [nameLower, entry] of Object.entries(map)) {
+    const lbs = Number(entry.lbsOver);
+    if (!Number.isFinite(lbs) || lbs <= 0) continue;
+    _weightMissSignals.set(nameLower, {
+      lbsOver: lbs,
+      severity: severityFromLbs(lbs),
+      source: `Manual override: ${lbs} lbs over`,
+    });
+  }
+}
+async function setManualWeightMiss(name: string, lbsOver: number): Promise<void> {
+  const map = await loadManualWeightMisses();
+  map[name.toLowerCase()] = { lbsOver, addedAt: Date.now() };
+  await saveManualWeightMisses(map);
+  await applyManualWeightMisses();
+  renderFighters();
+  console.log(`[UFC Analyzer] Manual weight-miss flag set: ${name} = ${lbsOver} lbs over. Badge should now appear.`);
+}
+async function clearManualWeightMiss(name: string): Promise<void> {
+  const map = await loadManualWeightMisses();
+  const key = name.toLowerCase();
+  if (!(key in map)) {
+    console.log(`[UFC Analyzer] No manual flag found for ${name}.`);
+    return;
+  }
+  delete map[key];
+  await saveManualWeightMisses(map);
+  _weightMissSignals.delete(key);
+  renderFighters();
+  console.log(`[UFC Analyzer] Manual weight-miss flag cleared for ${name}.`);
+}
+async function listManualWeightMisses(): Promise<void> {
+  const map = await loadManualWeightMisses();
+  const entries = Object.entries(map);
+  if (!entries.length) { console.log('[UFC Analyzer] No manual weight-miss flags set.'); return; }
+  console.table(entries.map(([name, e]) => ({
+    fighter: name,
+    lbsOver: e.lbsOver,
+    addedAt: new Date(e.addedAt).toLocaleString(),
+  })));
+}
+// Expose to console
+(window as unknown as { markMissedWeight: typeof setManualWeightMiss }).markMissedWeight = setManualWeightMiss;
+(window as unknown as { clearMissedWeight: typeof clearManualWeightMiss }).clearMissedWeight = clearManualWeightMiss;
+(window as unknown as { listMissedWeights: typeof listManualWeightMisses }).listMissedWeights = listManualWeightMisses;
+
 // fetchFighterNews moved to ./analyzer/news.ts. fetchAllFighterNews stays here
 // because it orchestrates module-scoped state (allFighters, renderFighters).
 async function fetchAllFighterNews(): Promise<void> {
@@ -11039,6 +11104,9 @@ async function fetchAllFighterNews(): Promise<void> {
     else if (oNamed.length > 0 && fNamed.length === 0) applyBestSignal(oppLower, oNamed);
     // else: ambiguous — both sides named or neither, similar counts → skip.
   }
+
+  // Apply manual overrides AFTER auto-detection so user flags always win.
+  await applyManualWeightMisses();
 
   renderFighters();
 }
