@@ -2143,7 +2143,7 @@ body {
 /* ── STICKY FIGHTER HEADER ROW ── */
 .fighter-header-row {
   display: grid;
-  grid-template-columns: 200px 1fr 160px 155px 22px;
+  grid-template-columns: 200px 1fr 240px 155px 22px;
   align-items: center;
   padding: 6px 14px;
   gap: 10px;
@@ -2158,14 +2158,16 @@ body {
 }
 .fhr-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 7px;
-  letter-spacing: 0.18em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text3);
+  color: var(--text2);
+  white-space: nowrap;
 }
 .fhr-label + .fhr-label {
   padding-left: 10px;
-  border-left: 1px solid rgba(150,150,170,0.14);
+  border-left: 1px solid rgba(150,150,170,0.22);
 }
 
 /* ── LEAN BADGE (gradient confidence pill) ── */
