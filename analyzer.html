@@ -1205,16 +1205,18 @@ body {
 
 /* ── TOAST ── */
 .toast {
-  position: fixed; bottom: 22px; right: 22px;
+  position: fixed; bottom: 28px; left: 50%;
   background: var(--bg3); border: 1px solid var(--border2);
   border-top: 2px solid var(--gold);
   border-radius: 5px; padding: 9px 16px;
   font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text);
-  z-index: 9999; transform: translateY(60px); opacity: 0;
+  z-index: 9999; transform: translate(-50%, 60px); opacity: 0;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  white-space: nowrap;
+  max-width: calc(100vw - 48px);
 }
-.toast.show { transform: translateY(0); opacity: 1; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
 
 /* ── REFRESH BTN ── */
 .refresh-btn {
