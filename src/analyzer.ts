@@ -12148,7 +12148,9 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const leanGradStyle = lean.lean !== 'none' && displayConf > 0
     ? `background:linear-gradient(90deg,rgba(${leanRGB},0.22) ${displayConf}%,rgba(${leanRGB},0.05) ${displayConf}%);`
     : '';
-  const displayGrade = displayConf > 0 ? ` ${getConfidenceGrade(displayConf)}` : '';
+  const gradeLetter = displayConf > 0 ? getConfidenceGrade(displayConf) : '';
+  const displayGrade = gradeLetter ? ` ${gradeLetter}` : '';
+  const gradeChipHtml = gradeLetter ? ` <span class="lean-grade-chip lean-grade-${gradeLetter.toLowerCase()}" title="Confidence grade ${gradeLetter}">${gradeLetter}</span>` : '';
   const clvTag = clvBoost
     ? (() => {
         const arrow = clvBoost.delta > 0 ? '↑' : '↓';
@@ -12163,8 +12165,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     : '';
   const confInlineLabel = confPct > 0
     ? recalConf != null && recalConf !== confPct
-      ? `<span class="lean-conf-inline" title="Original: ${rawConfPct}% ${lean.confidenceGrade || ''} · Recalibrated from historical accuracy${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${displayConf}%${displayGrade} <span style="font-size:9px;opacity:0.6">↻</span>${clvTag}</span>`
-      : `<span class="lean-conf-inline" title="Confidence${lean.confidenceGrade ? ' ' + lean.confidenceGrade : ''}: ${rawConfPct}%${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${confPct}%${displayGrade}${clvTag}</span>`
+      ? `<span class="lean-conf-inline" title="Original: ${rawConfPct}% ${lean.confidenceGrade || ''} · Recalibrated from historical accuracy${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${displayConf}%${gradeChipHtml} <span style="font-size:9px;opacity:0.6">↻</span>${clvTag}</span>`
+      : `<span class="lean-conf-inline" title="Confidence${lean.confidenceGrade ? ' ' + lean.confidenceGrade : ''}: ${rawConfPct}%${clvBoost ? ` · AI×CLV ${clvBoost.delta > 0 ? '+' : ''}${clvBoost.delta}` : ''}">${confPct}%${gradeChipHtml}${clvTag}</span>`
     : '';
   const activeLine = activePlatformLine(f);
   const platformLabel = activePlatformLabel(f);
