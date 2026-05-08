@@ -5886,7 +5886,10 @@ async function renderQAPanel(): Promise<void> {
 
 function renderModelHealthWidget(): void {
   void renderQAPanel();
-  const leans = allFighters.map(getEffectiveLean).filter(l => l.lean !== 'none' && l.conf > 0);
+  const leanPairs = allFighters
+    .map(f => ({ f, l: getEffectiveLean(f) }))
+    .filter(({ l }) => l.lean !== 'none' && l.conf > 0);
+  const leans = leanPairs.map(p => p.l);
   const setText = (id: string, value: string): void => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -5895,8 +5898,8 @@ function renderModelHealthWidget(): void {
   if (!leans.length) {
     setText('mhHitRate', '--%');
     setText('mhHitTrend', 'Waiting for model data');
-    setText('mhConfidence', '--%');
-    setText('mhConfidenceTrend', 'No active leans');
+    setText('mhTopEdge', '--');
+    setText('mhTopEdgeTrend', 'No actionable edges');
     setText('mhCoverage', '0');
     setText('mhCoverageTrend', 'fighters with actionable leans');
     void renderLearningDiagnosticsWidget();
@@ -5915,12 +5918,28 @@ function renderModelHealthWidget(): void {
     .filter((v): v is number => v != null);
 
   const avgHit = hitProbs.length ? Math.round((hitProbs.reduce((s, v) => s + v, 0) / hitProbs.length) * 100) : 0;
-  const avgConf = Math.round(leans.reduce((s, l) => s + (l.conf || 0), 0) / leans.length);
+
+  let topEdge: { name: string; source: LeanSource; dir: 'over' | 'under'; ev: number } | null = null;
+  for (const { f, l } of leanPairs) {
+    const dir = l.lean as 'over' | 'under';
+    if (shouldSkipFpSideForFighter(f, l._source, dir)) continue;
+    const ev = computeFighterEV(f, l);
+    if (ev == null) continue;
+    if (!topEdge || ev > topEdge.ev) {
+      topEdge = { name: f.name, source: l._source, dir, ev };
+    }
+  }
 
   setText('mhHitRate', `${avgHit}%`);
   setText('mhHitTrend', avgHit >= 58 ? 'Calibrated edge stable' : avgHit >= 52 ? 'Moderate model edge' : 'Conservative edge profile');
-  setText('mhConfidence', `${avgConf}%`);
-  setText('mhConfidenceTrend', avgConf >= 70 ? 'High-confidence slate' : avgConf >= 55 ? 'Balanced confidence' : 'Low-confidence slate');
+  if (topEdge) {
+    const sign = topEdge.ev >= 0 ? '+' : '';
+    setText('mhTopEdge', `${sign}${topEdge.ev}%`);
+    setText('mhTopEdgeTrend', `${topEdge.name} · ${topEdge.source.toUpperCase()}-${topEdge.dir.toUpperCase()}`);
+  } else {
+    setText('mhTopEdge', '--');
+    setText('mhTopEdgeTrend', 'No actionable edges');
+  }
   setText('mhCoverage', `${leans.length}`);
   setText('mhCoverageTrend', 'fighters with actionable leans');
 
