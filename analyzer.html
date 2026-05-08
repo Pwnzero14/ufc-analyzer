@@ -2240,9 +2240,16 @@ body {
   display: flex;
   border: 1px solid var(--border2);
   border-radius: 4px;
-  overflow: hidden;
   background: var(--bg2);
   flex-shrink: 0;
+}
+.view-tabs .tab-btn:first-child {
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.view-tabs .data-tabs-wrap:last-child .data-tabs-trigger {
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
 }
 .view-tabs .tab-btn {
   font-family: 'Oswald', sans-serif;
@@ -2286,6 +2293,59 @@ body {
 .view-tabs .tab-btn-primary:not(.active) .tab-count {
   background: rgba(248,198,74,0.22);
   color: var(--gold);
+}
+.view-tabs .data-tabs-wrap {
+  position: relative;
+  display: flex;
+}
+.view-tabs .data-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-right: none;
+}
+.view-tabs .data-tabs-trigger.is-data-active {
+  background: var(--gold);
+  color: #000;
+}
+.data-tabs-caret {
+  font-size: 9px;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+.view-tabs .data-tabs-trigger[aria-expanded="true"] .data-tabs-caret {
+  transform: rotate(180deg);
+}
+.data-tabs-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 168px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+}
+.data-tabs-popover[hidden] { display: none; }
+.data-tabs-popover .tab-btn {
+  border: none !important;
+  border-radius: 4px;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.data-tabs-popover .tab-btn.active {
+  background: var(--gold);
+  color: #000;
+}
+.data-tabs-popover .tab-btn:hover:not(.active) {
+  background: var(--bg4);
+  color: var(--text);
 }
 
 /* ── DEBUG PANEL ── */
@@ -4860,8 +4920,16 @@ body.loading {
     <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
     <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
     <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
-    <button class="tab-btn" data-view="calibration">📈 Calibration</button>
-    <button class="tab-btn" data-view="archive">Archive</button>
+    <div class="data-tabs-wrap">
+      <button class="tab-btn data-tabs-trigger" id="dataTabsTrigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Calibration and Archive views">
+        <span id="dataTabsLabel">Data</span>
+        <span class="data-tabs-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="data-tabs-popover" id="dataTabsPopover" role="menu" hidden>
+        <button class="tab-btn" data-view="calibration">📈 Calibration</button>
+        <button class="tab-btn" data-view="archive">Archive</button>
+      </div>
+    </div>
   </div>
   <div class="density-control">
     <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">

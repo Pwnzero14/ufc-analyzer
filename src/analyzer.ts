@@ -15429,6 +15429,44 @@ function bindLearningDetailsToggle(): void {
   });
 }
 
+function syncDataTabsTrigger(): void {
+  const trigger = document.getElementById('dataTabsTrigger');
+  const labelEl = document.getElementById('dataTabsLabel');
+  if (!trigger || !labelEl) return;
+  const isDataView = currentView === 'calibration' || currentView === 'archive';
+  trigger.classList.toggle('is-data-active', isDataView);
+  if (isDataView) {
+    const activeBtn = document.querySelector(`#dataTabsPopover [data-view="${currentView}"]`);
+    labelEl.textContent = (activeBtn?.textContent || 'Data').trim();
+  } else {
+    labelEl.textContent = 'Data';
+  }
+}
+
+function bindDataTabsTrigger(): void {
+  const trigger = document.getElementById('dataTabsTrigger');
+  const popover = document.getElementById('dataTabsPopover');
+  if (!trigger || !popover) return;
+  const closePopover = (): void => {
+    trigger.setAttribute('aria-expanded', 'false');
+    popover.setAttribute('hidden', '');
+  };
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const expanded = trigger.getAttribute('aria-expanded') === 'true';
+    trigger.setAttribute('aria-expanded', String(!expanded));
+    if (expanded) popover.setAttribute('hidden', '');
+    else popover.removeAttribute('hidden');
+  });
+  // Selecting a sub-tab closes the popover (existing tab handler still fires)
+  popover.addEventListener('click', () => closePopover());
+  // Click outside → close
+  document.addEventListener('click', (e) => {
+    if (trigger.contains(e.target as Node) || popover.contains(e.target as Node)) return;
+    closePopover();
+  });
+}
+
 function updateDensityTriggerDot(): void {
   const dot = document.getElementById('densityTriggerDot');
   const trigger = document.getElementById('densityTrigger');
@@ -16144,7 +16182,10 @@ function initAnalyzerCore(): void {
       if (container) container.style.display = 'block';
     }
     renderFighters();
+    syncDataTabsTrigger();
   });
+  bindDataTabsTrigger();
+  syncDataTabsTrigger();
 
   // Reset baselines: re-anchor all baselines to current values so deltas become 0.
   // Future real movement will show correctly from this point forward.
