@@ -3395,6 +3395,16 @@ function shortCareerArchetypeLabel(label: LearnedCareerArchetype): string {
   return 'DURABLE';
 }
 
+function describeCareerArchetype(label: LearnedCareerArchetype): string {
+  if (label === 'volume_accumulator') return 'High-output striker scoring via volume — favors OVERs on SS and FP';
+  if (label === 'front_loaded_finisher') return 'Aggressive early-rounds finisher — fights tend to end before going long';
+  if (label === 'control_merchant') return 'Takedown-heavy grappler who controls position — favors TD-OVERs and grinding wins';
+  if (label === 'submission_chaser') return 'Ground specialist hunting submissions — high finish potential, SS variance';
+  if (label === 'point_bank_striker') return 'Precision striker scoring via accuracy not volume — late-round kicker';
+  if (label === 'chaos_brawler') return 'Unpredictable brawler — high variance both directions, boom-or-bust';
+  return 'Balanced profile with no extreme tendencies';
+}
+
 function mapCareerLabelToBaseArchetype(label: LearnedCareerArchetype, db: FighterDB): FighterArchetype {
   if (label === 'volume_accumulator') return 'volume_striker';
   if (label === 'control_merchant') {
@@ -12547,7 +12557,10 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // #18: Peer Comparison Percentiles
   const peerPercentiles = calcPeerPercentileRanking(allFighters, f.name);
   const archetypeProfile = learnArchetypeProfile(f.name, db, oppEntry?.db || null, f.moneyline ?? null);
-  const archetypeBadgeHtml = `<span class="style-matchup-chip style-chip-default" title="${archetypeProfile.summary}" style="margin-left:6px;font-size:9px;padding:1px 6px">${shortCareerArchetypeLabel(archetypeProfile.careerLabel)}</span>`;
+  const archetypeFullName = formatCareerArchetypeLabel(archetypeProfile.careerLabel);
+  const archetypeDesc = describeCareerArchetype(archetypeProfile.careerLabel);
+  const archetypeTitle = `${archetypeFullName} — ${archetypeDesc}${archetypeProfile.matchupAlert !== 'none' ? ` · Matchup alert: ${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}` : ''}`;
+  const archetypeBadgeHtml = `<span class="style-matchup-chip style-chip-default" title="${archetypeTitle.replace(/"/g, '&quot;')}" style="margin-left:6px;font-size:9px;padding:1px 6px">${shortCareerArchetypeLabel(archetypeProfile.careerLabel)}</span>`;
   const archetypeAlertHtml = archetypeProfile.matchupAlert !== 'none'
     ? `<span class="style-matchup-chip" title="${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}" style="margin-left:4px;font-size:9px;padding:1px 6px;background:rgba(255,100,100,0.12);border-color:rgba(255,100,100,0.32);color:#ff8f8f">${formatMatchupAlertLabel(archetypeProfile.matchupAlert)}</span>`
     : '';
@@ -12623,7 +12636,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     const parts: string[] = [];
     if (isSteam) {
       const dir = dedupedMoves[0]?.delta > 0 ? '📈' : '📉';
-      parts.push(`<div class="sharp-move-badge steam-badge" title="Steam move: ${steamStats.join(', ')} moved ≥${STEAM_THRESHOLD}pts across multiple books">${dir} STEAM ${steamStats.join('/')}</div>`);
+      parts.push(`<div class="sharp-move-badge steam-badge" title="Steam move (sharp money signal): ${steamStats.join(', ')} ${dedupedMoves[0]?.delta > 0 ? 'rising' : 'dropping'} ≥${STEAM_THRESHOLD}pts across multiple books — strong market move worth respecting">${dir} STEAM ${steamStats.join('/')}</div>`);
     }
     if (isReverseSteam) {
       parts.push(`<div class="sharp-move-badge reverse-steam-badge" title="Reverse steam: ${reverseSteamStats.join(', ')} dropped then recovered">↩ REVERSE ${reverseSteamStats.join('/')}</div>`);
