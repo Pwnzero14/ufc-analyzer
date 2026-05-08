@@ -3119,6 +3119,40 @@ body.loading {
     --text-lg: 18px;
   }
 
+  .slate-banner {
+    margin: 12px 28px 10px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-md);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+    overflow: hidden;
+  }
+  .slate-banner .qa-panel {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 6px 18px;
+    border-bottom: 1px solid rgba(150,150,170,0.18);
+  }
+  .slate-banner .qa-panel.qa-ok {
+    background: linear-gradient(180deg, rgba(72,187,120,0.06), rgba(72,187,120,0.02));
+    border-bottom-color: rgba(72,187,120,0.30);
+  }
+  .slate-banner .qa-panel.qa-warn {
+    background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.02));
+    border-bottom-color: rgba(248,198,74,0.32);
+  }
+  .slate-banner .qa-panel.qa-err {
+    background: linear-gradient(180deg, rgba(229,62,62,0.06), rgba(229,62,62,0.02));
+    border-bottom-color: rgba(229,62,62,0.32);
+  }
+  .slate-banner .model-health-strip {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
   .model-health-strip {
     margin: 12px 28px 10px;
     display: flex;
@@ -4826,6 +4860,8 @@ body.loading {
   </div>
 </div>
 
+<!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
+<div id="slateStatusBanner" class="slate-banner">
 <!-- PRE-LOCK QA PANEL -->
 <div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
 
@@ -4848,6 +4884,7 @@ body.loading {
     <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
   </div>
 </div>
+</div><!-- /slateStatusBanner -->
 
 <div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
   <div class="ld-drilldown-banner">
