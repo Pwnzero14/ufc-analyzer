@@ -2200,8 +2200,21 @@ body {
 .lean-conf { display: none; }
 
 /* ── DYNAMIC LINE STRIP ── */
-.platform-lines { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.line-cell { min-width: 42px; }
+.platform-lines {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150,150,170,0.25) transparent;
+}
+.platform-lines::-webkit-scrollbar { height: 4px; }
+.platform-lines::-webkit-scrollbar-thumb { background: rgba(150,150,170,0.25); border-radius: 2px; }
+.platform-lines::-webkit-scrollbar-thumb:hover { background: rgba(150,150,170,0.45); }
+.platform-lines::-webkit-scrollbar-track { background: transparent; }
+.line-cell { min-width: 42px; flex-shrink: 0; }
 
 
 /* ── VIEW TABS (bottom bar) ── */
