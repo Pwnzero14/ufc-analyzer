@@ -13131,7 +13131,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgb(${leanRGB}); color: rgb(${leanRGB});"></div></div>` : ''}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
-        ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b">⚔ Rivalry split</div>` : ''}
+        ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b" title="Rival models disagree with the main lean — ${String(lean.rivalryDissent).replace(/"/g, '&quot;')}">⚔ Rival models dissent</div>` : ''}
         ${(() => {
           if (!_fighterArchiveStats) return '';
           const key = (normalizeName(f.name) || f.name).toLowerCase();
