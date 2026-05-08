@@ -10632,19 +10632,26 @@ function renderFighters(): void {
 }
 
 function updateViewTabCounts(): void {
-  let over = 0, under = 0;
+  let over = 0, under = 0, bestOver = 0, bestUnder = 0;
   for (const f of allFighters) {
-    const lean = getEffectiveLean(f).lean;
-    if (lean === 'over') over++;
-    else if (lean === 'under') under++;
+    const el = getEffectiveLean(f);
+    if (el.lean === 'over') {
+      over++;
+      if (!shouldSkipFpSideForFighter(f, el._source, 'over')) bestOver++;
+    } else if (el.lean === 'under') {
+      under++;
+      if (!shouldSkipFpSideForFighter(f, el._source, 'under')) bestUnder++;
+    }
   }
   const setText = (id: string, n: number): void => {
     const el = document.getElementById(id);
     if (el) el.textContent = String(n);
   };
+  // Best Picks panel caps each section at 8; this approximates the visible pick count.
   setText('tabCountAll', allFighters.length);
   setText('tabCountOver', over);
   setText('tabCountUnder', under);
+  setText('tabCountBestPicks', Math.min(8, bestOver) + Math.min(8, bestUnder));
 }
 
 function _renderFightersImpl(): void {

@@ -2260,6 +2260,18 @@ body {
 }
 .view-tabs .tab-btn.active .tab-count { background: rgba(0,0,0,0.18); color: rgba(0,0,0,0.7); }
 .view-tabs .tab-btn:hover:not(.active) .tab-count { color: var(--text2); }
+.view-tabs .tab-btn-primary {
+  color: var(--gold);
+  font-weight: 700;
+  border-left: 1px solid rgba(248,198,74,0.55);
+  padding-left: 16px;
+  background: rgba(248,198,74,0.06);
+}
+.view-tabs .tab-btn-primary:hover:not(.active) { color: #ffe27a; background: rgba(248,198,74,0.14); }
+.view-tabs .tab-btn-primary:not(.active) .tab-count {
+  background: rgba(248,198,74,0.22);
+  color: var(--gold);
+}
 
 /* ── DEBUG PANEL ── */
 .debug-panel-hidden { display: none; }
@@ -4700,7 +4712,7 @@ body.loading {
     <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
     <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
     <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
-    <button class="tab-btn" data-view="bestpicks">⚡ AI Best Picks</button>
+    <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
     <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
     <button class="tab-btn" data-view="calibration">📈 Calibration</button>
     <button class="tab-btn" data-view="archive">Archive</button>
