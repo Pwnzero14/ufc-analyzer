@@ -16226,8 +16226,8 @@ function initAnalyzerCore(): void {
     if (!wrap) return;
     const visible = !wrap.classList.contains('debug-panel-hidden');
     wrap.classList.toggle('debug-panel-hidden', visible);
-    const tb = document.getElementById('debugToggleBtn');
-    if (tb) tb.textContent = visible ? '⚡ DEBUG' : '✕ DEBUG';
+    const icon = document.querySelector('#debugToggleBtn .debug-icon');
+    if (icon) icon.textContent = visible ? '⚡' : '✕';
   });
 
   // Card row expand/collapse
@@ -16522,8 +16522,8 @@ document.getElementById('dbgBgDumpBtn')?.addEventListener('click', async () => {
 document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
   const wrap = document.getElementById('debugPanelWrap');
   if (wrap) wrap.classList.add('debug-panel-hidden');
-  const tb = document.getElementById('debugToggleBtn');
-  if (tb) tb.textContent = '⚡ DEBUG';
+  const icon = document.querySelector('#debugToggleBtn .debug-icon');
+  if (icon) icon.textContent = '⚡';
 });
 
 // ── BETR SCREENSHOT READER ────────────────────────────────────────────────

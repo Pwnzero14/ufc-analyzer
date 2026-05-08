@@ -2203,24 +2203,6 @@ body {
 .platform-lines { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .line-cell { min-width: 42px; }
 
-/* ── DEBUG PANEL TOGGLE BUTTON ── */
-.debug-toggle-float {
-  position: fixed;
-  bottom: 10px;
-  right: 10px;
-  z-index: 10000;
-  background: rgba(6,7,16,0.92);
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--text3);
-  padding: 4px 10px;
-  cursor: pointer;
-  letter-spacing: 0.08em;
-  transition: all 0.15s;
-}
-.debug-toggle-float:hover { color: var(--gold); border-color: var(--gold); }
 
 /* ── VIEW TABS (bottom bar) ── */
 .view-tabs {
@@ -4725,6 +4707,9 @@ body.loading {
         <button class="overflow-item" id="restoreStorageBtn" title="Restore extension storage from a JSON backup file">
           <span>📥</span> Restore
         </button>
+        <button class="overflow-item" id="debugToggleBtn" title="Toggle debug panel">
+          <span class="debug-icon">⚡</span> Debug
+        </button>
         <button class="overflow-item overflow-item-danger" id="resetBaselinesBtn" title="Clear all movement baselines and bias tips" style="display:none">
           <span>⚠</span> <span class="overflow-item-label">RESET LINES</span>
         </button>
@@ -5041,9 +5026,6 @@ body.loading {
 </div>
 
 <div class="toast" id="toast"></div>
-
-<!-- DEBUG TOGGLE BUTTON -->
-<button class="debug-toggle-float" id="debugToggleBtn" title="Toggle debug panel">⚡ DEBUG</button>
 
 <!-- DEBUG PANEL -->
 <div id="debugPanelWrap" class="debug-panel-wrap debug-panel-hidden">
