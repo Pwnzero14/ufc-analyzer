@@ -10866,7 +10866,7 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       const header = document.createElement('div');
       header.className = `fight-group-header fgh-${badgeCls}`;
       const f2Name = activeFighters[i + 1]?.name || opp || '';
-      header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled (hides both fighters)">CANCEL</button><div class="fight-group-line"></div>`;
+      header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled — hides both fighters from the slate (use for withdrawals)">× Cancel fight</button><div class="fight-group-line"></div>`;
       const cancelBtn = header.querySelector('.fight-cancel-btn') as HTMLButtonElement;
       cancelBtn?.addEventListener('click', () => { void cancelFight(f.name, f2Name); });
       frag.appendChild(header);
