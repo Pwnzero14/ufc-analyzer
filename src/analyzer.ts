@@ -5984,6 +5984,7 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
       setText('ldDrilldownTitle', 'No drilldown yet');
       setText('ldDrilldownMeta', 'Need resolved outcomes');
       setText('ldDrilldownBody', 'No settled picks yet.');
+      setText('ldFooterSummary', '0 resolved · waiting for settled outcomes');
       return;
     }
 
@@ -6066,6 +6067,8 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
         setText('ldDrilldownMeta', `Fade ${missLabel}`);
       }
       setText('ldDrilldownBody', `Based on ${memoryProfile.taggedSamples} tagged samples tracked.`);
+      const topShort = topHit ? hitLabel : (topMiss ? `fade ${missLabel}` : '--');
+      setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · Top: ${topShort}`);
       return;
     }
 
@@ -6113,6 +6116,7 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
       setText('ldDrilldownTitle', 'Not enough pattern samples yet');
       setText('ldDrilldownMeta', `${resolvedRows.length} resolved rows captured`);
       setText('ldDrilldownBody', 'Keep grading events to unlock stronger tag diagnostics.');
+      setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · keep grading to unlock patterns`);
       return;
     }
 
@@ -6131,6 +6135,7 @@ async function renderLearningDiagnosticsWidget(): Promise<void> {
         ? `${topMiss.label} hits only ${missPct}% on ${topMiss.total} rows — strong fade.`
         : `${topMiss.label} hits ${missPct}% on ${topMiss.total} rows — soft fade.`
     );
+    setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · Top: ${topHit.label}`);
   } catch (e) {
     debugLog(`learning diagnostics render failed: ${(e as Error).message}`);
   }
@@ -15409,6 +15414,19 @@ function bindSourceToggles(): void {
   updateSourceToggleUI();
 }
 
+function bindLearningDetailsToggle(): void {
+  const toggle = document.getElementById('ldDetailsToggle');
+  const details = document.getElementById('ldDetails');
+  if (!toggle || !details) return;
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    const next = !expanded;
+    toggle.setAttribute('aria-expanded', String(next));
+    if (next) details.removeAttribute('hidden');
+    else details.setAttribute('hidden', '');
+  });
+}
+
 function updateDensityTriggerDot(): void {
   const dot = document.getElementById('densityTriggerDot');
   const trigger = document.getElementById('densityTrigger');
@@ -15927,6 +15945,7 @@ function initAnalyzerCore(): void {
     });
   });
   bindSourceToggles();
+  bindLearningDetailsToggle();
 
   // Top-bar buttons
   document.getElementById('refreshBtn')?.addEventListener('click', loadData);

@@ -3191,14 +3191,108 @@ body.loading {
   .learning-diagnostics-strip {
     margin: 0 28px 10px;
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 24px;
-    padding: 10px 18px;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 18px;
     border: 1px solid rgba(44,212,208,0.35);
     background: linear-gradient(180deg, rgba(44,212,208,0.08), rgba(44,212,208,0.03));
     border-radius: var(--radius-md);
   }
+
+  .ld-drilldown-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .ld-drilldown-icon {
+    font-size: 22px;
+    line-height: 1;
+    color: var(--gold, #ffbe6b);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .ld-drilldown-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .ld-drilldown-title {
+    font-size: 17px !important;
+    color: var(--gold, #ffbe6b) !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .ld-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(44,212,208,0.22);
+    flex-wrap: wrap;
+  }
+
+  .ld-footer-summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-xs);
+    color: var(--text2);
+    line-height: 1.4;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ld-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(44,212,208,0.35);
+    background: rgba(44,212,208,0.06);
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .ld-details-toggle:hover {
+    background: rgba(44,212,208,0.14);
+    border-color: rgba(44,212,208,0.55);
+    color: var(--cyan);
+  }
+  .ld-details-toggle[aria-expanded="true"] {
+    background: rgba(44,212,208,0.14);
+    border-color: rgba(44,212,208,0.55);
+    color: var(--cyan);
+  }
+  .ld-details-caret {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 9px;
+  }
+  .ld-details-toggle[aria-expanded="true"] .ld-details-caret {
+    transform: rotate(180deg);
+  }
+
+  .ld-details {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(44,212,208,0.18);
+  }
+  .ld-details[hidden] { display: none; }
 
   .ld-stat {
     display: flex;
@@ -4754,29 +4848,40 @@ body.loading {
 </div>
 
 <div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
-  <div class="ld-stat">
-    <span class="ld-label">Learning Memory</span>
-    <span class="ld-value" id="ldResolved">0 resolved</span>
-    <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
+  <div class="ld-drilldown-banner">
+    <span class="ld-drilldown-icon" aria-hidden="true">⚡</span>
+    <div class="ld-drilldown-content">
+      <span class="ld-label">Learning Drilldown</span>
+      <span class="ld-value ld-drilldown-title" id="ldDrilldownTitle">No drilldown yet</span>
+      <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
+      <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
+    </div>
   </div>
-  <div class="ld-divider" aria-hidden="true"></div>
-  <div class="ld-stat">
-    <span class="ld-label">Market Accuracy</span>
-    <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
-    <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
+  <div class="ld-footer">
+    <span class="ld-footer-summary" id="ldFooterSummary">Loading diagnostics…</span>
+    <button class="ld-details-toggle" id="ldDetailsToggle" type="button" aria-expanded="false" aria-controls="ldDetails" title="Show learning memory, market accuracy, and pattern tracker details">
+      <span>Details</span>
+      <span class="ld-details-caret" aria-hidden="true">▾</span>
+    </button>
   </div>
-  <div class="ld-divider" aria-hidden="true"></div>
-  <div class="ld-stat">
-    <span class="ld-label">Pattern Tracker</span>
-    <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
-    <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
-  </div>
-  <div class="ld-divider" aria-hidden="true"></div>
-  <div class="ld-stat">
-    <span class="ld-label">Learning Drilldown</span>
-    <span class="ld-value" id="ldDrilldownTitle">No drilldown yet</span>
-    <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
-    <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
+  <div class="ld-details" id="ldDetails" hidden>
+    <div class="ld-stat">
+      <span class="ld-label">Learning Memory</span>
+      <span class="ld-value" id="ldResolved">0 resolved</span>
+      <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Market Accuracy</span>
+      <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
+      <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Pattern Tracker</span>
+      <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
+      <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
+    </div>
   </div>
 </div>
 <!-- LINE MOVEMENT SUMMARY -->
