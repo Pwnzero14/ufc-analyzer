@@ -495,8 +495,10 @@ function isUsableUpcomingCard(card: UpcomingCard | null | undefined): card is Up
   if (!card || !card.date) return false;
   const ts = parseEventDateMs(card.date);
   if (!Number.isFinite(ts)) return false;
-  // Only accept cards for events that haven't fully passed yet (6h grace for same-night use).
-  return ts >= Date.now() - 6 * 60 * 60 * 1000;
+  // parseEventDateMs returns midnight of event day; UFC fights start ~10 PM event day
+  // and end ~1-2 AM the next morning. 30h grace keeps the card usable through fight
+  // night and into the morning after, when result absorption typically runs.
+  return ts >= Date.now() - 30 * 60 * 60 * 1000;
 }
 
 function applyUpcomingCardContext(card: UpcomingCard | null): void {

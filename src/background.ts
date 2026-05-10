@@ -593,7 +593,7 @@ function computeFP_PP(stats: {
 }
 
 async function fetchFightDetails(url: string): Promise<Array<{
-  name: string; won: boolean; ss: number; totalStr: number; td: number;
+  name: string; won: boolean; ss: number; ssR1: number; totalStr: number; td: number;
   kd: number; rev: number; sub: number; ctrlSecs: number; method: string; round: number;
   fightTimeMins: number;
 }>> {
@@ -622,11 +622,16 @@ async function fetchFightDetails(url: string): Promise<Array<{
     const lastRoundMins = timeM ? (parseInt(timeM[1]) + parseInt(timeM[2]) / 60) : 5;
     const fightTimeMins = Math.round(((round - 1) * 5 + lastRoundMins) * 100) / 100;
 
-    // UFCStats fight detail page: the FIRST <tbody> is the Totals table.
+    // UFCStats fight detail page tbodies: [0]=Totals, [1]=Per-round Totals, [2]=Sig Strikes, [3]=Per-round Sig Strikes.
     // Each data row has ONE <tr> with both fighters; each <td> separates values using <p> tags.
-    const firstTbody = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)?.[1] || '';
+    const allTbodies = [...html.matchAll(/<tbody[^>]*>([\s\S]*?)<\/tbody>/gi)].map(m => m[1]);
+    const firstTbody = allTbodies[0] || '';
+    const perRoundTbody = allTbodies[1] || '';
     const firstRow = firstTbody.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || '';
     const cells = [...firstRow.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
+    // Per-round Totals: first data row = Round 1 (same column layout as Totals).
+    const r1Row = perRoundTbody.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || '';
+    const r1Cells = [...r1Row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
 
     // UFCStats separates per-fighter values using <p> tags (not <br>).
     // Split on </p> or <br>, strip tags, drop empties, return value at idx.
@@ -645,6 +650,8 @@ async function fetchFightDetails(url: string): Promise<Array<{
       const kd      = parseInt(cellVal(cells[1] ?? '', i)) || 0;
       const ssM     = cellVal(cells[2] ?? '', i).match(/(\d+)\s+of\s+\d+/);
       const ss      = ssM ? parseInt(ssM[1]) : 0;
+      const ssR1M   = cellVal(r1Cells[2] ?? '', i).match(/(\d+)\s+of\s+\d+/);
+      const ssR1    = ssR1M ? parseInt(ssR1M[1]) : 0;
       const totM    = cellVal(cells[4] ?? '', i).match(/(\d+)\s+of\s+\d+/);
       const totalStr = totM ? parseInt(totM[1]) : 0;
       const tdM     = cellVal(cells[5] ?? '', i).match(/(\d+)\s+of\s+\d+/);
@@ -652,7 +659,7 @@ async function fetchFightDetails(url: string): Promise<Array<{
       const sub     = parseInt(cellVal(cells[7] ?? '', i)) || 0;
       const rev     = parseInt(cellVal(cells[8] ?? '', i)) || 0;
       const ctrl    = parseCtrlTime(cellVal(cells[9] ?? '', i) || '0:00');
-      result.push({ name: names[i], won: statuses[i] === 'W', ss, totalStr, td, kd, rev, sub, ctrlSecs: ctrl, method, round, fightTimeMins });
+      result.push({ name: names[i], won: statuses[i] === 'W', ss, ssR1, totalStr, td, kd, rev, sub, ctrlSecs: ctrl, method, round, fightTimeMins });
     }
     return result;
   } catch {
@@ -865,13 +872,14 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
         // Pick6 'ctrl' lines are in minutes; UFCStats provides ctrlSecs.
         const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
         const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
+                + applyResult(nameVariants, archiveEvent, 'SS_R1', f.ssR1)
                 + applyResult(nameVariants, archiveEvent, 'TD', f.td)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
                 + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins)
                 + applyResult(nameVariants, archiveEvent, 'ctrl', ctrlMins);
         if (n > 0) {
-          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min CTRL=${ctrlMins}min (${f.won ? 'W' : 'L'} R${f.round})`);
+          console.log(`[UFC Settle] ${f.name}: SS=${f.ss} SS_R1=${f.ssR1} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min CTRL=${ctrlMins}min (${f.won ? 'W' : 'L'} R${f.round})`);
           settled++;
         }
       }
@@ -965,6 +973,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
           const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
           const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
+                  + applyResult([archiveName], archiveEvent, 'SS_R1', f.ssR1)
                   + applyResult([archiveName], archiveEvent, 'TD', f.td)
                   + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
                   + applyResult([archiveName], archiveEvent, 'Fantasy_PP', fpPP)
@@ -2798,9 +2807,10 @@ function isCardDateUsable(raw: string | null | undefined): boolean {
   const ts = parseEventDateMs(raw);
   if (!Number.isFinite(ts)) return false;
   const now = Date.now();
-  // Accept event dates up to 6 hours after the event start to cover same-night use,
-  // but ensure the day-after the event properly expires the cache.
-  return ts >= now - 6 * 60 * 60 * 1000;
+  // parseEventDateMs returns midnight of event day; UFC fights start ~10 PM event day
+  // and end ~1-2 AM the next morning. 30h grace keeps the card usable through fight
+  // night and into the morning after, when result absorption typically runs.
+  return ts >= now - 30 * 60 * 60 * 1000;
 }
 
 async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardCache | null> {
