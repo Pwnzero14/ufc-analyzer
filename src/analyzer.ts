@@ -152,6 +152,15 @@ const debugMessages: string[] = [];
 const statsCache: Record<string, FighterDB> = {};
 const statsCachePromises: Record<string, Promise<FighterDB>> = {};
 
+// Manual style overrides — bypass deriveStyle's threshold classifier when the
+// user knows better (e.g. Costa flagged grappler from sub finishes vs lower
+// competition but is actually a brawler; Allen flagged balanced but has the
+// grappling edge in a specific matchup). Loaded from chrome.storage.local at
+// init, read synchronously by buildFighterDB.
+const FIGHTER_STYLE_OVERRIDE_KEY = 'fighter_style_override_v1';
+type FighterStyle = 'striker' | 'grappler' | 'balanced';
+const _fighterStyleOverrides = new Map<string, FighterStyle>();
+
 let currentView = 'all';
 let currentPlatform = 'pick6';
 let trendWindow: 3 | 5 | 0 = 3; // 0 = career (no windowed chip)
@@ -806,7 +815,7 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
     tdDef: careerStats?.tdDef || null,
     tdAcc: careerStats?.tdAcc || null,
     stance: careerStats?.stance || null,
-    style: deriveStyle(careerStats),
+    style: _fighterStyleOverrides.get(name.trim().toLowerCase()) ?? deriveStyle(careerStats),
     finishRate,
     avgFP_weighted,
     fpFloor:        fpStats.floor,
@@ -853,7 +862,22 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
 }
 
 // ── UFC STATS FETCH ────────────────────────────────────────────────────────
+// Platform names sometimes don't match UFCStats: alt first names (Timothy Angel
+// Cuamba → Timmy Cuamba) or typos on UFCStats's side (Bernardo Sopaj → Benardo
+// Sopaj). Map is keyed by lowercased platform name, value is the UFCStats name
+// to search instead. Add new entries when the candidate-search-by-first+last
+// can't find a real fighter.
+const UFCSTATS_NAME_ALIASES: Record<string, string> = {
+  'timothy angel cuamba': 'Timmy Cuamba',
+  'bernardo sopaj': 'Benardo Sopaj',
+};
+
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
+  const aliased = UFCSTATS_NAME_ALIASES[name.trim().toLowerCase()];
+  if (aliased && aliased !== name) {
+    debugLog(`Alias: ${name} → ${aliased}`);
+    name = aliased;
+  }
   const cacheKey = `ufcstats_v49_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
@@ -11017,6 +11041,74 @@ async function listManualWeightMisses(): Promise<void> {
 (window as unknown as { clearMissedWeight: typeof clearManualWeightMiss }).clearMissedWeight = clearManualWeightMiss;
 (window as unknown as { listMissedWeights: typeof listManualWeightMisses }).listMissedWeights = listManualWeightMisses;
 
+// ── MANUAL FIGHTER-STYLE OVERRIDE ──────────────────────────────────────────
+// deriveStyle is a crude threshold classifier (tdAvg > 2.0 → grappler, etc.)
+// that misfires when a fighter has stat-padded numbers vs lower competition
+// or when their matchup-specific role differs from career averages. User
+// flags via console:
+//   window.setFighterStyle('Melquizael Costa', 'striker')
+//   window.clearFighterStyle('Melquizael Costa')
+//   window.listFighterStyles()
+// After overriding, re-run Generate Predictions to recompute SS/TD with the
+// new style. Persists in chrome.storage.local under FIGHTER_STYLE_OVERRIDE_KEY.
+async function loadFighterStyleOverrides(): Promise<Record<string, FighterStyle>> {
+  try {
+    const data = await storageGet<Record<string, unknown>>([FIGHTER_STYLE_OVERRIDE_KEY]);
+    const raw = data[FIGHTER_STYLE_OVERRIDE_KEY];
+    return (raw && typeof raw === 'object') ? (raw as Record<string, FighterStyle>) : {};
+  } catch { return {}; }
+}
+async function saveFighterStyleOverrides(map: Record<string, FighterStyle>): Promise<void> {
+  await new Promise<void>((res) => chrome.storage.local.set({ [FIGHTER_STYLE_OVERRIDE_KEY]: map }, res));
+}
+async function applyFighterStyleOverrides(): Promise<void> {
+  const map = await loadFighterStyleOverrides();
+  _fighterStyleOverrides.clear();
+  for (const [nameLower, style] of Object.entries(map)) {
+    if (style === 'striker' || style === 'grappler' || style === 'balanced') {
+      _fighterStyleOverrides.set(nameLower, style);
+    }
+  }
+  // Mutate any already-cached fighter DBs so panels reflect the change without
+  // a refetch. Generate Predictions still needs to re-run to recompute SS/TD.
+  for (const [cacheKey, db] of Object.entries(statsCache)) {
+    const override = _fighterStyleOverrides.get(cacheKey.trim().toLowerCase());
+    if (override && db.style !== override) db.style = override;
+  }
+}
+async function setFighterStyle(name: string, style: FighterStyle): Promise<void> {
+  if (style !== 'striker' && style !== 'grappler' && style !== 'balanced') {
+    console.error(`[UFC Analyzer] Invalid style "${style}" — must be 'striker' | 'grappler' | 'balanced'`);
+    return;
+  }
+  const map = await loadFighterStyleOverrides();
+  map[name.trim().toLowerCase()] = style;
+  await saveFighterStyleOverrides(map);
+  await applyFighterStyleOverrides();
+  console.log(`[UFC Analyzer] Style override set: ${name} → ${style}. Re-run Generate Predictions to recompute SS/TD/FP with the new style.`);
+}
+async function clearFighterStyle(name: string): Promise<void> {
+  const map = await loadFighterStyleOverrides();
+  const key = name.trim().toLowerCase();
+  if (!(key in map)) {
+    console.log(`[UFC Analyzer] No style override found for ${name}.`);
+    return;
+  }
+  delete map[key];
+  await saveFighterStyleOverrides(map);
+  _fighterStyleOverrides.delete(key);
+  console.log(`[UFC Analyzer] Style override cleared for ${name}. Re-run Generate Predictions to revert to classifier output.`);
+}
+async function listFighterStyles(): Promise<void> {
+  const map = await loadFighterStyleOverrides();
+  const entries = Object.entries(map);
+  if (!entries.length) { console.log('[UFC Analyzer] No fighter-style overrides set.'); return; }
+  console.table(entries.map(([name, style]) => ({ fighter: name, style })));
+}
+(window as unknown as { setFighterStyle: typeof setFighterStyle }).setFighterStyle = setFighterStyle;
+(window as unknown as { clearFighterStyle: typeof clearFighterStyle }).clearFighterStyle = clearFighterStyle;
+(window as unknown as { listFighterStyles: typeof listFighterStyles }).listFighterStyles = listFighterStyles;
+
 // fetchFighterNews moved to ./analyzer/news.ts. fetchAllFighterNews stays here
 // because it orchestrates module-scoped state (allFighters, renderFighters).
 async function fetchAllFighterNews(): Promise<void> {
@@ -16054,6 +16146,9 @@ function bindExclusiveButtons(selector: string, onActivate: (el: HTMLElement) =>
 
 // ── UI INIT ───────────────────────────────────────────────────────────────
 function initAnalyzerCore(): void {
+  // Load any persisted manual style overrides before predictions/fighter DBs build.
+  void applyFighterStyleOverrides();
+
   // Platform switcher
   document.querySelectorAll('[data-platform]').forEach(btn => {
     btn.addEventListener('click', () => setActivePlatform((btn as HTMLElement).dataset['platform'] || 'pick6'));
