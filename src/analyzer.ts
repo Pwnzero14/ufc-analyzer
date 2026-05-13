@@ -595,7 +595,7 @@ function hasAnyVisibleSourceLine(f: AnalyzerFighter): boolean {
 }
 
 function applySourceVisibilityFilter(fighters: AnalyzerFighter[]): AnalyzerFighter[] {
-  return fighters.filter((f) => hasAnyVisibleSourceLine(f));
+  return fighters.filter((f) => hasAnyVisibleSourceLine(f) || isUpcomingCardFighter(f.name));
 }
 
 function updateSourceToggleUI(): void {
@@ -13913,6 +13913,20 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (f.opponent) entry.opponent = normalizeName(f.opponent);
   });
 
+  // Inject empty placeholder entries for upcoming-card fighters not yet present
+  // in any platform-line scrape (late additions, debutees before books post props).
+  // Without these, half-resolved pairs collapse a slot in orderFightersByCard and
+  // its positional i%2 fight-badge grouping cascades wrong pairings downstream.
+  for (const cp of upcomingCardPairs) {
+    for (const [self, opp] of [[cp.f1, cp.f2], [cp.f2, cp.f1]] as const) {
+      if (map[self]) continue;
+      if (Object.keys(map).some(k => namesMatch(k, self))) continue;
+      const placeholder = createMergedLineEntry(self);
+      placeholder.opponent = opp;
+      map[self] = placeholder;
+    }
+  }
+
   Object.values(map).forEach((entry) => {
     entry.moneyline = resolveMoneylineFromMap(entry.name);
     // Fallback: if no platform provided an opponent, try the upcoming card
@@ -14047,7 +14061,7 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
       f.line_p6 != null || f.line_ud != null || f.line_betr != null ||
       f.line_pp != null || f.line_p6_ss != null || f.line_ud_ss != null ||
       f.line_betr_ss != null || f.line_pp_ss != null || f.line_dk_ss != null;
-    const pruned = entries.filter((f) => !!dbMap[f.name]?.loaded || hasRealLines(f));
+    const pruned = entries.filter((f) => !!dbMap[f.name]?.loaded || hasRealLines(f) || isUpcomingCardFighter(f.name));
     if (pruned.length >= 8) {
       entries = pruned;
       const keep = new Set(entries.map((e) => e.name));
