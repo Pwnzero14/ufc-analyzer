@@ -11107,6 +11107,52 @@ async function listFighterStyles(): Promise<void> {
 }
 (window as unknown as { setFighterStyle: typeof setFighterStyle }).setFighterStyle = setFighterStyle;
 (window as unknown as { clearFighterStyle: typeof clearFighterStyle }).clearFighterStyle = clearFighterStyle;
+
+// ── MANUAL LINE-BASELINE RESET ─────────────────────────────────────────────
+// When a fighter's opponent changes mid-event (e.g., Bellato pulls out and
+// Edwards replaces him), the prior fighter's baselines become stale — the new
+// opener vs the replacement gets diffed against the old line vs the dropped
+// opponent, producing a false drift + RLM badge. Baselines are keyed by
+// fighter name alone (no opponent in the key) and the existing wipe triggers
+// only fire on event changes, so opponent-swaps within the same event need a
+// manual nudge. User runs:
+//   window.resetFighterBaseline('Modestas Bukauskas')
+// to clear all opening-line + prev-refresh + history entries for that fighter
+// across every platform/stat. Next refresh re-snapshots current lines as the
+// new opener.
+async function resetFighterBaseline(name: string): Promise<void> {
+  const target = name.trim().toLowerCase();
+  if (!target) {
+    console.error('[UFC Analyzer] resetFighterBaseline: name required');
+    return;
+  }
+  let openingCleared = 0;
+  for (const key of [..._openingLines.keys()]) {
+    const parts = key.split('|');
+    if (parts[2] === target) { _openingLines.delete(key); openingCleared++; }
+  }
+  let prevCleared = 0;
+  for (const key of [..._prevRefreshLines.keys()]) {
+    const parts = key.split('|');
+    if (parts[2] === target) { _prevRefreshLines.delete(key); prevCleared++; }
+  }
+  let historyCleared = 0;
+  for (const key of Object.keys(_lineHistory.series)) {
+    if (key.startsWith(`${target}|`)) { delete _lineHistory.series[key]; historyCleared++; }
+  }
+  if (openingCleared === 0 && prevCleared === 0 && historyCleared === 0) {
+    console.log(`[UFC Analyzer] resetFighterBaseline: no entries found for "${name}" — check spelling. Nothing cleared.`);
+    return;
+  }
+  _lineHistory.updatedAt = Date.now();
+  await Promise.all([
+    storageSet({ lines_open_v1: buildOpeningLinesRecord() }),
+    storageSet({ [STORAGE_LINE_HISTORY_KEY]: _lineHistory }),
+  ]);
+  renderFighters();
+  console.log(`[UFC Analyzer] Baseline reset for ${name}: cleared ${openingCleared} opening / ${prevCleared} prev-refresh / ${historyCleared} history entries. Next refresh re-anchors.`);
+}
+(window as unknown as { resetFighterBaseline: typeof resetFighterBaseline }).resetFighterBaseline = resetFighterBaseline;
 (window as unknown as { listFighterStyles: typeof listFighterStyles }).listFighterStyles = listFighterStyles;
 
 // fetchFighterNews moved to ./analyzer/news.ts. fetchAllFighterNews stays here
