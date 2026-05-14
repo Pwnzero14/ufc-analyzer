@@ -870,6 +870,9 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
 const UFCSTATS_NAME_ALIASES: Record<string, string> = {
   'timothy angel cuamba': 'Timmy Cuamba',
   'bernardo sopaj': 'Benardo Sopaj',
+  'george tuco tokkos': 'Tuco Tokkos',
+  'doo ho choi': 'Dooho Choi',
+  'thomas gantt': 'Tommy Gantt',
 };
 
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
