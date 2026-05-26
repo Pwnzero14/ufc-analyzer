@@ -7,7 +7,11 @@ export const CONFIG = {
       id: 'pick6',
       label: 'Pick6 (DraftKings)',
       color: '#63b3ed',
-      url: 'https://pick6.draftkings.com/?sport=UFC',
+      // 2026-05-15: DK collapsed UFC into a unified MMA category (category/129).
+      // The bare ?sport=MMA homepage shows sample cards only — stat-tab pills
+      // (Significant Strikes / Takedowns / Fantasy Points / Control Time) live
+      // on category/129. SPA fills in pickGroup for current event.
+      url: 'https://pick6.draftkings.com/category/129?sport=MMA',
     },
     underdog: {
       id: 'underdog',

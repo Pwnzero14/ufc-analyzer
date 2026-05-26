@@ -168,7 +168,7 @@ document.getElementById('fetch-dk-tds-btn')?.addEventListener('click', async () 
 
   try {
     const url =
-      'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fighter-props&subcategory=takedowns-landed-o-u';
+      'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=takedowns-landed-o-u';
     const tab = await chrome.tabs.create({ url, active: true });
 
     await new Promise((r) => setTimeout(r, 3500));

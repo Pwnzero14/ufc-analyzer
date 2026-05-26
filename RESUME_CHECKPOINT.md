@@ -1,15 +1,15 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-04-30 13:51:40 -04:00
+Last Saved: 2026-05-07 11:57:20 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 35a9291
+HEAD: d7d17c5
 
 ## Last Notes
-Title-based main-event detection + card-order row pairing both shipped. Betr UFC 314 lines entered. Predictor v2 + weight-miss verification gated on DM vs Prates settle Sat May 2.
+(none)
 
 ## Snapshot
-Directory: C:\Users\abdir\Downloads\ufc_project_v2\backups\full_project_snapshot_20260430_135140
+Directory: C:\Users\abdir\Downloads\ufc_project_v2\backups\full_project_snapshot_20260507_115720
 Zip: 
 ## Resume Checklist
 1. Run npm run build.
@@ -19,7 +19,13 @@ Zip:
 ## Working Tree Status
 ~~~text
  M .claude/settings.local.json
- M RESUME_NEXT_SESSION.md
+?? RESUME_2026_05_01_BEST_PICKS.md
+?? RESUME_2026_05_02_POST_PERTH.md
+?? RESUME_2026_05_04_POST_PRATES_LEARNED.md
+?? RESUME_2026_05_05_PREDICTOR_V2_COMPLETE.md
+?? RESUME_2026_05_05_UI_PASS_PARTIAL.md
+?? RESUME_2026_05_06_UI_ROUND_3.md
+?? RESUME_WEIGHT_MISS_BADGE.md
 ?? "UsersabdirAppDataRoamingOpera SoftwareOpera GX StableDefaultLocal Extension Settingsjbkieeoleplngmkbeoilnfnkjhploigp/"
 ?? resume.ps1
 ?? start-chrome-debug.bat

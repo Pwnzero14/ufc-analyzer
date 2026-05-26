@@ -2,6 +2,7 @@ import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.j
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
 import { FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
+import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
 import { _weightMissSignals, parseWeightMissFromTitle, severityFromLbs, MANUAL_WEIGHT_MISS_KEY } from './analyzer/weight-miss.js';
 import type { WeightMissSignal, ManualWeightMissMap } from './analyzer/weight-miss.js';
@@ -873,6 +874,10 @@ const UFCSTATS_NAME_ALIASES: Record<string, string> = {
   'george tuco tokkos': 'Tuco Tokkos',
   'doo ho choi': 'Dooho Choi',
   'thomas gantt': 'Tommy Gantt',
+  // Analyzer canonicalizes to "Su Mudaerji" (so historical archive keys keep
+  // matching) but UFCStats lists him as the single-word "Sumudaerji". Bridge
+  // here so the alpha-index lookup uses the single-word form.
+  'su mudaerji': 'Sumudaerji',
 };
 
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
@@ -933,6 +938,27 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
         }
         cands.push({ char: last[0].toLowerCase(), first: first.toLowerCase(), last: last.toLowerCase() });
       }
+      // Chinese / Asian fighter convention: UFCStats sometimes indexes by the
+      // family name's initial (which platforms put in the FIRST cell) instead
+      // of the given name's initial. For "Song Yadong" we already search ?char=y
+      // — also try ?char=s with the same first/last. Safe because findDetailUrl
+      // requires both cells to match exactly.
+      if (cleanParts.length === 2) {
+        const first = cleanParts[0].toLowerCase();
+        const last = cleanParts[1].toLowerCase();
+        if (first[0] !== last[0]) {
+          cands.push({ char: first[0], first, last });
+        }
+      }
+      // Single-word fighters (Aoriqileng, Sumudaerji). UFCStats indexes some of
+      // these with the name in just one cell (first OR last) and the other
+      // empty. Empty-cell wildcards are gated in findDetailUrl so they only
+      // match rows where the corresponding cell is actually empty.
+      if (cleanParts.length === 1) {
+        const single = cleanParts[0].toLowerCase();
+        cands.push({ char: single[0], first: single, last: '' });
+        cands.push({ char: single[0], first: '', last: single });
+      }
       const firstLen = cleanParts[0].length;
       const lastLen  = cleanParts[cleanParts.length-1].length;
       if (cleanParts.length === 2 && (firstLen <= 3 || lastLen <= 3)) {
@@ -953,10 +979,8 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     async function getAlphaPage(char: string): Promise<string> {
       if (pageCache[char]) return pageCache[char];
       const url = `http://www.ufcstats.com/statistics/fighters?char=${char}&page=all`;
-      let res: Response;
-      try { res = await fetch(url); } catch(e: unknown) { debugLog(`Fetch error [${char}]: ${(e as Error).message}`); return ''; }
-      if (!res.ok) { debugLog(`HTTP ${res.status} for char=${char}`); return ''; }
-      const html = await res.text();
+      const html = await ufcstatsFetchText(url);
+      if (!html) { debugLog(`Fetch failed for char=${char}`); return ''; }
       pageCache[char] = html;
       debugLog(`Loaded [${char.toUpperCase()}] page: ${html.length} chars`);
       return html;
@@ -975,8 +999,14 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
           .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase().replace(/-/g, ' '));
         const firstCell = cells[0] || '';
         const lastCell  = cells[1] || '';
-        const firstOk = firstCell === firstLower || firstCell.startsWith(firstLower + ' ') || firstCell.endsWith(' ' + firstLower) || firstCell.includes(' ' + firstLower + ' ');
-        const lastOk  = lastCell  === lastLower  || lastCell.startsWith(lastLower + ' ')   || lastCell.endsWith(' ' + lastLower)   || lastCell.includes(' ' + lastLower + ' ');
+        // Empty firstLower/lastLower mean "this cell must be empty" — used by
+        // single-word fighters where UFCStats puts the name in just one cell.
+        const firstOk = firstLower
+          ? (firstCell === firstLower || firstCell.startsWith(firstLower + ' ') || firstCell.endsWith(' ' + firstLower) || firstCell.includes(' ' + firstLower + ' '))
+          : !firstCell;
+        const lastOk = lastLower
+          ? (lastCell === lastLower || lastCell.startsWith(lastLower + ' ') || lastCell.endsWith(' ' + lastLower) || lastCell.includes(' ' + lastLower + ' '))
+          : !lastCell;
         if (firstOk && lastOk) {
           return link[1].replace('http://ufcstats.com/','http://www.ufcstats.com/');
         }
@@ -994,9 +1024,8 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
 
     if (!detailUrl) { debugLog(`✗ NOT FOUND: ${name}`); return null; }
 
-    const detailRes = await fetch(detailUrl);
-    if (!detailRes.ok) { debugLog(`Detail HTTP ${detailRes.status}`); return null; }
-    const detailHtml = await detailRes.text();
+    const detailHtml = await ufcstatsFetchText(detailUrl);
+    if (!detailHtml) { debugLog(`Detail fetch failed for ${name}`); return null; }
 
     const careerStats = parseCareerStats(detailHtml);
     const fightLinks  = parseFightHistoryLinks(detailHtml);
@@ -1012,8 +1041,9 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     for (let b = 0; b < fightLinks.length; b += BATCH_SIZE) {
       const batch = fightLinks.slice(b, b + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (fight) => {
-        const fRes  = await fetch(fight.fightUrl!);
-        return fRes.text();
+        const text = await ufcstatsFetchText(fight.fightUrl!);
+        if (text == null) throw new Error('challenge or fetch failed');
+        return text;
       }));
       for (let i = 0; i < batch.length; i++) {
         const fight = batch[i];
@@ -10698,6 +10728,413 @@ function updateViewTabCounts(): void {
   setText('tabCountBestPicks', Math.min(8, bestOver) + Math.min(8, bestUnder));
 }
 
+// ── FIGHT-PAIR LAYOUT ─────────────────────────────────────────────────────
+// Group two opponents into a single Fight so the upcoming-card view can render
+// them side-by-side with a shared spine. Presentation only — does not feed
+// predictor, EV, or storage paths.
+type FightCardPosition = 'main' | 'co-main' | 'main-card' | 'prelim';
+type CorrelationStat = 'SS' | 'FP' | 'FT';
+interface FightCorrelation {
+  type: 'neg-correlated-same-direction';
+  stat: CorrelationStat;
+  direction: 'over' | 'under';
+  note: string;
+}
+interface FightPair {
+  fighterA: AnalyzerFighter;
+  fighterB: AnalyzerFighter | null;
+  fightIndex: number;
+  weightClass?: WeightClass;
+  rounds: 3 | 5;
+  cardPosition: FightCardPosition;
+  ftLine: number | null;
+  ftPlatKey: 'p6' | 'ud' | 'pp' | 'betr' | 'dk' | null;
+  bothHaveCtrl: boolean;
+  correlation: FightCorrelation | null;
+  isTopEdgeFight: boolean;
+  topEdgeConf: number;
+}
+
+function isPlaceholderFighter(f: AnalyzerFighter | null | undefined): boolean {
+  return !!f && f.db?.loaded === false;
+}
+
+function fighterHasCtrlProp(f: AnalyzerFighter | null): boolean {
+  if (!f) return false;
+  return f.line_p6_ctrl != null || f.line_ud_ctrl != null
+      || f.line_pp_ctrl != null || f.line_betr_ctrl != null
+      || f.line_dk_ctrl != null;
+}
+
+function pickFightTimeLine(
+  f: AnalyzerFighter | null,
+): { value: number; plat: 'p6' | 'ud' | 'pp' | 'betr' | 'dk' } | null {
+  if (!f) return null;
+  const candidates: Array<{ value: number | null | undefined; plat: 'p6' | 'ud' | 'pp' | 'betr' | 'dk' }> = [
+    { value: f.line_p6_ft,   plat: 'p6'   },
+    { value: f.line_ud_ft,   plat: 'ud'   },
+    { value: f.line_pp_ft,   plat: 'pp'   },
+    { value: f.line_betr_ft, plat: 'betr' },
+    { value: f.line_dk_ft,   plat: 'dk'   },
+  ];
+  for (const c of candidates) {
+    if (c.value != null && Number.isFinite(c.value)) return { value: c.value, plat: c.plat };
+  }
+  return null;
+}
+
+function computeFightCorrelation(
+  a: AnalyzerFighter,
+  b: AnalyzerFighter,
+): FightCorrelation | null {
+  if (isPlaceholderFighter(a) || isPlaceholderFighter(b)) return null;
+  const aSs = a.lean_ss?.lean, bSs = b.lean_ss?.lean;
+  if (aSs && aSs === bSs && (aSs === 'over' || aSs === 'under')) {
+    return {
+      type: 'neg-correlated-same-direction',
+      stat: 'SS',
+      direction: aSs,
+      note: `Both ${aSs.toUpperCase()} SS — same-fight same-direction. Lean ONE side.`,
+    };
+  }
+  const aFp = a.lean?.lean, bFp = b.lean?.lean;
+  if (aFp && aFp === bFp && (aFp === 'over' || aFp === 'under')) {
+    return {
+      type: 'neg-correlated-same-direction',
+      stat: 'FP',
+      direction: aFp,
+      note: aFp === 'over'
+        ? `Both OVER FP — only one fighter gets the win bonus. Lean ONE side.`
+        : `Both UNDER FP — needs a fast finish. Lean ONE side.`,
+    };
+  }
+  const aFt = a.lean_ft?.lean, bFt = b.lean_ft?.lean;
+  if (aFt && aFt === bFt && (aFt === 'over' || aFt === 'under')) {
+    return {
+      type: 'neg-correlated-same-direction',
+      stat: 'FT',
+      direction: aFt,
+      note: `Both ${aFt.toUpperCase()} FT — same fight, same direction. Lean ONE side.`,
+    };
+  }
+  return null;
+}
+
+function cardPositionForFightIndex(fightIndex: number, totalFights: number): FightCardPosition {
+  if (fightIndex === 0) return 'main';
+  if (fightIndex === 1) return 'co-main';
+  if (fightIndex < Math.ceil(totalFights * 0.55)) return 'main-card';
+  return 'prelim';
+}
+
+function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
+  const out: FightPair[] = [];
+  const totalFights = Math.ceil(activeFighters.length / 2);
+
+  // Slate-wide top-edge scan — confidence on whichever leaned stat scores highest.
+  let topEdgeName = '';
+  let topEdgeConf = 0;
+  for (const f of activeFighters) {
+    if (isPlaceholderFighter(f)) continue;
+    const el = getEffectiveLean(f);
+    if (el.lean !== 'over' && el.lean !== 'under') continue;
+    const c = el.conf || 0;
+    if (c > topEdgeConf) { topEdgeConf = c; topEdgeName = f.name; }
+  }
+
+  for (let i = 0; i < activeFighters.length; i += 2) {
+    const a = activeFighters[i];
+    const b = activeFighters[i + 1] || null;
+    const fightIndex = Math.floor(i / 2);
+    const cardPair = upcomingCardPairs[fightIndex];
+    // Trust upcomingCardPairs ordering — orderFightersByCard() aligns activeFighters
+    // to the same sequence. weightClass falls back to undefined when missing.
+    const weightClass = cardPair?.weightClass;
+    const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
+    const correlation = b ? computeFightCorrelation(a, b) : null;
+    const aRounds = scheduledRoundsMap.get(normalizeName(a.name) || a.name) ?? null;
+    const bRounds = b ? scheduledRoundsMap.get(normalizeName(b.name) || b.name) ?? null : null;
+    const scheduled = aRounds || bRounds;
+    const rounds: 3 | 5 = scheduled === 5 ? 5 : fightIndex === 0 ? 5 : 3;
+    const topEdge = !!topEdgeName && (a.name === topEdgeName || b?.name === topEdgeName);
+    out.push({
+      fighterA: a,
+      fighterB: b,
+      fightIndex,
+      weightClass,
+      rounds,
+      cardPosition: cardPositionForFightIndex(fightIndex, totalFights),
+      ftLine: ft?.value ?? null,
+      ftPlatKey: ft?.plat ?? null,
+      bothHaveCtrl: fighterHasCtrlProp(a) && fighterHasCtrlProp(b),
+      correlation,
+      isTopEdgeFight: topEdge,
+      topEdgeConf: topEdge ? topEdgeConf : 0,
+    });
+  }
+  return out;
+}
+
+function spineHasContent(fight: FightPair): boolean {
+  return !!fight.ftLine || fight.bothHaveCtrl || !!fight.correlation || fight.isTopEdgeFight;
+}
+
+function weightClassChip(weight: WeightClass | undefined): string {
+  if (!weight) return '';
+  const label = String(weight).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `<span class="fight-spine-weight" title="Weight class">${label}</span>`;
+}
+
+// ── FILLED-SPINE HELPERS ──────────────────────────────────────────────────
+// Per-fighter colors used across the filled-spine sections (matchup values,
+// L5 trend strokes, common-opp stat lines, legend chips). Cyan = side A,
+// yellow = side B. Yellow intentionally matches the existing top-edge callout.
+const SPINE_COLOR_A = '#5ee5e0';
+const SPINE_COLOR_B = '#ffd24a';
+
+function spineFightTime(f: FightResult): number {
+  if (!f.date) return 0;
+  const t = new Date(f.date).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function spineHistorySorted(db: FighterDB | null | undefined): FightResult[] {
+  if (!db?.history?.length) return [];
+  return [...db.history].sort((x, y) => spineFightTime(y) - spineFightTime(x));
+}
+
+function spineOppAbsorbsSS(db: FighterDB | null | undefined): number | null {
+  if (!db?.history?.length) return null;
+  const samples = db.history
+    .map(h => h.oppStats?.sigStr)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (samples.length < 2) return null;
+  return parseFloat((samples.reduce((s, v) => s + v, 0) / samples.length).toFixed(1));
+}
+
+function spineEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function spineMethodShort(method: string | null | undefined): string {
+  const m = String(method || '').toUpperCase();
+  if (/SUB/.test(m)) return 'SUB';
+  if (/KO|TKO/.test(m)) return 'KO';
+  return 'DEC';
+}
+
+function spineResultLetter(result: string | null | undefined): string {
+  const r = String(result || '').toLowerCase();
+  if (r === 'win') return 'W';
+  if (r === 'loss' || r === 'lose') return 'L';
+  if (r === 'draw') return 'D';
+  return '–';
+}
+
+function spineFighterStatLine(f: FightResult, color: string): string {
+  const ss = f.sigStr != null ? String(Math.round(f.sigStr)) : '—';
+  const fp = f.fp != null ? String(Math.round(f.fp)) : '—';
+  const res = spineResultLetter(f.result);
+  const meth = spineMethodShort(f.method);
+  return `<span class="spine-cmn-stat" style="color:${color}">${ss}·${fp}·${res}/${meth}</span>`;
+}
+
+function spineMatchupHTML(a: AnalyzerFighter, b: AnalyzerFighter): string {
+  const da = a.db, db2 = b.db;
+  const ssA = da?.avgSigStr, ssB = db2?.avgSigStr;
+  const absA = spineOppAbsorbsSS(da), absB = spineOppAbsorbsSS(db2);
+  const fnA = da?.finishRate, fnB = db2?.finishRate;
+  const fmt = (v: number | null | undefined): string =>
+    v == null || !Number.isFinite(v) ? '<span class="spine-missing">—</span>' : (v as number).toFixed(1);
+  const fmtPct = (v: number | null | undefined): string =>
+    v == null || !Number.isFinite(v) ? '<span class="spine-missing">—</span>' : `${Math.round((v as number) * 100)}%`;
+  return `
+    <div class="spine-section">
+      <div class="spine-section-head">MATCHUP</div>
+      <div class="spine-matchup-row">
+        <span class="spine-val-a">${fmt(ssA)}</span>
+        <span class="spine-row-label">SS/fight</span>
+        <span class="spine-val-b">${fmt(ssB)}</span>
+      </div>
+      <div class="spine-matchup-row">
+        <span class="spine-val-a">${fmt(absA)}</span>
+        <span class="spine-row-label">opp abs</span>
+        <span class="spine-val-b">${fmt(absB)}</span>
+      </div>
+      <div class="spine-matchup-row">
+        <span class="spine-val-a">${fmtPct(fnA)}</span>
+        <span class="spine-row-label">P(fin)</span>
+        <span class="spine-val-b">${fmtPct(fnB)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function spineCommonOppsHTML(a: AnalyzerFighter, b: AnalyzerFighter): string {
+  const histA = spineHistorySorted(a.db).slice(0, 8);
+  const histB = spineHistorySorted(b.db).slice(0, 8);
+  // Build normalized opp → fight map for side A so we can intersect in O(N).
+  const mapA = new Map<string, FightResult>();
+  for (const fight of histA) {
+    const norm = normalizeName(fight.opp);
+    if (norm && !mapA.has(norm.toLowerCase())) mapA.set(norm.toLowerCase(), fight);
+  }
+  const shared: Array<{ nameDisp: string; fA: FightResult; fB: FightResult; recency: number }> = [];
+  for (const fight of histB) {
+    const norm = normalizeName(fight.opp);
+    if (!norm) continue;
+    const key = norm.toLowerCase();
+    const fA = mapA.get(key);
+    if (!fA) continue;
+    shared.push({
+      nameDisp: norm,
+      fA,
+      fB: fight,
+      recency: Math.max(spineFightTime(fA), spineFightTime(fight)),
+    });
+  }
+  shared.sort((x, y) => y.recency - x.recency);
+  const top3 = shared.slice(0, 3);
+  let body: string;
+  if (top3.length === 0) {
+    body = `<div class="spine-cmn-empty">none in past 8 fights</div>`;
+  } else {
+    body = top3.map(s => `
+      <div class="spine-cmn-row">
+        <div class="spine-cmn-name">${spineEscape(s.nameDisp)}</div>
+        <div class="spine-cmn-stats">
+          ${spineFighterStatLine(s.fA, SPINE_COLOR_A)}
+          <span class="spine-cmn-sep">·</span>
+          ${spineFighterStatLine(s.fB, SPINE_COLOR_B)}
+        </div>
+      </div>
+    `).join('');
+  }
+  return `
+    <div class="spine-section">
+      <div class="spine-section-head">COMMON OPPS</div>
+      ${body}
+    </div>
+  `;
+}
+
+function spineL5TrendsHTML(a: AnalyzerFighter, b: AnalyzerFighter): string {
+  const histAAll = spineHistorySorted(a.db);
+  const histBAll = spineHistorySorted(b.db);
+  // Need ≥2 fights on both sides to plot a polyline; otherwise suppress whole section.
+  if (histAAll.length < 2 || histBAll.length < 2) return '';
+  const n = Math.min(5, histAAll.length, histBAll.length);
+  // Slice newest-N then reverse to chronological asc so the polyline reads
+  // oldest → newest left-to-right (with the end-dot landing on the latest fight).
+  const histA = histAAll.slice(0, n).reverse();
+  const histB = histBAll.slice(0, n).reverse();
+  const stats: Array<{ label: string; key: 'sigStr' | 'fp' | 'td' }> = [
+    { label: 'SS', key: 'sigStr' },
+    { label: 'FP', key: 'fp' },
+    { label: 'TD', key: 'td' },
+  ];
+  const pickStat = (h: FightResult, k: 'sigStr' | 'fp' | 'td'): number => {
+    const v = k === 'sigStr' ? h.sigStr : k === 'fp' ? h.fp : h.td;
+    return v == null ? NaN : v;
+  };
+  const rows = stats.map(({ label, key }) => {
+    const valsA = histA.map(h => pickStat(h, key)).filter(v => Number.isFinite(v));
+    const valsB = histB.map(h => pickStat(h, key)).filter(v => Number.isFinite(v));
+    const sparkA = valsA.length >= 2
+      ? renderSparkline(valsA.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_A, w: 70, h: 14 })
+      : '<span class="spine-missing">—</span>';
+    const sparkB = valsB.length >= 2
+      ? renderSparkline(valsB.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_B, w: 70, h: 14 })
+      : '<span class="spine-missing">—</span>';
+    return `
+      <div class="spine-trend-row">
+        <span class="spine-trend-cell">${sparkA}</span>
+        <span class="spine-trend-label">${label}</span>
+        <span class="spine-trend-cell">${sparkB}</span>
+      </div>
+    `;
+  }).join('');
+  const lastNameA = a.name.split(' ').pop() || a.name;
+  const lastNameB = b.name.split(' ').pop() || b.name;
+  return `
+    <div class="spine-section">
+      <div class="spine-section-head">L${n} TRENDS</div>
+      ${rows}
+      <div class="spine-trend-legend">
+        <span class="spine-legend-a">${spineEscape(lastNameA)}</span>
+        <span class="spine-legend-b">${spineEscape(lastNameB)}</span>
+      </div>
+    </div>
+  `;
+}
+
+// Built once per fight-pair render. Returns '' for placeholder fighters so
+// the spine stays narrow and only the shared-header chips show. CSS hides
+// the wrapper in default state — `.fight-pair:has(.fighter-row.expanded)`
+// reveals it.
+function buildFilledSpineWrapper(a: AnalyzerFighter, b: AnalyzerFighter | null): string {
+  if (!b || isPlaceholderFighter(a) || isPlaceholderFighter(b)) return '';
+  return `
+    <div class="fight-spine-filled">
+      ${spineMatchupHTML(a, b)}
+      ${spineCommonOppsHTML(a, b)}
+      ${spineL5TrendsHTML(a, b)}
+      <div class="fight-spine-spacer"></div>
+    </div>
+  `;
+}
+
+function buildFightSpine(fight: FightPair): HTMLDivElement {
+  const spine = document.createElement('div');
+  spine.className = 'fight-spine';
+
+  const roundsChip = `<span class="fight-spine-rounds" title="Scheduled rounds">${fight.rounds}R</span>`;
+  const weightChip = weightClassChip(fight.weightClass);
+
+  let ftBlock = '';
+  if (fight.ftLine != null) {
+    const platLabels: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
+    const platLabel = fight.ftPlatKey ? platLabels[fight.ftPlatKey] : '';
+    const aName = fight.fighterA.name;
+    const sparkPoints = fight.ftPlatKey ? getSparklinePointsForPlat(aName, 'ft', fight.ftPlatKey) : [];
+    const sparkHtml = sparkPoints.length >= 2 ? renderSparkline(sparkPoints, 'auto') : '';
+    ftBlock = `<div class="fight-spine-ft" title="Fight time line">
+      <span class="fight-spine-ft-label">FT</span>
+      <span class="fight-spine-ft-value">${fight.ftLine}</span>
+      ${platLabel ? `<span class="fight-spine-ft-plat">${platLabel}</span>` : ''}
+      ${sparkHtml}
+    </div>`;
+  }
+
+  let ctrlBlock = '';
+  if (fight.bothHaveCtrl) {
+    ctrlBlock = `<div class="fight-spine-ctrl" title="Both fighters have a CTRL prop">CTRL ×2</div>`;
+  }
+
+  let corrBlock = '';
+  if (fight.correlation) {
+    const c = fight.correlation;
+    corrBlock = `<div class="fight-spine-corr" title="${c.note}">⚠ ${c.direction.toUpperCase()} ${c.stat} ×2</div>`;
+  }
+
+  let topEdgeBlock = '';
+  if (fight.isTopEdgeFight && fight.topEdgeConf > 0) {
+    topEdgeBlock = `<div class="fight-spine-top-edge" title="Slate's top-edge lean lives in this fight">TOP EDGE • ${Math.round(fight.topEdgeConf)}%</div>`;
+  }
+
+  const filledBlock = buildFilledSpineWrapper(fight.fighterA, fight.fighterB);
+
+  spine.innerHTML = `
+    <div class="fight-spine-chips">${roundsChip}${weightChip}</div>
+    ${ftBlock}
+    ${ctrlBlock}
+    ${corrBlock}
+    ${topEdgeBlock}
+    ${filledBlock}
+  `;
+  return spine;
+}
+
 function _renderFightersImpl(): void {
   const container = document.getElementById('cardContainer');
   if (!container) return;
@@ -10888,38 +11325,91 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // per row triggers a layout pass per row (~80 passes for a 26-fighter card).
   const frag = document.createDocumentFragment();
 
-  const totalFights = Math.ceil(activeFighters.length / 2);
   const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
-  activeFighters.forEach((f, i) => {
+
+  const buildRowForFighter = (f: AnalyzerFighter, rowIdx: number, fightIndex: number): HTMLDivElement => {
     const explicitOpp = sanitizeOpponentName(f.opponent, f.name);
     const looseOpp = sanitizeLooseOpponentToken(f.opponent, f.name);
     const opp = explicitOpp || looseOpp;
     const oppEntry = resolveOpponentEntry(f, explicitOpp, looseOpp);
-    if (i % 2 === 0 && showFightGroups) {
-      const fightIndex = Math.floor(i / 2);
-      let badgeText: string, badgeCls: string;
-      if (fightIndex === 0) { badgeText = 'MAIN EVENT'; badgeCls = 'main'; }
-      else if (fightIndex === 1) { badgeText = 'CO-MAIN'; badgeCls = 'co'; }
-      else if (fightIndex < Math.ceil(totalFights * 0.55)) { badgeText = 'MAIN CARD'; badgeCls = 'card'; }
-      else { badgeText = 'PRELIM'; badgeCls = 'prelim'; }
+    debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
+    const row = buildFighterRow(f, oppEntry ?? null, fightIndex);
+    row.style.setProperty('--row-index', String(rowIdx % 18));
+    if (isPlaceholderFighter(f)) row.classList.add('fighter-row-placeholder');
+    return row;
+  };
+
+  if (showFightGroups) {
+    const fights = buildFights(activeFighters);
+    fights.forEach((fight, idx) => {
+      const a = fight.fighterA;
+      const b = fight.fighterB;
+      // Skip only truly empty pairs (no UFCStats AND no platform lines). When
+      // UFCStats whiffs the whole card (e.g. early fight-week before detail
+      // pages exist), db.loaded is false everywhere but UD/Pick6 still have
+      // real lines — those must render.
+      const hasAnyLine = (x: AnalyzerFighter): boolean =>
+        hasSourceLine(x, 'p6') || hasSourceLine(x, 'ud') || hasSourceLine(x, 'pp')
+        || hasSourceLine(x, 'betr') || hasSourceLine(x, 'dk');
+      if (b && isPlaceholderFighter(a) && isPlaceholderFighter(b) && !hasAnyLine(a) && !hasAnyLine(b)) return;
+
+      const badgeText = fight.cardPosition === 'main' ? 'MAIN EVENT'
+                      : fight.cardPosition === 'co-main' ? 'CO-MAIN'
+                      : fight.cardPosition === 'main-card' ? 'MAIN CARD'
+                      : 'PRELIM';
+      const badgeCls = fight.cardPosition === 'main' ? 'main'
+                     : fight.cardPosition === 'co-main' ? 'co'
+                     : fight.cardPosition === 'main-card' ? 'card'
+                     : 'prelim';
       const header = document.createElement('div');
       header.className = `fight-group-header fgh-${badgeCls}`;
-      const f2Name = activeFighters[i + 1]?.name || opp || '';
+      const f2Name = b?.name || '';
       header.innerHTML = `<div class="fight-group-line"></div><span class="fight-badge ${badgeCls}">${badgeText}</span><button class="fight-cancel-btn" title="Mark fight as cancelled — hides both fighters from the slate (use for withdrawals)">× Cancel fight</button><div class="fight-group-line"></div>`;
       const cancelBtn = header.querySelector('.fight-cancel-btn') as HTMLButtonElement;
-      cancelBtn?.addEventListener('click', () => { void cancelFight(f.name, f2Name); });
+      cancelBtn?.addEventListener('click', () => { void cancelFight(a.name, f2Name); });
       frag.appendChild(header);
-    }
-    debugLog(`TD/SS lookup: ${f.name} → rawOpp="${String(f.opponent ?? '')}" explicitOpp="${explicitOpp}" looseOpp="${looseOpp}" resolvedOpp="${opp}" oppEntry="${oppEntry?.name}" oppTdLine=${oppEntry?.line_p6_td ?? oppEntry?.line_ud_td ?? oppEntry?.line_pp_td ?? oppEntry?.line_betr_td ?? null} oppSsLine=${oppEntry?.line_p6_ss ?? oppEntry?.line_ud_ss ?? oppEntry?.line_pp_ss ?? oppEntry?.line_betr_ss ?? null} selfTdLine=${f.line_p6_td ?? f.line_ud_td ?? f.line_pp_td ?? f.line_betr_td ?? null}`);
-    const row = buildFighterRow(f, oppEntry ?? null, Math.floor(i / 2));
-    row.style.setProperty('--row-index', String(i % 18));
-    frag.appendChild(row);
-    if (!showFightGroups && i % 2 === 1 && i < activeFighters.length - 1) {
-      const sp = document.createElement('div');
-      sp.style.cssText = 'height:8px';
-      frag.appendChild(sp);
-    }
-  });
+
+      const rowA = buildRowForFighter(a, idx * 2, idx);
+
+      if (!b) {
+        frag.appendChild(rowA);
+        return;
+      }
+
+      const rowB = buildRowForFighter(b, idx * 2 + 1, idx);
+      const hasSpine = spineHasContent(fight);
+
+      const pair = document.createElement('div');
+      pair.className = 'fight-pair';
+      if (!hasSpine) pair.classList.add('fight-pair-no-spine');
+      rowA.classList.add('fight-pair-fighter-a');
+      rowB.classList.add('fight-pair-fighter-b');
+
+      pair.appendChild(rowA);
+      if (hasSpine) {
+        pair.appendChild(buildFightSpine(fight));
+      } else {
+        const emptySpine = document.createElement('div');
+        emptySpine.className = 'fight-spine fight-spine-empty';
+        // Filled-mode content needs to exist in DOM even when no header chips
+        // exist, so the `.fight-pair:has(.expanded)` CSS rule can reveal it.
+        emptySpine.innerHTML = buildFilledSpineWrapper(fight.fighterA, fight.fighterB);
+        pair.appendChild(emptySpine);
+      }
+      pair.appendChild(rowB);
+      frag.appendChild(pair);
+    });
+  } else {
+    activeFighters.forEach((f, i) => {
+      const row = buildRowForFighter(f, i, Math.floor(i / 2));
+      frag.appendChild(row);
+      if (i % 2 === 1 && i < activeFighters.length - 1) {
+        const sp = document.createElement('div');
+        sp.style.cssText = 'height:8px';
+        frag.appendChild(sp);
+      }
+    });
+  }
 
   // Show cancelled fights at bottom with restore option
   if (cancelledFightPairs.length > 0 && showFightGroups) {
@@ -13343,14 +13833,35 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         <!-- Removed spikeEvent and odds badge UI -->
       </div>
       <div class="stats-mini">
-        <div class="stat-mini-cell stat-fp" title="${normDisplayFP!=null?`Round-normalized (${roundNormTag}): ${(projFP??mlAdjFP??platformAvgFP??0).toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplayFP}. Hist avg fight: ${histAvgMins}m, expected: ${isFiveRound?FIVE_ROUND_MINS:THREE_ROUND_MINS}m.`:projFP!=null?`Opp-adjusted projection: (your avg ${baseAvgFP!.toFixed(1)} + opp allows ${oppAvgFPAllowed!.toFixed(1)}) ÷ 2 = ${projFP.toFixed(1)}. Based on ${oppFPAllowedSamples.length} opp fights.`:mlAdjFP!=null?`ML-adjusted: ${mlAdjFP.toFixed(1)} FP (win/loss FP weighted by ${f.moneyline!=null?(f.moneyline<0?f.moneyline:'+'+f.moneyline):'-'} implied win prob). Raw avg: ${platformAvgFP!=null?platformAvgFP.toFixed(1):'—'}`:'Recent fantasy points average from UFCStats history'}">
-          <div class="stat-mini-label">${projFP!=null?'Proj FP':'Avg FP'}${roundNormTag?` <span class="round-norm-tag">${roundNormTag}</span>`:''}</div>
-          <div class="stat-mini-val">${normDisplayFP!=null?normDisplayFP.toFixed(1):projFP!=null?projFP.toFixed(1):mlAdjFP!=null?mlAdjFP.toFixed(1):(platformAvgFP!=null?platformAvgFP.toFixed(1):'...')} ${avgFPPercentileLabel}${projFP!=null&&!normDisplayFP?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgFPAllowed} FP avg">(${oppAvgFPAllowed})</span>`:''}${mlAdjShift!=null&&Math.abs(mlAdjShift)>=3&&!normDisplayFP&&!projFP?`<span class="ml-adj-badge ${mlAdjShift>0?'pos':'neg'}">${mlAdjShift>0?'+':''}${mlAdjShift.toFixed(1)}</span>`:''}${trendChip(fpTrend,`${_twLabel} avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</div>
-          <div class="fp-range-label">${db.fpFloor!=null?`${fpFloor}–${fpCeiling}`:''}</div>
+        <div class="stat-card stat-card-fp" title="${normDisplayFP!=null?`Round-normalized (${roundNormTag}): ${(projFP??mlAdjFP??platformAvgFP??0).toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplayFP}. Hist avg fight: ${histAvgMins}m, expected: ${isFiveRound?FIVE_ROUND_MINS:THREE_ROUND_MINS}m.`:projFP!=null?`Opp-adjusted projection: (your avg ${baseAvgFP!.toFixed(1)} + opp allows ${oppAvgFPAllowed!.toFixed(1)}) ÷ 2 = ${projFP.toFixed(1)}. Based on ${oppFPAllowedSamples.length} opp fights.`:mlAdjFP!=null?`ML-adjusted: ${mlAdjFP.toFixed(1)} FP (win/loss FP weighted by ${f.moneyline!=null?(f.moneyline<0?f.moneyline:'+'+f.moneyline):'-'} implied win prob). Raw avg: ${platformAvgFP!=null?platformAvgFP.toFixed(1):'—'}`:'Recent fantasy points average from UFCStats history'}">
+          <div class="stat-card-head">
+            <span class="stat-card-label">${projFP!=null?'Proj FP':'Avg FP'}</span>
+            ${roundNormTag?`<span class="round-norm-tag">${roundNormTag}</span>`:''}
+          </div>
+          <div class="stat-card-big">
+            <span class="stat-card-num">${normDisplayFP!=null?normDisplayFP.toFixed(1):projFP!=null?projFP.toFixed(1):mlAdjFP!=null?mlAdjFP.toFixed(1):(platformAvgFP!=null?platformAvgFP.toFixed(1):'...')}</span>
+            <span class="stat-card-meta">${avgFPPercentileLabel}${projFP!=null&&!normDisplayFP?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgFPAllowed} FP avg">(${oppAvgFPAllowed})</span>`:''}${mlAdjShift!=null&&Math.abs(mlAdjShift)>=3&&!normDisplayFP&&!projFP?`<span class="ml-adj-badge ${mlAdjShift>0?'pos':'neg'}">${mlAdjShift>0?'+':''}${mlAdjShift.toFixed(1)}</span>`:''}${trendChip(fpTrend,`${_twLabel} avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</span>
+          </div>
+          ${db.fpFloor!=null?`<div class="stat-card-foot">${fpFloor}–${fpCeiling}</div>`:''}
         </div>
-        <div class="stat-mini-cell stat-ss" title="${normDisplaySS!=null?`Round-normalized (${roundNormTag}): ${displaySS!.toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplaySS}. Hist avg fight: ${histAvgMins}m, expected: ${isFiveRound?FIVE_ROUND_MINS:THREE_ROUND_MINS}m.`:projSS!=null?`Opp-adjusted projection: (your avg ${avgSS!.toFixed(1)} + opp allows ${oppAvgSSAllowed!.toFixed(1)}) ÷ 2 = ${projSS.toFixed(1)}. Based on ${oppSSAllowedSamples.length} opp fights.${ssSpreadTip?' | '+ssSpreadTip:''}`:ssSpreadTip||'Average significant strikes landed per fight'}"><div class="stat-mini-label">${projSS!=null?'Proj SS':'Avg SS'}${roundNormTag?` <span class="round-norm-tag">${roundNormTag}</span>`:''}</div><div class="stat-mini-val">${finalDisplaySS!=null?finalDisplaySS.toFixed(1):'...'}${projSS!=null&&!normDisplaySS?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>`:''}${trendChip(ssTrend,`SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</div>${ssSpreadLabel?`<div class="ss-spread-label" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor!==1.0?`±${(parseFloat(ssSpreadLabel.slice(1))*roundNormFactor).toFixed(1)}`:ssSpreadLabel}</div>`:''}</div>
-        <div class="stat-mini-cell stat-ss" title="Current active platform SS betting line"><div class="stat-mini-label" title="Current active platform SS betting line">SS Line</div><div class="stat-mini-val">${primarySSLine!=null?primarySSLine.toFixed(1):'...'}</div></div>
-        <div class="stat-mini-cell ${ssDeltaClass}" title="${normDisplaySS!=null?`Delta = Norm SS (${finalDisplaySS!.toFixed(1)}) minus SS line (${roundNormTag} adjusted).`:projSS!=null?`Delta = Proj SS (${projSS.toFixed(1)}) minus SS line. Projection = (raw avg ${avgSS!.toFixed(1)} + opp allows ${oppAvgSSAllowed!.toFixed(1)}) ÷ 2.`:'Delta = Avg SS minus active SS line. Positive favors over, negative favors under.'}"><div class="stat-mini-label" title="SS Delta">SS Delta</div><div class="stat-mini-val">${ssDeltaText}${normDisplayTD!=null?` <span style="font-size:8px;color:var(--text-muted)" title="${projTD!=null?`Proj TD opp-adj: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}, normalized: ${projTD} × ${roundNormFactor.toFixed(2)} = ${normDisplayTD}`:`TD normalized: ${avgTDraw} × ${roundNormFactor.toFixed(2)} = ${normDisplayTD}`}">(${projTD!=null?'P':'A'}TD ${normDisplayTD})</span>`:projTD!=null&&!normDisplayTD?` <span style="font-size:8px;color:var(--text-muted)" title="Proj TD: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}">(PTD ${projTD})</span>`:''}</div></div>
+        <div class="stat-card stat-card-ss">
+          <div class="stat-card-head">
+            <span class="stat-card-label">SS</span>
+            ${roundNormTag?`<span class="round-norm-tag">${roundNormTag}</span>`:''}
+          </div>
+          <div class="stat-row" title="${normDisplaySS!=null?`Round-normalized (${roundNormTag}): ${displaySS!.toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplaySS}.`:projSS!=null?`Opp-adjusted projection: (your avg ${avgSS!.toFixed(1)} + opp allows ${oppAvgSSAllowed!.toFixed(1)}) ÷ 2 = ${projSS.toFixed(1)}.${ssSpreadTip?' | '+ssSpreadTip:''}`:ssSpreadTip||'Average significant strikes landed per fight'}">
+            <span class="stat-row-label">${projSS!=null?'proj':'avg'}</span>
+            <span class="stat-row-val">${finalDisplaySS!=null?finalDisplaySS.toFixed(1):'...'}${ssSpreadLabel?`<span class="ss-spread-inline" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor!==1.0?`±${(parseFloat(ssSpreadLabel.slice(1))*roundNormFactor).toFixed(1)}`:ssSpreadLabel}</span>`:''}${projSS!=null&&!normDisplaySS?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>`:''}${trendChip(ssTrend,`SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</span>
+          </div>
+          <div class="stat-row" title="Current active platform SS betting line">
+            <span class="stat-row-label">line</span>
+            <span class="stat-row-val">${primarySSLine!=null?primarySSLine.toFixed(1):'...'}</span>
+          </div>
+          <div class="stat-delta-block ${ssDeltaClass}" title="${normDisplaySS!=null?`Delta = Norm SS (${finalDisplaySS!.toFixed(1)}) minus SS line.`:projSS!=null?`Delta = Proj SS (${projSS.toFixed(1)}) minus SS line.`:'Delta = Avg SS minus SS line. Positive favors over, negative favors under.'}">
+            <span class="stat-delta-val">${ssDeltaText}</span>
+            ${normDisplayTD!=null?`<span class="stat-delta-td" title="${projTD!=null?`Proj TD opp-adj: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}, normalized: ${normDisplayTD}`:`TD normalized: ${avgTDraw} × ${roundNormFactor.toFixed(2)} = ${normDisplayTD}`}">${projTD!=null?'P':'A'}TD ${normDisplayTD}</span>`:projTD!=null&&!normDisplayTD?`<span class="stat-delta-td" title="Proj TD: (avg ${avgTDraw} + opp allows ${oppAvgTDAllowed}) ÷ 2 = ${projTD}">PTD ${projTD}</span>`:''}
+          </div>
+        </div>
       </div>
       <div class="lean-cell">
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
@@ -13482,32 +13993,45 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   return row;
 }
 
+function expandRowDetailPanel(row: HTMLElement): void {
+  const detail = row.querySelector('.fighter-detail') as HTMLElement | null;
+  if (!detail) return;
+  // First expand: build the detail-panel HTML now (deferred from row creation).
+  const builder = _pendingDetailBuilders.get(row);
+  if (builder) {
+    detail.innerHTML = builder();
+    _pendingDetailBuilders.delete(row);
+  }
+  // Animate bars inside the detail panel when expanding.
+  // Reset bars to 0 first (in case of re-expand), then fill with stagger.
+  detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach(bar => {
+    bar.style.width = '0%';
+  });
+  requestAnimationFrame(() => {
+    detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach((bar, idx) => {
+      // Cap stagger total at ~350ms — past that the wave is invisible and the
+      // last bar firing 3s late just feels like jank.
+      const delay = Math.min(idx * 4, 350);
+      setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, delay);
+    });
+  });
+}
+
 function toggleRow(row: HTMLElement): void {
   const wasExpanded = row.classList.contains('expanded');
-  row.classList.toggle('expanded');
+  const desiredExpanded = !wasExpanded;
+  row.classList.toggle('expanded', desiredExpanded);
+  if (desiredExpanded) expandRowDetailPanel(row);
 
-  if (!wasExpanded) {
-    const detail = row.querySelector('.fighter-detail') as HTMLElement | null;
-    if (detail) {
-      // First expand: build the detail-panel HTML now (deferred from row creation).
-      const builder = _pendingDetailBuilders.get(row);
-      if (builder) {
-        detail.innerHTML = builder();
-        _pendingDetailBuilders.delete(row);
-      }
-      // Animate bars inside the detail panel when expanding.
-      // Reset bars to 0 first (in case of re-expand), then fill with stagger.
-      detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach(bar => {
-        bar.style.width = '0%';
-      });
-      requestAnimationFrame(() => {
-        detail.querySelectorAll<HTMLElement>('[data-fill-width]').forEach((bar, idx) => {
-          // Cap stagger total at ~350ms — past that the wave is invisible and the
-          // last bar firing 3s late just feels like jank.
-          const delay = Math.min(idx * 4, 350);
-          setTimeout(() => { bar.style.width = bar.dataset.fillWidth!; }, delay);
-        });
-      });
+  // Paired-row sync: inside a .fight-pair, mirror the expansion on the partner
+  // row so both fighters' bar grids show simultaneously for side-by-side
+  // comparison. Skips work if the partner is already in the desired state.
+  const pair = row.closest('.fight-pair');
+  if (pair) {
+    const partner = Array.from(pair.querySelectorAll<HTMLElement>('.fighter-row')).find(r => r !== row);
+    if (partner && partner.classList.contains('expanded') !== desiredExpanded) {
+      partner.classList.toggle('expanded', desiredExpanded);
+      if (desiredExpanded) expandRowDetailPanel(partner);
     }
   }
 }
@@ -13645,6 +14169,25 @@ const NAME_ALIASES: Record<string, string> = {
   'Su Sumudaerji':    'Su Mudaerji',
   'Sumudaerji Su':    'Su Mudaerji',
   'Sumudaerji':       'Su Mudaerji',
+  // Chinese / Asian fighters where platforms (UD, Pick6) use one order/spacing
+  // and UFCStats uses another. Aliases here unify both forms so card-pair
+  // matching, opponent resolution, and downstream archive lookups all agree.
+  // Right-hand side mirrors the UFCStats canonical form on the event page.
+  'Yadong Song':      'Song Yadong',
+  // UFCStats writes "YiSak Lee" with an internal capital S. normalizeName
+  // title-cases each word ("Yisak Lee"), so the canonical form is "Yisak Lee"
+  // — alias both UD's 3-word "Yi Sak Lee" and the original UFCStats form
+  // (which post-title-case already lands here) to that.
+  'Yi Sak Lee':       'Yisak Lee',
+  'Qileng Aori':      'Aoriqileng',
+  'Aori Qileng':      'Aoriqileng',
+  'Xiong Jing Nan':   'Xiong Jingnan',
+  // Reverse-order variants: platforms sometimes list Chinese fighters in
+  // Western order (given-family) while UFCStats uses Chinese order (family-given).
+  'Kangjie Zhu':      'Zhu Kangjie',
+  'Meng Ding':        'Ding Meng',
+  'Mingyang Zhang':   'Zhang Mingyang',
+  'Jingnan Xiong':    'Xiong Jingnan',
   'Damon Jackson':    'Donte Johnson',
   'Myktybek Orolbai': 'Myktybek Orolbai Uulu',
   'Orolbai':          'Myktybek Orolbai Uulu',
@@ -14941,13 +15484,68 @@ function setWatcherVisualState(state: WatcherVisualState, text?: string): void {
   }
 }
 
+// Inline SVG sparkline for LINE MOVERS rows and the fight spine. Returns a
+// string of SVG markup (so it can be inlined into innerHTML) or '' when there
+// are fewer than 2 points worth plotting. Pure render — no storage access.
+// opts.color overrides the direction-derived stroke (used by spine L5 trends
+// for per-fighter cyan/yellow). opts.w/h override the default 90×18 box.
+function renderSparkline(
+  points: Array<{ t: number; v: number }>,
+  direction: 'up' | 'down' | 'auto' = 'auto',
+  opts?: { color?: string; w?: number; h?: number },
+): string {
+  if (!points || points.length < 2) return '';
+  const w = opts?.w ?? 90, h = opts?.h ?? 18, pad = 2;
+  const values = points.map(p => p.v);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    const x = pad + (i / (values.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (values[i] - min) / range) * (h - pad * 2);
+    xs.push(x);
+    ys.push(y);
+  }
+  const coords = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const dir = direction === 'auto'
+    ? (values[values.length - 1] >= values[0] ? 'up' : 'down')
+    : direction;
+  const stroke = opts?.color ?? (dir === 'up' ? '#5ee589' : '#ff5a73');
+  const x0 = xs[0].toFixed(1), y0 = ys[0].toFixed(1);
+  const x1 = xs[xs.length - 1].toFixed(1), y1 = ys[ys.length - 1].toFixed(1);
+  return `<svg class="line-sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">`
+    + `<polyline points="${coords}" stroke="${stroke}" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`
+    + `<circle cx="${x0}" cy="${y0}" r="1.8" fill="#6c7080"/>`
+    + `<circle cx="${x1}" cy="${y1}" r="1.8" fill="${stroke}"/>`
+    + `</svg>`;
+}
+
+// Extract a per-platform timeline from _lineHistory for (name, stat, platKey).
+// _lineHistory.series stores [{t, v: Record<plat, number>}] — we project out
+// the requested platform and drop points where that platform was missing.
+function getSparklinePointsForPlat(
+  name: string,
+  stat: string,
+  platKey: string,
+): Array<{ t: number; v: number }> {
+  const series = _lineHistory.series[lineHistoryKey(name, stat)];
+  if (!series || series.length === 0) return [];
+  const out: Array<{ t: number; v: number }> = [];
+  for (const pt of series) {
+    const v = pt.v?.[platKey];
+    if (typeof v === 'number' && Number.isFinite(v)) out.push({ t: pt.t, v });
+  }
+  return out;
+}
+
 function renderLineMovementSummary(): void {
   const container = document.getElementById('lineMovementSummary');
   const body = document.getElementById('movementSummaryBody');
   const timeEl = document.getElementById('movementSummaryTime');
   if (!container || !body) return;
 
-  type SummaryEntry = { name: string; stat: string; delta: number; open: number; close: number; sourcePlat: string; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
+  type SummaryEntry = { name: string; stat: string; delta: number; open: number; close: number; sourcePlat: string; sourcePlatKey: string; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
   const entries: SummaryEntry[] = [];
   const platLabels: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
   // Pick-em platforms where "public hammers OVER" heuristic applies. DK is a
@@ -14966,6 +15564,7 @@ function renderLineMovementSummary(): void {
       let maxOpen: number | null = null;
       let maxClose: number | null = null;
       let maxPlatLabel = '';
+      let maxPlatKey = '';
       const movedPlats: string[] = [];
       // RLM roll-up: count pick-em platforms moving against the public OVER flow.
       let pickemRise = 0, pickemDrop = 0, maxPickemRise = 0, maxPickemDrop = 0;
@@ -14984,6 +15583,7 @@ function renderLineMovementSummary(): void {
             maxOpen = opening;
             maxClose = current;
             maxPlatLabel = platLabel;
+            maxPlatKey = plat;
           }
         }
         if (delta != null && PICKEM_PLATS.has(plat)) {
@@ -15005,6 +15605,7 @@ function renderLineMovementSummary(): void {
           open: maxOpen,
           close: maxClose,
           sourcePlat: maxPlatLabel,
+          sourcePlatKey: maxPlatKey,
           platforms: movedPlats,
           isSteam: movedPlats.length >= 2 && Math.abs(maxDelta) >= 2.0,
           rlm,
@@ -15032,11 +15633,16 @@ function renderLineMovementSummary(): void {
     const rlmTag = e.rlm
       ? `<span class="rlm-tag rlm-${e.rlm}" title="Reverse line movement — ${e.rlm === 'under' ? 'rising against public OVER default → sharp UNDER flow' : 'deep drop below open → heavy OVER action'}">RLM ${e.rlm.toUpperCase()}</span>`
       : '';
+    const sparkPoints = e.sourcePlatKey ? getSparklinePointsForPlat(e.name, e.stat.toLowerCase(), e.sourcePlatKey) : [];
+    const sparkHtml = sparkPoints.length >= 2
+      ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.stat} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length-1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
+      : '';
     return `<div class="movement-summary-row">
       <span class="movement-summary-fighter">${e.name}</span>
       <span class="movement-summary-stat">${e.stat}</span>
       <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
       <span class="movement-summary-delta ${cls}">${arrow}${Math.abs(e.delta)}</span>
+      ${sparkHtml}
       <span class="movement-summary-platforms">${e.platforms.join(', ')}</span>
       ${steamTag}${rlmTag}
     </div>`;
@@ -15848,26 +16454,19 @@ async function fetchCardFromUFCStatsDirect(
       'http://www.ufcstats.com/statistics/events/completed?page=1',
     ];
     for (const src of sources) {
-      let listHtml: string;
-      try {
-        const res = await fetch(src);
-        if (!res.ok) continue;
-        listHtml = await res.text();
-      } catch { continue; }
+      const listHtml = await ufcstatsFetchText(src);
+      if (!listHtml) continue;
 
       const evts = parseEventList(listHtml);
       // Sort by proximity to today; check most recent 10
       const sorted = evts.slice().sort((a, b) => Math.abs(Date.now() - a.ts) - Math.abs(Date.now() - b.ts));
       for (const evt of sorted.slice(0, 10)) {
-        try {
-          const evRes = await fetch(evt.url);
-          if (!evRes.ok) continue;
-          const evHtml = await evRes.text();
-          const fighters = parseFighters(evHtml);
-          if (hasEnoughOverlap(fighters)) {
-            return { event: evt.name, fighters };
-          }
-        } catch { /* skip */ }
+        const evHtml = await ufcstatsFetchText(evt.url);
+        if (!evHtml) continue;
+        const fighters = parseFighters(evHtml);
+        if (hasEnoughOverlap(fighters)) {
+          return { event: evt.name, fighters };
+        }
       }
     }
   } catch { /* ignore */ }

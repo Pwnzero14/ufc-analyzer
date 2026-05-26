@@ -282,6 +282,11 @@ async function scrapePick6AllStats() {
     // Require FP/SS/TD breadth; CTRL is optional (Pick6 only offers it on some cards / some events).
     const hasEnoughCoverage = (c) => c.total >= 8 && c.fpCount >= 4 && c.ssCount >= 4 && c.tdCount >= 2;
 
+    // 2026-05-15: DK consolidated UFC under MMA category/129. The page has a
+    // Featured | UFC | MVP sub-tab row — click UFC first to filter to UFC fighters.
+    // Idempotent if already active.
+    await clickButtonByLabels('pick6', ['ufc'], 800);
+
     for (let attempt = 1; attempt <= 2; attempt++) {
       log('pick6', `Stat crawl attempt ${attempt}`);
 
@@ -292,43 +297,37 @@ async function scrapePick6AllStats() {
       let coverage = getStatCoverage(merged);
       if (hasEnoughCoverage(coverage)) break;
 
-      if (coverage.fpCount < 4 && await clickButtonByLabels('pick6', ['fantasy points', 'fight score', 'fantasy score', 'fantasy point', 'fantasy pts', 'fight pts', 'score', 'popular'], 350)) {
+      if (coverage.fpCount < 4 && await clickButtonByLabels('pick6', ['fantasy points', 'fight score', 'fantasy score', 'fantasy point', 'fantasy pts', 'fight pts', 'score', 'popular'], 700)) {
         await scrollToLoadAll({ timeoutMs: 600, intervalMs: 200 });
         mergeInto(scrapePick6());
         sendInterim();
         coverage = getStatCoverage(merged);
       }
 
-      if (coverage.ssCount < 4 && await clickButtonByLabels('pick6', ['significant strikes', 'significant strike', 'sig strikes'], 350)) {
+      if (coverage.ssCount < 4 && await clickButtonByLabels('pick6', ['significant strikes', 'significant strike', 'sig strikes'], 700)) {
         await scrollToLoadAll({ timeoutMs: 600, intervalMs: 200 });
         mergeInto(scrapePick6());
         sendInterim();
         coverage = getStatCoverage(merged);
       }
 
-      if (coverage.tdCount < 2 && await clickButtonByLabels('pick6', ['takedowns', 'takedown'], 350)) {
+      if (coverage.tdCount < 2 && await clickButtonByLabels('pick6', ['takedowns', 'takedown'], 700)) {
         await scrollToLoadAll({ timeoutMs: 600, intervalMs: 200 });
         mergeInto(scrapePick6());
         sendInterim();
         coverage = getStatCoverage(merged);
       }
 
-      // Control Time — nested under the "Time" main tab. Must click "Time" first
-      // to expose the Fight Time / Control Time sub-tabs, then click "Control Time".
-      // Without the first click, the Control Time sub-tab isn't in the DOM.
-      // Pick6 markup: Time = <button role="tab">, Control Time = <button role="radio" data-testid="pill">.
-      const timeClicked = await clickButtonByLabels('pick6', ['time'], 700);
-      if (timeClicked) {
-        log('pick6', 'Clicked Time tab, looking for Control Time sub-tab');
-        const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 700);
-        if (ctrlClicked) {
-          log('pick6', 'Clicked Control Time sub-tab, scraping');
-          await scrollToLoadAll({ timeoutMs: 800, intervalMs: 200 });
-          mergeInto(scrapePick6());
-          sendInterim();
-          coverage = getStatCoverage(merged);
-          log('pick6', `CTRL coverage after click: ctrl=${coverage.ctrlCount}/${coverage.total}`);
-        }
+      // Control Time — 2026-05-15 layout has Control Time as a direct top-level pill
+      // (was previously nested under a "Time" tab). Click it directly.
+      const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 700);
+      if (ctrlClicked) {
+        log('pick6', 'Clicked Control Time pill, scraping');
+        await scrollToLoadAll({ timeoutMs: 800, intervalMs: 200 });
+        mergeInto(scrapePick6());
+        sendInterim();
+        coverage = getStatCoverage(merged);
+        log('pick6', `CTRL coverage after click: ctrl=${coverage.ctrlCount}/${coverage.total}`);
       }
 
       log('pick6', `Coverage after attempt ${attempt}: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, ctrl=${coverage.ctrlCount}`);
@@ -638,8 +637,9 @@ async function scrapePrizePicksAllStats() {
 function scrapeDKSportsbookProps() {
   const fighters = {};
   const href = (window.location.href || '').toLowerCase();
-  const preferSS = href.includes('subcategory=significant-strikes-o-u');
-  const preferTD = href.includes('subcategory=takedowns-landed-o-u');
+  // 2026-05-15: DK moved stat selector from `subcategory=` to `nav_1=`; keep both for safety.
+  const preferSS = href.includes('nav_1=significant-strikes-o-u') || href.includes('subcategory=significant-strikes-o-u');
+  const preferTD = href.includes('nav_1=takedowns-landed-o-u') || href.includes('subcategory=takedowns-landed-o-u');
 
   const ensure = (name) => {
     if (!fighters[name]) {
@@ -890,7 +890,9 @@ if (host.includes('pick6.draftkings.com')) {
     try {
       const pickGroupMatch = window.location.search.match(/[?&]pickGroup=(\d+)/);
       const sportMatch = window.location.search.match(/[?&]sport=([A-Za-z]+)/);
-      if (!pickGroupMatch || !sportMatch || sportMatch[1].toUpperCase() !== 'UFC') return false;
+      // 2026-05-15: DK consolidated UFC under MMA; accept either so we don't drop captures.
+      const sport = sportMatch ? sportMatch[1].toUpperCase() : '';
+      if (!pickGroupMatch || !sportMatch || (sport !== 'UFC' && sport !== 'MMA')) return false;
       const pickGroup = pickGroupMatch[1];
       if (pickGroup === lastSentPickGroup) return true;
       lastSentPickGroup = pickGroup;

@@ -9,6 +9,7 @@ import {
   WeightClass,
 } from './types/index.js';
 import { CONFIG, FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
+import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 
 // ── IN-MEMORY STORE ────────────────────────────────────────────────────
 const store = { pick6: null as any, underdog: null as any, betr: null as any, prizepicks: null as any, draftkings_sportsbook: null as any };
@@ -598,9 +599,8 @@ async function fetchFightDetails(url: string): Promise<Array<{
   fightTimeMins: number;
 }>> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const html = await ufcstatsFetchText(url, { signal: AbortSignal.timeout(12000) });
+    if (!html) return [];
 
     // Fighter names: first two fighter-details links on the page
     const nameMatches = [...html.matchAll(/fighter-details\/[a-f0-9]+[^>]*>\s*([^<]+?)\s*<\/a>/gi)];
@@ -738,11 +738,10 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
     console.log(`[UFC Settle] ${unresolved.length} unresolved records across ${eventNames.length} event(s): ${eventNames.join(' | ')}`);
 
     // Fetch completed events list from UFCStats
-    const listRes = await fetch('http://www.ufcstats.com/statistics/events/completed?page=all', {
+    const listHtml = await ufcstatsFetchText('http://www.ufcstats.com/statistics/events/completed?page=all', {
       signal: AbortSignal.timeout(15000),
     });
-    if (!listRes.ok) throw new Error(`UFCStats list HTTP ${listRes.status}`);
-    const listHtml = await listRes.text();
+    if (!listHtml) throw new Error('UFCStats list fetch failed (challenge or network)');
 
     const completedEvents: Array<{ name: string; url: string; date: string }> = [];
     for (const rowM of [...listHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]) {
@@ -799,9 +798,8 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
       console.log(`[UFC Settle] Matched "${archiveEvent}" → "${match.name}"`);
 
       // Fetch event page to get individual fight URLs
-      const evRes = await fetch(match.url, { signal: AbortSignal.timeout(12000) });
-      if (!evRes.ok) { errors.push(`Event page error: ${match.name}`); continue; }
-      const evHtml = await evRes.text();
+      const evHtml = await ufcstatsFetchText(match.url, { signal: AbortSignal.timeout(12000) });
+      if (!evHtml) { errors.push(`Event page error: ${match.name}`); continue; }
 
       const fightUrls = [...new Set(
         [...evHtml.matchAll(/href="(http[^"]*fight-details\/[a-f0-9]+)"/gi)].map(m => m[1])
@@ -927,9 +925,8 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
             let entry = fetchedEventCache.get(cacheKey);
             if (!entry) {
               try {
-                const evRes = await fetch(ev.url, { signal: AbortSignal.timeout(12000) });
-                if (!evRes.ok) continue;
-                const evHtml = await evRes.text();
+                const evHtml = await ufcstatsFetchText(ev.url, { signal: AbortSignal.timeout(12000) });
+                if (!evHtml) continue;
                 const fightUrls = [...new Set([...evHtml.matchAll(/href="(http[^"]*fight-details\/[a-f0-9]+)"/gi)].map(m => m[1]))];
                 const results: FightResult[] = [];
                 for (const fightUrl of fightUrls) {
@@ -1630,12 +1627,11 @@ async function autoBackupOnStartup(): Promise<void> {
 
 const AUTO_SCRAPE_URLS: Record<'pick6'|'underdog'|'prizepicks'|'draftkings_sportsbook', string[]> = {
   pick6: [
-    // Start from the live UFC board; older available-players routes now 404.
+    // 2026-05-15: DK consolidated UFC under unified MMA category (category/129).
+    // category/46 (Fight Score) and category/47 (Takedowns) no longer exist under
+    // ?sport=UFC; the MMA homepage SPA-navigates to category/129?sport=MMA&pickGroup=...
+    // and the scraper clicks stat tabs from there.
     CONFIG.platforms.pick6.url,
-    // TD props page — category/47 is Takedowns; pickGroup is event-specific so omit it
-    'https://pick6.draftkings.com/category/47?sport=UFC',
-    // Fight Score (FP) props page — category/46 is Fight Score on Pick6
-    'https://pick6.draftkings.com/category/46?sport=UFC',
   ],
   underdog: [
     // Prioritize stat-specific pages first so SS/TD capture completes quickly.
@@ -1649,8 +1645,9 @@ const AUTO_SCRAPE_URLS: Record<'pick6'|'underdog'|'prizepicks'|'draftkings_sport
   ],
   draftkings_sportsbook: [
     // DraftKings Sportsbook UFC Fighter Props (SS + TD + Odds)
-    'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fighter-props&subcategory=significant-strikes-o-u',
-    'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fighter-props&subcategory=takedowns-landed-o-u',
+    // 2026-05-15: DK restructured params — category=fights, stat moved to nav_1
+    'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=significant-strikes-o-u',
+    'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=takedowns-landed-o-u',
   ],
 };
 
@@ -2820,9 +2817,8 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
   }
 
   try {
-    const res = await fetch(CONFIG.api.ufcstats.upcoming);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
+    const html = await ufcstatsFetchText(CONFIG.api.ufcstats.upcoming);
+    if (!html) throw new Error('UFCStats upcoming fetch failed (challenge or network)');
 
     const events: Array<{ name: string; date: string; url: string; ts: number }> = [];
     const rows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
@@ -2853,9 +2849,8 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
     const threeDays = 3 * 24 * 60 * 60 * 1000;
     if (!nextEvent || nextEvent.ts - now > sevenDays) {
       try {
-        const compRes = await fetch(CONFIG.api.ufcstats.completed);
-        if (compRes.ok) {
-          const compHtml = await compRes.text();
+        const compHtml = await ufcstatsFetchText(CONFIG.api.ufcstats.completed);
+        if (compHtml) {
           const compEvents: Array<{ name: string; date: string; url: string; ts: number }> = [];
           const compRows = [...compHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
           for (const rowM of compRows) {
@@ -2891,9 +2886,8 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
     if (recentPast.length) {
       const lastEvent = recentPast[0];
       try {
-        const lastRes = await fetch(lastEvent.url);
-        if (lastRes.ok) {
-          const lastHtml = await lastRes.text();
+        const lastHtml = await ufcstatsFetchText(lastEvent.url);
+        if (lastHtml) {
           const lastFighters: UpcomingCardFighter[] = [];
           const lastRows = [...lastHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
           for (const rowM of lastRows) {
@@ -2916,9 +2910,8 @@ async function fetchUpcomingUFCCard(forceRefresh = false): Promise<UpcomingCardC
       } catch { /* non-fatal */ }
     }
 
-    const evRes = await fetch(nextEvent.url);
-    if (!evRes.ok) throw new Error(`Event HTTP ${evRes.status}`);
-    const evHtml = await evRes.text();
+    const evHtml = await ufcstatsFetchText(nextEvent.url);
+    if (!evHtml) throw new Error('UFCStats event page fetch failed (challenge or network)');
 
     // Parse venue location from event detail page
     const locationMatch = evHtml.match(/Location:\s*([^<]+)/i);
@@ -3017,17 +3010,15 @@ async function findCardForFighters(names: string[]): Promise<UpcomingCardCache |
       'http://www.ufcstats.com/statistics/events/completed?page=1',
     ];
     for (const src of sources) {
-      const res = await fetch(src);
-      if (!res.ok) continue;
-      const html = await res.text();
+      const html = await ufcstatsFetchText(src);
+      if (!html) continue;
       const evts = parseEventList(html);
       // Check most recent events first (completed page is reverse-chronological)
       const sorted = evts.slice().sort((a, b) => Math.abs(Date.now() - a.ts) - Math.abs(Date.now() - b.ts));
       for (const evt of sorted.slice(0, 8)) {
         try {
-          const evRes = await fetch(evt.url);
-          if (!evRes.ok) continue;
-          const evHtml = await evRes.text();
+          const evHtml = await ufcstatsFetchText(evt.url);
+          if (!evHtml) continue;
           const fighters = parseFighters(evHtml);
           if (fighters.length >= 6 && overlaps(fighters)) {
             const card: UpcomingCardCache = {
