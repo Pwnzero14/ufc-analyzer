@@ -2,7 +2,7 @@
 
 **Branch:** `feature/sleek-theme-v1`
 **Date:** 2026-05-26 (Monday early AM — fight week for Song vs Figueiredo 2026-05-30)
-**Working tree:** Same dozens-of-uncommitted-changes carry. This session added ~25 more lines of uncommitted analyzer changes + 1 new file + 1 new memory.
+**Working tree:** Clean of session work. Everything captured in checkpoint commit `07f624d` and pushed to origin. Only items still uncommitted: `.claude/settings.local.json` (machine-specific, intentional skip) + two untracked dirs we deliberately left alone (`UsersabdirAppDataRoaming…Opera GX.../` looks like an irreplaceable Opera storage backup; `ufc_project_v2/` looks like an empty nested copy).
 
 ---
 
@@ -14,7 +14,7 @@ Fight week for Song vs. Figueiredo opened with a fully broken slate. Three indep
 2. **Render skip mis-classified all fighters as "placeholders"** when UFCStats whiffed every fetch, hiding the entire card even though UD had 18 lines.
 3. **Chinese fighter name reversals + UFCStats's internal-capitalization of `YiSak Lee`** broke unification between platform scrapes and the UFCStats schedule, cascading into shifted card-pair grouping.
 
-All three fixed. UFCStats data loading, matchups correct end-to-end. No event next weekend after this — natural commit + cleanup window.
+All three fixed. UFCStats data loading, matchups correct end-to-end. **Backlog from prior ~3 weeks of work plus this session shipped in checkpoint commit [`07f624d`](../../commit/07f624d) and pushed to origin** — 40 files, +4893/-194.
 
 ---
 
@@ -84,10 +84,9 @@ If you alias `'Yi Sak Lee' → 'YiSak Lee'`, the UFCStats-side path produces `"Y
 ## Sticky context for next session
 
 - **Next UFC card:** Song vs Figueiredo Friday 2026-05-30 (Macau, China). Detail page: ufcstats.com/event-details/1e75e6c9de99fa76.
-- **Branch carries dozens of uncommitted changes** from many prior sessions, now plus this session's PoW wrapper + name aliases + render fix. **Consider committing before fight night** — would suck to lose this work.
+- **Branch is clean and pushed.** `feature/sleek-theme-v1` is at `07f624d` on origin. No more multi-week backlog risk — going forward, commit per feature.
 - **Build clean as of last `npm run build`.**
-- **Filled-spine work from 5/16 still uncommitted.**
-- **Ghost-fighter archive-write fix at [background.ts:1108](src/background.ts#L1108)** still pending from 5/17 resume.
+- **Ghost-fighter archive-write fix at [background.ts:1108](src/background.ts#L1108)** still pending from 5/17 resume — that's the cleanest next thing to ship.
 
 ---
 
@@ -111,25 +110,20 @@ If you alias `'Yi Sak Lee' → 'YiSak Lee'`, the UFCStats-side path produces `"Y
 
 ## Next session priorities
 
-### Option A — Commit the backlog (recommended before fight night)
+### Option A — Ship the ghost-fighter archive-write fix (recommended)
 
-Dozens of uncommitted changes carry a real risk. Break into logical commits:
-1. `feat(ufcstats): solve proof-of-work bot challenge` — new file + 12 fetch site rewires
-2. `fix(render): keep fight pairs with lines but no UFCStats data` — analyzer.ts:11317 + helper
-3. `fix(aliases): Song vs Figueiredo card name unification` — NAME_ALIASES + UFCSTATS_NAME_ALIASES additions
-4. `feat(ufcstats): support single-word fighters on alpha index` — nameCandidates + findDetailUrl
-5. Pick up other uncommitted features (filled spine, lean badges, etc.) as separate commits
+Still pending from 5/17. [background.ts:1108](src/background.ts#L1108) should filter archive writes against `card.pairs` not the platform roster union. Prevents the UD cross-promotion ghost-line problem at source. Natural follow-up to the PoW work, doable as a clean small commit.
 
-### Option B — Ship the ghost-fighter archive-write fix
-
-Still pending from 5/17. [background.ts:1108](src/background.ts#L1108) should filter archive writes against `card.pairs` not the platform roster union. Prevents the UD cross-promotion ghost-line problem at source.
-
-### Option C — Predictor UI decouple
+### Option B — Predictor UI decouple
 
 Per [RESUME_2026_05_10_PRE_LINE_PREDICTIONS.md](RESUME_2026_05_10_PRE_LINE_PREDICTIONS.md). Allow GENERATE PREDICTIONS to work on the card before platform lines drop. ~30-45 min.
+
+### Option C — Watch Friday's card live
+
+Song vs Figueiredo runs 2026-05-30. First post-PoW-fix event. Worth being around to catch any settle-path regressions live since the settle path also routes through `ufcstatsFetchText` now.
 
 ---
 
 ## Next session opener
 
-> Continuing `feature/sleek-theme-v1`. Last session (2026-05-26): solved UFCStats's new SHA-256 PoW bot challenge via a wrapper at [src/services/ufcstats-fetch.ts](src/services/ufcstats-fetch.ts), fixed an analyzer render bug where placeholder-fighter skip nuked the whole card when UFCStats whiffed, and added name aliases for Song vs Figueiredo's Chinese fighters (incl. a `YiSak Lee` post-title-case gotcha). UFCStats data + matchups all correct end-to-end. Backlog of uncommitted changes is now large — committing before Friday's card is the recommended move. See [RESUME_2026_05_26_UFCSTATS_POW_AND_NAME_ALIASES.md](RESUME_2026_05_26_UFCSTATS_POW_AND_NAME_ALIASES.md).
+> Continuing `feature/sleek-theme-v1` (clean, pushed, at `07f624d`). Last session (2026-05-26): solved UFCStats's new SHA-256 PoW bot challenge via a wrapper at [src/services/ufcstats-fetch.ts](src/services/ufcstats-fetch.ts), fixed an analyzer render bug where placeholder-fighter skip nuked the whole card when UFCStats whiffed, added name aliases for Song vs Figueiredo's Chinese fighters (incl. a `YiSak Lee` post-title-case gotcha), and committed ~3 weeks of backlog. UFCStats data + matchups all correct end-to-end. Next likely target: ghost-fighter archive-write fix at [background.ts:1108](src/background.ts#L1108). See [RESUME_2026_05_26_UFCSTATS_POW_AND_NAME_ALIASES.md](RESUME_2026_05_26_UFCSTATS_POW_AND_NAME_ALIASES.md).
