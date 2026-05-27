@@ -7,11 +7,11 @@ export const CONFIG = {
       id: 'pick6',
       label: 'Pick6 (DraftKings)',
       color: '#63b3ed',
-      // 2026-05-15: DK collapsed UFC into a unified MMA category (category/129).
-      // The bare ?sport=MMA homepage shows sample cards only — stat-tab pills
-      // (Significant Strikes / Takedowns / Fantasy Points / Control Time) live
-      // on category/129. SPA fills in pickGroup for current event.
-      url: 'https://pick6.draftkings.com/category/129?sport=MMA',
+      // 2026-05-27: DK reverted the 5/15 MMA-category consolidation for the
+      // Song vs Figueiredo card — `?sport=UFC` homepage once again renders the
+      // UFC slate directly with stat-tab pills. If DK flips back to the unified
+      // MMA category, revert to 'https://pick6.draftkings.com/category/129?sport=MMA'.
+      url: 'https://pick6.draftkings.com/?sport=UFC',
     },
     underdog: {
       id: 'underdog',
