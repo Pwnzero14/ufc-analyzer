@@ -41,6 +41,13 @@ function normalizeOddsName(name: unknown): string | null {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ')
     .trim();
+  // BestFightOdds renders single-word fighter names (Sumudaerji, Aoriqileng, etc.)
+  // as "Name Name" in their markup. De-dupe so the analyzer's NAME_ALIASES map
+  // (keyed on the single-word form) resolves to the canonical name.
+  const parts = n.split(' ');
+  if (parts.length === 2 && parts[0] === parts[1] && parts[0].length >= 4) {
+    n = parts[0];
+  }
   return n || null;
 }
 

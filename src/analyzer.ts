@@ -14181,6 +14181,8 @@ const NAME_ALIASES: Record<string, string> = {
   'Yi Sak Lee':       'Yisak Lee',
   'Qileng Aori':      'Aoriqileng',
   'Aori Qileng':      'Aoriqileng',
+  'Aori Aoriqileng':  'Aoriqileng',
+  'Harris Carlston':  'Carlston Harris',
   'Xiong Jing Nan':   'Xiong Jingnan',
   // Reverse-order variants: platforms sometimes list Chinese fighters in
   // Western order (given-family) while UFCStats uses Chinese order (family-given).
