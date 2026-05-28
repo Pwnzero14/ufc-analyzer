@@ -2116,7 +2116,12 @@ async function scrapePick6UrlsConcurrently(
     const createdTabs = await Promise.all(
       urls.map(async (url, idx) => {
         const urlStart = Date.now();
-        const tab = await chrome.tabs.create({ url, active: false });
+        // Pick6 must open active so Chrome doesn't throttle rAF — React's view
+        // updates after stat-tab clicks rely on rAF and don't fire reliably in
+        // background tabs (CTRL/TD/SS captures all fail in inactive tabs). The
+        // tab auto-closes in the finally block when the scrape ends, returning
+        // focus to whatever tab was active before.
+        const tab = await chrome.tabs.create({ url, active: true });
         const tabId = tab.id ?? null;
         const createElapsed = Date.now() - urlStart;
         if (tabId != null) {

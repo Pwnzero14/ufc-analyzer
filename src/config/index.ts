@@ -7,11 +7,15 @@ export const CONFIG = {
       id: 'pick6',
       label: 'Pick6 (DraftKings)',
       color: '#63b3ed',
-      // 2026-05-27: DK reverted the 5/15 MMA-category consolidation for the
-      // Song vs Figueiredo card — `?sport=UFC` homepage once again renders the
-      // UFC slate directly with stat-tab pills. If DK flips back to the unified
-      // MMA category, revert to 'https://pick6.draftkings.com/category/129?sport=MMA'.
-      url: 'https://pick6.draftkings.com/?sport=UFC',
+      // 2026-05-28: Bare `?sport=UFC` URL loads but is missing the Time parent
+      // tab (no Control Time sub-tab access) until DK's SPA redirects to the
+      // /category/N URL — which happens too slowly for the auto-fetch scrape.
+      // Target /category/46 directly; the cached pickGroup gets appended by the
+      // injection in background.ts so we land on the per-event view immediately.
+      // DK has used /category/46, /category/129, and bare ?sport=UFC across the
+      // past two months — if Pick6 fetching breaks, first check what URL a
+      // logged-out browser actually lands on for the current card.
+      url: 'https://pick6.draftkings.com/category/46?sport=UFC',
     },
     underdog: {
       id: 'underdog',

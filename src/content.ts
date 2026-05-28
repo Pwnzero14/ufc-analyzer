@@ -318,12 +318,15 @@ async function scrapePick6AllStats() {
         coverage = getStatCoverage(merged);
       }
 
-      // Control Time — 2026-05-15 layout has Control Time as a direct top-level pill
-      // (was previously nested under a "Time" tab). Click it directly.
-      const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 700);
+      // Control Time — Pick6 re-nested this under a parent "Time" tab (Fight Time /
+      // Control Time sub-row appears only after Time is clicked). Click the parent
+      // first to surface the sub-tabs, then the Control Time sub-tab. Waits bumped
+      // beyond a single rAF tick to survive throttled inactive tabs.
+      await clickButtonByLabels('pick6', ['time'], 1000);
+      const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 1200);
       if (ctrlClicked) {
         log('pick6', 'Clicked Control Time pill, scraping');
-        await scrollToLoadAll({ timeoutMs: 800, intervalMs: 200 });
+        await scrollToLoadAll({ timeoutMs: 1200, intervalMs: 200 });
         mergeInto(scrapePick6());
         sendInterim();
         coverage = getStatCoverage(merged);
