@@ -62,7 +62,7 @@ Both fixes are low-risk and self-contained. Could ship together as one `fix(sett
 ## State of the project right now
 
 - **Branch:** `feature/sleek-theme-v1` — clean, no uncommitted code changes; in sync with `origin`.
-- **Last committed work:** `4f91acb docs(resume): 2026-05-28 fight week stabilization + 2026-05-30 post-card settle` (this session). Prior code commit: `dda8d67 fix(pick6): restore CTRL auto-fetch` (2026-05-28).
+- **Last committed work (this session, docs only):** `106302c docs(resume): note end-of-session housekeeping` + `4f91acb docs(resume): 2026-05-28 fight week stabilization + 2026-05-30 post-card settle`. Last code commit remains `dda8d67 fix(pick6): restore CTRL auto-fetch` (2026-05-28).
 - **Snapshot:** `backups/full_project_snapshot_20260530_214754/` — 7.4 MB lean snapshot (source + dist + docs + configs + `_memory_snapshot/` with all 32 auto-memory files). Skips node_modules, .opera-* profiles, .git.
 - **Archive:** all Song vs Figueiredo rows resolved, green ✓. Storage at ~5.5 MB / 10 MB.
 - **Predictor:** Learning Cycle absorbed Song vs Figueiredo. Weights updated.
