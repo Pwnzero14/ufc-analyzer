@@ -3,7 +3,7 @@
 **Branch:** `feature/sleek-theme-v1`
 **Date:** 2026-05-30 (Saturday morning, day after Song vs Figueiredo card)
 **Next card:** Belal vs Bonfim (slate already loaded in analyzer)
-**Working tree:** No new code commits this session — entirely settle/storage/cleanup operations. `.claude/settings.local.json` and the two pre-existing untracked dirs still showing.
+**Working tree:** No new code commits this session — entirely settle/storage/cleanup operations. End-of-session housekeeping: full project snapshot taken + this resume + the 05-28 resume committed and pushed in `4f91acb`. `.claude/settings.local.json` and the two pre-existing untracked dirs still showing.
 
 ---
 
@@ -61,8 +61,9 @@ Both fixes are low-risk and self-contained. Could ship together as one `fix(sett
 
 ## State of the project right now
 
-- **Branch:** `feature/sleek-theme-v1` — clean, no uncommitted code changes.
-- **Last committed work:** `dda8d67 fix(pick6): restore CTRL auto-fetch` (from 2026-05-28 session).
+- **Branch:** `feature/sleek-theme-v1` — clean, no uncommitted code changes; in sync with `origin`.
+- **Last committed work:** `4f91acb docs(resume): 2026-05-28 fight week stabilization + 2026-05-30 post-card settle` (this session). Prior code commit: `dda8d67 fix(pick6): restore CTRL auto-fetch` (2026-05-28).
+- **Snapshot:** `backups/full_project_snapshot_20260530_214754/` — 7.4 MB lean snapshot (source + dist + docs + configs + `_memory_snapshot/` with all 32 auto-memory files). Skips node_modules, .opera-* profiles, .git.
 - **Archive:** all Song vs Figueiredo rows resolved, green ✓. Storage at ~5.5 MB / 10 MB.
 - **Predictor:** Learning Cycle absorbed Song vs Figueiredo. Weights updated.
 - **Next card:** Belal vs Bonfim slate loaded — lines already being scraped per platform schedules.
