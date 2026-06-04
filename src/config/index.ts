@@ -160,3 +160,52 @@ export const PRIZEPICKS_SCORING = {
     decision: 10,
   },
 } as const;
+
+// ── FIGHTER NAME ALIASES ───────────────────────────────────────────────
+// Platform spelling (key) → UFCStats canonical form (value). Keys are written
+// in the title-cased shape analyzer's normalizeName produces; both sides are
+// re-normalized by each consumer before use, so casing/spacing here is just for
+// readability. Shared by analyzer.ts (normalizeName) and the settle path in
+// background.ts so card-pair matching, opponent resolution, and archive
+// settlement all agree on one canonical name. Add new entries when a platform
+// lists a fighter in a different order/spacing than UFCStats.
+export const NAME_ALIASES: Record<string, string> = {
+  'Jung Young Lee':   'Jeongyeong Lee',
+  'Jungyoung Lee':    'Jeongyeong Lee',
+  'Su Sumudaerji':    'Su Mudaerji',
+  'Sumudaerji Su':    'Su Mudaerji',
+  'Sumudaerji':       'Su Mudaerji',
+  // Chinese / Asian fighters where platforms (UD, Pick6) use one order/spacing
+  // and UFCStats uses another. Right-hand side mirrors the UFCStats canonical
+  // form on the event page.
+  'Yadong Song':      'Song Yadong',
+  // UFCStats writes "YiSak Lee" with an internal capital S. normalizeName
+  // title-cases each word ("Yisak Lee"), so the canonical form is "Yisak Lee".
+  'Yi Sak Lee':       'Yisak Lee',
+  'Qileng Aori':      'Aoriqileng',
+  'Aori Qileng':      'Aoriqileng',
+  'Aori Aoriqileng':  'Aoriqileng',
+  'Harris Carlston':  'Carlston Harris',
+  'Xiong Jing Nan':   'Xiong Jingnan',
+  // Reverse-order variants: platforms sometimes list Chinese fighters in
+  // Western order (given-family) while UFCStats uses Chinese order (family-given).
+  'Kangjie Zhu':      'Zhu Kangjie',
+  'Meng Ding':        'Ding Meng',
+  'Mingyang Zhang':   'Zhang Mingyang',
+  'Jingnan Xiong':    'Xiong Jingnan',
+  'Damon Jackson':    'Donte Johnson',
+  'Myktybek Orolbai': 'Myktybek Orolbai Uulu',
+  'Orolbai':          'Myktybek Orolbai Uulu',
+  'Kevin Vallejos':   'Kevin Vallejos',
+  'Jose Miguel Delgado': 'Jose Delgado',
+  'Jose M Delgado':   'Jose Delgado',
+  'Patricio Freire':           'Patricio Pitbull',
+  'Patricio Pitbull Freire':   'Patricio Pitbull',
+  'Loopy Godinez':     'Lupita Godinez',
+  'Paulo Henrique Costa': 'Paulo Costa',
+  'Paulo Henrique Da Silva Costa': 'Paulo Costa',
+  'Christopher Padilla': 'Chris Padilla',
+  'Azamat Murazakov':    'Azamat Murzakanov',
+  'A Murazakov':         'Azamat Murzakanov',
+  'Darya Zheleznyakova': 'Daria Zhelezniakova',
+};

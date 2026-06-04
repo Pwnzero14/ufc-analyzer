@@ -1,6 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
-import { FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
+import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
@@ -1037,7 +1037,6 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     // Fetch all fight detail pages in parallel batches of 5
     const BATCH_SIZE = 5;
     const fightHistory: UFCFightHistory[] = new Array(fightLinks.length);
-    let firstFightHtmlStored = false;
     for (let b = 0; b < fightLinks.length; b += BATCH_SIZE) {
       const batch = fightLinks.slice(b, b + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (fight) => {
@@ -1051,13 +1050,6 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
         const settled = results[i];
         if (settled.status === 'fulfilled') {
           const fHtml = settled.value;
-          if (!firstFightHtmlStored) {
-            const debugKey = `debug_fight_html_${name.toLowerCase().replace(/\s+/g,'_')}`;
-            if (typeof chrome !== 'undefined' && chrome.storage) {
-              chrome.storage.local.set({ [debugKey]: { html: fHtml.slice(0, 20000), url: fight.fightUrl, opponent: fight.opponent } });
-            }
-            firstFightHtmlStored = true;
-          }
           const stats = parseFightDetailStats(fHtml, name, detailUrl);
           const oppStats = parseFightDetailStatsOpponent(fHtml, name, detailUrl);
           const method = stats?.method || fight.method;
@@ -14163,49 +14155,8 @@ function renderH2HModal(a: AnalyzerFighter, b: AnalyzerFighter): void {
 }
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────
-const NAME_ALIASES: Record<string, string> = {
-  'Jung Young Lee':   'Jeongyeong Lee',
-  'Jungyoung Lee':    'Jeongyeong Lee',
-  'Su Sumudaerji':    'Su Mudaerji',
-  'Sumudaerji Su':    'Su Mudaerji',
-  'Sumudaerji':       'Su Mudaerji',
-  // Chinese / Asian fighters where platforms (UD, Pick6) use one order/spacing
-  // and UFCStats uses another. Aliases here unify both forms so card-pair
-  // matching, opponent resolution, and downstream archive lookups all agree.
-  // Right-hand side mirrors the UFCStats canonical form on the event page.
-  'Yadong Song':      'Song Yadong',
-  // UFCStats writes "YiSak Lee" with an internal capital S. normalizeName
-  // title-cases each word ("Yisak Lee"), so the canonical form is "Yisak Lee"
-  // — alias both UD's 3-word "Yi Sak Lee" and the original UFCStats form
-  // (which post-title-case already lands here) to that.
-  'Yi Sak Lee':       'Yisak Lee',
-  'Qileng Aori':      'Aoriqileng',
-  'Aori Qileng':      'Aoriqileng',
-  'Aori Aoriqileng':  'Aoriqileng',
-  'Harris Carlston':  'Carlston Harris',
-  'Xiong Jing Nan':   'Xiong Jingnan',
-  // Reverse-order variants: platforms sometimes list Chinese fighters in
-  // Western order (given-family) while UFCStats uses Chinese order (family-given).
-  'Kangjie Zhu':      'Zhu Kangjie',
-  'Meng Ding':        'Ding Meng',
-  'Mingyang Zhang':   'Zhang Mingyang',
-  'Jingnan Xiong':    'Xiong Jingnan',
-  'Damon Jackson':    'Donte Johnson',
-  'Myktybek Orolbai': 'Myktybek Orolbai Uulu',
-  'Orolbai':          'Myktybek Orolbai Uulu',
-  'Kevin Vallejos':   'Kevin Vallejos',
-  'Jose Miguel Delgado': 'Jose Delgado',
-  'Jose M Delgado':   'Jose Delgado',
-  'Patricio Freire':           'Patricio Pitbull',
-  'Patricio Pitbull Freire':   'Patricio Pitbull',
-  'Loopy Godinez':     'Lupita Godinez',
-  'Paulo Henrique Costa': 'Paulo Costa',
-  'Paulo Henrique Da Silva Costa': 'Paulo Costa',
-  'Christopher Padilla': 'Chris Padilla',
-  'Azamat Murazakov':    'Azamat Murzakanov',
-  'A Murazakov':         'Azamat Murzakanov',
-  'Darya Zheleznyakova': 'Daria Zhelezniakova',
-};
+// NAME_ALIASES now lives in config/index.ts (shared with background.ts's settle
+// path). Add new aliases there, not here.
 
 function normalizeName(name: string|null|undefined): string|null {
   if (!name || name === 'null' || name === 'undefined') return null;

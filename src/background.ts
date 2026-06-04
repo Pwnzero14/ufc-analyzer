@@ -8,7 +8,7 @@ import {
   PropArchiveRecord,
   WeightClass,
 } from './types/index.js';
-import { CONFIG, FANTASY_SCORING, PRIZEPICKS_SCORING } from './config/index.js';
+import { CONFIG, FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES } from './config/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 
 // ── IN-MEMORY STORE ────────────────────────────────────────────────────
@@ -692,7 +692,15 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
   const errors: string[] = [];
 
   // Inline normalizers matching PropArchiveService logic
-  const _normName  = (s: string) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const _baseNorm  = (s: string) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  // Alias-aware name normalizer. Archive rows carry platform spellings (e.g.
+  // "Yadong Song") while UFCStats parses the canonical form ("Song Yadong");
+  // without this bridge those siblings never match and settle leaves orphans.
+  // Re-normalize both sides of the shared NAME_ALIASES map so lookups agree
+  // regardless of how the map's keys/values are cased in config.
+  const _aliasLC: Record<string, string> = {};
+  for (const [k, v] of Object.entries(NAME_ALIASES)) _aliasLC[_baseNorm(k)] = _baseNorm(v);
+  const _normName  = (s: string) => { const base = _baseNorm(s); return _aliasLC[base] || base; };
   const _normEvent = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
   const _normProp  = (v: string) => {
     if (/^ss$/i.test(v)) return 'ss';
