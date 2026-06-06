@@ -26,12 +26,14 @@
       const title = (line.title || line.stat || line.stat_type || '').toLowerCase();
 
       // Classify by stat type
-      let lineType: 'ss' | 'td' | 'fp' | null = null;
+      let lineType: 'ss' | 'ss_r1' | 'td' | 'fp' | null = null;
       if (
         title.includes('significant strike') ||
         title === 'significant strikes'
       ) {
-        lineType = 'ss';
+        // Round-1-only variants ("Round 1 Significant Strikes") get their own
+        // bucket so they don't overwrite the total-fight SS line.
+        lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(title) ? 'ss_r1' : 'ss';
       } else if (title.includes('takedown') && !title.includes('def')) {
         lineType = 'td';
       } else if (
@@ -49,6 +51,7 @@
       const validation: Record<string, [number, number]> = {
         fp: [5, 300],
         ss: [1, 300],
+        ss_r1: [1, 150],
         td: [0.5, 20],
       };
       const [min, max] = validation[lineType];
@@ -82,6 +85,7 @@
           name,
           line_fp: null,
           line_ss: null,
+          line_ss_r1: null,
           line_td: null,
           opponent,
         };
@@ -91,7 +95,7 @@
     });
 
     return Object.values(allFighters).filter(
-      (f) => f.line_fp || f.line_ss || f.line_td
+      (f) => f.line_fp || f.line_ss || f.line_ss_r1 || f.line_td
     );
   }
 

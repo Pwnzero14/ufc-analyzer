@@ -98,12 +98,12 @@ interface LeanResult {
   fairValueEdge?: number;
   fairValuePerBook?: { source: string; line: number; edge: number }[];
 }
-type LeanSource = 'fp'|'ss'|'td'|'ft'|'ctrl';
+type LeanSource = 'fp'|'ss'|'ss_r1'|'td'|'ft'|'ctrl';
 type SourcePlatformKey = 'pick6'|'underdog'|'prizepicks'|'betr'|'draftkings_sportsbook';
 interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string; _platform?: SourcePlatformKey }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
-interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
+interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
 
 function createEmptyLean(verdict = ''): LeanResult {
   return { lean: 'none', conf: 0, reasons: [], verdict };
@@ -119,6 +119,7 @@ function createPlaceholderAnalyzerFighter(name: string, opponent: string): Analy
     line_p6_ctrl: null,
     line_ud: null,
     line_ud_ss: null,
+    line_ud_ss_r1: null,
     line_ud_td: null,
     line_ud_ft: null,
     line_ud_ctrl: null,
@@ -138,6 +139,7 @@ function createPlaceholderAnalyzerFighter(name: string, opponent: string): Analy
     db: { loaded: false } as FighterDB,
     lean: createEmptyLean(),
     lean_ss: null,
+    lean_ss_r1: null,
     lean_td: null,
     lean_ft: null,
     lean_ctrl: null,
@@ -1290,7 +1292,8 @@ async function loadBayesianPriors(): Promise<void> {
 }
 
 function getHistoricalPriorForSource(source: LeanSource | undefined): number {
-  if (!source || source === 'ctrl') return 0.55;
+  // ss_r1 has no measured Bayesian prior (R1 SS props aren't archived/settled) — fall back.
+  if (!source || source === 'ctrl' || source === 'ss_r1') return 0.55;
   return _bayesianPriors[source] ?? 0.55;
 }
 
@@ -1929,6 +1932,11 @@ function getSourceLineEntries(f: AnalyzerFighter, source: LeanSource): Array<{ p
           ['prizepicks', f.line_pp_ss],
           ['betr', f.line_betr_ss],
           ['draftkings_sportsbook', f.line_dk_ss],
+        ]
+    : source === 'ss_r1'
+      ? [
+          ['prizepicks', f.line_pp_ss_r1],
+          ['underdog', f.line_ud_ss_r1],
         ]
       : source === 'td'
         ? [
@@ -4868,6 +4876,134 @@ function calcSSLean(
   };
 }
 
+// Round-1-only significant-strikes lean (PrizePicks + Underdog offer this prop).
+// Deliberately conservative vs the full-fight SS lean: R1 is a single-round sample
+// with built-in early-finish risk, so confidence is capped lower and the weak ±0.5
+// tier collapses to a push — only corroborated signals (edge + hit-rate / form /
+// style) surface a lean. When PP and UD post different lines, the easiest line for
+// the projected direction is used (lowest for OVER, highest for UNDER).
+function calcSSR1Lean(
+  name: string,
+  db: FighterDB|null,
+  availableLines: number[] = [],
+  oppDB: FighterDB|null,
+  moneyline: number | null = null,
+): LeanResult|null {
+  const lines = availableLines.filter((l): l is number => l != null && Number.isFinite(l));
+  if (!lines.length || !db || !db.loaded) return null;
+  const history = (db.history || []).filter(h => h.sigStrR1 != null);
+  if (history.length < 3) return null;
+
+  const avgR1 = history.reduce((s, h) => s + (h.sigStrR1 || 0), 0) / history.length;
+
+  // Opp-adjusted projection: R1 sig strikes the opponent has historically allowed.
+  const oppSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+    .map(h => h.sigStrR1)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const oppAllowed = oppSamples.length >= 3
+    ? parseFloat((oppSamples.reduce((s, v) => s + v, 0) / oppSamples.length).toFixed(1))
+    : null;
+  const proj = oppAllowed != null ? parseFloat(((avgR1 + oppAllowed) / 2).toFixed(1)) : null;
+  const effective = proj ?? avgR1;
+
+  // Pick the best line for the projected direction across PP/UD.
+  const minL = Math.min(...lines);
+  const maxL = Math.max(...lines);
+  const mid = (minL + maxL) / 2;
+  const dirHint: 'over' | 'under' = effective >= mid ? 'over' : 'under';
+  const line = dirHint === 'over' ? minL : maxL;
+
+  const reasons: LeanReason[] = [];
+  let score = 0;
+
+  const label = proj != null
+    ? `Proj R1 SS (${effective.toFixed(1)} — avg ${avgR1.toFixed(1)} + opp allows ${oppAllowed})`
+    : `Avg R1 SS (${effective.toFixed(1)})`;
+  const diff = effective - line;
+  if      (diff > 8)   { score += 2.5; reasons.push({ icon:'pos', text:`${label} is ${diff.toFixed(1)} above line — strong over value` }); }
+  else if (diff > 4)   { score += 1.5; reasons.push({ icon:'pos', text:`${label} edges the line by ${diff.toFixed(1)}` }); }
+  else if (diff > 1.5) { score += 0.6; reasons.push({ icon:'pos', text:`${label} slightly above line` }); }
+  else if (diff < -8)  { score -= 2.5; reasons.push({ icon:'neg', text:`${label} is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
+  else if (diff < -4)  { score -= 1.5; reasons.push({ icon:'neg', text:`${label} trails line by ${Math.abs(diff).toFixed(1)}` }); }
+  else if (diff < -1.5){ score -= 0.6; reasons.push({ icon:'neg', text:`${label} slightly below line` }); }
+  else                 {               reasons.push({ icon:'neu', text:`${label} near line — toss-up` }); }
+
+  // Hit rate is the dominant signal for a bounded single-round stat — it directly
+  // measures how often the line is covered. An extreme record (never covered, or
+  // always covered) over a solid sample is the strongest tell R1 SS offers and is
+  // weighted accordingly; it also flags the lean as high-conviction below.
+  const hits = history.filter(h => (h.sigStrR1 || 0) > line).length;
+  const rate = hits / history.length;
+  const extremeClean = (rate === 0 || rate === 1) && history.length >= 8;
+  if      (rate === 1 && history.length >= 8) { score += 3.0; reasons.push({ icon:'pos', text:`Cleared R1 SS line in ALL ${history.length} UFC fights (${history.length}/${history.length}) — structurally clean over` }); }
+  else if (rate >= 0.8)  { score += 1.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
+  else if (rate >= 0.6)  { score += 0.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} over R1 SS line` }); }
+  else if (rate === 0 && history.length >= 8) { score -= 3.0; reasons.push({ icon:'neg', text:`Never cleared R1 SS line in ${history.length} UFC fights (0/${history.length}) — structurally clean under` }); }
+  else if (rate <= 0.2)  { score -= 1.8; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
+  else if (rate <= 0.4)  { score -= 0.8; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} over R1 SS line — under tendency` }); }
+  else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${history.length} over R1 SS line — near 50/50` }); }
+
+  if (history.length >= 3) {
+    const recentAvg = history.slice(0, 3).reduce((s, h) => s + (h.sigStrR1 || 0), 0) / 3;
+    const trend = recentAvg - avgR1;
+    if      (trend > 6)  { score += 0.7; reasons.push({ icon:'pos', text:`Recent R1 form UP — last 3 avg ${recentAvg.toFixed(0)} vs career ${avgR1.toFixed(0)}` }); }
+    else if (trend < -6) { score -= 0.7; reasons.push({ icon:'neg', text:`Recent R1 form DOWN — last 3 avg ${recentAvg.toFixed(0)} vs career ${avgR1.toFixed(0)}` }); }
+  }
+
+  if (db.style === 'striker') { score += 0.4; reasons.push({ icon:'pos', text:`Striker — typically high round-1 output` }); }
+  else if (db.style === 'grappler') { score -= 0.4; reasons.push({ icon:'neg', text:`Grappler — may chase early takedowns over R1 striking volume` }); }
+
+  // Best-line note last so the diff reason stays as the verdict headline.
+  if (lines.length > 1) {
+    reasons.push({ icon:'neu', text:`Best ${dirHint.toUpperCase()} line ${line} chosen across PP/UD range ${minL}–${maxL}` });
+  }
+
+  // An extreme/clean historical record proves low round-1 variance empirically, so
+  // it earns a higher confidence ceiling and is exempt from the volatility haircut
+  // (the record already accounts for early finishes and pace swings).
+  const cap = extremeClean ? 86 : 80;
+  let lean: 'over'|'under'|'push', conf: number;
+  if      (score >= 3)    { lean = 'over';  conf = Math.min(cap, 62 + score * 3.5); }
+  else if (score >= 1.5)  { lean = 'over';  conf = Math.min(70, 54 + score * 5); }
+  else if (score <= -3)   { lean = 'under'; conf = Math.min(cap, 62 + Math.abs(score) * 3.5); }
+  else if (score <= -1.5) { lean = 'under'; conf = Math.min(70, 54 + Math.abs(score) * 5); }
+  else                    { lean = 'push';  conf = 50; }
+
+  // R1 SS volatility haircut — single round + early-finish risk, never boosted.
+  // Skipped when the record is structurally clean (variance already proven low).
+  const ssStdDev = db.ssStdDev ?? null;
+  if (ssStdDev != null && lean !== 'push' && !extremeClean) {
+    if (ssStdDev > 14) {
+      conf = Math.max(50, conf - 10);
+      reasons.push({ icon:'neg', text:`High SS variance (±${ssStdDev.toFixed(1)}) + single-round sample — confidence reduced` });
+    } else if (ssStdDev > 7) {
+      conf = Math.max(50, conf - 5);
+      reasons.push({ icon:'neu', text:`Moderate SS variance (±${ssStdDev.toFixed(1)}) — some R1 unpredictability` });
+    }
+  }
+
+  const vtxt = proj != null ? `proj ${proj.toFixed(1)}` : `avg ${avgR1.toFixed(1)}`;
+  const headline = reasons.find(r => r.icon !== 'neu')?.text ?? reasons[0]?.text ?? '';
+  const verdict = lean === 'over'
+    ? `R1 SS OVER ${line} (${vtxt}) — ${headline}`
+    : lean === 'under'
+      ? `R1 SS UNDER ${line} (${vtxt}) — ${headline}`
+      : `R1 SS NO LEAN at ${line} (${vtxt})`;
+
+  void name; void moneyline;
+  return {
+    lean,
+    conf: Math.round(conf),
+    confidenceGrade: getConfidenceGrade(Math.round(conf)),
+    score: parseFloat(score.toFixed(2)),
+    reasons,
+    verdict,
+    avg: effective,
+    line,
+    type: 'ss_r1',
+  };
+}
+
 function calcTDLean(
   name: string,
   db: FighterDB|null,
@@ -5362,6 +5498,7 @@ function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
   if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push') return { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
   if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push') return { ...f.lean_td, _source: 'td', _label: ' (TD)' };
   if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push') return { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
+  if (f.lean_ss_r1?.lean && f.lean_ss_r1.lean !== 'none' && f.lean_ss_r1.lean !== 'push') return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
   return { ...(f.lean || { lean: 'none', conf: 0, reasons: [], verdict: '' }), _source: 'fp', _label: '' };
 }
 
@@ -5392,12 +5529,12 @@ function _computeWeightMissDeltas(
     case 'small':
       reasonsToPrepend.push({ icon: 'neg', text: `Missed weight by ${lbsLabel} — completed cut, drained, no size upside` });
       confDelta = -10;
-      avgDelta = source === 'fp' ? -8 : source === 'ss' ? -7 : source === 'ft' ? -1.5 : source === 'td' ? -0.3 : 0;
+      avgDelta = source === 'fp' ? -8 : source === 'ss' ? -7 : source === 'ss_r1' ? -3.5 : source === 'ft' ? -1.5 : source === 'td' ? -0.3 : 0;
       break;
     case 'moderate':
       reasonsToPrepend.push({ icon: 'neg', text: `Missed weight by ${lbsLabel} — failed cut, mild cardio risk` });
       confDelta = -7;
-      avgDelta = source === 'fp' ? -5 : source === 'ss' ? -4 : source === 'ft' ? -1.0 : source === 'td' ? -0.2 : 0;
+      avgDelta = source === 'fp' ? -5 : source === 'ss' ? -4 : source === 'ss_r1' ? -2 : source === 'ft' ? -1.0 : source === 'td' ? -0.2 : 0;
       break;
     case 'big':
       if (isGrappler && (source === 'td' || source === 'ctrl')) {
@@ -5409,11 +5546,11 @@ function _computeWeightMissDeltas(
         reasonsToPrepend.push({ icon: 'pos', text: `Missed weight by ${lbsLabel} — possible size edge` });
         reasonsToPrepend.push({ icon: 'neg', text: `Big miss also signals cardio risk` });
         confDelta = -3;
-        avgDelta = source === 'fp' ? -3 : source === 'ss' ? -3 : 0;
+        avgDelta = source === 'fp' ? -3 : source === 'ss' ? -3 : source === 'ss_r1' ? -1.5 : 0;
       } else {
         reasonsToPrepend.push({ icon: 'neg', text: `Missed weight by ${lbsLabel} — failed cut + cardio collapse risk` });
         confDelta = -8;
-        avgDelta = source === 'fp' ? -7 : source === 'ss' ? -6 : source === 'ft' ? -1.2 : 0;
+        avgDelta = source === 'fp' ? -7 : source === 'ss' ? -6 : source === 'ss_r1' ? -3 : source === 'ft' ? -1.2 : 0;
       }
       break;
     case 'extreme':
@@ -5424,13 +5561,13 @@ function _computeWeightMissDeltas(
       } else {
         reasonsToPrepend.push({ icon: 'neg', text: `Massive miss (${lbsLabel}) — major cut failure, severe cardio + prep red flag` });
         confDelta = -15;
-        avgDelta = source === 'fp' ? -12 : source === 'ss' ? -10 : source === 'ft' ? -2.0 : source === 'td' ? -0.5 : 0;
+        avgDelta = source === 'fp' ? -12 : source === 'ss' ? -10 : source === 'ss_r1' ? -5 : source === 'ft' ? -2.0 : source === 'td' ? -0.5 : 0;
       }
       break;
     case 'unknown':
       reasonsToPrepend.push({ icon: 'neg', text: `Missed weight (amount unconfirmed) — likely failed cut, conservative UNDER nudge` });
       confDelta = -5;
-      avgDelta = source === 'fp' ? -4 : source === 'ss' ? -3 : source === 'ft' ? -0.7 : 0;
+      avgDelta = source === 'fp' ? -4 : source === 'ss' ? -3 : source === 'ss_r1' ? -1.5 : source === 'ft' ? -0.7 : 0;
       break;
   }
 
@@ -5479,9 +5616,10 @@ function applyWeightMissToFighter(fighter: AnalyzerFighter): void {
   const { oppPaceHigh, oppPaceTotal } = _getOppPace(fighter);
   const lbsLabel = sig ? _formatLbsLabel(sig) : '';
 
-  const targets: Array<['lean' | 'lean_ss' | 'lean_td' | 'lean_ft' | 'lean_ctrl', LeanSource]> = [
+  const targets: Array<['lean' | 'lean_ss' | 'lean_ss_r1' | 'lean_td' | 'lean_ft' | 'lean_ctrl', LeanSource]> = [
     ['lean', 'fp'],
     ['lean_ss', 'ss'],
+    ['lean_ss_r1', 'ss_r1'],
     ['lean_td', 'td'],
     ['lean_ft', 'ft'],
     ['lean_ctrl', 'ctrl'],
@@ -6276,6 +6414,18 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       if (currentPlatform === 'draftkings_sportsbook') return f.line_dk_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_betr_ss ?? null;
       return f.line_betr_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_dk_ss ?? null;
     }
+    if (source === 'ss_r1') {
+      // R1 SS is offered only by PrizePicks and Underdog. When a specific book is
+      // requested (e.g. bestSideLineForPick walking all books), return null for any
+      // platform that doesn't carry the prop so no phantom candidates are created.
+      if (platform) {
+        if (platform === 'prizepicks') return f.line_pp_ss_r1 ?? null;
+        if (platform === 'underdog') return f.line_ud_ss_r1 ?? null;
+        return null;
+      }
+      if (currentPlatform === 'underdog') return f.line_ud_ss_r1 ?? f.line_pp_ss_r1 ?? null;
+      return f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
+    }
     if (source === 'td') {
       if (platform === 'pick6') return f.line_p6_td ?? null;
       if (platform === 'underdog') return f.line_ud_td ?? null;
@@ -6328,6 +6478,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
 
   const sourceBonus = (source: EffectiveLean['_source']): number => {
     if (source === 'ft') return 1.8;
+    // R1 SS sits between full-fight stat leans and FT: it's a bounded single-round
+    // market whose clean historical records are highly predictive, so it earns a
+    // bonus above SS/TD but below FT.
+    if (source === 'ss_r1') return 1.5;
     if (source === 'ss' || source === 'td') return 1.2;
     return 0;
   };
@@ -6391,6 +6545,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     // Existing FP pick-em rules (UD/P6/Betr underdog UNDER not offered, Betr OVER inflated).
     if (shouldSkipFpSideForFighter(f, c._source, c.lean as 'over' | 'under')) return false;
     if (c._source === 'fp') return true;
+    // R1 SS (PrizePicks + Underdog pick-em) has no scraped side-odds — it can't be
+    // chalk-filtered or side-availability-gated the way SS/TD/FT are. Worthiness is
+    // enforced upstream by calcSSR1Lean's conservative confidence gating, so accept
+    // any non-push R1 SS candidate that survived candidate collection.
+    if (c._source === 'ss_r1') return true;
     const dir = c.lean as 'over' | 'under';
     const sideOdds = sideOddsFor(f, c._source, dir);
     const platform = c._platform ?? getSourceActivePlatformKey(f, c._source);
@@ -6438,6 +6597,9 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     // Stick with the existing single-lean approach; line variance is small.
     if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push' && lineForLeanSource(f, 'ss') != null) {
       candidates.push({ ...f.lean_ss, _source: 'ss', _label: ' (SS line)' });
+    }
+    if (f.lean_ss_r1?.lean && f.lean_ss_r1.lean !== 'none' && f.lean_ss_r1.lean !== 'push' && lineForLeanSource(f, 'ss_r1') != null) {
+      candidates.push({ ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS line)' });
     }
     if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push' && lineForLeanSource(f, 'td') != null) {
       candidates.push({ ...f.lean_td, _source: 'td', _label: ' (TD line)' });
@@ -6624,7 +6786,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const line = lineForLeanSource(f, el._source, el._platform);
     const samples = db?.history?.length || 0;
     const conf = getAdjustedBestPickConfidence(f);
-    const statLean = el._source === 'ss' || el._source === 'td' || el._source === 'ft';
+    const statLean = el._source === 'ss' || el._source === 'ss_r1' || el._source === 'td' || el._source === 'ft';
     const highConfReq = statLean ? 78 : 72;
     const highSampleReq = statLean ? 8 : 7;
     const medConfReq = statLean ? 64 : 58;
@@ -6795,7 +6957,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       // the verdict prefix (e.g. "SS OVER 46.5 (proj 69.3) — ...") so the
       // reason stays consistent with the displayed line/book.
       if (line != null && originalLine != null && line !== originalLine && el._source && (el.lean === 'over' || el.lean === 'under')) {
-        const prefix = `${el._source.toUpperCase()} ${el.lean.toUpperCase()} `;
+        const prefix = `${el._source === 'ss_r1' ? 'R1 SS' : el._source.toUpperCase()} ${el.lean.toUpperCase()} `;
         if (reason.startsWith(prefix)) {
           const tail = reason.slice(prefix.length);
           const m = tail.match(/^(\d+(?:\.\d+)?)/);
@@ -6804,7 +6966,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
           }
         }
       }
-      const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source">(${el._source?.toUpperCase()} line)</span>` : '';
+      const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source">(${el._source === 'ss_r1' ? 'R1 SS' : el._source?.toUpperCase()} line)</span>` : '';
 
       // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts show ⚡ corr
       const corrPenalty = corrPenaltyMap.get(f.name) || 0;
@@ -6871,6 +7033,10 @@ async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: Analyz
       if (source === 'fp') return activePlatformAvgFP(f.db) ?? f.db.avgFP_weighted ?? f.db.avgFP ?? null;
       if (source === 'ss') {
         const values = history.map((fight) => fight.sigStr).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+      }
+      if (source === 'ss_r1') {
+        const values = history.map((fight) => fight.sigStrR1).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
         return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
       }
       if (source === 'td') {
@@ -6976,6 +7142,11 @@ async function persistAiLeanSnapshot(fighters: AnalyzerFighter[]): Promise<void>
           : source === 'ss'
             ? (() => {
                 const values = (f.db?.history || []).map((fight) => fight.sigStr).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+                return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+              })()
+            : source === 'ss_r1'
+            ? (() => {
+                const values = (f.db?.history || []).map((fight) => fight.sigStrR1).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
                 return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
               })()
             : source === 'td'
@@ -13142,7 +13313,15 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
 
   const historyHTML   = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp');
   const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss');
-  const ssR1Line = f.line_pp_ss_r1 ?? null;
+  const ssR1Line = f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
+  // R1 SS is offered by both PrizePicks and Underdog — label the panel by whichever
+  // platform(s) actually supplied a line (PP is shown first when both exist).
+  const ssR1Sources = [f.line_pp_ss_r1 != null ? 'PP' : null, f.line_ud_ss_r1 != null ? 'UD' : null].filter(Boolean) as string[];
+  const ssR1Badge = ssR1Sources.length === 1 ? `${ssR1Sources[0]}-only` : ssR1Sources.join('+');
+  const ssR1Meta = [
+    f.line_pp_ss_r1 != null ? `PP R1 SS: ${f.line_pp_ss_r1}` : null,
+    f.line_ud_ss_r1 != null ? `UD R1 SS: ${f.line_ud_ss_r1}` : null,
+  ].filter(Boolean).join(' · ');
   const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
   const tdHistoryHTML = buildHistoryBars(fights, h => h.td,     activeLine, ssLine, tdLine, ftLine, 'td');
   const ftHistoryHTML = buildHistoryBars(
@@ -13168,7 +13347,9 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const oppCompareSsLine   = oppSsLine;
   const oppCompareTdLine   = oppTdLine;
   const oppCompareCtrlLine = platformStatLine(oppEntry, 'ctrl');
-  const oppCompareSsR1Line = oppEntry?.line_pp_ss_r1 ?? null;
+  const oppCompareSsR1Line = oppEntry?.line_pp_ss_r1 ?? oppEntry?.line_ud_ss_r1 ?? null;
+  const oppSsR1Sources = [oppEntry?.line_pp_ss_r1 != null ? 'PP' : null, oppEntry?.line_ud_ss_r1 != null ? 'UD' : null].filter(Boolean) as string[];
+  const oppSsR1Badge = oppSsR1Sources.length === 1 ? `${oppSsR1Sources[0]}-only` : oppSsR1Sources.join('+');
   const oppFPHistory   = buildHistoryBars(oppFights, h => getFightFantasyValueForPlatform(h, historyPlatform), oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'fp');
   const oppSSHistory   = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ss');
   const oppSSR1History = buildHistoryBars(oppFights, h => h.sigStrR1, oppCompareSsR1Line, oppCompareSsR1Line, null, null, 'ss');
@@ -13803,6 +13984,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('p6', 'ctrl', f.line_p6_ctrl)}
         ${lineCell('ud', 'fp', f.line_ud)}
         ${lineCell('ud', 'ss', f.line_ud_ss)}
+        ${(f.line_ud_ss_r1 != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>R1 SS</span></div><div class="line-value ud">${f.line_ud_ss_r1}</div></div>` : ''}
         ${lineCell('ud', 'td', f.line_ud_td)}
         ${lineCell('ud', 'ft', f.line_ud_ft)}
         ${lineCell('ud', 'ctrl', f.line_ud_ctrl)}
@@ -13910,8 +14092,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine!=null?` vs Line ${formatMinutesAsClock(ctrlLine)}`:''}${panelBadge(ctrlConf)}${f.line_p6_ctrl!=null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ctrl!=null?formatMinutesAsClock(f.line_p6_ctrl):'—'} · UD: ${f.line_ud_ctrl!=null?formatMinutesAsClock(f.line_ud_ctrl):'—'} · PP: ${f.line_pp_ctrl!=null?formatMinutesAsClock(f.line_pp_ctrl):'—'} · BT: ${f.line_betr_ctrl!=null?formatMinutesAsClock(f.line_betr_ctrl):'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
-        ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">PP-only</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> PP R1 SS: ${ssR1Line}</div></div>` : ''}
-        ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">PP-only</span></div>${oppFights.length?oppSSR1History:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
+        ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">${ssR1Badge}</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${ssR1Meta}</div></div>` : ''}
+        ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">${oppSsR1Badge}</span></div>${oppFights.length?oppSSR1History:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp CTRL Scored vs ${f.name}${oppCompareCtrlLine != null ? ` · ${oppName} CTRL line ${formatMinutesAsClock(oppCompareCtrlLine)}` : ''}${panelBadge(oppCtrlConf)}</div>${oppFights.length?oppCTRLHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         ${ssAnalysisHtml}
@@ -13968,6 +14150,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'})</div>
           <div class="lean-reason">${f.lean_ss.reasons.map(r=>`<div class="lean-point"><span class="lean-point-icon ${r.icon==='pos'?'pos':r.icon==='neg'?'neg':''}">${r.icon==='pos'?'↑':r.icon==='neg'?'↓':'→'}</span><span>${r.text}</span></div>`).join('')}</div>
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
+        </div>`:''}
+        ${(f.lean_ss_r1 && f.lean_ss_r1.lean!=='push')?`<div class="detail-panel">
+          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1||'—'} · UD: ${f.line_ud_ss_r1||'—'})</div>
+          <div class="lean-reason">${f.lean_ss_r1.reasons.map(r=>`<div class="lean-point"><span class="lean-point-icon ${r.icon==='pos'?'pos':r.icon==='neg'?'neg':''}">${r.icon==='pos'?'↑':r.icon==='neg'?'↓':'→'}</span><span>${r.text}</span></div>`).join('')}</div>
+          <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>`:''}
         ${f.lean_td?`<div class="detail-panel">
           <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'})</div>
@@ -14229,6 +14416,7 @@ interface MergedLineEntry {
   line_p6_ctrl: number | null;
   line_ud: number | null;
   line_ud_ss: number | null;
+  line_ud_ss_r1: number | null;
   line_ud_td: number | null;
   line_ud_ft: number | null;
   line_ud_ctrl: number | null;
@@ -14276,6 +14464,7 @@ function createMergedLineEntry(name: string): MergedLineEntry {
     line_p6_ctrl: null,
     line_ud: null,
     line_ud_ss: null,
+    line_ud_ss_r1: null,
     line_ud_td: null,
     line_ud_ft: null,
     line_ud_ctrl: null,
@@ -14377,8 +14566,9 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
-    entry.line_ud      = f.line_fp ?? f.line ?? null;
-    entry.line_ud_ss   = f.line_ss ?? null;
+    entry.line_ud       = f.line_fp ?? f.line ?? null;
+    entry.line_ud_ss    = f.line_ss ?? null;
+    entry.line_ud_ss_r1 = f.line_ss_r1 ?? null;
     entry.line_ud_td   = f.line_td ?? null;
     entry.line_ud_ft   = f.line_ft ?? null;
     entry.line_ud_ctrl = f.line_ctrl ?? null;
@@ -14668,11 +14858,13 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     const tdLinesA   = [f.line_p6_td,   f.line_ud_td,   f.line_pp_td,   f.line_betr_td,   f.line_dk_td].filter((value): value is number => value != null);
     const ftLinesA   = [f.line_p6_ft,   f.line_ud_ft,   f.line_pp_ft,   f.line_betr_ft,   f.line_dk_ft].filter((value): value is number => value != null);
     const ctrlLinesA = [f.line_p6_ctrl, f.line_ud_ctrl, f.line_pp_ctrl, f.line_betr_ctrl, f.line_dk_ctrl].filter((value): value is number => value != null);
+    const ssR1LinesA = [f.line_pp_ss_r1, f.line_ud_ss_r1].filter((value): value is number => value != null);
     const leanSSA   = calcSSLean(f.name, dbA, ssLineA, dbB, f.line_dk_ss ?? null, ssLinesA, moneylineA);
+    const leanSSR1A = calcSSR1Lean(f.name, dbA, ssR1LinesA, dbB, moneylineA);
     const leanTDA   = calcTDLean(f.name, dbA, tdLineA, dbB, f.line_dk_td ?? null, tdLinesA, moneylineA);
     const leanFTA   = calcFTLean(f.name, dbA, ftLineA, dbB, f.line_dk_ft ?? null, ftLinesA, moneylineA);
     const leanCTRLA = calcCTRLLean(f.name, dbA, ctrlLineA, dbB, f.line_dk_ctrl ?? null, ctrlLinesA, moneylineA, f.ctrl_under_available ?? null);
-    updateFighterLeans(f.name, leanSSA, leanTDA, leanFTA, leanCTRLA);
+    updateFighterLeans(f.name, leanSSA, leanTDA, leanFTA, leanCTRLA, leanSSR1A);
 
     if (opp) {
       const ssLineB   = opp.line_p6_ss   ?? opp.line_ud_ss   ?? opp.line_pp_ss   ?? opp.line_betr_ss   ?? opp.line_dk_ss   ?? null;
@@ -14683,11 +14875,13 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
       const tdLinesB   = [opp.line_p6_td,   opp.line_ud_td,   opp.line_pp_td,   opp.line_betr_td,   opp.line_dk_td].filter((value): value is number => value != null);
       const ftLinesB   = [opp.line_p6_ft,   opp.line_ud_ft,   opp.line_pp_ft,   opp.line_betr_ft,   opp.line_dk_ft].filter((value): value is number => value != null);
       const ctrlLinesB = [opp.line_p6_ctrl, opp.line_ud_ctrl, opp.line_pp_ctrl, opp.line_betr_ctrl, opp.line_dk_ctrl].filter((value): value is number => value != null);
+      const ssR1LinesB = [opp.line_pp_ss_r1, opp.line_ud_ss_r1].filter((value): value is number => value != null);
       const leanSSB   = calcSSLean(opp.name, dbB, ssLineB, dbA, opp.line_dk_ss ?? null, ssLinesB, moneylineB);
+      const leanSSR1B = calcSSR1Lean(opp.name, dbB, ssR1LinesB, dbA, moneylineB);
       const leanTDB   = calcTDLean(opp.name, dbB, tdLineB, dbA, opp.line_dk_td ?? null, tdLinesB, moneylineB);
       const leanFTB   = calcFTLean(opp.name, dbB, ftLineB, dbA, opp.line_dk_ft ?? null, ftLinesB, moneylineB);
       const leanCTRLB = calcCTRLLean(opp.name, dbB, ctrlLineB, dbA, opp.line_dk_ctrl ?? null, ctrlLinesB, moneylineB, opp.ctrl_under_available ?? null);
-      updateFighterLeans(opp.name, leanSSB, leanTDB, leanFTB, leanCTRLB);
+      updateFighterLeans(opp.name, leanSSB, leanTDB, leanFTB, leanCTRLB, leanSSR1B);
     }
 
     paired.add(f.name);
@@ -14824,13 +15018,14 @@ function applyLean(f: { name: string }, db: FighterDB|null, lean: LeanResult): v
   }
 }
 
-function updateFighterLeans(name: string, lean_ss: LeanResult|null, lean_td: LeanResult|null, lean_ft: LeanResult|null, lean_ctrl: LeanResult|null = null): void {
+function updateFighterLeans(name: string, lean_ss: LeanResult|null, lean_td: LeanResult|null, lean_ft: LeanResult|null, lean_ctrl: LeanResult|null = null, lean_ss_r1: LeanResult|null = null): void {
   const idx = allFighters.findIndex((x) => x.name === name);
   if (idx >= 0) {
-    if (lean_ss)   allFighters[idx].lean_ss   = lean_ss;
-    if (lean_td)   allFighters[idx].lean_td   = lean_td;
-    if (lean_ft)   allFighters[idx].lean_ft   = lean_ft;
-    if (lean_ctrl) allFighters[idx].lean_ctrl = lean_ctrl;
+    if (lean_ss)    allFighters[idx].lean_ss    = lean_ss;
+    if (lean_ss_r1) allFighters[idx].lean_ss_r1 = lean_ss_r1;
+    if (lean_td)    allFighters[idx].lean_td    = lean_td;
+    if (lean_ft)    allFighters[idx].lean_ft    = lean_ft;
+    if (lean_ctrl)  allFighters[idx].lean_ctrl  = lean_ctrl;
   }
 }
 

@@ -390,17 +390,21 @@ function scrapeUnderdog() {
 
         let lineType = null;
         if (label.includes('fantasy') || label.includes('pts')) lineType = 'fp';
-        else if (label.includes('significant strike') || label.includes('sig. strike')) lineType = 'ss';
+        else if (label.includes('significant strike') || label.includes('sig. strike')) {
+          // Round-1-only variants get their own bucket so they don't overwrite the
+          // total-fight SS line.
+          lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(label) ? 'ss_r1' : 'ss';
+        }
         else if (label.includes('takedown')) lineType = 'td';
         if (!lineType) continue;
 
-        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
+        if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, opponent };
         fighters[name][`line_${lineType}`] = val;
         if (opponent && !fighters[name].opponent) fighters[name].opponent = opponent;
       }
     });
 
-    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td || f.line_ctrl);
+    const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_ss_r1 || f.line_td || f.line_ctrl);
     log('underdog', `Found ${result.length} fighters`);
     return result;
   } catch (error) {

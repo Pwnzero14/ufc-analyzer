@@ -3,7 +3,7 @@ export interface Fighter {
   name: string;
   line_fp?: number | null;
   line_ss?: number | null;
-  line_ss_r1?: number | null;  // PrizePicks-only: Round 1 significant strikes
+  line_ss_r1?: number | null;  // Round 1 significant strikes (PrizePicks + Underdog)
   line_td?: number | null;
   line_ft?: number | null;
   // Control time line, stored in minutes for parity with FT (UFCStats shows mm:ss)
@@ -300,7 +300,7 @@ export type PropType =
   | 'Fantasy'      // Pick6/Underdog/Betr scoring (sigStr×0.4, td×5, kd×10, R1=90, dec=30, etc.)
   | 'Fantasy_PP'   // PrizePicks scoring (sigStr×0.5, sub×4, td×5, kd×10, R1=50, dec=10, no quick-finish)
   | 'SS'
-  | 'SS_R1'        // PrizePicks-only: significant strikes in round 1 only
+  | 'SS_R1'        // Significant strikes in round 1 only (PrizePicks + Underdog)
   | 'TD'
   | 'Control'
   | 'FightTime'
