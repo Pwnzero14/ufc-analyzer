@@ -24,7 +24,7 @@ You only need **Google Chrome**. The extension comes pre-built, so it's just dow
 
 ## How to use it
 
-1. **Log in** to the fantasy sites you use in the same Chrome profile (Pick6/DraftKings, Underdog, PrizePicks, Betr). The extension reads lines through your own logged-in session — **you must be logged into Underdog** for its lines to come through. (Pick6 props are visible without logging in, but see the first-fetch warm-up note below.)
+1. **Log in** to the fantasy sites you use in the same Chrome profile (Pick6/DraftKings, Underdog, PrizePicks). The extension reads lines through your own logged-in session — **you must be logged into Underdog** for its lines to come through. (Pick6 props are visible without logging in, but see the first-fetch warm-up note below. Betr is entered manually by the owner — see the Betr note below.)
 2. Click the **extension icon** in the toolbar to open the popup, then open the **Analyzer** (it opens in its own tab).
 3. Hit **Auto-Fetch Lines** (or just visit the fantasy sites once with the extension active) to pull the current slate.
 4. Open the **AI Best Picks** tab inside the analyzer to see the ranked overs and unders for the upcoming card.
@@ -40,6 +40,10 @@ Pick6's **first** auto-fetch often comes back empty — its prop tabs don't load
 3. After that, the **next auto-fetch works on its own**, and it keeps working automatically from then on.
 
 You only have to do this the first time (or occasionally if Pick6 reshuffles their page).
+
+### Note on Betr lines (won't appear for you)
+
+Betr doesn't expose its lines in a way the extension can auto-fetch, so **Betr lines are entered by hand by the owner** — they're read off **screenshots of the Betr app** and typed into the tool's storage manually. That means **if you're not the owner, the Betr column will be empty** — that's expected, not a bug. Everything else (Pick6/DraftKings, Underdog, PrizePicks, fighter histories, Best Picks) works normally without it.
 
 ---
 
@@ -60,6 +64,7 @@ Your saved lines and history live in Chrome's storage, so they carry over.
 - **No lines show up** — Make sure you're logged into the fantasy sites in the same Chrome profile, then use **Auto-Fetch Lines**. Some books only post props closer to fight day.
 - **Underdog lines missing** — You're probably not logged in to Underdog in this Chrome profile. Log in, then re-fetch. (Pick6 doesn't need a login — if it's empty, see the warm-up note below.)
 - **Pick6 always empty on the first try** — This is expected. Open the Pick6 UFC props page and click through each prop tab (SS, TDs, Fantasy Points, Control Time, etc.) once; the next auto-fetch will then pull Pick6 on its own. See the "First-time Pick6 fetch" note above.
+- **Betr column is empty** — Expected for everyone but the owner. Betr can't be auto-fetched, so its lines are entered by hand from screenshots by the owner only. See the "Note on Betr lines" above.
 - **It looks out of date after an update** — Click the **↻ reload** icon on the extension card in `chrome://extensions`, then refresh the analyzer tab.
 
 ---
