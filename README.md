@@ -2,7 +2,7 @@
 
 A Chrome extension that auto-fetches UFC fantasy prop lines from **Pick6 / DraftKings, Underdog, PrizePicks, and Betr**, pulls each fighter's real fight history from UFCStats, and ranks the strongest **Best Picks** (overs/unders) across Fantasy Points, Significant Strikes, Round-1 Significant Strikes, Takedowns, Fight Time, and Control Time.
 
-It runs entirely in your own browser using your existing logins — there's no server and nothing is sent anywhere (except an optional AI-analysis feature you have to opt into with your own API key).
+It runs entirely in your own browser using your existing logins — there's no server and nothing is sent anywhere.
 
 ---
 
@@ -51,12 +51,6 @@ When a new version is released, just **download a fresh ZIP, unzip it into a new
 - replace the old folder's contents with the new ones and click the **↻ reload** icon on the extension card.
 
 Your saved lines and history live in Chrome's storage, so they carry over.
-
----
-
-## Optional — AI analysis (Anthropic API key)
-
-The analyzer works fully without this. There's an extra "AI analyze" feature that calls Claude; to use it, paste your own **Anthropic API key** into the field in the analyzer's settings. The key is stored locally in Chrome on your machine and is only sent to Anthropic's API when you click analyze. No key? Just ignore it — everything else still works.
 
 ---
 
