@@ -2,7 +2,7 @@
 
 **Branch:** `feature/sleek-theme-v1`
 **Date:** 2026-06-06 (Saturday — Belal vs Bonfim card is TODAY)
-**HEAD:** `3647a73` — docs-only commits this session (rename resume + README notes/corrections). No `src/` changes.
+**HEAD:** `323f3c8` (+ this resume commit) — docs-only commits this session (rename resume + README notes/corrections). No `src/` changes.
 **Working tree:** clean re: code. `.claude/settings.local.json` modified (pre-existing) + two long-standing untracked dirs still showing.
 
 ---
@@ -29,14 +29,15 @@ Tested the GitHub download-ZIP flow in a new browser-user window to see what the
 - **Login requirement (corrected)** — only **Underdog** needs a login for its lines to come through. **Pick6 props are visible WITHOUT logging in** (initial wording wrongly said Pick6 too; fixed in `89eb74f`). In "How to use it" + matching troubleshooting entry.
 - **First-time Pick6 fetch warm-up** — Pick6's *first* auto-fetch usually returns empty until you open each prop tab once manually. New "First-time Pick6 fetch" subsection: go to Pick6 UFC props page → click through each prop tab (SS, TDs, Fantasy Points, Control Time, etc.) → next auto-fetch then works on its own and keeps working. (This is the real cause of empty Pick6, NOT a login issue.)
 - **Removed the "Optional — AI analysis (Anthropic API key)" section (`3647a73`)** — it was misleading. The core analyzer / Best Picks / all fight-stat math is **100% local and needs no API key**. The ONLY Anthropic-key feature is a niche "🔍 READ WITH AI" button in the Betr line-entry panel that OCRs *screenshots* of the Betr app into the line table — unused (Betr lines go in via snippet/modal) and irrelevant to the friend. README now mentions no API key anywhere.
+- **Betr lines are owner-only — documented (`323f3c8`)** — Betr can't be auto-fetched, so its lines are hand-entered from **screenshots of the Betr app by the owner only**. For **anyone but the owner the Betr column is empty by design** (not a bug). Added a "Note on Betr lines" subsection + troubleshooting entry, and trimmed Betr out of the auto-fetch login list in step 1.
 
-Commits this session: `cf1bbf2` (rename resume), `2b0eda3` (README notes), `7026ed5` (resume fold-in), `89eb74f` (login correction), `3647a73` (AI-key section removal). All pushed to `feature/sleek-theme-v1` AND `master`.
+Commits this session: `cf1bbf2` (rename resume), `2b0eda3` (README notes), `7026ed5` (resume fold-in), `89eb74f` (login correction), `3647a73` (AI-key section removal), `323f3c8` (Betr owner-only note). All pushed to `feature/sleek-theme-v1` AND `master`.
 
 ---
 
 ## State of the project right now
 
-- **Branch:** `feature/sleek-theme-v1` @ `3647a73`, in sync with `origin`. `master` also @ `3647a73`.
+- **Branch:** `feature/sleek-theme-v1` @ `323f3c8` (+ this resume commit), in sync with `origin`. `master` matches.
 - **Remote:** `origin` → `https://github.com/Pwnzero14/ufc-analyzer.git` (corrected spelling).
 - **Betr lines:** Belal vs Bonfim base lines still loaded in `lines_betr_manual_v1` (24 SS + 9 FP). Edit individual lines via BETR LINES modal row-edit; don't re-run the bulk snippet.
 - **Card:** Belal Muhammad vs Gabriel Bonfim, Saturday 6/6 — happening today.
