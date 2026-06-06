@@ -6,103 +6,68 @@ It runs entirely in your own browser using your existing logins — there's no s
 
 ---
 
-## What you need first
+## Install (the easy way — no tools needed)
 
-| Requirement | Why | Where to get it |
-|---|---|---|
-| **Google Chrome** | Runs the extension | https://www.google.com/chrome/ |
-| **Node.js 18 or newer** (includes `npm`) | Used once to build the extension | https://nodejs.org/ (pick the "LTS" installer) |
-| **Git** *(optional)* | To clone/update the repo. You can also just download the ZIP. | https://git-scm.com/ |
+You only need **Google Chrome**. The extension comes pre-built, so it's just download → unzip → load.
 
-> **You must build the project before loading it.** The compiled code lives in a `dist/` folder that is **not** included in the repo, so loading the folder straight from GitHub will not work until you run the build step below.
-
----
-
-## Step 1 — Get the code
-
-**Option A — with Git (recommended, makes updates easy):**
-
-```bash
-git clone https://github.com/Pwnzero14/ufc-analzyer.git
-cd ufc-analzyer
-```
-
-**Option B — without Git:**
-
-1. On the GitHub page, click the green **Code** button → **Download ZIP**.
-2. Unzip it somewhere permanent (e.g. `Documents`). Don't delete this folder later — the extension loads directly from it.
-3. Open a terminal **inside** that unzipped folder.
-
----
-
-## Step 2 — Build it
-
-From inside the project folder, run:
-
-```bash
-npm install
-npm run build
-```
-
-- `npm install` downloads the build tools (one-time, may take a minute).
-- `npm run build` compiles the code into a new **`dist/`** folder.
-
-When it finishes with no red errors, you're ready to load it into Chrome.
-
----
-
-## Step 3 — Load it into Chrome
-
-1. Open Chrome and go to **`chrome://extensions`** (type it in the address bar).
-2. Turn on **Developer mode** (toggle in the top-right corner).
-3. Click **Load unpacked**.
-4. Select the **project folder** (the one containing `manifest.json` — i.e. the folder you cloned/unzipped, *not* the `dist` folder inside it).
-5. The **UFC Fantasy Lines Grabber** extension should now appear in your list.
+1. On the GitHub page, click the green **`< > Code`** button → **Download ZIP**.
+2. **Unzip** it somewhere permanent (e.g. your `Documents` folder). Don't delete this folder later — Chrome loads the extension directly from it.
+3. Open Chrome and go to **`chrome://extensions`** (type it in the address bar).
+4. Turn on **Developer mode** (toggle in the top-right corner).
+5. Click **Load unpacked**.
+6. Select the **unzipped folder** — the one that contains `manifest.json` (if your unzip created a folder-inside-a-folder, pick the inner one with `manifest.json` in it).
+7. **UFC Fantasy Lines Grabber** now appears in your extensions list. 🎉
 
 > Tip: click the puzzle-piece icon in Chrome's toolbar and **pin** the extension so its icon is always visible.
 
 ---
 
-## Step 4 — Use it
+## How to use it
 
 1. **Log in** to the fantasy sites you use in the same Chrome profile (Pick6/DraftKings, Underdog, PrizePicks, Betr). The extension reads lines through your own logged-in session.
 2. Click the **extension icon** in the toolbar to open the popup, then open the **Analyzer** (it opens in its own tab).
-3. Hit **Auto-Fetch Lines** (or visit the fantasy sites once with the extension active) to pull the current slate.
+3. Hit **Auto-Fetch Lines** (or just visit the fantasy sites once with the extension active) to pull the current slate.
 4. Open the **AI Best Picks** tab inside the analyzer to see the ranked overs and unders for the upcoming card.
 
-That's it — fighter histories and line comparisons populate automatically once lines are fetched.
+Fighter histories and cross-book line comparisons populate automatically once lines are fetched.
+
+---
+
+## Updating to a newer version
+
+When a new version is released, just **download a fresh ZIP, unzip it into a new folder**, and in `chrome://extensions`:
+
+- either point **Load unpacked** at the new folder, or
+- replace the old folder's contents with the new ones and click the **↻ reload** icon on the extension card.
+
+Your saved lines and history live in Chrome's storage, so they carry over.
 
 ---
 
 ## Optional — AI analysis (Anthropic API key)
 
-The core analyzer works fully without this. There's an extra "AI analyze" feature that calls Claude; to use it, paste your own **Anthropic API key** into the field in the analyzer's settings. The key is stored locally in Chrome storage on your machine and is only sent to Anthropic's API when you click analyze. If you don't have a key, just ignore this — everything else still works.
-
----
-
-## Updating to the latest version
-
-If you cloned with Git:
-
-```bash
-git pull
-npm install
-npm run build
-```
-
-Then go to **`chrome://extensions`** and click the **↻ reload** icon on the extension card (this reliably flushes the old code).
-
-If you downloaded the ZIP, download a fresh ZIP, re-run `npm install && npm run build`, and reload the extension.
+The analyzer works fully without this. There's an extra "AI analyze" feature that calls Claude; to use it, paste your own **Anthropic API key** into the field in the analyzer's settings. The key is stored locally in Chrome on your machine and is only sent to Anthropic's API when you click analyze. No key? Just ignore it — everything else still works.
 
 ---
 
 ## Troubleshooting
 
-- **"Manifest file is missing or unreadable" / it won't load** — You selected the wrong folder or skipped the build. Make sure you ran `npm run build` (a `dist/` folder must exist) and that you pointed *Load unpacked* at the folder containing `manifest.json`.
-- **`npm` is not recognized** — Node.js isn't installed (or the terminal was open before you installed it). Install Node.js LTS, then open a fresh terminal.
-- **Build shows errors** — Make sure you're on Node 18+ (`node -v`) and ran `npm install` first.
+- **"Manifest file is missing or unreadable"** — You selected the wrong folder. Point *Load unpacked* at the folder that directly contains `manifest.json`.
 - **No lines show up** — Make sure you're logged into the fantasy sites in the same Chrome profile, then use **Auto-Fetch Lines**. Some books only post props closer to fight day.
-- **Code changed but the analyzer looks the same** — Rebuild (`npm run build`) and click the **↻ reload** button on the extension card in `chrome://extensions`, then refresh the analyzer tab.
+- **It looks out of date after an update** — Click the **↻ reload** icon on the extension card in `chrome://extensions`, then refresh the analyzer tab.
+
+---
+
+## For developers (building from source)
+
+The repo ships with the compiled `dist/` folder so end users don't need to build. If you want to modify the code:
+
+```bash
+npm install      # one-time: installs the TypeScript build tools (needs Node.js 18+)
+npm run build    # compiles src/ → dist/
+```
+
+Then reload the extension in `chrome://extensions`. Source lives in `src/` (TypeScript); the build outputs to `dist/`, which the manifest and HTML pages load. After changing code, rebuild and commit the updated `dist/` so the shared/download version stays current.
 
 ---
 
