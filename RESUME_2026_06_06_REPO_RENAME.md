@@ -1,15 +1,15 @@
-# Resume — Repo Renamed to `ufc-analyzer`
+# Resume — Repo Renamed to `ufc-analyzer` + README Sharing Notes
 
 **Branch:** `feature/sleek-theme-v1`
 **Date:** 2026-06-06 (Saturday — Belal vs Bonfim card is TODAY)
-**HEAD:** `03cf083` — unchanged this session (no code commits made).
+**HEAD:** `2b0eda3` — docs-only commits this session (rename resume + README notes). No `src/` changes.
 **Working tree:** clean re: code. `.claude/settings.local.json` modified (pre-existing) + two long-standing untracked dirs still showing.
 
 ---
 
 ## TL;DR
 
-Short admin session. Fixed the misspelled GitHub repo name and re-pointed the local remote. **No code changes, no commits.** The R1 SS / settle-watch items from the [2026-06-05 resume](RESUME_2026_06_05_R1_SS_LEAN_AND_REPO_SHIP.md) are still open and carry forward unchanged.
+Short admin/docs session. Fixed the misspelled GitHub repo name, re-pointed the local remote, and added friend-facing setup notes to the README after a fresh-profile download test. **No `src/` changes.** The R1 SS / settle-watch items from the [2026-06-05 resume](RESUME_2026_06_05_R1_SS_LEAN_AND_REPO_SHIP.md) are still open and carry forward unchanged.
 
 ---
 
@@ -23,11 +23,19 @@ Short admin session. Fixed the misspelled GitHub repo name and re-pointed the lo
 - GitHub **redirects** the old `ufc-analzyer` URL to the new one, so the download link already shared with the friend still works.
 - ⚠️ **If the friend already cloned:** their local remote still points at the old URL (redirect covers it). They can clean it up anytime with `git remote set-url origin https://github.com/Pwnzero14/ufc-analyzer.git`.
 
+### README sharing notes added (after a fresh-profile download test)
+
+Tested the GitHub download-ZIP flow in a new browser-user window to see what the friend's experience would be, then documented two gaps in [README.md](README.md):
+- **Login requirement** — must be logged into **Underdog and Pick6** (same Chrome profile) for their lines to come through. Added to "How to use it" + two troubleshooting entries.
+- **First-time Pick6 fetch warm-up** — Pick6's *first* auto-fetch usually returns empty until you open each prop tab once manually. New "First-time Pick6 fetch" subsection: go to Pick6 UFC props page → click through each prop tab (SS, TDs, Fantasy Points, Control Time, etc.) → next auto-fetch then works on its own and keeps working.
+
+Commits: `cf1bbf2` (rename resume), `2b0eda3` (README notes). Both pushed to `feature/sleek-theme-v1` AND `master`.
+
 ---
 
 ## State of the project right now
 
-- **Branch:** `feature/sleek-theme-v1` @ `03cf083`, in sync with `origin`. `master` also @ `03cf083`.
+- **Branch:** `feature/sleek-theme-v1` @ `2b0eda3`, in sync with `origin`. `master` also @ `2b0eda3`.
 - **Remote:** `origin` → `https://github.com/Pwnzero14/ufc-analyzer.git` (corrected spelling).
 - **Betr lines:** Belal vs Bonfim base lines still loaded in `lines_betr_manual_v1` (24 SS + 9 FP). Edit individual lines via BETR LINES modal row-edit; don't re-run the bulk snippet.
 - **Card:** Belal Muhammad vs Gabriel Bonfim, Saturday 6/6 — happening today.
