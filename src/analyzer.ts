@@ -14364,7 +14364,15 @@ function namesMatch(a: string, b: string): boolean {
   if (dedup(a.toLowerCase()) === dedup(b.toLowerCase())) return true;
   if (aLast === bLast && (aFirst.startsWith(bFirst) || bFirst.startsWith(aFirst))) return true;
   if (a.startsWith(b + ' ') || b.startsWith(a + ' ')) return true;
-  if (aLast === bLast && aLast.length > 4) return true;
+  // Shared surname alone is NOT identity when both sides have full, differing
+  // first names: "Michael Chandler" ≠ "Chelsea Chandler". Only treat a surname
+  // match as the same fighter when one first name is an abbreviation/initial
+  // (e.g. "C Chandler" → "Chelsea Chandler") or the initials agree.
+  if (aLast === bLast && aLast.length > 4) {
+    const aAbbrev = aFirst.length <= 2 || aFirst.endsWith('.');
+    const bAbbrev = bFirst.length <= 2 || bFirst.endsWith('.');
+    if (aAbbrev || bAbbrev || aFirst[0] === bFirst[0]) return true;
+  }
   return false;
 }
 
