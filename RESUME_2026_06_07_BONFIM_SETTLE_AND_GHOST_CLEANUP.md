@@ -2,8 +2,13 @@
 
 **Branch:** `feature/sleek-theme-v1`
 **Date:** 2026-06-07 (Sunday, ~12:50 AM — night after the Belal/Bonfim card)
-**HEAD:** `bc46e43` — fuzzy-merge fix shipped (src + dist). Pushed to `feature/sleek-theme-v1` AND `master`.
+**HEAD:** `0350b5f` — three code fixes shipped tonight (src + dist), all pushed to `feature/sleek-theme-v1` AND `master`.
 **Working tree:** clean re: code (`.claude/settings.local.json` + 2 untracked dirs pre-existing).
+
+## Code fixes shipped this session
+- `bc46e43` — namesMatch false surname-only merge (Michael ≠ Chelsea Chandler)
+- `0350b5f` — UFCStats fighter lookup strips apostrophes (Sean Omalley ↔ Sean O'Malley); **verified live** — O'Malley's stats panel now populates. Covers all apostrophe names (D'Angelo, O'Neill, etc.).
+- Console (storage, backup-first): Bonfim ghost/dead-row cleanup (279→20) + Betr Bonfim manual-line clear.
 
 ---
 
@@ -46,13 +51,17 @@ Outcome: shipped the merge fix, cleared the dead rows via backup-first console c
 
 ---
 
+## Betr Bonfim manual lines — CLEARED (was the late-session issue)
+The 24 Bonfim Betr manual entries (`lines_betr_manual_v1`) wouldn't auto-clear. Root cause: they only auto-clear via `handleClearBetrLines()` after a settle when `stillUnresolved === 0` ([background.ts:1037](src/background.ts#L1037)) — which never hit because of the ghosts/dupes. `BETR_EVENT_DATE` (hardcoded `2026-04-18`) only clears the seed, not manual entries. Cleared via backup-first console snippet (removed `lines_betr` + `lines_betr_manual_v1`, backup `betr_backup_bonfim_*`). Slate now clean on UFC Freedom 250.
+- **Deferred code fix:** make Betr manual lines auto-clear when the *current event* moves past the Betr card's date, instead of depending on `stillUnresolved === 0`.
+
 ## Open / next-session work
 
-1. **Prune storage backups** (above) — highest priority; storage bloat is a recurring root cause.
+1. **Prune storage backups** — highest priority; storage near `kQuotaBytes`. Multiple `prop_archive_backup_*` + `betr_backup_*` keys created tonight are huge. Read-only audit (list keys + sizes), then keep most-recent 1–2, delete the rest.
 2. **FIX B (deferred, code):** don't archive UD-only fighters who aren't on the P6-defined current card during an event overlap — stops ghosts at the source. (Natural card-flip resolved it this time, but it'll recur every overlap.) Note residual: during overlap, abbreviated `C Chandler` (Betr) can still match `Michael Chandler` when Chelsea isn't in the fetch — Fix B would also help here.
-3. **Clear stale Betr Bonfim lines** — the card's over (6/6); the 24 manual Betr entries are now past-event. Per [[feedback_betr_reset_rule]] they should clear on/after event day.
-4. **UFC Freedom 250 settle** — the 20 remaining props settle after next Saturday's card.
-5. Minor: `✗ NOT FOUND: Sean Omalley` — UFCStats apostrophe normalization (UFC 250 fighter); low priority.
+3. **Betr auto-clear code fix** (above) — date-driven instead of `stillUnresolved===0`.
+4. **UFC Freedom 250 settle** — the 20 remaining props settle after next Saturday's card (Jun 14).
+5. Minor/cosmetic: O'Malley **lookup** is fixed; the **display name** still shows "Sean Omalley" (platform spelling, no apostrophe). Optional display-name prettifier — zero data impact.
 
 ---
 
