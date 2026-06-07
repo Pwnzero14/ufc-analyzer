@@ -901,7 +901,8 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     const COMPOUND = new Set(['de','van','von','da','dos','del','di','le','la','du','el','abdul']);
 
     function nameCandidates(n: string): NameCandidate[] {
-      const parts = n.trim().split(/\s+/);
+      // Strip apostrophes so "Sean O'Malley" ↔ platform "Sean Omalley" both resolve.
+      const parts = n.replace(/['’]/g, '').trim().split(/\s+/);
       const hasSuffix = SUFFIXES.has(parts[parts.length-1].toLowerCase().replace('.',''));
       const cleanParts = hasSuffix ? parts.slice(0,-1) : [...parts];
       const cands: NameCandidate[] = [];
@@ -998,7 +999,7 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
         const link = row.match(/href="(http:\/\/(?:www\.)?ufcstats\.com\/fighter-details\/[a-f0-9]+)"/i);
         if (!link) continue;
         const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
-          .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase().replace(/-/g, ' '));
+          .map(c => c[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim().toLowerCase().replace(/['’]/g, '').replace(/-/g, ' '));
         const firstCell = cells[0] || '';
         const lastCell  = cells[1] || '';
         // Empty firstLower/lastLower mean "this cell must be empty" — used by
