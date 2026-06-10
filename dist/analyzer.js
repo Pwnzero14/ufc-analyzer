@@ -155,6 +155,28 @@ let latestValueSpikeByFighter = {};
 let isDataLoadInFlight = false;
 let queuedDataReload = false;
 let bestPicksRenderSeq = 0;
+// Display-only name prettifier — restores apostrophes the fantasy platforms strip
+// (e.g. "Sean Omalley" -> "Sean O'Malley"). Lookups, keys, and storage keep the raw name.
+const PRETTY_SURNAMES = {
+    omalley: "O'Malley",
+    oneill: "O'Neill",
+    osullivan: "O'Sullivan",
+    obrien: "O'Brien",
+    oconnell: "O'Connell",
+    oconnor: "O'Connor",
+};
+function prettyName(name) {
+    const raw = (name ?? '').toString();
+    if (!raw)
+        return raw;
+    return raw.split(' ').map(w => {
+        const key = w.toLowerCase().replace(/[^a-z]/g, '');
+        const mapped = PRETTY_SURNAMES[key];
+        if (!mapped)
+            return w;
+        return w === w.toUpperCase() && w.length > 2 ? mapped.toUpperCase() : mapped;
+    }).join(' ');
+}
 let eventCountdownTimer = null;
 let periodicRefreshTimer = null;
 let upcomingCardPairs = [];
@@ -6673,7 +6695,8 @@ function renderBestPicks(container, renderSeq = 0) {
                 }
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}">
         <div class="best-pick-rank">#${i + 1}</div>
-        <div><div class="best-pick-name">${f.name}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reason}</div></div>
+        <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reason}</div></div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label || ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -6686,6 +6709,20 @@ function renderBestPicks(container, renderSeq = 0) {
         }
         const html = `<div class="best-picks-grid">${buildSection(overs, 'over')}${buildSection(unders, 'under')}</div>`;
         container.innerHTML = html || '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';
+        // Hydrate Best Picks avatars from the cached headshot pipeline
+        container.querySelectorAll('.bp-avatar-img[data-name]').forEach(img => {
+            const nm = img.dataset['name'] || '';
+            if (!nm)
+                return;
+            void fetchFighterImageUrl(nm)
+                .then(url => {
+                if (!url)
+                    return;
+                img.onload = () => img.parentElement?.classList.add('has-img');
+                img.src = url;
+            })
+                .catch(() => { });
+        });
         renderModelHealthWidget();
     })();
 }
@@ -7292,7 +7329,7 @@ function renderParlayLab(container) {
         const sel = parlaySelectedLegs.has(key);
         return `<div class="parlay-leg-row${sel ? ' selected' : ''}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
-      <span class="parlay-leg-name">${a.leg.fighter}</span>
+      <span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat">${a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
@@ -7304,7 +7341,7 @@ function renderParlayLab(container) {
             const key = parlayLegKey(l.fighter, l.stat, l.direction);
             return `<div class="parlay-slip-leg">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
-          <span class="parlay-leg-name" style="flex:1">${l.fighter}</span>
+          <span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
           <span class="parlay-leg-dir ${l.direction}">${l.direction.toUpperCase()}</span>
           <span class="parlay-leg-stat">${l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
@@ -7361,9 +7398,9 @@ function renderParlayLab(container) {
             const impactPct = `+${(p.alert.impact * 100).toFixed(0)}%`;
             return `<div class="synergy-pair-card${bothSelected ? ' synergy-active' : ''}" data-synergy-key1="${key1}" data-synergy-key2="${key2}">
         <div class="synergy-pair-legs">
-          <span class="synergy-pair-leg"><span class="parlay-leg-name">${p.leg1.fighter}</span> <span class="parlay-leg-dir ${p.leg1.direction}">${p.leg1.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg1.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg1.line}</span></span>
+          <span class="synergy-pair-leg"><span class="parlay-leg-name">${prettyName(p.leg1.fighter)}</span> <span class="parlay-leg-dir ${p.leg1.direction}">${p.leg1.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg1.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg1.line}</span></span>
           <span class="synergy-pair-plus">+</span>
-          <span class="synergy-pair-leg"><span class="parlay-leg-name">${p.leg2.fighter}</span> <span class="parlay-leg-dir ${p.leg2.direction}">${p.leg2.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg2.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg2.line}</span></span>
+          <span class="synergy-pair-leg"><span class="parlay-leg-name">${prettyName(p.leg2.fighter)}</span> <span class="parlay-leg-dir ${p.leg2.direction}">${p.leg2.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg2.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg2.line}</span></span>
         </div>
         <div class="synergy-pair-reason">${p.alert.message}</div>
         <div class="synergy-pair-meta"><span class="synergy-pair-impact">${impactPct} health</span><span class="synergy-pair-conf">avg ${avgConf}%</span>${bothSelected ? '<span class="synergy-pair-added">IN SLIP</span>' : ''}</div>
@@ -8670,7 +8707,7 @@ async function renderArchivePanel(container) {
     const topFantasyHtml = topFantasy.length
         ? topFantasy.map(x => `<div class="best-pick-row">
           <div class="best-pick-rank">${x.rate}%</div>
-          <div><div class="best-pick-name">${x.fighter}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
+          <div><div class="best-pick-name">${prettyName(x.fighter)}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
           <div class="best-pick-meta"><span class="best-pick-platform">Fantasy</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
@@ -8678,7 +8715,7 @@ async function renderArchivePanel(container) {
     const topSSHtml = topSS.length
         ? topSS.map(x => `<div class="best-pick-row">
           <div class="best-pick-rank">${x.rate}%</div>
-          <div><div class="best-pick-name">${x.fighter}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
+          <div><div class="best-pick-name">${prettyName(x.fighter)}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
           <div class="best-pick-meta"><span class="best-pick-platform">SS</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
@@ -8686,7 +8723,7 @@ async function renderArchivePanel(container) {
     const topTDHtml = topTD.length
         ? topTD.map(x => `<div class="best-pick-row">
           <div class="best-pick-rank">${x.rate}%</div>
-          <div><div class="best-pick-name">${x.fighter}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
+          <div><div class="best-pick-name">${prettyName(x.fighter)}</div><div class="best-pick-reason">${x.total} events · ${Math.round(x.rate / 100 * x.total)}/${x.total} over</div></div>
           <div class="best-pick-meta"><span class="best-pick-platform">TD</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
@@ -8972,7 +9009,7 @@ async function renderArchivePanel(container) {
     const pendingBannerHtml = pendingEvents.length > 0 ? `
     <div class="pending-settle-banner" style="margin-bottom:12px;border:1px solid rgba(240,180,40,0.35);border-left:3px solid var(--amber);border-radius:6px;background:rgba(240,180,40,0.06);padding:10px 14px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber);font-weight:700">⏳ Awaiting Settlement</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber);font-weight:700">⏳ Awaiting Settlement</span>
         <span style="font-size:10px;color:var(--text-muted)">${unresolvedCount} props across ${pendingEvents.length} event${pendingEvents.length === 1 ? '' : 's'} need results</span>
         <button id="pendingDismissBtn" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:3px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:600;cursor:pointer;color:var(--text-muted);letter-spacing:0.04em" title="Mark remaining unresolved records as push (result = line)">✕ DISMISS</button>
         <button id="pendingSettleBtn" style="background:var(--amber);color:#000;border:none;border-radius:4px;padding:3px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;cursor:pointer;letter-spacing:0.04em">⚡ SETTLE NOW</button>
@@ -13261,61 +13298,47 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, 2)
         .map(x => `${x.name}: ${x.verdictText} (${x.confidence}% conf)`);
+    const maVal = (t) => /^(unavailable|insufficient|needs both|no |none)/i.test(t) ? `<span class="ma-value-dim">${t}</span>` : t;
+    const maVerdictChip = (text) => {
+        const cls = /\bOVER\b/i.test(text) ? 'over' : /\bUNDER\b/i.test(text) ? 'under' : 'none';
+        return `<span class="ma-verdict-chip ${cls}">${text}</span>`;
+    };
+    const maConfBar = (conf) => {
+        const n = Math.max(0, Math.min(100, Math.round(conf)));
+        const hue = n >= 70 ? 'high' : n >= 50 ? 'med' : 'low';
+        return `<span class="ma-conf"><span class="ma-conf-bar"><span class="ma-conf-fill ${hue}" style="width:${Math.max(4, n)}%"></span></span><span class="ma-conf-num">${n}</span></span>`;
+    };
+    const maSection = (label, a) => `
+        <div class="ma-subhead">${prettyName(a.name)} <span class="ma-subhead-tag">${label}</span></div>
+        <div class="ma-row"><span class="ma-label">Current line</span><span class="ma-value">${maVal(a.currentLineText)}</span></div>
+        <div class="ma-row"><span class="ma-label">Historical avg</span><span class="ma-value">${maVal(a.avgText)}</span></div>
+        <div class="ma-row"><span class="ma-label">Vs similar lines</span><span class="ma-value">${maVal(a.vsLineText)}</span></div>
+        <div class="ma-row"><span class="ma-label">Matchup notes</span><span class="ma-value">${maVal(a.matchupNotes)}</span></div>
+        <div class="ma-row"><span class="ma-label">Verdict</span><span class="ma-value">${maVerdictChip(a.verdictText)}</span></div>
+        <div class="ma-row"><span class="ma-label">Confidence</span><span class="ma-value">${maConfBar(a.confidence)}</span></div>`;
     const ctrlAnalysisHtml = `
-    <div class="detail-panel">
+    <div class="detail-panel ma-panel ma-ctrl">
       <div class="detail-panel-title">CTRL Matchup Analyzer</div>
-      <div class="lean-reason">
-        <div><strong>### Fighter CTRL Analysis</strong></div>
-        <div>- Name: ${fighterCtrlAnalysis.name}</div>
-        <div>- Current CTRL line: ${fighterCtrlAnalysis.currentLineText}</div>
-        <div>- Historical average CTRL: ${fighterCtrlAnalysis.avgText}</div>
-        <div>- Historical performance vs similar lines: ${fighterCtrlAnalysis.vsLineText}</div>
-        <div>- Matchup notes: ${fighterCtrlAnalysis.matchupNotes}</div>
-        <div>- Over/Under verdict: ${fighterCtrlAnalysis.verdictText}</div>
-        <div>- Confidence score (0-100): ${fighterCtrlAnalysis.confidenceText}</div>
-        <br>
-        <div><strong>### Opponent CTRL Analysis</strong></div>
-        <div>- Name: ${opponentCtrlAnalysis.name}</div>
-        <div>- Current CTRL line: ${opponentCtrlAnalysis.currentLineText}</div>
-        <div>- Historical average CTRL: ${opponentCtrlAnalysis.avgText}</div>
-        <div>- Historical performance vs similar lines: ${opponentCtrlAnalysis.vsLineText}</div>
-        <div>- Matchup notes: ${opponentCtrlAnalysis.matchupNotes}</div>
-        <div>- Over/Under verdict: ${opponentCtrlAnalysis.verdictText}</div>
-        <div>- Confidence score (0-100): ${opponentCtrlAnalysis.confidenceText}</div>
-        <br>
-        <div><strong>### Final Summary</strong></div>
-        <div>- Side with clearest value: ${ctrlStrongest.available ? `${ctrlStrongest.name} (${ctrlStrongest.verdictText})` : 'No clear edge (insufficient data)'}</div>
-        <div>- Key reasons: ${ctrlKeyReasons}</div>
-        <div>- Recommended lean(s) for pick’em platforms: ${ctrlRecommendedLeans.length ? ctrlRecommendedLeans.join(' | ') : 'No CTRL lean above confidence threshold'}</div>
+      <div class="lean-reason ma-analysis">
+        ${maSection('CTRL', fighterCtrlAnalysis)}
+        ${maSection('CTRL · OPP', opponentCtrlAnalysis)}
+        <div class="ma-subhead">Final Summary</div>
+        <div class="ma-row"><span class="ma-label">Clearest value</span><span class="ma-value ma-verdict">${ctrlStrongest.available ? `${ctrlStrongest.name} (${ctrlStrongest.verdictText})` : 'No clear edge (insufficient data)'}</span></div>
+        <div class="ma-row"><span class="ma-label">Key reasons</span><span class="ma-value">${ctrlKeyReasons}</span></div>
+        <div class="ma-row"><span class="ma-label">Recommended</span><span class="ma-value">${ctrlRecommendedLeans.length ? ctrlRecommendedLeans.join(' | ') : 'No CTRL lean above confidence threshold'}</span></div>
       </div>
     </div>`;
     const ssAnalysisHtml = `
-    <div class="detail-panel">
+    <div class="detail-panel ma-panel ma-ss">
       <div class="detail-panel-title">SS Matchup Analyzer</div>
-      <div class="lean-reason">
-        <div><strong>### Fighter SS Analysis</strong></div>
-        <div>- Name: ${fighterSsAnalysis.name}</div>
-        <div>- Current SS line: ${fighterSsAnalysis.currentLineText}</div>
-        <div>- Historical average SS: ${fighterSsAnalysis.avgText}</div>
-        <div>- Historical performance vs similar lines: ${fighterSsAnalysis.vsLineText}</div>
-        <div>- Matchup notes: ${fighterSsAnalysis.matchupNotes}</div>
-        <div>- Over/Under verdict: ${fighterSsAnalysis.verdictText}</div>
-        <div>- Confidence score (0-100): ${fighterSsAnalysis.confidenceText}</div>
-        <br>
-        <div><strong>### Opponent SS Analysis</strong></div>
-        <div>- Name: ${opponentSsAnalysis.name}</div>
-        <div>- Current SS line: ${opponentSsAnalysis.currentLineText}</div>
-        <div>- Historical average SS: ${opponentSsAnalysis.avgText}</div>
-        <div>- Historical performance vs similar lines: ${opponentSsAnalysis.vsLineText}</div>
-        <div>- Matchup notes: ${opponentSsAnalysis.matchupNotes}</div>
-        <div>- Over/Under verdict: ${opponentSsAnalysis.verdictText}</div>
-        <div>- Confidence score (0-100): ${opponentSsAnalysis.confidenceText}</div>
-        <br>
-        <div><strong>### Final Summary</strong></div>
-        <div>- Side with clearest value: ${strongest.available ? `${strongest.name} (${strongest.verdictText})` : 'No clear edge (insufficient data)'}</div>
-        <div>- Key reasons: ${keyReasons}</div>
-        <div>- Volatility / red flags: ${volatilityFlags.length ? volatilityFlags.join(' · ') : 'None flagged from fetched variance/style metrics'}</div>
-        <div>- Recommended lean(s) for pick’em platforms: ${recommendedLeans.length ? recommendedLeans.join(' | ') : 'No SS lean above confidence threshold'}</div>
+      <div class="lean-reason ma-analysis">
+        ${maSection('SS', fighterSsAnalysis)}
+        ${maSection('SS · OPP', opponentSsAnalysis)}
+        <div class="ma-subhead">Final Summary</div>
+        <div class="ma-row"><span class="ma-label">Clearest value</span><span class="ma-value ma-verdict">${strongest.available ? `${strongest.name} (${strongest.verdictText})` : 'No clear edge (insufficient data)'}</span></div>
+        <div class="ma-row"><span class="ma-label">Key reasons</span><span class="ma-value">${keyReasons}</span></div>
+        <div class="ma-row"><span class="ma-label">Volatility flags</span><span class="ma-value">${volatilityFlags.length ? volatilityFlags.join(' · ') : 'None flagged from fetched variance/style metrics'}</span></div>
+        <div class="ma-row"><span class="ma-label">Recommended</span><span class="ma-value">${recommendedLeans.length ? recommendedLeans.join(' | ') : 'No SS lean above confidence threshold'}</span></div>
       </div>
     </div>`;
     const row = document.createElement('div');
@@ -13325,9 +13348,9 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     row.innerHTML = `
     <div class="fighter-main">
       <div class="fighter-info">
-        <div class="fighter-flag">${db.country || '🏴'}</div>
+        <div class="fighter-avatar"><span class="fighter-avatar-flag">${db.country || '🏴'}</span><img class="fighter-avatar-img" alt="" /></div>
         <div>
-          <div class="fighter-name" title="${f.name}">${f.name}${streakEmoji}</div>
+          <div class="fighter-name" title="${prettyName(f.name)}">${prettyName(f.name)}${streakEmoji}</div>
           <div class="fighter-record">${db.record || '—'} · ${db.style || '...'}${(() => { const oppStrength = calcOpponentStrengthScore(oppEntry?.db ?? null); const emoji = oppStrength.score >= 1.45 ? '🔴' : oppStrength.score >= 0.75 ? '🟡' : oppStrength.score > -0.2 ? '⚪' : '🟢'; return oppEntry?.db?.loaded ? ` <span title="${oppStrength.label}" style="font-size:11px;opacity:0.85">${emoji}</span>` : ''; })()}</div>
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px">${archetypeBadgeHtml}${archetypeAlertHtml}</div>
           ${sharpBadgeHtml}
@@ -13532,6 +13555,20 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
       </div>`);
+    // Async fighter headshot — same cached pipeline as the H2H modal.
+    // Falls back silently to the flag emoji when no image resolves.
+    void fetchFighterImageUrl(f.name)
+        .then(url => {
+        if (!url)
+            return;
+        const av = row.querySelector('.fighter-avatar');
+        const img = row.querySelector('.fighter-avatar-img');
+        if (av && img) {
+            img.onload = () => av.classList.add('has-img');
+            img.src = url;
+        }
+    })
+        .catch(() => { });
     return row;
 }
 function expandRowDetailPanel(row) {
@@ -15165,7 +15202,7 @@ function renderLineMovementSummary() {
             ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.stat} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length - 1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
             : '';
         return `<div class="movement-summary-row">
-      <span class="movement-summary-fighter">${e.name}</span>
+      <span class="movement-summary-fighter">${prettyName(e.name)}</span>
       <span class="movement-summary-stat">${e.stat}</span>
       <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
       <span class="movement-summary-delta ${cls}">${arrow}${Math.abs(e.delta)}</span>
