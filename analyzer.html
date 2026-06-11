@@ -5406,7 +5406,7 @@ body.compact-view .fighter-avatar-flag { font-size: 12px; }
 /* ── GLOW-UP 5: Plus-ultra round ── */
 
 /* Best Picks avatars */
-.best-picks-section .best-pick-row { grid-template-columns: 26px 34px 1fr auto auto; }
+.best-picks-section .best-pick-row:has(.bp-avatar) { grid-template-columns: 26px 34px 1fr auto auto; }
 .bp-avatar {
   position: relative; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
   background: linear-gradient(135deg, var(--bg4), var(--bg2));
@@ -5614,6 +5614,62 @@ html { scroll-behavior: smooth; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
 }
 @media (max-width: 1100px) { .panel-pair { grid-template-columns: 1fr; } }
+
+
+/* ── GLOW-UP 11: Cross-view navigation ── */
+.best-pick-row[data-jump], .movement-summary-row[data-jump] { cursor: pointer; }
+@keyframes jumpFlash {
+  0%   { box-shadow: 0 0 0 2px rgba(248,198,74,0.9), 0 0 44px rgba(248,198,74,0.4); }
+  100% { box-shadow: none; }
+}
+.fighter-row.jump-flash { animation: jumpFlash 1.6s ease-out; }
+
+
+/* ── GLOW-UP 12: Command palette ── */
+.cmd-palette {
+  position: fixed; inset: 0; z-index: 6500;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh;
+  background: rgba(2,4,10,0.7);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.cmd-palette.is-hidden { display: none; }
+.cmd-palette-box {
+  width: min(460px, 92vw);
+  background: var(--bg2); border: 1px solid var(--border3); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 40px rgba(248,198,74,0.1);
+}
+.cmd-palette-input {
+  width: 100%; background: var(--bg3); border: none; border-bottom: 1px solid var(--border2);
+  padding: 13px 16px; color: var(--text);
+  font-family: 'Sora', sans-serif; font-size: 14px; outline: none;
+}
+.cmd-palette-results { max-height: 330px; overflow-y: auto; }
+.cmd-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; }
+.cmd-item.sel, .cmd-item:hover { background: rgba(248,198,74,0.08); }
+.cmd-item-name { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--text); }
+.cmd-item-meta { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--text3); white-space: nowrap; }
+.cmd-item-empty { padding: 16px; font-size: 12px; color: var(--text3); text-align: center; }
+
+
+/* ── GLOW-UP 13: Archive predictions table ── */
+.pred-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) 64px 56px 64px 96px 1fr;
+  gap: 10px; align-items: center;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.12s;
+}
+.pred-row:hover { background: var(--bg3); }
+.pred-row:last-child { border-bottom: none; }
+.pred-fighter { display: flex; align-items: center; gap: 8px; min-width: 0; }
+@media (max-width: 1100px) {
+  .pred-row { grid-template-columns: minmax(150px, 1fr) 60px 50px 60px 90px; }
+  .pred-row > :last-child { grid-column: 1 / -1; }
+}
+
+/* Archive stat badges: hover lift to match the rest of the app */
+.archive-stat-badge { transition: transform 0.15s, box-shadow 0.15s; }
+.archive-stat-badge:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
 
 </style>
 </head>
@@ -6029,8 +6085,16 @@ html { scroll-behavior: smooth; }
     <div class="kbd-help-title">⌨ Keyboard Shortcuts</div>
     <div class="kbd-help-row"><span class="kbd-key">/</span> Focus search</div>
     <div class="kbd-help-row"><span class="kbd-key">1</span>–<span class="kbd-key">5</span> All · Over · Under · Best Picks · Parlay</div>
+    <div class="kbd-help-row"><span class="kbd-key">K</span> Quick-jump to any fighter</div>
     <div class="kbd-help-row"><span class="kbd-key">?</span> Toggle this help</div>
     <div class="kbd-help-row"><span class="kbd-key">Esc</span> Close</div>
+  </div>
+</div>
+
+<div id="cmdPalette" class="cmd-palette is-hidden">
+  <div class="cmd-palette-box">
+    <input id="cmdPaletteInput" class="cmd-palette-input" type="text" placeholder="Jump to fighter…" autocomplete="off">
+    <div id="cmdPaletteResults" class="cmd-palette-results"></div>
   </div>
 </div>
 

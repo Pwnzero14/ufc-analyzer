@@ -7056,7 +7056,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         }
       }
 
-      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}">
+      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
         <div><div class="best-pick-name">${prettyName(f.name)}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reason}</div></div>
@@ -7085,6 +7085,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         img.src = url;
       })
       .catch(() => { /* cosmetic only */ });
+  });
+
+  // Click a pick to jump to that fighter's card
+  container.querySelectorAll<HTMLElement>('.best-pick-row[data-jump]').forEach(el => {
+    el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
   });
 
   renderModelHealthWidget();
@@ -8596,8 +8601,8 @@ function renderPredictionsHtml(
       const confColor = confWidth >= 65 ? 'var(--green)' : confWidth >= 45 ? 'var(--amber)' : 'var(--red)';
       const reasons = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...p.fantasy.reasons.slice(0, 2)]
         .map(r => `<span style="display:inline-block;font-size:9px;color:var(--text-muted);background:rgba(255,255,255,0.04);padding:1px 5px;border-radius:3px;margin:1px 2px">${r}</span>`).join('');
-      return `<div class="best-pick-row" style="align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
-        <div style="min-width:110px"><div style="font-size:11px;font-weight:600;color:var(--text)">${p.fighter}</div><div style="font-size:9px;color:var(--text-muted)">vs ${p.opponent} · ${p.scheduledRounds}R</div></div>
+      return `<div class="pred-row" data-jump="${p.fighter}" title="Open fighter card">
+        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text)">${prettyName(p.fighter)}</div><div style="font-size:9px;color:var(--text-muted)">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</div></div></div>
         <div style="min-width:55px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">SS</div><div style="font-size:12px;font-weight:700;color:${ssColor}">${p.ss.line} ${ssArrow}</div></div>
         <div style="min-width:45px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">TD</div><div style="font-size:12px;font-weight:700;color:${tdColor}">${p.td.line} ${tdArrow}</div></div>
         <div style="min-width:55px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div></div>
@@ -9946,6 +9951,12 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       btn.disabled = false;
       btn.textContent = '↻ Force Backfill';
     }
+  });
+
+  // Pred rows: avatar hydration + jump-to-card
+  hydrateAvatarImgs(container);
+  container.querySelectorAll<HTMLElement>('.pred-row[data-jump]').forEach(el => {
+    el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
   });
 
   // Predictor: Generate Predictions button
@@ -14298,6 +14309,32 @@ function expandRowDetailPanel(row: HTMLElement): void {
   });
 }
 
+// Cross-view navigation: jump from Best Picks / Line Movers to a fighter's
+// card — switches to All Fighters, expands the row, scrolls, and flashes it.
+function jumpToFighterCard(name: string): void {
+  if (!name) return;
+  const go = (attempt = 0): void => {
+    const row = document.querySelector<HTMLElement>(`.fighter-row[data-name="${CSS.escape(name)}"]`);
+    if (!row) {
+      if (attempt < 10) setTimeout(() => go(attempt + 1), 100);
+      return;
+    }
+    if (!row.classList.contains('expanded')) toggleRow(row);
+    const y = row.getBoundingClientRect().top + window.scrollY - 150;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+    row.classList.remove('jump-flash');
+    void row.offsetWidth; // restart animation if re-triggered
+    row.classList.add('jump-flash');
+    setTimeout(() => row.classList.remove('jump-flash'), 1800);
+  };
+  if (currentView !== 'all') {
+    (document.querySelector('.tab-btn[data-view="all"]') as HTMLElement | null)?.click();
+    setTimeout(() => go(), 150);
+  } else {
+    go();
+  }
+}
+
 function toggleRow(row: HTMLElement): void {
   const wasExpanded = row.classList.contains('expanded');
   const desiredExpanded = !wasExpanded;
@@ -15895,7 +15932,7 @@ function renderLineMovementSummary(): void {
     const sparkHtml = sparkPoints.length >= 2
       ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.stat} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length-1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
       : '';
-    return `<div class="movement-summary-row">
+    return `<div class="movement-summary-row" data-jump="${e.name}" title="Open fighter card">
       <span class="movement-summary-fighter">${prettyName(e.name)}</span>
       <span class="movement-summary-stat">${e.stat}</span>
       <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
@@ -15913,6 +15950,9 @@ function renderLineMovementSummary(): void {
   };
 
   body.innerHTML = sectionHtml('▲ Steamers', 'rise', steamers) + sectionHtml('▼ Drifters', 'drop', drifters);
+  body.querySelectorAll<HTMLElement>('.movement-summary-row[data-jump]').forEach(el => {
+    el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+  });
   if (timeEl) timeEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
@@ -17471,13 +17511,63 @@ function initAnalyzerCore(): void {
   }
   updateSortTrendTriggerLabel();
 
+  // ── Quick-jump command palette (press K) ──────────────────────────────────
+  const cmdPalette = document.getElementById('cmdPalette');
+  const cmdInput = document.getElementById('cmdPaletteInput') as HTMLInputElement | null;
+  const cmdResults = document.getElementById('cmdPaletteResults');
+  let cmdSel = 0;
+  const closePalette = (): void => { cmdPalette?.classList.add('is-hidden'); };
+  const renderPalette = (q: string): void => {
+    if (!cmdResults) return;
+    const ql = q.trim().toLowerCase();
+    const items = allFighters
+      .filter(f => !ql || f.name.toLowerCase().includes(ql) || (f.opponent || '').toLowerCase().includes(ql))
+      .slice(0, 12);
+    cmdSel = Math.min(cmdSel, Math.max(0, items.length - 1));
+    cmdResults.innerHTML = items.length ? items.map((f, i) => `
+      <div class="cmd-item ${i === cmdSel ? 'sel' : ''}" data-name="${f.name}">
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></span>
+        <span class="cmd-item-name">${prettyName(f.name)}</span>
+        <span class="cmd-item-meta">${f.db?.record || ''} · vs ${prettyName(f.opponent || '—')}</span>
+      </div>`).join('') : '<div class="cmd-item-empty">No fighters match</div>';
+    hydrateAvatarImgs(cmdResults);
+    cmdResults.querySelectorAll<HTMLElement>('.cmd-item').forEach(el => {
+      el.addEventListener('click', () => { closePalette(); jumpToFighterCard(el.dataset['name'] || ''); });
+    });
+  };
+  const openPalette = (): void => {
+    if (!cmdPalette || !cmdInput) return;
+    cmdSel = 0;
+    cmdInput.value = '';
+    renderPalette('');
+    cmdPalette.classList.remove('is-hidden');
+    cmdInput.focus();
+  };
+  const movePaletteSel = (d: number): void => {
+    const items = Array.from(cmdResults?.querySelectorAll<HTMLElement>('.cmd-item') || []);
+    if (!items.length) return;
+    cmdSel = (cmdSel + d + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle('sel', i === cmdSel));
+    items[cmdSel].scrollIntoView({ block: 'nearest' });
+  };
+  cmdInput?.addEventListener('input', () => { cmdSel = 0; renderPalette(cmdInput.value); });
+  cmdInput?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); movePaletteSel(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); movePaletteSel(-1); }
+    else if (ev.key === 'Enter') {
+      const sel = cmdResults?.querySelectorAll<HTMLElement>('.cmd-item')[cmdSel];
+      if (sel?.dataset['name']) { closePalette(); jumpToFighterCard(sel.dataset['name']); }
+    } else if (ev.key === 'Escape') { closePalette(); }
+  });
+  cmdPalette?.addEventListener('click', (e) => { if (e.target === cmdPalette) closePalette(); });
+
   // ── Keyboard shortcuts: "/" search, 1-5 views, "?" help overlay ───────────
   const kbdHelp = document.getElementById('kbdHelp');
   kbdHelp?.addEventListener('click', (e) => { if (e.target === kbdHelp) kbdHelp.classList.add('is-hidden'); });
   document.addEventListener('keydown', (ev) => {
     const t = ev.target as HTMLElement | null;
     const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-    if (ev.key === 'Escape') { kbdHelp?.classList.add('is-hidden'); return; }
+    if (ev.key === 'Escape') { kbdHelp?.classList.add('is-hidden'); cmdPalette?.classList.add('is-hidden'); return; }
     if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (ev.key === '/') {
       ev.preventDefault();
@@ -17485,6 +17575,7 @@ function initAnalyzerCore(): void {
       return;
     }
     if (ev.key === '?') { ev.preventDefault(); kbdHelp?.classList.toggle('is-hidden'); return; }
+    if (ev.key === 'k' || ev.key === 'K') { ev.preventDefault(); openPalette(); return; }
     const viewByKey: Record<string, string> = { '1': 'all', '2': 'over', '3': 'under', '4': 'bestpicks', '5': 'parlaylab' };
     const view = viewByKey[ev.key];
     if (view) {
