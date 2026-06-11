@@ -274,33 +274,55 @@ export class StorageService {
     return /quota/i.test(msg);
   }
 
-  // Thin redundant backup keys to reclaim space. A "backup" key contains "backup"
-  // (case-insensitive). Keys are grouped into families by stripping a trailing
-  // _<epoch>; the newest per family is kept and the rest deleted. Never deletes the
-  // live archive (prop_archive_v1), platform lines (lines_*), or any non-backup key.
+  // Thin redundant backup keys to reclaim space. Backups are redundant snapshots of
+  // the live archive (prop_archive_v1), so deleting old ones is safe. Uses the same
+  // detection + family grouping as snippets/2026-06-09_backup_prune.js: a backup key
+  // matches the backup patterns below, and a "family" is the key minus its trailing
+  // timestamp (epoch OR ISO-ish suffix). Keeps the newest per family, deletes the rest.
+  // Never touches prop_archive_v1, platform lines (lines_*), or any non-backup key.
   private static async pruneBackupsForQuota(): Promise<number> {
     const all: Record<string, any> = await new Promise((resolve) => {
       chrome.storage.local.get(null, (r) => resolve(r || {}));
     });
-    const backupKeys = Object.keys(all).filter((k) => /backup/i.test(k) && k !== 'prop_archive_v1');
-    if (!backupKeys.length) return 0;
-    const trailingNum = (k: string) => Number((k.match(/_(\d+)$/) || [])[1] || 0);
-    const familyOf = (k: string) => k.replace(/_\d+$/, '');
-    const families = new Map<string, string[]>();
-    for (const k of backupKeys) {
-      const arr = families.get(familyOf(k)) || [];
-      arr.push(k);
-      families.set(familyOf(k), arr);
+    const enc = new TextEncoder();
+    const sizeMB = (v: any): number => { try { return enc.encode(JSON.stringify(v)).length / 1048576; } catch { return 0; } };
+    const isBackup = (k: string): boolean =>
+      k !== 'prop_archive_v1' &&
+      (/^prop_archive_(orphan_)?backup_/.test(k) || /^betr_backup_/.test(k) || /_backup_/i.test(k) || /backup/i.test(k));
+    const familyOf = (k: string): string => k.replace(/[_-]\d[\d\-T:.Z]*$/, '');
+
+    const backups = Object.keys(all).filter(isBackup);
+    const totalMB = Object.keys(all).reduce((s, k) => s + sizeMB(all[k]), 0);
+    const backupMB = backups.reduce((s, k) => s + sizeMB(all[k]), 0);
+    console.warn(`${CONFIG.logging.prefix} StorageService quota recovery: total≈${totalMB.toFixed(2)}MB across ${Object.keys(all).length} keys, ${backups.length} backup key(s)≈${backupMB.toFixed(2)}MB`);
+
+    if (!backups.length) {
+      // Bloat isn't in backups (likely the live archive or stats cache). Log the biggest
+      // keys so a persistent quota failure is diagnosable instead of silent.
+      const top = Object.keys(all).map((k) => ({ key: k, MB: +sizeMB(all[k]).toFixed(2) })).sort((a, b) => b.MB - a.MB).slice(0, 8);
+      console.warn(`${CONFIG.logging.prefix} StorageService: no backup keys to prune. Largest keys:`, top);
+      return 0;
     }
+
+    const fams: Record<string, string[]> = {};
+    for (const k of backups) (fams[familyOf(k)] ||= []).push(k);
     const toDelete: string[] = [];
-    for (const keys of families.values()) {
-      if (keys.length <= 1) continue; // keep a family's only (newest) backup
-      const sorted = keys.slice().sort((a, b) => trailingNum(a) - trailingNum(b));
-      toDelete.push(...sorted.slice(0, -1)); // delete all but the newest
+    for (const keys of Object.values(fams)) {
+      keys.sort(); // timestamps sort lexically within a family
+      toDelete.push(...keys.slice(0, Math.max(0, keys.length - 1))); // keep newest per family
+    }
+
+    // Fallback: if every backup family is a singleton, thinning frees nothing. Since
+    // backups are redundant copies of prop_archive_v1 (still intact), drop all but the
+    // single largest backup to recover — the live data is never at risk.
+    if (!toDelete.length && backups.length > 1) {
+      const bySize = backups.slice().sort((a, b) => sizeMB(all[b]) - sizeMB(all[a]));
+      toDelete.push(...bySize.slice(1));
     }
     if (!toDelete.length) return 0;
+
     await this.chromeClear(toDelete);
-    this.log(`Quota recovery: pruned ${toDelete.length} backup key(s): ${toDelete.join(', ')}`);
+    this.log(`Quota recovery: pruned ${toDelete.length} backup key(s)`);
     return toDelete.length;
   }
 
