@@ -7,15 +7,15 @@ export const CONFIG = {
       id: 'pick6',
       label: 'Pick6 (DraftKings)',
       color: '#63b3ed',
-      // 2026-05-28: Bare `?sport=UFC` URL loads but is missing the Time parent
-      // tab (no Control Time sub-tab access) until DK's SPA redirects to the
-      // /category/N URL — which happens too slowly for the auto-fetch scrape.
-      // Target /category/46 directly; the cached pickGroup gets appended by the
-      // injection in background.ts so we land on the per-event view immediately.
+      // 2026-06-11: `/category/46?sport=UFC` now DEAD — it redirects a logged-out
+      // browser to the Pick6 homepage (World Cup), scraping 0 UFC fighters. The
+      // live entry point for the current card is the bare root `/?sport=UFC` (what
+      // the in-app UFC tab navigates to). The SPA loads UFC fighter cards + stat
+      // tabs from there; the content script clicks through SS/TD tabs to capture.
       // DK has used /category/46, /category/129, and bare ?sport=UFC across the
-      // past two months — if Pick6 fetching breaks, first check what URL a
-      // logged-out browser actually lands on for the current card.
-      url: 'https://pick6.draftkings.com/category/46?sport=UFC',
+      // past months — if Pick6 fetching breaks, first check what URL a logged-out
+      // browser actually lands on for the current card (click the in-app UFC tab).
+      url: 'https://pick6.draftkings.com/?sport=UFC',
     },
     underdog: {
       id: 'underdog',

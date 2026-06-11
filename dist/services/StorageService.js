@@ -230,7 +230,7 @@ export class StorageService {
             });
         });
     }
-    static chromeSet(obj) {
+    static chromeSetRaw(obj) {
         return new Promise((resolve, reject) => {
             chrome.storage.local.set(obj, () => {
                 const err = chrome.runtime.lastError;
@@ -240,6 +240,59 @@ export class StorageService {
                     resolve();
             });
         });
+    }
+    // Write wrapper with automatic quota recovery. chrome.storage.local has a ~10 MB
+    // cap; when old archive backups fill it, every line write fails with
+    // "Resource::kQuotaBytes quota exceeded" and platforms silently stop persisting
+    // (UD/DK go blank). On a quota error we prune stale *backup* keys — keeping the
+    // newest per family and never touching the live archive (prop_archive_v1),
+    // platform lines (lines_*), or any non-backup key — then retry the write once.
+    static chromeSet(obj) {
+        return this.chromeSetRaw(obj).catch(async (err) => {
+            if (!this.isQuotaError(err))
+                throw err;
+            const pruned = await this.pruneBackupsForQuota();
+            if (pruned <= 0)
+                throw err;
+            console.warn(`${CONFIG.logging.prefix} StorageService: quota hit — pruned ${pruned} old backup key(s), retrying write`);
+            return this.chromeSetRaw(obj);
+        });
+    }
+    static isQuotaError(error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return /quota/i.test(msg);
+    }
+    // Thin redundant backup keys to reclaim space. A "backup" key contains "backup"
+    // (case-insensitive). Keys are grouped into families by stripping a trailing
+    // _<epoch>; the newest per family is kept and the rest deleted. Never deletes the
+    // live archive (prop_archive_v1), platform lines (lines_*), or any non-backup key.
+    static async pruneBackupsForQuota() {
+        const all = await new Promise((resolve) => {
+            chrome.storage.local.get(null, (r) => resolve(r || {}));
+        });
+        const backupKeys = Object.keys(all).filter((k) => /backup/i.test(k) && k !== 'prop_archive_v1');
+        if (!backupKeys.length)
+            return 0;
+        const trailingNum = (k) => Number((k.match(/_(\d+)$/) || [])[1] || 0);
+        const familyOf = (k) => k.replace(/_\d+$/, '');
+        const families = new Map();
+        for (const k of backupKeys) {
+            const arr = families.get(familyOf(k)) || [];
+            arr.push(k);
+            families.set(familyOf(k), arr);
+        }
+        const toDelete = [];
+        for (const keys of families.values()) {
+            if (keys.length <= 1)
+                continue; // keep a family's only (newest) backup
+            const sorted = keys.slice().sort((a, b) => trailingNum(a) - trailingNum(b));
+            toDelete.push(...sorted.slice(0, -1)); // delete all but the newest
+        }
+        if (!toDelete.length)
+            return 0;
+        await this.chromeClear(toDelete);
+        this.log(`Quota recovery: pruned ${toDelete.length} backup key(s): ${toDelete.join(', ')}`);
+        return toDelete.length;
     }
     static chromeClear(keys) {
         return new Promise((resolve, reject) => {

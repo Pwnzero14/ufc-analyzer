@@ -1910,7 +1910,7 @@ async function fetchUnderdogFromBackground(): Promise<UnderdogCoverage> {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const timeoutMs = 18000 + (attempt - 1) * 6000;
-        const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        const res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) continue;
         const data = await res.json();
         const fighters = parseUnderdogApiFighters(data);
@@ -2315,9 +2315,15 @@ async function autoScrapeAllPlatforms(): Promise<any> {
     await Promise.all(orderedPlatforms.map(async (platform) => {
       // Clear this platform individually right before fetching so stale data doesn't leak,
       // while leaving all OTHER platforms' stored lines intact so the analyzer always
-      // has the most complete combined view available.
-      store[platform] = null;
-      try { await chrome.storage.local.remove([`lines_${platform}`]); } catch { /* ok */ }
+      // has the most complete combined view available. EXCEPTION: Underdog fetches via an
+      // authenticated API and merges onto existing lines (fetchUnderdogFromBackground), so
+      // clearing it first means a transient/rate-limited/401 miss blanks UD entirely
+      // ("UD no data"). Skip the pre-clear for UD: a failed fetch then keeps last-good
+      // lines, while a successful fetch still merges/replaces them.
+      if (platform !== 'underdog') {
+        store[platform] = null;
+        try { await chrome.storage.local.remove([`lines_${platform}`]); } catch { /* ok */ }
+      }
 
       let urls = AUTO_SCRAPE_URLS[platform];
       // Pick6 /category/N URLs redirect to the homepage without pickGroup. Inject the

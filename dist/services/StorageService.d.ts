@@ -24,7 +24,10 @@ export declare class StorageService {
     static getErrorLog(): Promise<AppError[]>;
     static clearErrorLog(): Promise<void>;
     private static chromeGet;
+    private static chromeSetRaw;
     private static chromeSet;
+    private static isQuotaError;
+    private static pruneBackupsForQuota;
     private static chromeClear;
 }
 //# sourceMappingURL=StorageService.d.ts.map

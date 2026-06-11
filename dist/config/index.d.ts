@@ -4,7 +4,7 @@ export declare const CONFIG: {
             readonly id: "pick6";
             readonly label: "Pick6 (DraftKings)";
             readonly color: "#63b3ed";
-            readonly url: "https://pick6.draftkings.com/category/46?sport=UFC";
+            readonly url: "https://pick6.draftkings.com/?sport=UFC";
         };
         readonly underdog: {
             readonly id: "underdog";
