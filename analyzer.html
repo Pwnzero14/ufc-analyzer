@@ -5783,6 +5783,53 @@ html { scroll-behavior: smooth; }
 }
 .ps-bar > span { display: block; height: 100%; border-radius: 3px; opacity: 0.85; }
 
+
+/* ── GLOW-UP 17: Skeleton loaders + staleness chips ── */
+.skel-wrap { display: flex; flex-direction: column; gap: 14px; padding: 10px 28px 40px; }
+.skel-section {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.skel-bar {
+  height: 12px; border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 600px 100%;
+  animation: skelShimmer 1.3s linear infinite;
+}
+.skel-title { width: 220px; height: 14px; }
+.skel-w70 { width: 70%; }
+.skel-w45 { width: 45%; }
+@keyframes skelShimmer { from { background-position: -600px 0; } to { background-position: 600px 0; } }
+@media (prefers-reduced-motion: reduce) { .skel-bar { animation: none; } }
+
+/* Data-age chip: color by staleness */
+.status-chunk.age-fresh { color: var(--green); background: rgba(0,232,122,0.07); }
+.status-chunk.age-aging { color: var(--gold); background: rgba(248,198,74,0.07); }
+.status-chunk.age-stale { color: var(--red); background: rgba(255,58,96,0.08); text-shadow: 0 0 8px rgba(255,58,96,0.4); }
+
+
+/* ── GLOW-UP 18: "Since you were away" briefing ── */
+.visit-briefing {
+  margin: 10px 28px 0; padding: 8px 14px;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  background: linear-gradient(90deg, rgba(248,198,74,0.07), rgba(86,195,255,0.05)), var(--bg2);
+  border: 1px solid rgba(248,198,74,0.25); border-radius: 8px;
+  font-size: 11px; color: var(--text2);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 24px rgba(248,198,74,0.06);
+  animation: glowViewIn 0.3s ease both;
+}
+.visit-briefing.is-hidden { display: none; }
+.vb-title {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 11px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold);
+}
+.vb-item { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; }
+.vb-item b { color: var(--text); font-weight: 600; }
+.vb-up { color: var(--green); }
+.vb-down { color: var(--red); }
+.vb-close { margin-left: auto; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; }
+.vb-close:hover { color: var(--text); }
+
 </style>
 </head>
 <body>
@@ -5995,6 +6042,7 @@ html { scroll-behavior: smooth; }
 </div>
 
 <!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
+<div id="visitBriefing" class="visit-briefing is-hidden"></div>
 <div id="slateStatusBanner" class="slate-banner">
 <!-- PRE-LOCK QA PANEL -->
 <div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>

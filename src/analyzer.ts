@@ -346,6 +346,75 @@ function hydrateAvatarImgs(root: ParentNode): void {
   });
 }
 
+// ── "Since you were away" briefing ─────────────────────────────────────────
+// Snapshots active lines + effective leans per visit (localStorage) and shows
+// a dismissible strip summarizing what changed while you were gone.
+const VISIT_SNAPSHOT_KEY = 'visit_snapshot_v1';
+interface VisitSnapshot { ts: number; lines: Record<string, number>; leans: Record<string, string>; }
+
+function renderVisitBriefing(): void {
+  const el = document.getElementById('visitBriefing');
+  if (!el || !allFighters.length) return;
+
+  let prev: VisitSnapshot | null = null;
+  try { prev = JSON.parse(localStorage.getItem(VISIT_SNAPSHOT_KEY) || 'null') as VisitSnapshot | null; } catch { prev = null; }
+
+  const lines: Record<string, number> = {};
+  const leans: Record<string, string> = {};
+  const stats = ['fp', 'ss', 'td', 'ft', 'ctrl'] as LeanSource[];
+  for (const f of allFighters) {
+    leans[f.name] = getEffectiveLean(f).lean;
+    for (const s of stats) {
+      const ln = getSourceActiveLine(f, s);
+      if (ln != null && Number.isFinite(Number(ln))) lines[`${f.name}|${s}`] = Number(ln);
+    }
+  }
+  const snap: VisitSnapshot = { ts: Date.now(), lines, leans };
+  const save = (): void => { try { localStorage.setItem(VISIT_SNAPSHOT_KEY, JSON.stringify(snap)); } catch { /* quota */ } };
+
+  if (!prev) { save(); return; }
+  const gapMs = Date.now() - prev.ts;
+  if (gapMs < 30 * 60 * 1000) return;                    // same visit cluster — keep baseline
+  if (gapMs > 7 * 24 * 3600 * 1000) { save(); return; }  // ancient snapshot — not meaningful
+
+  const moves: { name: string; stat: string; from: number; to: number; d: number }[] = [];
+  for (const [k, v] of Object.entries(lines)) {
+    const pv = prev.lines[k];
+    if (pv != null && Math.abs(v - pv) >= 0.5) {
+      const [name, stat] = k.split('|');
+      moves.push({ name, stat: (stat || '').toUpperCase(), from: pv, to: v, d: v - pv });
+    }
+  }
+  moves.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+
+  const flips: { name: string; from: string; to: string }[] = [];
+  for (const [name, lv] of Object.entries(leans)) {
+    const pv = prev.leans[name];
+    if (pv != null && pv !== lv && (lv === 'over' || lv === 'under')) flips.push({ name, from: pv, to: lv });
+  }
+
+  if (!moves.length && !flips.length) { save(); el.classList.add('is-hidden'); return; }
+
+  const ago = gapMs < 3600e3 ? `${Math.round(gapMs / 60000)}m` : gapMs < 86400e3 ? `${Math.round(gapMs / 3600e3)}h` : `${Math.round(gapMs / 86400e3)}d`;
+  const big = moves[0];
+  const movesStr = moves.length
+    ? `<span class="vb-item">📈 <b>${moves.length}</b> line${moves.length > 1 ? 's' : ''} moved${big ? ` · biggest: <b>${prettyName(big.name)}</b> ${big.stat} ${big.from}→${big.to} <span class="${big.d > 0 ? 'vb-up' : 'vb-down'}">${big.d > 0 ? '▲' : '▼'}${Math.abs(big.d).toFixed(1)}</span>` : ''}</span>`
+    : '';
+  const flipsStr = flips.length
+    ? `<span class="vb-item">🔄 <b>${flips.length}</b> lean${flips.length > 1 ? 's' : ''} flipped: ${flips.slice(0, 3).map(x => `<b>${prettyName(x.name)}</b> ${x.from === 'none' ? '' : x.from.toUpperCase() + '→'}${x.to.toUpperCase()}`).join(', ')}${flips.length > 3 ? '…' : ''}</span>`
+    : '';
+  el.innerHTML = `<span class="vb-title">⏱ Since your last visit · ${ago} ago</span>${movesStr}${flipsStr}<button class="vb-close" title="Dismiss">✕</button>`;
+  el.classList.remove('is-hidden');
+  el.querySelector('.vb-close')?.addEventListener('click', () => el.classList.add('is-hidden'));
+  save();
+}
+
+// Shimmer skeleton shown while heavy panels (archive/calibration) load.
+function loadingSkeleton(label: string): string {
+  const section = `<div class="skel-section"><div class="skel-bar skel-title"></div><div class="skel-bar"></div><div class="skel-bar skel-w70"></div><div class="skel-bar skel-w45"></div></div>`;
+  return `<div class="skel-wrap" aria-label="${label}" title="${label}">${section}${section}${section}</div>`;
+}
+
 function prettyName(name: string | null | undefined): string {
   const raw = (name ?? '').toString();
   if (!raw) return raw;
@@ -8731,7 +8800,7 @@ function renderPredictionsHtml(
 }
 
 async function renderArchivePanel(container: HTMLElement): Promise<void> {
-  container.innerHTML = '<div class="inline-empty-msg">Loading prop archive...</div>';
+  container.innerHTML = loadingSkeleton('Loading prop archive…');
 
   // Auto-settle once per session if there are past unresolved events
   if (!_archiveAutoSettleFired) {
@@ -9450,7 +9519,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         <div style="font-size:8px;color:${diffColor};font-weight:700${lowN ? ';opacity:0.5' : ''}">${diffSign}${diff}%</div>
         <div style="position:relative;width:100%;height:${maxBarH}px;display:flex;align-items:flex-end;justify-content:center">
           <div style="position:absolute;bottom:0;width:60%;height:${predictedH}px;background:rgba(125,145,190,0.12);border:1px dashed rgba(125,145,190,0.3);border-radius:3px" title="Predicted: ${predicted}%"></div>
-          <div style="position:relative;width:50%;height:${actualH}px;background:${actualColor};opacity:${lowN ? 0.45 : 0.85};border-radius:3px;z-index:1" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
+          <div style="position:relative;width:50%;height:${actualH}px;background:${actualColor};opacity:${lowN ? 0.45 : 0.85};border-radius:4px 4px 2px 2px;box-shadow:0 0 10px ${actualColor};z-index:1" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
         </div>
         <div style="font-size:9px;font-weight:700;color:var(--text)">${actualRate}%</div>
         <div style="font-size:8px;color:var(--text-muted)">${b.rangeLabel}</div>
@@ -10226,7 +10295,7 @@ function getRecalibratedConfidence(rawConf: number, source?: LeanSource): number
 
 // ── Calibration Panel (dedicated tab) ────────────────────────────────────────
 async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
-  container.innerHTML = '<div class="inline-empty-msg">Loading calibration data...</div>';
+  container.innerHTML = loadingSkeleton('Loading calibration data…');
 
   const [archivePayload, aiSnapshotPayload] = await Promise.all([
     storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY]),
@@ -10455,7 +10524,7 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
       <div style="font-size:9px;color:${diffColor};font-weight:700${lowN ? ';opacity:0.5' : ''}">${diffSign}${diff}%</div>
       <div style="position:relative;width:100%;height:${maxBarH}px;display:flex;align-items:flex-end;justify-content:center">
         <div style="position:absolute;bottom:0;width:60%;height:${predictedH}px;background:rgba(125,145,190,0.12);border:1px dashed rgba(125,145,190,0.3);border-radius:3px" title="Predicted: ${predicted}%"></div>
-        <div style="position:relative;width:50%;height:${actualH}px;background:${actualColor};opacity:${lowN ? 0.45 : 0.85};border-radius:3px;z-index:1" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
+        <div style="position:relative;width:50%;height:${actualH}px;background:${actualColor};opacity:${lowN ? 0.45 : 0.85};border-radius:4px 4px 2px 2px;box-shadow:0 0 10px ${actualColor};z-index:1" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
       </div>
       <div style="font-size:10px;font-weight:700;color:var(--text)">${actualRate}%</div>
       <div style="font-size:9px;color:var(--text-muted)">${b.rangeLabel}</div>
@@ -15466,7 +15535,7 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
       : `Max line delta from opening: ${_maxDelta.toFixed(1)}`;
     _oc.innerHTML =
       `<span class="status-chunk" title="${archiveTitle}">${archiveText}</span>` +
-      `<span class="status-chunk">🕒 ${ageH}h old</span>` +
+      `<span class="status-chunk age-${Number(ageH) < 6 ? 'fresh' : Number(ageH) < 48 ? 'aging' : 'stale'}" title="Opening lines captured ${ageH}h ago">🕒 ${ageH}h old</span>` +
       `<span class="status-chunk" title="${movementTitle}">max Δ${_maxDelta.toFixed(1)}${recentMoveTrail}</span>`;
     // Show reset button when baselines exist
     const _rb = document.getElementById('resetBaselinesBtn');
@@ -15474,6 +15543,7 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
   } else if (_oc) {
     _oc.textContent = _openingLines.size === 0 ? ' · 📍awaiting baseline' : '';
   }
+  renderVisitBriefing();
   showToast(`Loaded ${allFighters.filter(f => f.db?.loaded).length} fighters with stats!`);
 }
 
