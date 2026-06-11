@@ -100,6 +100,8 @@ function scrapePick6() {
                         fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
                     }
                     fighters[name].line_ss = line;
+                    // Pick6 sometimes only offers "More" (OVER) on SS — detect Less button.
+                    fighters[name].ss_under_available = /\bLess\b/i.test(cardText);
                 }
             }
             const tdMatch = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
@@ -110,6 +112,8 @@ function scrapePick6() {
                         fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
                     }
                     fighters[name].line_td = line;
+                    // Pick6 low takedown lines are often More/OVER-only — detect Less button.
+                    fighters[name].td_under_available = /\bLess\b/i.test(cardText);
                 }
             }
             // Control Time — minutes. Accepts "2:30 Control" or "2.5 Control Time".
@@ -391,6 +395,10 @@ function scrapeUnderdog() {
                 else if (label.includes('takedown'))
                     lineType = 'td';
                 if (!lineType)
+                    continue;
+                // Takedown lines are bounded (~0.5–6.5); reject SS/FP-magnitude values that
+                // would otherwise land in line_td and surface as a bogus "TD UNDER 59.5".
+                if (lineType === 'td' && (val < 0 || val >= 20))
                     continue;
                 if (!fighters[name])
                     fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, opponent };

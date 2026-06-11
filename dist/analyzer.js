@@ -6342,6 +6342,17 @@ function renderBestPicks(container, renderSeq = 0) {
                 return dir === 'over' ? (f.ud_ft_over_avail ?? null) : (f.ud_ft_under_avail ?? null);
             return null;
         };
+        // Pick6 SS/TD props are frequently More/OVER-only (e.g. low takedown lines) — the
+        // card shows no "Less" button, so an UNDER lean is unplaceable. Captured at scrape
+        // via the Less-button check. true = Less offered, false = More-only, null = unknown
+        // (pre-flag / stale lines captured before this was tracked — leave alone, don't drop).
+        const p6UnderAvailable = (f, source) => {
+            if (source === 'ss')
+                return f.ss_under_available ?? null;
+            if (source === 'td')
+                return f.td_under_available ?? null;
+            return null;
+        };
         const isCandidateUsable = (f, c) => {
             // Existing FP pick-em rules (UD/P6/Betr underdog UNDER not offered, Betr OVER inflated).
             if (shouldSkipFpSideForFighter(f, c._source, c.lean))
@@ -6372,6 +6383,12 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             else if (platform === 'draftkings_sportsbook' && sideOdds == null) {
                 // DK posts both sides explicitly; null odds means the side wasn't scraped.
+                return false;
+            }
+            else if (platform === 'pick6' && dir === 'under' && p6UnderAvailable(f, c._source) === false) {
+                // Pick6 offered only "More" (OVER) on this SS/TD prop — no Less/UNDER side, so
+                // the under can't be placed. Only drop on positive confirmation (false); null
+                // (stale lines pre-flag) is left alone until the user re-fetches Pick6.
                 return false;
             }
             // Chalk reject: implied prob > 0.667 means -200+ American — line hits often
@@ -14014,6 +14031,8 @@ function createMergedLineEntry(name) {
         ctrl_over_odds: null,
         ctrl_under_odds: null,
         ctrl_under_available: null,
+        ss_under_available: null,
+        td_under_available: null,
         ud_ss_over_avail: null,
         ud_ss_under_avail: null,
         ud_td_over_avail: null,
@@ -14047,6 +14066,12 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             return false;
         return true;
     }
+    // Takedown lines are physically bounded (UFC single-fight record ~21; real prop
+    // lines sit at 0.5–6.5). Some scraper paths (UD/secondary) lack the range guard
+    // Pick6 has, letting an SS-magnitude value (e.g. 59.5) land in a *_td field and
+    // surface as a bogus "TD UNDER 59.5". Sanitize every TD assignment at merge so it
+    // also cleans already-stored stale lines without needing a fresh re-fetch.
+    const plausibleTd = (v) => (v != null && Number.isFinite(v) && v >= 0 && v < 20) ? v : null;
     (p6Fighters || []).forEach((f) => {
         if (!isValidFighterName(f.name))
             return;
@@ -14057,7 +14082,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             map[n] = createMergedLineEntry(n);
         map[n].line_p6 = f.line_fp ?? f.line ?? null;
         map[n].line_p6_ss = f.line_ss ?? null;
-        map[n].line_p6_td = f.line_td ?? null;
+        map[n].line_p6_td = plausibleTd(f.line_td);
         map[n].line_p6_ft = f.line_ft ?? null;
         map[n].line_p6_ctrl = f.line_ctrl ?? null;
         if (f.ss_over_odds != null)
@@ -14078,6 +14103,10 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             map[n].ctrl_under_odds = f.ctrl_under_odds;
         if (f.ctrl_under_available != null)
             map[n].ctrl_under_available = f.ctrl_under_available;
+        if (f.ss_under_available != null)
+            map[n].ss_under_available = f.ss_under_available;
+        if (f.td_under_available != null)
+            map[n].td_under_available = f.td_under_available;
         if (f.opponent)
             map[n].opponent = normalizeName(f.opponent);
     });
@@ -14118,7 +14147,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         entry.line_ud = f.line_fp ?? f.line ?? null;
         entry.line_ud_ss = f.line_ss ?? null;
         entry.line_ud_ss_r1 = f.line_ss_r1 ?? null;
-        entry.line_ud_td = f.line_td ?? null;
+        entry.line_ud_td = plausibleTd(f.line_td);
         entry.line_ud_ft = f.line_ft ?? null;
         entry.line_ud_ctrl = f.line_ctrl ?? null;
         if (f.ss_over_odds != null)
@@ -14161,7 +14190,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const entry = findOrCreateEntry(n);
         entry.line_betr = f.line_fp ?? f.line ?? null;
         entry.line_betr_ss = f.line_ss ?? null;
-        entry.line_betr_td = f.line_td ?? null;
+        entry.line_betr_td = plausibleTd(f.line_td);
         entry.line_betr_ft = f.line_ft ?? null;
         entry.line_betr_ctrl = f.line_ctrl ?? null;
         if (f.opponent) {
@@ -14192,7 +14221,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         entry.line_pp = f.line_fp ?? f.line ?? null;
         entry.line_pp_ss = f.line_ss ?? null;
         entry.line_pp_ss_r1 = f.line_ss_r1 ?? null;
-        entry.line_pp_td = f.line_td ?? null;
+        entry.line_pp_td = plausibleTd(f.line_td);
         entry.line_pp_ft = f.line_ft ?? null;
         entry.line_pp_ctrl = f.line_ctrl ?? null;
         if (f.opponent)
@@ -14206,7 +14235,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             return;
         const entry = findOrCreateEntry(n);
         entry.line_dk_ss = f.line_ss ?? null;
-        entry.line_dk_td = f.line_td ?? null;
+        entry.line_dk_td = plausibleTd(f.line_td);
         entry.line_dk_ft = f.line_ft ?? null;
         entry.line_dk_ctrl = f.line_ctrl ?? null;
         if (f.ss_over_odds != null)

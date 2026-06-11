@@ -61,6 +61,8 @@ export class ScraperService {
               fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
             }
             fighters[name].line_ss = line;
+            // Pick6 sometimes only offers "More" (OVER) on SS — detect Less button.
+            fighters[name].ss_under_available = /\bLess\b/i.test(cardText);
           }
         }
 
@@ -73,6 +75,8 @@ export class ScraperService {
               fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
             }
             fighters[name].line_td = line;
+            // Pick6 low takedown lines are often More/OVER-only — detect Less button.
+            fighters[name].td_under_available = /\bLess\b/i.test(cardText);
           }
         }
 
