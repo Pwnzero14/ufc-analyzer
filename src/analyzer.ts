@@ -6584,6 +6584,18 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // across all books that have a value (lowest for OVER, highest for UNDER).
   // FP already runs per-book candidate generation and carries _platform on the
   // chosen candidate; FP and push/none directions short-circuit to null here.
+  // SS UNDER side availability is asymmetric across pick-em books: Pick6 / PrizePicks /
+  // Betr offer the SS UNDER only for FAVORITES (underdogs are More/OVER-only), while
+  // Underdog offers it only for UNDERDOGS. DraftKings (a real sportsbook) has both sides.
+  // So a fighter's SS under is placeable on Pick6/PP/Betr if they're a favorite, on
+  // Underdog if they're a dog, and on DK either way.
+  const ssUnderBookOffered = (f: AnalyzerFighter, book: SourcePlatformKey): boolean => {
+    if (book === 'draftkings_sportsbook') return true;
+    const dog = isMoneylineUnderdog(f);
+    if (book === 'underdog') return dog;
+    return !dog; // pick6 / prizepicks / betr → favorites only
+  };
+
   const bestSideLineForPick = (
     f: AnalyzerFighter,
     source: EffectiveLean['_source'] | undefined,
@@ -6595,6 +6607,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const books: SourcePlatformKey[] = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
     const candidates: Array<{ line: number; book: SourcePlatformKey }> = [];
     for (const b of books) {
+      // For SS unders, only consider books that actually offer the under side for this
+      // fighter's favorite/underdog status — otherwise we'd surface an unplaceable line
+      // (e.g. a non-favorite's SS under on Pick6, which is OVER-only there).
+      if (source === 'ss' && dir === 'under' && !ssUnderBookOffered(f, b)) continue;
       const v = lineForLeanSource(f, source, b);
       if (v != null) candidates.push({ line: v, book: b });
     }
@@ -6702,15 +6718,19 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     } else if (platform === 'draftkings_sportsbook' && sideOdds == null) {
       // DK posts both sides explicitly; null odds means the side wasn't scraped.
       return false;
-    } else if (platform === 'pick6' && dir === 'under') {
-      // Pick6 frequently offers only "More" (OVER) on these props — no Less/UNDER side,
-      // so the under can't be placed. TD is predominantly OVER-only (low takedown lines),
-      // so suppress the under unless a Less button was POSITIVELY confirmed at scrape
-      // (=== true) — same suppress-by-default rule already used for Pick6 CTRL. SS is
-      // more often two-sided, so it keeps the lighter rule (drop only on confirmed false).
-      const p6avail = p6UnderAvailable(f, c._source);
-      if (c._source === 'td' && p6avail !== true) return false;
-      if (c._source === 'ss' && p6avail === false) return false;
+    } else if (platform === 'pick6' && c._source === 'td' && dir === 'under' && p6UnderAvailable(f, 'td') !== true) {
+      // Pick6 TD unders are almost always More/OVER-only (low takedown lines) and aren't
+      // offered on other books either, so suppress unless a Less button was positively
+      // confirmed at scrape (suppress-by-default, same rule as Pick6 CTRL).
+      return false;
+    }
+    // SS UNDER placeability is favorite-dependent and book-specific: keep the candidate
+    // only if SOME book offers the under side for this fighter (favorites → Pick6/PP/Betr,
+    // underdogs → Underdog, DK → either). Drops e.g. a non-favorite whose SS line sits only
+    // on Pick6 (OVER-only there); bestSideLineForPick then shows whichever book is valid.
+    if (c._source === 'ss' && dir === 'under') {
+      const ssBooks: SourcePlatformKey[] = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
+      if (!ssBooks.some(b => ssUnderBookOffered(f, b) && lineForLeanSource(f, 'ss', b) != null)) return false;
     }
     // Chalk reject: implied prob > 0.667 means -200+ American — line hits often
     // but pays so little that even a strong lean isn't worth taking. FT UNDER
