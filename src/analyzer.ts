@@ -8696,7 +8696,7 @@ function renderPredictionsHtml(
       <span style="padding:3px 9px;background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.28);border-radius:10px;color:var(--red);font-weight:500">▼ Worst · ${s.worstPrediction}</span>
     </div>
     <div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px;color:var(--text-muted);flex-wrap:wrap">
-      <span><span style="text-transform:uppercase;letter-spacing:0.08em;font-size:9px;opacity:0.75">Weights</span> ${wAdj}</span>
+      <details class="weights-details"><summary>Weights — click to expand</summary><div class="weights-body">${wAdj}</div></details>
       <span><span style="text-transform:uppercase;letter-spacing:0.08em;font-size:9px;opacity:0.75">Trends</span> ${s.trendUpdates}</span>
     </div>
     ${deltaRows}`;
@@ -9148,8 +9148,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const upcomingHtml = upcomingEvents
     .filter(d => d.unresolved > 0 || d.total > 0) // hide empty shell events
     .map(d =>
-      `<div class="best-pick-row" style="opacity:0.6">
-        <div class="best-pick-rank" style="font-size:10px;min-width:44px;color:var(--text-muted)">UPCOMING</div>
+      `<div class="event-row" style="opacity:0.6">
+        <div class="event-pct" style="font-size:9px;color:var(--text-muted)">SOON</div>
         <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${d.unresolved} lines archived · awaiting results</div></div>
         ${deleteBtn(d.display)}
       </div>`
@@ -9182,8 +9182,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           }
           clvStr = `<div class="best-pick-reason" style="font-size:10px;color:var(--text-muted)">CLV: ${d.clvMoved}/${d.clvTracked} moved · avg |Δ| ${avgAbs}${biggestStr}${agreementStr}</div>`;
         }
-        return `<div class="best-pick-row">
-          <div class="best-pick-rank" style="font-size:11px;min-width:44px">${rate !== null ? rate + '%' : '?'}</div>
+        return `<div class="event-row">
+          <div class="event-pct" style="color:${rate === null ? 'var(--text3)' : rate >= 60 ? 'var(--green)' : rate >= 40 ? 'var(--gold)' : 'var(--red)'}">${rate !== null ? rate + '%' : '—'}</div>
           <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${rateStr}${unresStr}${aiStr}</div>${clvStr}</div>
           ${deleteBtn(d.display)}
         </div>`;
@@ -9197,7 +9197,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           <div class="best-pick-meta"><span class="best-pick-platform">Fantasy</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
-    : `<div class="inline-empty-msg">Need 2+ events per fighter — overall: ${fantasyHits}/${fantasyTotal} (${fantasyHitRate}%)</div>`;
+    : `<div class="rate-hero"><div class="rate-hero-num" style="color:${fantasyHitRate >= 50 ? 'var(--green)' : fantasyHitRate >= 35 ? 'var(--gold)' : 'var(--red)'}">${fantasyHitRate}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, fantasyHitRate))}%;background:${fantasyHitRate >= 50 ? 'var(--green)' : fantasyHitRate >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${fantasyHits}/${fantasyTotal} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
 
   const topSSHtml = topSS.length
     ? topSS.map(x => `<div class="best-pick-row">
@@ -9206,7 +9206,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           <div class="best-pick-meta"><span class="best-pick-platform">SS</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
-    : `<div class="inline-empty-msg">Need 2+ events per fighter — overall: ${ssHits}/${ssRows.length}</div>`;
+    : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(ssHits / Math.max(1, ssRows.length) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(ssHits / Math.max(1, ssRows.length) * 100)))}%;background:${Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${ssHits}/${ssRows.length} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
 
   const topTDHtml = topTD.length
     ? topTD.map(x => `<div class="best-pick-row">
@@ -9215,7 +9215,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           <div class="best-pick-meta"><span class="best-pick-platform">TD</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
-    : `<div class="inline-empty-msg">Need 2+ events per fighter — overall: ${tdHits}/${tdRows.length}</div>`;
+    : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(tdHits / Math.max(1, tdRows.length) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(tdHits / Math.max(1, tdRows.length) * 100)))}%;background:${Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${tdHits}/${tdRows.length} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
 
   // ── AI pick accuracy by stat type (lean-direction correct, not raw over rate) ──
   const aiStatBadge = (label: string, propType: string): string => {
@@ -9226,7 +9226,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     // Don't color-grade until 5+ samples — small samples produce misleading red/green signals
     const color = lowN ? 'var(--text-muted)' : pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
     const nTag = lowN ? ` <span style="opacity:0.5;font-size:9px">(n=${d.total})</span>` : '';
-    return `<span class="archive-stat-badge"${lowN ? '' : ` style="--asb-color:${color}"`}><span class="asb-label">${label}</span><span class="asb-val" style="color:${color}">${d.hits}/${d.total} <span style="opacity:0.7">(${pct}%)${nTag}</span></span></span>`;
+    return `<span class="archive-stat-badge"${lowN ? '' : ` style="--asb-color:${color}"`}><span class="asb-label">${label}</span><span class="asb-val" style="color:${color}">${d.hits}/${d.total} <span style="opacity:0.7">(${pct}%)${nTag}</span></span><span class="asb-bar"><span style="width:${Math.max(2, Math.min(100, pct))}%;background:${color}"></span></span></span>`;
   };
   const statSummaryHtml = `
     <div class="archive-stat-summary">
@@ -9293,12 +9293,12 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         <span style="flex:1;color:var(--text-muted)">Platform / Prop</span>
         ${biasHdr('Avg Edge', 'avgEdge')} &nbsp; ${biasHdr('Hit%', 'hitRate')} &nbsp; ${biasHdr('N', 'total')}
        </div>` +
-      biasSorted.map(x => `<div class="best-pick-row">
-        <div class="best-pick-rank">${x.platform.toUpperCase()}</div>
-        <div><div class="best-pick-name">${x.propType}</div><div class="best-pick-reason">${x.total} records · avg edge ${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</div></div>
-        <div class="best-pick-meta"><span class="best-pick-platform">Hit Rate</span></div>
-        <div class="best-pick-line">${x.hitRate}%</div>
-      </div>`).join('')
+      biasSorted.map(x => { const rc = x.hitRate >= 55 ? 'var(--green)' : x.hitRate >= 45 ? 'var(--gold)' : 'var(--red)'; return `<div class="bias-row">
+        <span class="bias-platform">${x.platform.toUpperCase()}</span>
+        <div class="bias-main"><div class="bias-prop">${x.propType}</div><div class="bias-sub">${x.total} records · avg edge ${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</div></div>
+        <span class="bias-bar"><span style="width:${Math.max(2, Math.min(100, x.hitRate))}%;background:${rc}"></span></span>
+        <span class="bias-rate" style="color:${rc}">${x.hitRate}%</span>
+      </div>`; }).join('')
     : '<div class="inline-empty-msg">No resolved outcomes yet</div>';
 
   // ── Platform bias bar chart (avg edge per stat, grouped by platform) ─────
@@ -9730,10 +9730,11 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const col = x.pct >= 60 ? 'var(--green)' : x.pct >= 48 ? 'var(--amber)' : 'var(--red)';
         const platLabel = PLAT_LABELS[x.plat] || x.plat.toUpperCase();
         return `<div class="plat-stat-row">
-          <div style="flex:1;display:flex;align-items:center;gap:6px">
+          <div style="flex:0 0 150px;display:flex;align-items:center;gap:6px">
             <span style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--text)">${platLabel}</span>
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${x.stat}</span>
           </div>
+          <span class="ps-bar"><span style="width:${Math.max(2, Math.min(100, x.pct))}%;background:${col}"></span></span>
           <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:${col};min-width:48px;text-align:right">${x.pct}%</span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${x.avgEdge >= 0 ? 'var(--green)' : 'var(--red)'};min-width:44px;text-align:right">${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);min-width:36px;text-align:right">${x.total}</span>

@@ -5671,6 +5671,118 @@ html { scroll-behavior: smooth; }
 .archive-stat-badge { transition: transform 0.15s, box-shadow 0.15s; }
 .archive-stat-badge:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
 
+
+/* ── GLOW-UP 14: Archive & Calibration sweep ── */
+
+/* Ad-hoc data rows (no rank cell) flow as flex — un-crushes the first column
+   in learning, results, accuracy, CLV, hit-rate, bias, backtest & grading rows */
+.best-pick-row:not(:has(.best-pick-rank)) { display: flex; align-items: center; gap: 12px; }
+
+/* Collapsible section frames: depth + gold-tick headers + hover */
+.best-picks-section[data-section-id] {
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 28px rgba(0,0,0,0.3);
+}
+.best-picks-section[data-section-id] > .best-picks-header {
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), transparent);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.best-picks-section[data-section-id] > .best-picks-header:hover { background: rgba(248,198,74,0.05); }
+.best-picks-section[data-section-id] > .best-picks-header::before {
+  content: ''; width: 3px; height: 12px; border-radius: 2px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--gold), var(--gold2));
+  box-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+.best-picks-section[data-section-id].collapsed { box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 4px 12px rgba(0,0,0,0.2); }
+
+/* Count pills on section headers */
+.best-picks-count {
+  margin-left: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text2);
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 999px; padding: 2px 8px;
+}
+
+/* Calibration: glowing score ring + interactive diagnostic cards */
+.calib-score-ring { filter: drop-shadow(0 0 14px rgba(32,223,143,0.25)); }
+.calib-diag-card { transition: transform 0.15s, box-shadow 0.15s; }
+.calib-diag-card:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.35); }
+
+/* Empty-state messages */
+.inline-empty-msg {
+  color: var(--text3); font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; padding: 16px; text-align: center;
+}
+
+
+/* Archive rows that DO have a rank cell: widen it (platform tags, rate %) */
+.best-picks-section[data-section-id] .best-pick-row:has(.best-pick-rank) { grid-template-columns: minmax(56px, auto) 1fr auto auto; }
+.best-picks-section[data-section-id] .best-pick-rank { text-align: left; }
+
+
+/* ── GLOW-UP 15: Archive evolution — bias rows, rate heroes, event rows ── */
+.bias-row { display: flex; align-items: center; gap: 12px; padding: 7px 14px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+.bias-row:hover { background: var(--bg3); }
+.bias-row:last-child { border-bottom: none; }
+.bias-platform {
+  flex: 0 0 96px; text-align: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em;
+  color: var(--text3); background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; padding: 3px 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bias-main { flex: 1; min-width: 0; }
+.bias-prop { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--text); }
+.bias-sub { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--text3); margin-top: 1px; }
+.bias-bar { width: 130px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.07); overflow: hidden; flex-shrink: 0; }
+.bias-bar > span { display: block; height: 100%; border-radius: 3px; }
+.bias-rate { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; min-width: 48px; text-align: right; }
+
+.rate-hero { padding: 16px; display: flex; flex-direction: column; gap: 7px; }
+.rate-hero-num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; line-height: 1; }
+.rate-hero-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07); overflow: hidden; max-width: 420px; }
+.rate-hero-bar > span { display: block; height: 100%; border-radius: 3px; }
+.rate-hero-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); }
+
+.event-row { display: flex; align-items: flex-start; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+.event-row:hover { background: var(--bg3); }
+.event-row:last-child { border-bottom: none; }
+.event-pct { flex: 0 0 52px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; text-align: right; padding-top: 1px; }
+
+.weights-details { font-size: 10px; color: var(--text-muted); min-width: 0; }
+.weights-details summary {
+  cursor: pointer; list-style: none;
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 9px; color: var(--text2);
+}
+.weights-details summary:hover { color: var(--gold); }
+.weights-details summary::before { content: '▸ '; }
+.weights-details[open] summary::before { content: '▾ '; }
+.weights-body { margin-top: 6px; line-height: 1.7; }
+
+.asb-bar { display: block; width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); overflow: hidden; margin-top: 5px; }
+.asb-bar > span { display: block; height: 100%; border-radius: 2px; }
+
+
+/* ── GLOW-UP 16: Backtest, grading & plat-stat polish ── */
+.bt-stat-card { transition: transform 0.15s, box-shadow 0.15s; }
+.bt-stat-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(0,0,0,0.4); }
+.bt-stat-val { text-shadow: 0 0 16px currentColor; }
+.bt-grade-badge { box-shadow: 0 0 18px rgba(248,198,74,0.25); }
+
+.grade-bar-bg, .grade-bar-fill { border-radius: 4px; }
+.grade-bar-fill { box-shadow: 0 0 10px rgba(248,198,74,0.2); }
+
+.plat-stat-row { transition: background 0.12s; border-radius: 4px; }
+.plat-stat-row:hover { background: rgba(255,255,255,0.025); }
+.ps-bar {
+  flex: 1; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.06); overflow: hidden;
+  align-self: center; margin: 0 4px;
+}
+.ps-bar > span { display: block; height: 100%; border-radius: 3px; opacity: 0.85; }
+
 </style>
 </head>
 <body>
