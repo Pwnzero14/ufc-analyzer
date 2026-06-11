@@ -19,6 +19,7 @@ export interface Fighter {
     ctrl_under_available?: boolean | null;
     ss_under_available?: boolean | null;
     td_under_available?: boolean | null;
+    fp_under_available?: boolean | null;
     ud_ss_over_avail?: boolean | null;
     ud_ss_under_avail?: boolean | null;
     ud_td_over_avail?: boolean | null;

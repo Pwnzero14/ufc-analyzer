@@ -27,6 +27,11 @@ export interface Fighter {
   // true = Less button present, false = More-only, null = unknown (pre-flag/stale).
   ss_under_available?: boolean | null;
   td_under_available?: boolean | null;
+  // Pick6-specific: same Less-button check for the Fantasy Points prop. Underdogs are
+  // given a More/OVER-only FP prop (no Less side), so this is the authoritative
+  // placeability signal for FP UNDERs — independent of the (often-incomplete)
+  // moneyline odds map. true = Less present, false = More-only, null = unknown.
+  fp_under_available?: boolean | null;
   // Underdog-specific: per-side availability for SS/TD/FT lines. UD pick-em is
   // often one-sided (only Higher offered). true = UD surfaced this side,
   // false = UD has the line but didn't offer this side, null = no UD line at all.

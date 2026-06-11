@@ -1278,6 +1278,7 @@ function mergeFighters(
       if (fighter.ctrl_under_available != null) merged.ctrl_under_available = fighter.ctrl_under_available;
       if (fighter.ss_under_available != null) merged.ss_under_available = fighter.ss_under_available;
       if (fighter.td_under_available != null) merged.td_under_available = fighter.td_under_available;
+      if (fighter.fp_under_available != null) merged.fp_under_available = fighter.fp_under_available;
       if (fighter.ss_over_odds != null) merged.ss_over_odds = fighter.ss_over_odds;
       if (fighter.ss_under_odds != null) merged.ss_under_odds = fighter.ss_under_odds;
       if (fighter.td_over_odds != null) merged.td_over_odds = fighter.td_over_odds;

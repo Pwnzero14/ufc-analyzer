@@ -1813,12 +1813,12 @@ function getSourceActiveLine(f, source) {
         return null;
     return getSourceLineEntries(f, source).find((entry) => entry.platform === platform)?.value ?? null;
 }
-// Pick6, Underdog Fantasy, and Betr offer Fantasy Points props as pick-em style plays
-// where underdogs are only given the OVER side (no UNDER button). Betr's underdog OVER
-// is additionally inflated to +money odds (not true pick-em value), so the user doesn't
-// take those bets. SS/TD/FT stat props still have both sides, and DK Sportsbook is a
-// standard book with both sides available.
-const PICKEM_UNDER_FORBIDDEN_PLATFORMS = new Set(['pick6', 'underdog', 'betr']);
+// Pick6, PrizePicks, and Betr give underdogs an OVER/More-only Fantasy Points prop
+// (no Less/UNDER side). Underdog Fantasy DOES offer the underdog's FP UNDER, so it is
+// deliberately NOT in this set. Betr's underdog OVER is additionally inflated to +money
+// odds (not true pick-em value), so the user doesn't take those bets. DK Sportsbook has
+// no FP props. (SS/TD side availability is handled separately by ssUnderBookOffered.)
+const PICKEM_UNDER_FORBIDDEN_PLATFORMS = new Set(['pick6', 'prizepicks', 'betr']);
 function isMoneylineUnderdog(f) {
     // Prefer the already-merged moneyline on the fighter, fall back to the odds map.
     const own = f.moneyline ?? resolveMoneylineFromMap(f.name);
@@ -1836,10 +1836,15 @@ function isMoneylineUnderdog(f) {
         return true;
     return false;
 }
-function shouldSkipFpSideForFighter(f, source, direction) {
+function shouldSkipFpSideForFighter(f, source, direction, platformOverride) {
     if (source !== 'fp')
         return false;
-    const platform = getSourceActivePlatformKey(f, source);
+    // Prefer the candidate's own book when the caller knows it (Best Picks builds one FP
+    // candidate per book). Falling back to the priority-resolved active platform would, for
+    // a fighter with FP lines on several books, judge every candidate by the top-priority
+    // book — wrongly dropping e.g. a dog's placeable Underdog FP UNDER just because Pick6
+    // also has a line for them.
+    const platform = platformOverride ?? getSourceActivePlatformKey(f, source);
     if (!platform)
         return false;
     if (!isMoneylineUnderdog(f))
@@ -5898,7 +5903,7 @@ function renderModelHealthWidget() {
     let topEdge = null;
     for (const { f, l } of leanPairs) {
         const dir = l.lean;
-        if (shouldSkipFpSideForFighter(f, l._source, dir))
+        if (shouldSkipFpSideForFighter(f, l._source, dir, l._platform))
             continue;
         const ev = computeFighterEV(f, l);
         if (ev == null)
@@ -6257,18 +6262,18 @@ function renderBestPicks(container, renderSeq = 0) {
         // across all books that have a value (lowest for OVER, highest for UNDER).
         // FP already runs per-book candidate generation and carries _platform on the
         // chosen candidate; FP and push/none directions short-circuit to null here.
-        // SS UNDER side availability is asymmetric across pick-em books: Pick6 / PrizePicks /
-        // Betr offer the SS UNDER only for FAVORITES (underdogs are More/OVER-only), while
-        // Underdog offers it only for UNDERDOGS. DraftKings (a real sportsbook) has both sides.
-        // So a fighter's SS under is placeable on Pick6/PP/Betr if they're a favorite, on
-        // Underdog if they're a dog, and on DK either way.
+        // SS UNDER side availability across books:
+        //  • PrizePicks / Betr — both sides for EVERY fighter (favorite or underdog).
+        //  • DraftKings — real sportsbook, both sides.
+        //  • Pick6 — SS UNDER only for FAVORITES (underdogs are More/OVER-only).
+        //  • Underdog — SS UNDER only for UNDERDOGS (favorites are Higher/OVER-only).
         const ssUnderBookOffered = (f, book) => {
-            if (book === 'draftkings_sportsbook')
+            if (book === 'draftkings_sportsbook' || book === 'prizepicks' || book === 'betr')
                 return true;
             const dog = isMoneylineUnderdog(f);
             if (book === 'underdog')
                 return dog;
-            return !dog; // pick6 / prizepicks / betr → favorites only
+            return !dog; // pick6 → favorites only
         };
         const bestSideLineForPick = (f, source, dir) => {
             if (!source || source === 'fp' || dir !== 'over' && dir !== 'under') {
@@ -6372,11 +6377,22 @@ function renderBestPicks(container, renderSeq = 0) {
             return null;
         };
         const isCandidateUsable = (f, c) => {
-            // Existing FP pick-em rules (UD/P6/Betr underdog UNDER not offered, Betr OVER inflated).
-            if (shouldSkipFpSideForFighter(f, c._source, c.lean))
+            // FP pick-em rules judged against THIS candidate's book (Pick6/PP/Betr underdog UNDER
+            // not offered; Betr underdog OVER inflated). Underdog FP unders are allowed for dogs.
+            if (shouldSkipFpSideForFighter(f, c._source, c.lean, c._platform))
                 return false;
-            if (c._source === 'fp')
+            if (c._source === 'fp') {
+                // Authoritative Pick6 placeability: Pick6 gives underdogs a More/OVER-only FP prop
+                // (no Less button). When the scrape positively recorded no Less side for THIS book's
+                // FP card, the UNDER is unplaceable on Pick6 — even when the (often-incomplete)
+                // moneyline map never flagged the fighter as a dog. Scoped to the Pick6 candidate so
+                // a book that does offer the under (e.g. Underdog) can still surface. null = unknown
+                // (stale/pre-flag or no Pick6 FP line) → keep, relying on the moneyline rule above.
+                const platform = c._platform ?? getSourceActivePlatformKey(f, 'fp');
+                if (c.lean === 'under' && platform === 'pick6' && (f.fp_under_available ?? null) === false)
+                    return false;
                 return true;
+            }
             // R1 SS (PrizePicks + Underdog pick-em) has no scraped side-odds — it can't be
             // chalk-filtered or side-availability-gated the way SS/TD/FT are. Worthiness is
             // enforced upstream by calcSSR1Lean's conservative confidence gating, so accept
@@ -6685,7 +6701,7 @@ function renderBestPicks(container, renderSeq = 0) {
             if (!el)
                 return false;
             // Skip Betr underdog FP OVERs — inflated +money odds, user doesn't take them.
-            if (shouldSkipFpSideForFighter(f, el._source, 'over'))
+            if (shouldSkipFpSideForFighter(f, el._source, 'over', el._platform))
                 return false;
             return true;
         });
@@ -6694,7 +6710,7 @@ function renderBestPicks(container, renderSeq = 0) {
             if (!el)
                 return false;
             // Drop unplaceable unders: underdogs have no UNDER side on pick-em FP props.
-            if (shouldSkipFpSideForFighter(f, el._source, 'under'))
+            if (shouldSkipFpSideForFighter(f, el._source, 'under', el._platform))
                 return false;
             return true;
         });
@@ -10603,12 +10619,12 @@ function updateViewTabCounts() {
         const el = getEffectiveLean(f);
         if (el.lean === 'over') {
             over++;
-            if (!shouldSkipFpSideForFighter(f, el._source, 'over'))
+            if (!shouldSkipFpSideForFighter(f, el._source, 'over', el._platform))
                 bestOver++;
         }
         else if (el.lean === 'under') {
             under++;
-            if (!shouldSkipFpSideForFighter(f, el._source, 'under'))
+            if (!shouldSkipFpSideForFighter(f, el._source, 'under', el._platform))
                 bestUnder++;
         }
     }
@@ -14079,6 +14095,7 @@ function createMergedLineEntry(name) {
         ctrl_under_available: null,
         ss_under_available: null,
         td_under_available: null,
+        fp_under_available: null,
         ud_ss_over_avail: null,
         ud_ss_under_avail: null,
         ud_td_over_avail: null,
@@ -14153,6 +14170,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             map[n].ss_under_available = f.ss_under_available;
         if (f.td_under_available != null)
             map[n].td_under_available = f.td_under_available;
+        if (f.fp_under_available != null)
+            map[n].fp_under_available = f.fp_under_available;
         if (f.opponent)
             map[n].opponent = normalizeName(f.opponent);
     });

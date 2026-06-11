@@ -41,6 +41,9 @@ export class ScraperService {
                             fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
                         }
                         fighters[name].line_fp = line;
+                        // Underdogs get a More/OVER-only FP prop — detect the Less button so FP UNDERs
+                        // can be gated without relying on the (often-incomplete) moneyline odds map.
+                        fighters[name].fp_under_available = /\bLess\b/i.test(cardText);
                     }
                 }
                 // Significant Strikes
@@ -116,8 +119,10 @@ export class ScraperService {
                     if (!fighters[name]) {
                         fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
                     }
-                    if (fpMatch)
+                    if (fpMatch) {
                         fighters[name].line_fp = parseFloat(fpMatch[1]);
+                        fighters[name].fp_under_available = /\bLess\b/i.test(text);
+                    }
                     if (ssMatch)
                         fighters[name].line_ss = parseFloat(ssMatch[1]);
                     if (tdMatch)

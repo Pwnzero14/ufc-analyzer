@@ -1303,6 +1303,8 @@ function mergeFighters(existing = [], incoming = []) {
                 merged.ss_under_available = fighter.ss_under_available;
             if (fighter.td_under_available != null)
                 merged.td_under_available = fighter.td_under_available;
+            if (fighter.fp_under_available != null)
+                merged.fp_under_available = fighter.fp_under_available;
             if (fighter.ss_over_odds != null)
                 merged.ss_over_odds = fighter.ss_over_odds;
             if (fighter.ss_under_odds != null)
