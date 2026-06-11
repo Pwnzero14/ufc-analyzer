@@ -314,6 +314,38 @@ const PRETTY_SURNAMES: Record<string, string> = {
   oconnell: "O'Connell",
   oconnor: "O'Connor",
 };
+// Count-up ticker for metric strip values. Parses the numeric part of strings
+// like "67%", "+60%", "14" and tweens it; non-numeric strings are set directly.
+function animateNumberText(el: HTMLElement, value: string, durationMs = 700): void {
+  const m = value.match(/^([+-]?)(\d+(?:\.\d+)?)(.*)$/);
+  if (!m || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = value; return; }
+  const sign = m[1], target = parseFloat(m[2]), suffix = m[3];
+  const decimals = m[2].includes('.') ? m[2].split('.')[1].length : 0;
+  const start = performance.now();
+  const tick = (now: number): void => {
+    const p = Math.min(1, (now - start) / durationMs);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = `${sign}${(target * eased).toFixed(decimals)}${suffix}`;
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// Hydrates any .bp-avatar-img[data-name] inside root from the cached headshot pipeline.
+function hydrateAvatarImgs(root: ParentNode): void {
+  root.querySelectorAll<HTMLImageElement>('.bp-avatar-img[data-name]').forEach(img => {
+    const nm = img.dataset['name'] || '';
+    if (!nm || img.src) return;
+    void fetchFighterImageUrl(nm)
+      .then(url => {
+        if (!url) return;
+        img.onload = () => img.parentElement?.classList.add('has-img');
+        img.src = url;
+      })
+      .catch(() => { /* cosmetic only */ });
+  });
+}
+
 function prettyName(name: string | null | undefined): string {
   const raw = (name ?? '').toString();
   if (!raw) return raw;
@@ -6115,6 +6147,10 @@ function renderModelHealthWidget(): void {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   };
+  const setNum = (id: string, value: string): void => {
+    const el = document.getElementById(id);
+    if (el) animateNumberText(el, value);
+  };
 
   if (!leans.length) {
     setText('mhHitRate', '--%');
@@ -6151,17 +6187,17 @@ function renderModelHealthWidget(): void {
     }
   }
 
-  setText('mhHitRate', `${avgHit}%`);
+  setNum('mhHitRate', `${avgHit}%`);
   setText('mhHitTrend', avgHit >= 58 ? 'Calibrated edge stable' : avgHit >= 52 ? 'Moderate model edge' : 'Conservative edge profile');
   if (topEdge) {
     const sign = topEdge.ev >= 0 ? '+' : '';
-    setText('mhTopEdge', `${sign}${topEdge.ev}%`);
+    setNum('mhTopEdge', `${sign}${topEdge.ev}%`);
     setText('mhTopEdgeTrend', `${topEdge.name} · ${topEdge.source.toUpperCase()}-${topEdge.dir.toUpperCase()}`);
   } else {
     setText('mhTopEdge', '--');
     setText('mhTopEdgeTrend', 'No actionable edges');
   }
-  setText('mhCoverage', `${leans.length}`);
+  setNum('mhCoverage', `${leans.length}`);
   setText('mhCoverageTrend', 'fighters with actionable leans');
 
   void renderLearningDiagnosticsWidget();
@@ -7722,7 +7758,7 @@ function renderParlayLab(container: HTMLElement): void {
     const sel = parlaySelectedLegs.has(key);
     return `<div class="parlay-leg-row${sel ? ' selected' : ''}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
-      <span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
+      <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat">${a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
@@ -7735,7 +7771,7 @@ function renderParlayLab(container: HTMLElement): void {
         const key = parlayLegKey(l.fighter, l.stat, l.direction);
         return `<div class="parlay-slip-leg">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
-          <span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
+          <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
           <span class="parlay-leg-dir ${l.direction}">${l.direction.toUpperCase()}</span>
           <span class="parlay-leg-stat">${l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
@@ -7842,6 +7878,8 @@ function renderParlayLab(container: HTMLElement): void {
   </div>`;
 
   // ── Bind click handlers ──
+  hydrateAvatarImgs(container);
+
   container.querySelectorAll<HTMLElement>('.parlay-leg-row').forEach(row => {
     row.addEventListener('click', () => {
       const key = row.dataset['parlayKey'];
@@ -13992,10 +14030,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   row.innerHTML = `
     <div class="fighter-main">
       <div class="fighter-info">
-        <div class="fighter-avatar"><span class="fighter-avatar-flag">${db.country || '🏴'}</span><img class="fighter-avatar-img" alt="" /></div>
+        <div class="fighter-avatar-wrap"><div class="fighter-avatar"><span class="fighter-avatar-flag">${db.country || '🏴'}</span><img class="fighter-avatar-img" alt="" /></div><span class="fighter-avatar-country">${db.country || ''}</span></div>
         <div>
           <div class="fighter-name" title="${prettyName(f.name)}">${prettyName(f.name)}${streakEmoji}</div>
           <div class="fighter-record">${db.record || '—'} · ${db.style || '...'}${(() => { const oppStrength = calcOpponentStrengthScore(oppEntry?.db ?? null); const emoji = oppStrength.score >= 1.45 ? '🔴' : oppStrength.score >= 0.75 ? '🟡' : oppStrength.score > -0.2 ? '⚪' : '🟢'; return oppEntry?.db?.loaded ? ` <span title="${oppStrength.label}" style="font-size:11px;opacity:0.85">${emoji}</span>` : ''; })()}</div>
+          ${(() => { const recent = (db.history || []).slice(0, 5).filter(h => h.result === 'win' || h.result === 'loss'); return recent.length >= 2 ? `<div class="form-dots" title="Last ${recent.length} fights — newest first">${recent.map(h => `<span class="form-dot ${h.result}"></span>`).join('')}</div>` : ''; })()}
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px">${archetypeBadgeHtml}${archetypeAlertHtml}</div>
           ${sharpBadgeHtml}
         </div>
@@ -14109,19 +14148,37 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // Lazy: defer building the detail panel HTML until the row is expanded.
   // The closure captures all per-row state (db, oppEntry, history strings, etc).
   _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
+        <div class="detail-section-head">📊 Stat Head-to-Head — ${prettyName(f.name)} vs ${prettyName(oppName || 'Opponent')}</div>
+        <div class="stat-pair">
         <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine?`<div class="panel-meta"><div class="panel-meta-line"></div> Line: ${activeLine}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'} · BT: ${f.line_betr_ss||'—'}</div>` : ''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Fight Time History${ftLine!=null?` vs Line ${formatMinutesAsClock(ftLine)}`:''}</div>${ftHistoryHTML}${ftLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ft!=null?formatMinutesAsClock(f.line_p6_ft):'—'} · UD: ${f.line_ud_ft!=null?formatMinutesAsClock(f.line_ud_ft):'—'} · PP: ${f.line_pp_ft!=null?formatMinutesAsClock(f.line_pp_ft):'—'} · BT: ${f.line_betr_ft!=null?formatMinutesAsClock(f.line_betr_ft):'—'}</div>`:''}</div>
-        <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine!=null?` vs Line ${formatMinutesAsClock(ctrlLine)}`:''}${panelBadge(ctrlConf)}${f.line_p6_ctrl!=null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ctrl!=null?formatMinutesAsClock(f.line_p6_ctrl):'—'} · UD: ${f.line_ud_ctrl!=null?formatMinutesAsClock(f.line_ud_ctrl):'—'} · PP: ${f.line_pp_ctrl!=null?formatMinutesAsClock(f.line_pp_ctrl):'—'} · BT: ${f.line_betr_ctrl!=null?formatMinutesAsClock(f.line_betr_ctrl):'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length?oppFPHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        </div>
+        <div class="stat-pair">
+        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'} · BT: ${f.line_betr_ss||'—'}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length?oppSSHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        </div>
+        ${(ssR1Line != null || oppCompareSsR1Line != null) ? `<div class="stat-pair">` : ''}
         ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">${ssR1Badge}</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${ssR1Meta}</div></div>` : ''}
         ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">${oppSsR1Badge}</span></div>${oppFights.length?oppSSR1History:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
+        ${(ssR1Line != null || oppCompareSsR1Line != null) ? `</div>` : ''}
+        <div class="stat-pair">
+        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        </div>
+        <div class="stat-pair">
+        <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine!=null?` vs Line ${formatMinutesAsClock(ctrlLine)}`:''}${panelBadge(ctrlConf)}${f.line_p6_ctrl!=null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ctrl!=null?formatMinutesAsClock(f.line_p6_ctrl):'—'} · UD: ${f.line_ud_ctrl!=null?formatMinutesAsClock(f.line_ud_ctrl):'—'} · PP: ${f.line_pp_ctrl!=null?formatMinutesAsClock(f.line_pp_ctrl):'—'} · BT: ${f.line_betr_ctrl!=null?formatMinutesAsClock(f.line_betr_ctrl):'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp CTRL Scored vs ${f.name}${oppCompareCtrlLine != null ? ` · ${oppName} CTRL line ${formatMinutesAsClock(oppCompareCtrlLine)}` : ''}${panelBadge(oppCtrlConf)}</div>${oppFights.length?oppCTRLHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        </div>
+        <div class="stat-pair">
+        <div class="detail-panel"><div class="detail-panel-title">Fight Time History${ftLine!=null?` vs Line ${formatMinutesAsClock(ftLine)}`:''}</div>${ftHistoryHTML}${ftLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ft!=null?formatMinutesAsClock(f.line_p6_ft):'—'} · UD: ${f.line_ud_ft!=null?formatMinutesAsClock(f.line_ud_ft):'—'} · PP: ${f.line_pp_ft!=null?formatMinutesAsClock(f.line_pp_ft):'—'} · BT: ${f.line_betr_ft!=null?formatMinutesAsClock(f.line_betr_ft):'—'}</div>`:''}</div>
+        ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
+        </div>
+        <div class="detail-section-head">🧠 Matchup Models &amp; Career</div>
+        <div class="panel-pair">
         ${ssAnalysisHtml}
         ${ctrlAnalysisHtml}
+        </div>
+        <div class="panel-pair">
         <div class="detail-panel">
           <div class="detail-panel-title">UFCStats Career Data</div>
           <span class="stat-val mid">${db.record||'...'}</span>
@@ -14159,16 +14216,23 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           ${db.detailUrl?`<div class="panel-link-wrap"><a href="${db.detailUrl}" target="_blank" class="panel-link">↗ View on UFCStats</a></div>`:''}
         </div>
         ${buildArchetypeLearnerPanel(f.name, db, oppEntry?.db || null, f.moneyline ?? null)}
+        </div>
+        <div class="panel-pair">
         <div class="detail-panel">
           <div class="detail-panel-title">Lean Analysis (FP)</div>
           <div class="lean-reason">${topDriversHTML}${groupedReasonsHTML}</div>
           ${lean.verdict?`<div class="lean-verdict ${lean.lean}">${lean.verdict}</div>`:''}
         </div>
         ${buildModelRivalryPanel(lean)}
+        </div>
+        <div class="panel-pair">
         ${buildFairValuePanel(lean)}
         ${buildPayoutEVPanel(f, lean, leanEvDetail, perBookEv)}
+        </div>
+        <div class="panel-pair">
         ${buildSimilarOpponentPanel(f.name, db, oppEntry?.db || null, activeLine, platformStatLine(f, 'ss'), platformStatLine(f, 'td'), platformStatLine(f, 'ctrl'))}
         ${buildOpponentQualityPanel(db, activeLine, platformStatLine(f, 'ss'))}
+        </div>
         ${buildLineTimelinePanel(f)}
         ${f.lean_ss?`<div class="detail-panel">
           <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'})</div>
@@ -14190,7 +14254,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           <div class="lean-reason">${f.lean_ft.reasons.map(r=>`<div class="lean-point"><span class="lean-point-icon ${r.icon==='pos'?'pos':r.icon==='neg'?'neg':''}">${r.icon==='pos'?'↑':r.icon==='neg'?'↓':'→'}</span><span>${r.text}</span></div>`).join('')}</div>
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>`:''}
-        ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
       </div>`);
 
@@ -17407,6 +17470,44 @@ function initAnalyzerCore(): void {
     });
   }
   updateSortTrendTriggerLabel();
+
+  // ── Keyboard shortcuts: "/" search, 1-5 views, "?" help overlay ───────────
+  const kbdHelp = document.getElementById('kbdHelp');
+  kbdHelp?.addEventListener('click', (e) => { if (e.target === kbdHelp) kbdHelp.classList.add('is-hidden'); });
+  document.addEventListener('keydown', (ev) => {
+    const t = ev.target as HTMLElement | null;
+    const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (ev.key === 'Escape') { kbdHelp?.classList.add('is-hidden'); return; }
+    if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === '/') {
+      ev.preventDefault();
+      (document.getElementById('fighterSearch') as HTMLInputElement | null)?.focus();
+      return;
+    }
+    if (ev.key === '?') { ev.preventDefault(); kbdHelp?.classList.toggle('is-hidden'); return; }
+    const viewByKey: Record<string, string> = { '1': 'all', '2': 'over', '3': 'under', '4': 'bestpicks', '5': 'parlaylab' };
+    const view = viewByKey[ev.key];
+    if (view) {
+      (document.querySelector(`.tab-btn[data-view="${view}"]`) as HTMLElement | null)?.click();
+    }
+  });
+
+  // Back-to-top floating button
+  const backToTop = document.getElementById('backToTop');
+  if (backToTop) {
+    window.addEventListener('scroll', () => {
+      backToTop.classList.toggle('visible', window.scrollY > 600);
+    }, { passive: true });
+    backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+
+  // One-time keyboard hint
+  try {
+    if (!localStorage.getItem('kbd_hint_v1')) {
+      localStorage.setItem('kbd_hint_v1', '1');
+      setTimeout(() => showToast('Tip: press ? for keyboard shortcuts — / to search, 1–5 to switch views'), 2500);
+    }
+  } catch { /* storage unavailable */ }
 
   // Initial data load
   requestDataReload();
