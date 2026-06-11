@@ -174,8 +174,11 @@ function scrapePick6() {
         if (!name || name.length < 3 || name.length > 45) return;
         if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
         if (fpMatch) fighters[name].line_fp = parseFloat(fpMatch[1]);
-        if (ssMatch) fighters[name].line_ss = parseFloat(ssMatch[1]);
-        if (tdMatch) fighters[name].line_td = parseFloat(tdMatch[1]);
+        // Capture Less-button availability per stat (mirrors the primary path) so Pick6
+        // OVER-only SS/TD unders get gated out of Best Picks. This is the path used on
+        // the ?sport=UFC props page, so without it the gate never fires here.
+        if (ssMatch) { fighters[name].line_ss = parseFloat(ssMatch[1]); fighters[name].ss_under_available = /\bLess\b/i.test(text); }
+        if (tdMatch) { fighters[name].line_td = parseFloat(tdMatch[1]); fighters[name].td_under_available = /\bLess\b/i.test(text); }
       });
     }
 
@@ -217,8 +220,8 @@ function scrapePick6() {
           fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
         }
         if (fpMatch) fighters[name].line_fp = parseFloat(fpMatch[1]);
-        if (ssMatch) fighters[name].line_ss = parseFloat(ssMatch[1]);
-        if (tdMatch) fighters[name].line_td = parseFloat(tdMatch[1]);
+        if (ssMatch) { fighters[name].line_ss = parseFloat(ssMatch[1]); fighters[name].ss_under_available = /\bLess\b/i.test(text); }
+        if (tdMatch) { fighters[name].line_td = parseFloat(tdMatch[1]); fighters[name].td_under_available = /\bLess\b/i.test(text); }
       });
     }
 

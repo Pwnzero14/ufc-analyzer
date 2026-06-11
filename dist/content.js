@@ -167,10 +167,17 @@ function scrapePick6() {
                     fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
                 if (fpMatch)
                     fighters[name].line_fp = parseFloat(fpMatch[1]);
-                if (ssMatch)
+                // Capture Less-button availability per stat (mirrors the primary path) so Pick6
+                // OVER-only SS/TD unders get gated out of Best Picks. This is the path used on
+                // the ?sport=UFC props page, so without it the gate never fires here.
+                if (ssMatch) {
                     fighters[name].line_ss = parseFloat(ssMatch[1]);
-                if (tdMatch)
+                    fighters[name].ss_under_available = /\bLess\b/i.test(text);
+                }
+                if (tdMatch) {
                     fighters[name].line_td = parseFloat(tdMatch[1]);
+                    fighters[name].td_under_available = /\bLess\b/i.test(text);
+                }
             });
         }
         // ── Tertiary: scan for any element whose text matches a line + stat label ─
@@ -216,10 +223,14 @@ function scrapePick6() {
                 }
                 if (fpMatch)
                     fighters[name].line_fp = parseFloat(fpMatch[1]);
-                if (ssMatch)
+                if (ssMatch) {
                     fighters[name].line_ss = parseFloat(ssMatch[1]);
-                if (tdMatch)
+                    fighters[name].ss_under_available = /\bLess\b/i.test(text);
+                }
+                if (tdMatch) {
                     fighters[name].line_td = parseFloat(tdMatch[1]);
+                    fighters[name].td_under_available = /\bLess\b/i.test(text);
+                }
             });
         }
         const result = Object.values(fighters).filter((f) => f.line_fp || f.line_ss || f.line_td || f.line_ctrl);
