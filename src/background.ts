@@ -1782,6 +1782,9 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
       || line.over_under?.title
       || ''
     ).toLowerCase();
+    // "(Combo)" props sum both fighters' totals — not an individual line. Skip so the
+    // combined value can't clobber the real per-fighter stat (see PrizePicks parser).
+    if (title.includes('combo')) continue;
     let lineType: 'fp'|'ss'|'ss_r1'|'td'|'ft'|null = null;
     if (title.includes('significant strike') || title === 'significant strikes') {
       // Round-1-only variants (e.g. "Sig Strikes Rd 1", "Round 1 Significant Strikes")
@@ -1993,6 +1996,12 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     if (oddsType && oddsType !== 'standard') continue;
 
     const stat = String(attrs.stat_type || '').toLowerCase();
+    // PrizePicks "(Combo)" props sum BOTH fighters' totals into one line (e.g.
+    // "Significant Strikes (Combo)" ≈ fighterA SS + fighterB SS), so they're not an
+    // individual fighter's line. Without this skip the combo's higher value matches
+    // `includes('significant strike')` and clobbers the real per-fighter SS line via
+    // upsert (observed: Bo Nickal SS captured as 49.5 = 28.5 + Daukaus 20.5).
+    if (stat.includes('combo')) continue;
     const isRound1 = /\brd\s*1\b|\bround\s*1\b|\br1\b|\b1st\s*round\b/.test(stat);
     let lineType: 'fp'|'ss'|'ss_r1'|'td'|'ft'|null = null;
 

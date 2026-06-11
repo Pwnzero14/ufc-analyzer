@@ -25,6 +25,10 @@
 
       const title = (line.title || line.stat || line.stat_type || '').toLowerCase();
 
+      // "(Combo)" props sum both fighters' totals — not an individual line. Skip so the
+      // combined value can't clobber the real per-fighter stat (see PrizePicks parser).
+      if (title.includes('combo')) return;
+
       // Classify by stat type
       let lineType: 'ss' | 'ss_r1' | 'td' | 'fp' | null = null;
       if (
