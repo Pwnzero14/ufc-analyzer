@@ -7026,7 +7026,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // suppresses opponent SS, so picking both is fighting yourself. Same-stat
   // both fighters in section is allowed (positive correlation, high-volume
   // fight scenario).
-  const dedupeNegCorrelatedSameFight = (sorted: AnalyzerFighter[], dir: 'over'|'under', limit: number): AnalyzerFighter[] => {
+  const dedupeNegCorrelatedSameFight = (sorted: AnalyzerFighter[], dir: 'over'|'under', limit: number, minTarget = 0): AnalyzerFighter[] => {
     // Pre-scan: identify fights that have an FP pick somewhere in the sorted list.
     // If a fight has an FP pick, we prefer it over any non-FP cross-stat conflict.
     const fightHasFpPick = new Set<string>();
@@ -7055,10 +7055,27 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       }
       result.push(f);
     }
+    // Backfill to reach minTarget: the strict pass keeps ~1 pick per fight, which can
+    // leave a section sparse on a one-sided card (e.g. only 2-3 placeable unders).
+    // When below minTarget, append the remaining candidates that were dropped ONLY for
+    // same-fight / cross-stat correlation — skipping fighters already shown — up to the
+    // hard limit. They already carry the ⚡/⬇ corr tag so the correlation stays visible,
+    // and the best uncorrelated picks still rank first. Never pads with unplaceable
+    // picks (those were already filtered out of `sorted` by isCandidateUsable).
+    if (result.length < minTarget) {
+      const have = new Set(result.map((x) => x.name.toLowerCase()));
+      for (const f of sorted) {
+        if (result.length >= limit) break;
+        const key = f.name.toLowerCase();
+        if (have.has(key)) continue;
+        result.push(f);
+        have.add(key);
+      }
+    }
     return result;
   };
-  const overs  = dedupeNegCorrelatedSameFight(allOversSorted, 'over', 8);
-  const unders = dedupeNegCorrelatedSameFight(allUndersSorted, 'under', 8);
+  const overs  = dedupeNegCorrelatedSameFight(allOversSorted, 'over', 8, 7);
+  const unders = dedupeNegCorrelatedSameFight(allUndersSorted, 'under', 8, 7);
   void persistBestPicksSnapshot(overs, unders);
 
   // Flag fighters whose opponent is still in the SAME section after demotion
