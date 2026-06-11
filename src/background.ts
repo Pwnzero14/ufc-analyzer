@@ -1381,7 +1381,7 @@ async function handleLinesCaptured(platform: string, data: any): Promise<void> {
     console.log(`[UFC] Merged ${platform}: existing ${existing.length}, incoming ${data.fighters.length}, merged ${mergedFighters.length}`);
     mergedFighters.forEach(f => {
       if (f.line_ss && f.line_td) {
-        console.log(`[UFC] Fighter ${f.name} has SS: ${f.line_ss}, TD: ${f.line_td}`);
+        console.log(`[UFC] Fighter ${f.name} has SS: ${f.line_ss}, TD: ${f.line_td} | ss_under_avail=${(f as any).ss_under_available ?? 'null'} td_under_avail=${(f as any).td_under_available ?? 'null'}`);
       }
     });
 

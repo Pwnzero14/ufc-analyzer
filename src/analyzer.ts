@@ -6702,11 +6702,15 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     } else if (platform === 'draftkings_sportsbook' && sideOdds == null) {
       // DK posts both sides explicitly; null odds means the side wasn't scraped.
       return false;
-    } else if (platform === 'pick6' && dir === 'under' && p6UnderAvailable(f, c._source) === false) {
-      // Pick6 offered only "More" (OVER) on this SS/TD prop — no Less/UNDER side, so
-      // the under can't be placed. Only drop on positive confirmation (false); null
-      // (stale lines pre-flag) is left alone until the user re-fetches Pick6.
-      return false;
+    } else if (platform === 'pick6' && dir === 'under') {
+      // Pick6 frequently offers only "More" (OVER) on these props — no Less/UNDER side,
+      // so the under can't be placed. TD is predominantly OVER-only (low takedown lines),
+      // so suppress the under unless a Less button was POSITIVELY confirmed at scrape
+      // (=== true) — same suppress-by-default rule already used for Pick6 CTRL. SS is
+      // more often two-sided, so it keeps the lighter rule (drop only on confirmed false).
+      const p6avail = p6UnderAvailable(f, c._source);
+      if (c._source === 'td' && p6avail !== true) return false;
+      if (c._source === 'ss' && p6avail === false) return false;
     }
     // Chalk reject: implied prob > 0.667 means -200+ American — line hits often
     // but pays so little that even a strong lean isn't worth taking. FT UNDER
