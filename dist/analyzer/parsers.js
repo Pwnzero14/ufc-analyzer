@@ -281,6 +281,28 @@ export function parseFightDetailStatsOpponent(html, fighterName, fighterDetailUr
             sigStrR1 = firstNum(r1Val(2));
         }
     }
-    return { oppName, kd, sigStr, sigStrR1, totStr, td, sub, ctrlSecs };
+    // Opponent's body/leg sig strikes (= body/leg ALLOWED by the focal fighter) — from the
+    // Head/Body/Leg breakdown table, taking the opponent's column (oppIdx). Cols:
+    // [fighter, Sig.str, Sig%, Head, Body=4, Leg=5, Distance, Clinch, Ground] — each "X of Y".
+    let sigStrBody = null;
+    let sigStrLeg = null;
+    for (const tableM of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
+        const tableHtml = tableM[1];
+        const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || '';
+        const headers = [...thead.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)]
+            .map(h => h[1].replace(/<[^>]+>/g, '').trim().toLowerCase());
+        if (headers.some(h => h === 'head') && headers.some(h => h === 'body') && headers.some(h => h === 'leg')) {
+            const blRows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+                .filter(r => !r[1].includes('<th') && r[1].includes('<td'));
+            if (blRows.length > 0) {
+                const blTds = [...blRows[0][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => [...m[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => clean(p[1])));
+                const blVal = (colIdx) => blTds[colIdx]?.[oppIdx] || blTds[colIdx]?.[0] || '';
+                sigStrBody = firstNum(blVal(4));
+                sigStrLeg = firstNum(blVal(5));
+            }
+            break;
+        }
+    }
+    return { oppName, kd, sigStr, sigStrR1, sigStrBody, sigStrLeg, totStr, td, sub, ctrlSecs };
 }
 //# sourceMappingURL=parsers.js.map

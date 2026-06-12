@@ -973,6 +973,8 @@ function buildFighterDB(name: string, ufcData: UFCStatsData|null): FighterDB {
           fp_p6: fp != null ? parseFloat(fp.toFixed(1)) : null,
           sigStr: os.sigStr ?? null,
           sigStrR1: os.sigStrR1 ?? null,
+          sigStrBody: os.sigStrBody ?? null,
+          sigStrLeg: os.sigStrLeg ?? null,
           totStr: os.totStr ?? null,
           td: os.td ?? null,
           kd: os.kd ?? null,
@@ -1014,7 +1016,7 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
     debugLog(`Alias: ${name} → ${aliased}`);
     name = aliased;
   }
-  const cacheKey = `ufcstats_v50_${name.toLowerCase().replace(/\s+/g,'_')}`;
+  const cacheKey = `ufcstats_v51_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
     if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
@@ -13601,6 +13603,16 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const oppFPHistory   = buildHistoryBars(oppFights, h => getFightFantasyValueForPlatform(h, historyPlatform), oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'fp');
   const oppSSHistory   = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ss');
   const oppSSR1History = buildHistoryBars(oppFights, h => h.sigStrR1, oppCompareSsR1Line, oppCompareSsR1Line, null, null, 'ss');
+  // Opp body/leg "scored vs" charts — what this fighter's past opponents landed to
+  // body/leg, vs the upcoming opponent's body/leg line (UD first). Mirrors opp R1 SS.
+  const oppCompareBodyLine = oppEntry?.line_ud_ss_body ?? oppEntry?.line_pp_ss_body ?? null;
+  const oppCompareLegLine  = oppEntry?.line_ud_ss_leg  ?? oppEntry?.line_pp_ss_leg  ?? null;
+  const oppBodySources = [oppEntry?.line_ud_ss_body != null ? 'UD' : null, oppEntry?.line_pp_ss_body != null ? 'PP' : null].filter(Boolean) as string[];
+  const oppLegSources  = [oppEntry?.line_ud_ss_leg  != null ? 'UD' : null, oppEntry?.line_pp_ss_leg  != null ? 'PP' : null].filter(Boolean) as string[];
+  const oppBodyBadge = oppBodySources.length === 1 ? `${oppBodySources[0]}-only` : oppBodySources.join('+');
+  const oppLegBadge  = oppLegSources.length === 1 ? `${oppLegSources[0]}-only` : oppLegSources.join('+');
+  const oppBodyHistory = buildHistoryBars(oppFights, h => h.sigStrBody, oppCompareBodyLine, oppCompareBodyLine, null, null, 'ss');
+  const oppLegHistory  = buildHistoryBars(oppFights, h => h.sigStrLeg,  oppCompareLegLine,  oppCompareLegLine,  null, null, 'ss');
   const oppTDHistory   = buildHistoryBars(oppFights, h => h.td,     oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'td');
   const oppCTRLHistory = buildHistoryBars(
     oppFights,
@@ -14338,10 +14350,14 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">${ssR1Badge}</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${ssR1Meta}</div></div>` : ''}
         ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">${oppSsR1Badge}</span></div>${oppFights.length?oppSSR1History:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         ${(ssR1Line != null || oppCompareSsR1Line != null) ? `</div>` : ''}
-        ${(bodyLine != null || legLine != null) ? `<div class="stat-pair">` : ''}
+        ${(bodyLine != null || oppCompareBodyLine != null) ? `<div class="stat-pair">` : ''}
         ${bodyLine != null ? `<div class="detail-panel"><div class="detail-panel-title">Body Sig Strikes History vs Line ${bodyLine} <span class="panel-confidence low">${bodyBadge}</span></div>${bodyHistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${bodyMeta}</div></div>` : ''}
+        ${oppCompareBodyLine != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp Body SS Scored vs ${f.name} · ${oppName} Body line ${oppCompareBodyLine} <span class="panel-confidence low">${oppBodyBadge}</span></div>${oppFights.length?oppBodyHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
+        ${(bodyLine != null || oppCompareBodyLine != null) ? `</div>` : ''}
+        ${(legLine != null || oppCompareLegLine != null) ? `<div class="stat-pair">` : ''}
         ${legLine != null ? `<div class="detail-panel"><div class="detail-panel-title">Leg Sig Strikes History vs Line ${legLine} <span class="panel-confidence low">${legBadge}</span></div>${legHistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${legMeta}</div></div>` : ''}
-        ${(bodyLine != null || legLine != null) ? `</div>` : ''}
+        ${oppCompareLegLine != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp Leg SS Scored vs ${f.name} · ${oppName} Leg line ${oppCompareLegLine} <span class="panel-confidence low">${oppLegBadge}</span></div>${oppFights.length?oppLegHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
+        ${(legLine != null || oppCompareLegLine != null) ? `</div>` : ''}
         <div class="stat-pair">
         <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine!=null?` vs Line ${tdLine}`:''}${trendChip(tdTrend,`TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine!=null?`<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'} · BT: ${f.line_betr_td||'—'}</div>`:''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length?oppTDHistory:'<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>

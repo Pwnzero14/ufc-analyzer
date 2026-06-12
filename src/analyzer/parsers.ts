@@ -4,7 +4,7 @@
 // both the focal fighter and their opponent.
 import type { CareerStats } from '../types/index.js';
 
-export interface OppStats { oppName?: string|null; kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; ctrlSecs?: number|null }
+export interface OppStats { oppName?: string|null; kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; sigStrBody?: number|null; sigStrLeg?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; ctrlSecs?: number|null }
 export interface UFCFightHistory { result: string; opponent: string; event: string; method: string; round: number|null; date: string|null; kd?: number|null; sigStr?: number|null; sigStrR1?: number|null; sigStrBody?: number|null; sigStrLeg?: number|null; totStr?: number|null; td?: number|null; sub?: number|null; rev?: number|null; ctrlSecs?: number|null; timeSecs?: number|null; oppStats?: OppStats|null; fightUrl?: string }
 
 export function parseCareerStats(html: string): CareerStats {
@@ -277,5 +277,29 @@ export function parseFightDetailStatsOpponent(html: string, fighterName: string,
     }
   }
 
-  return { oppName, kd, sigStr, sigStrR1, totStr, td, sub, ctrlSecs };
+  // Opponent's body/leg sig strikes (= body/leg ALLOWED by the focal fighter) — from the
+  // Head/Body/Leg breakdown table, taking the opponent's column (oppIdx). Cols:
+  // [fighter, Sig.str, Sig%, Head, Body=4, Leg=5, Distance, Clinch, Ground] — each "X of Y".
+  let sigStrBody: number|null = null;
+  let sigStrLeg: number|null = null;
+  for (const tableM of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
+    const tableHtml = tableM[1];
+    const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || '';
+    const headers = [...thead.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)]
+      .map(h => h[1].replace(/<[^>]+>/g,'').trim().toLowerCase());
+    if (headers.some(h => h === 'head') && headers.some(h => h === 'body') && headers.some(h => h === 'leg')) {
+      const blRows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+        .filter(r => !r[1].includes('<th') && r[1].includes('<td'));
+      if (blRows.length > 0) {
+        const blTds = [...blRows[0][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m =>
+          [...m[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(p => clean(p[1])));
+        const blVal = (colIdx: number) => blTds[colIdx]?.[oppIdx] || blTds[colIdx]?.[0] || '';
+        sigStrBody = firstNum(blVal(4));
+        sigStrLeg  = firstNum(blVal(5));
+      }
+      break;
+    }
+  }
+
+  return { oppName, kd, sigStr, sigStrR1, sigStrBody, sigStrLeg, totStr, td, sub, ctrlSecs };
 }

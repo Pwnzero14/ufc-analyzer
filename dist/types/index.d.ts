@@ -65,6 +65,8 @@ export interface FightResult {
 export interface FightStats {
     sigStr?: number | null;
     sigStrR1?: number | null;
+    sigStrBody?: number | null;
+    sigStrLeg?: number | null;
     totStr?: number | null;
     ctrlSecs?: number | null;
     kd?: number | null;
@@ -95,6 +97,8 @@ export interface OppFightResult {
     fp: number | null;
     sigStr: number | null;
     sigStrR1?: number | null;
+    sigStrBody?: number | null;
+    sigStrLeg?: number | null;
     totStr: number | null;
     td: number | null;
     kd: number | null;
