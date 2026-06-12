@@ -6177,6 +6177,43 @@ button:not(:disabled):active { transform: scale(0.96); }
 .movement-summary-delta.drop { text-shadow: 0 0 8px rgba(255,58,96,0.3); }
 
 
+/* ── GLOW-UP 27: Finishing touches ── */
+/* Gold scroll-progress bar pinned above the glass header.
+   Scroll-driven (animation-timeline) — silently absent on older engines. */
+body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  z-index: 10000; pointer-events: none;
+  background: linear-gradient(90deg, var(--gold), var(--orange));
+  box-shadow: 0 0 8px rgba(248,198,74,0.4);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  animation: pageScrollProgress linear both;
+  animation-timeline: scroll(root);
+}
+@keyframes pageScrollProgress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Calibrated hit-rate: gold gradient hero, same language as Proj FP */
+.mh-value {
+  background: linear-gradient(180deg, #fff6dd 15%, var(--gold));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.3));
+  text-shadow: none;
+}
+
+/* Search: gold caret, placeholder recedes on focus */
+.search-input { caret-color: var(--gold); }
+.search-input:focus::placeholder { color: transparent; transition: color 0.2s ease; }
+
+/* Anchor jumps glide instead of teleporting */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+
 </style>
 </head>
 <body>
