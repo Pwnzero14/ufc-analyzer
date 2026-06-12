@@ -2141,12 +2141,13 @@ function getSourceActiveLine(f: AnalyzerFighter, source: LeanSource): number | n
   return getSourceLineEntries(f, source).find((entry) => entry.platform === platform)?.value ?? null;
 }
 
-// Pick6, PrizePicks, and Betr give underdogs an OVER/More-only Fantasy Points prop
-// (no Less/UNDER side). Underdog Fantasy DOES offer the underdog's FP UNDER, so it is
-// deliberately NOT in this set. Betr's underdog OVER is additionally inflated to +money
-// odds (not true pick-em value), so the user doesn't take those bets. DK Sportsbook has
-// no FP props. (SS/TD side availability is handled separately by ssUnderBookOffered.)
-const PICKEM_UNDER_FORBIDDEN_PLATFORMS: Set<SourcePlatformKey> = new Set(['pick6', 'prizepicks', 'betr']);
+// Pick6 and Betr give underdogs an OVER/More-only Fantasy Points prop (no Less/UNDER
+// side). Underdog Fantasy AND PrizePicks both DO offer the underdog's FP UNDER, so they
+// are deliberately NOT in this set (confirmed 2026-06-12 — PP previously thought to block
+// it). Betr's underdog OVER is additionally inflated to +money odds (not true pick-em
+// value), so the user doesn't take those bets. DK Sportsbook has no FP props. (SS/TD side
+// availability is handled separately by ssUnderBookOffered/tdUnderBookOffered.)
+const PICKEM_UNDER_FORBIDDEN_PLATFORMS: Set<SourcePlatformKey> = new Set(['pick6', 'betr']);
 
 function isMoneylineUnderdog(f: AnalyzerFighter): boolean {
   // Prefer the already-merged moneyline on the fighter, fall back to the odds map.
@@ -2163,6 +2164,22 @@ function isMoneylineUnderdog(f: AnalyzerFighter): boolean {
   return false;
 }
 
+// Pick6 (DraftKings Pick6) and Underdog Fantasy use the SAME FP scoring, so a fighter's
+// FP line should be ~equal on both books. When Pick6's line sits well ABOVE Underdog's,
+// Pick6 is posting the underdog's More/OVER-only line (inflated, no Less side) while
+// Underdog carries the real, under-able number. This is an authoritative dog signal that
+// does NOT depend on the moneyline map — it catches the recurring isMoneylineUnderdog
+// fail-open (missing bout in fight_odds_moneyline) that leaked Alex Pereira's Pick6 FP
+// UNDER at 93.5 when his real Underdog line was 64.99.
+function pick6FpInflatedVsUnderdog(f: AnalyzerFighter): boolean {
+  const p6 = f.line_p6 ?? null;
+  const ud = f.line_ud ?? null;
+  if (p6 == null || ud == null || ud <= 0) return false;
+  // Same-scoring books: a ≥6-point AND ≥15% gap (Pick6 higher) is well beyond normal
+  // line variance and reliably marks Pick6's dog over-only inflation.
+  return p6 - ud >= 6 && p6 >= ud * 1.15;
+}
+
 function shouldSkipFpSideForFighter(
   f: AnalyzerFighter,
   source: LeanSource,
@@ -2177,6 +2194,10 @@ function shouldSkipFpSideForFighter(
   // also has a line for them.
   const platform = platformOverride ?? getSourceActivePlatformKey(f, source);
   if (!platform) return false;
+  // Pick6 FP UNDER is unplaceable for underdogs (More/OVER-only). The Pick6-vs-Underdog
+  // line divergence detects the dog even when the moneyline map is missing the bout, so
+  // check it BEFORE the moneyline early-out below.
+  if (direction === 'under' && platform === 'pick6' && pick6FpInflatedVsUnderdog(f)) return true;
   if (!isMoneylineUnderdog(f)) return false;
   if (direction === 'under' && PICKEM_UNDER_FORBIDDEN_PLATFORMS.has(platform)) return true;
   if (direction === 'over' && platform === 'betr') return true;
@@ -6633,6 +6654,20 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return !dog; // pick6 → favorites only
   };
 
+  // TD UNDER side availability per book — mirrors the authoritative gating already in
+  // isCandidateUsable so bestSideLineForPick can't surface an unplaceable line:
+  //  • Pick6 — TD unders are More/OVER-only by default (low takedown lines); only a
+  //    positively-confirmed Less button (td_under_available === true) makes it placeable.
+  //  • Underdog — records the actual offered side at ingest; a false flag means UD had the
+  //    TD line but not the under side.
+  //  • DraftKings — real sportsbook, posts both sides (line presence checked separately).
+  //  • PrizePicks / Betr — pick-em books that carry both sides on the TD props they offer.
+  const tdUnderBookOffered = (f: AnalyzerFighter, book: SourcePlatformKey): boolean => {
+    if (book === 'pick6') return (f.td_under_available ?? null) === true;
+    if (book === 'underdog') return (f.ud_td_under_avail ?? null) !== false;
+    return true; // draftkings_sportsbook / prizepicks / betr
+  };
+
   const bestSideLineForPick = (
     f: AnalyzerFighter,
     source: EffectiveLean['_source'] | undefined,
@@ -6644,10 +6679,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const books: SourcePlatformKey[] = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
     const candidates: Array<{ line: number; book: SourcePlatformKey }> = [];
     for (const b of books) {
-      // For SS unders, only consider books that actually offer the under side for this
-      // fighter's favorite/underdog status — otherwise we'd surface an unplaceable line
-      // (e.g. a non-favorite's SS under on Pick6, which is OVER-only there).
-      if (source === 'ss' && dir === 'under' && !ssUnderBookOffered(f, b)) continue;
+      // For SS/TD unders, only consider books that actually offer the under side for this
+      // fighter — otherwise we'd surface an unplaceable line (e.g. a non-favorite's SS under
+      // on Pick6, which is OVER-only there, or a Pick6 TD under that has no Less button).
+      if (dir === 'under' && source === 'ss' && !ssUnderBookOffered(f, b)) continue;
+      if (dir === 'under' && source === 'td' && !tdUnderBookOffered(f, b)) continue;
       const v = lineForLeanSource(f, source, b);
       if (v != null) candidates.push({ line: v, book: b });
     }
@@ -6916,10 +6952,15 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const el = getBestPickLean(f);
     const baseConfidence = el.conf || 0;
     const propType = el._source === 'fp' ? 'Fantasy' : el._source.toUpperCase();
-    // Archive lookup: when the candidate carries a specific book (e.g., a PP FP
-    // candidate), validate against THAT book's archive — its hit rate, not the
-    // active platform's. Falls back to the active platform label for non-FP.
-    const platform = el._platform ?? normalizeArchivePlatformLabel(activePlatformLabel(f));
+    // Archive lookup: validate against the book actually shown in the badge — its hit
+    // rate, not the user's active platform's. FP candidates carry _platform directly;
+    // SS/TD/FT show the placeable best-side book from bestSideLineForPick (e.g. a TD
+    // under shown on DK must be checked against DK's archive rows, not Pick6's — Pick6
+    // may not even offer that under). Falls back to the active platform label.
+    const displayedBook = (el._source !== 'fp' && (el.lean === 'over' || el.lean === 'under'))
+      ? bestSideLineForPick(f, el._source, el.lean).book
+      : null;
+    const platform = el._platform ?? displayedBook ?? normalizeArchivePlatformLabel(activePlatformLabel(f));
     const matchingRows = recentResolvedRows.filter((row) => {
       if (String(row.propType) !== propType) return false;
       if (platform && String(row.platform || '').toLowerCase() !== platform) return false;
