@@ -6096,6 +6096,44 @@ button:not(:disabled):active { transform: scale(0.96); }
 .parlay-leg-row:hover { transform: translateX(2px); }
 
 
+/* ── GLOW-UP 25: App chrome polish ── */
+/* Sticky header goes glass: content scrolls under a frosted bar */
+.header {
+  background: rgba(13,18,33,0.82);
+  -webkit-backdrop-filter: blur(12px) saturate(1.25);
+  backdrop-filter: blur(12px) saturate(1.25);
+}
+
+/* Active view tab: gold authority glow */
+.view-tabs .tab-btn.active {
+  box-shadow: 0 0 14px rgba(248,198,74,0.3), inset 0 -2px 0 rgba(0,0,0,0.18);
+  text-shadow: none;
+}
+/* Hover: gold underline creeps in */
+.view-tabs .tab-btn { position: relative; }
+.view-tabs .tab-btn:not(.active)::after {
+  content: ''; position: absolute; left: 50%; right: 50%; bottom: 0; height: 2px;
+  background: rgba(248,198,74,0.55);
+  transition: left 0.18s ease, right 0.18s ease;
+}
+.view-tabs .tab-btn:not(.active):hover::after { left: 12%; right: 12%; }
+
+/* AUTO-FETCH: breathing glow when fresh data is flowing */
+.btn.auto-fetch-btn[data-freshness="fresh"] { animation: autoFetchBreath 3.6s ease-in-out infinite; }
+@keyframes autoFetchBreath {
+  0%, 100% { box-shadow: 0 0 0 rgba(0,232,122,0); }
+  50%      { box-shadow: 0 0 16px rgba(0,232,122,0.35); }
+}
+
+/* Logo: glove wiggle on hover */
+.logo:hover .logo-icon { animation: gloveJab 0.45s ease; }
+@keyframes gloveJab {
+  0%, 100% { transform: rotate(0); }
+  30% { transform: rotate(-14deg) translateX(-1px); }
+  60% { transform: rotate(8deg) translateX(2px); }
+}
+
+
 </style>
 </head>
 <body>
