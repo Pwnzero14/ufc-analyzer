@@ -46,7 +46,7 @@ Four things shipped, all verified live and pushed to both branches:
 - **Cache: `ufcstats_v50_` (was v49).** A fresh fetch re-fetches all histories to populate body/leg. Old `ufcstats_v49_*` keys are now orphaned — prune snippet `CURRENT_UFCSTATS_VERSION` should be bumped to 50 to reclaim them.
 - UI: LINES-strip cells (`UD Body`/`UD Leg`/`PP Body`/`PP Leg`) + drilldown `Body/Leg Sig Strikes History vs Line` panels via `buildHistoryBars(fights, h => h.sigStrBody|sigStrLeg, line, …, 'ss')`.
 
-**Opponent body/leg panels — ✅ DONE (commit `896e85c`).** `parseFightDetailStatsOpponent` reads the Head/Body/Leg table for the opponent column (`oppIdx`); `sigStrBody`/`sigStrLeg` added to `OppStats`/`FightStats`/`OppFightResult` and threaded through the `db.oppHistory` map; **cache bumped v50→v51**; drilldown now renders Body and Leg each as a self|opp stat-pair (`Body Sig Strikes History` + `⚔️ Opp Body SS Scored`, same for Leg).
+**Opponent body/leg panels — ✅ DONE + VERIFIED LIVE (commit `896e85c`).** Confirmed on Freedom 250 (Topuria/Gaethje): self Body/Leg panels render paired with `⚔️ Opp Body/Leg SS Scored` panels, all bars populated after the v51 re-fetch. `parseFightDetailStatsOpponent` reads the Head/Body/Leg table for the opponent column (`oppIdx`); `sigStrBody`/`sigStrLeg` added to `OppStats`/`FightStats`/`OppFightResult` and threaded through the `db.oppHistory` map; **cache bumped v50→v51**; drilldown now renders Body and Leg each as a self|opp stat-pair (`Body Sig Strikes History` + `⚔️ Opp Body SS Scored`, same for Leg).
 
 **Still NOT done (future):**
 - Projection/lean (`calcSSBodyLean` etc.) + Best-Picks eligibility — later phase. Body/leg remain display+history only.
