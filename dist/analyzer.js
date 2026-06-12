@@ -13584,8 +13584,8 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${lineCell('ud', 'fp', f.line_ud)}
         ${lineCell('ud', 'ss', f.line_ud_ss)}
         ${(f.line_ud_ss_r1 != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>R1 SS</span></div><div class="line-value ud">${f.line_ud_ss_r1}</div></div>` : ''}
-        ${(f.line_ud_ss_body != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Body SS</span></div><div class="line-value ud">${f.line_ud_ss_body}</div></div>` : ''}
-        ${(f.line_ud_ss_leg != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Leg SS</span></div><div class="line-value ud">${f.line_ud_ss_leg}</div></div>` : ''}
+        ${(f.line_ud_ss_body != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Body</span></div><div class="line-value ud">${f.line_ud_ss_body}</div></div>` : ''}
+        ${(f.line_ud_ss_leg != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Leg</span></div><div class="line-value ud">${f.line_ud_ss_leg}</div></div>` : ''}
         ${lineCell('ud', 'td', f.line_ud_td)}
         ${lineCell('ud', 'ft', f.line_ud_ft)}
         ${lineCell('ud', 'ctrl', f.line_ud_ctrl)}
@@ -13597,8 +13597,8 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${lineCell('pp', 'fp', f.line_pp)}
         ${lineCell('pp', 'ss', f.line_pp_ss)}
         ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div></div>` : ''}
-        ${(f.line_pp_ss_body != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Body SS</span></div><div class="line-value pp">${f.line_pp_ss_body}</div></div>` : ''}
-        ${(f.line_pp_ss_leg != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Leg SS</span></div><div class="line-value pp">${f.line_pp_ss_leg}</div></div>` : ''}
+        ${(f.line_pp_ss_body != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Body</span></div><div class="line-value pp">${f.line_pp_ss_body}</div></div>` : ''}
+        ${(f.line_pp_ss_leg != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Leg</span></div><div class="line-value pp">${f.line_pp_ss_leg}</div></div>` : ''}
         ${lineCell('pp', 'td', f.line_pp_td)}
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
