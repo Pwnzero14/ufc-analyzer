@@ -5980,6 +5980,50 @@ html { scroll-behavior: smooth; }
 }
 
 
+/* ── GLOW-UP 22: Fighter card header strip ── */
+/* Avatar ring takes the lean color (gold ring stays for push / no-lean rows) */
+.fighter-row.lean-over-row .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(0,232,122,0.35), 0 3px 8px rgba(0,0,0,0.4);
+}
+.fighter-row.lean-over-row:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(0,232,122,0.6), 0 4px 12px rgba(0,0,0,0.5);
+}
+.fighter-row.lean-under-row .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(255,58,96,0.33), 0 3px 8px rgba(0,0,0,0.4);
+}
+.fighter-row.lean-under-row:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(255,58,96,0.58), 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* Stat cards: tactile hover + gradient hero number on Proj FP */
+.stat-card { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+.stat-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border2);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+.stat-card-fp .stat-card-num {
+  background: linear-gradient(180deg, #eafffe 20%, #6fe3dd);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 6px rgba(44,212,208,0.3));
+}
+
+/* Line cells: tactile hover */
+.line-cell { transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
+.line-cell:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.3); }
+
+/* Lean badge: one-shot sheen sweep when the row is hovered */
+.lean-badge { position: relative; overflow: hidden; }
+.lean-badge::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -45%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.16), transparent);
+  opacity: 0; pointer-events: none;
+}
+.fighter-row:hover .lean-badge::after { opacity: 1; animation: leanSheen 0.65s ease forwards; }
+@keyframes leanSheen { from { left: -45%; } to { left: 105%; } }
+
+
 </style>
 </head>
 <body>
