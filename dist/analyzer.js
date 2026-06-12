@@ -13141,14 +13141,23 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         f.line_ud_ss_r1 != null ? `UD R1 SS: ${f.line_ud_ss_r1}` : null,
     ].filter(Boolean).join(' · ');
     const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
-    // Body/Leg sig strikes (Underdog + PrizePicks). History bars use per-fight body/leg
-    // landed from UFCStats (populated after the v50 cache re-fetch). UD listed first.
-    const bodyLine = f.line_ud_ss_body ?? f.line_pp_ss_body ?? null;
+    // Body/Leg sig strikes (Underdog + PrizePicks only). History bars use per-fight body/leg
+    // landed from UFCStats (populated after the v50 cache re-fetch). The displayed line
+    // follows the active platform — PrizePicks shows the PP line, every other selection
+    // (Underdog and platforms without body/leg) defaults to UD-first — so clicking the UD
+    // vs PP pill switches the number like the other props do. The meta footer still lists
+    // both books so the alternate line stays visible.
+    const platformBodyLegLine = (ud, pp) => {
+        const udv = ud ?? null;
+        const ppv = pp ?? null;
+        return currentPlatform === 'prizepicks' ? (ppv ?? udv) : (udv ?? ppv);
+    };
+    const bodyLine = platformBodyLegLine(f.line_ud_ss_body, f.line_pp_ss_body);
     const bodySources = [f.line_ud_ss_body != null ? 'UD' : null, f.line_pp_ss_body != null ? 'PP' : null].filter(Boolean);
     const bodyBadge = bodySources.length === 1 ? `${bodySources[0]}-only` : bodySources.join('+');
     const bodyMeta = [f.line_ud_ss_body != null ? `UD Body: ${f.line_ud_ss_body}` : null, f.line_pp_ss_body != null ? `PP Body: ${f.line_pp_ss_body}` : null].filter(Boolean).join(' · ');
     const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss');
-    const legLine = f.line_ud_ss_leg ?? f.line_pp_ss_leg ?? null;
+    const legLine = platformBodyLegLine(f.line_ud_ss_leg, f.line_pp_ss_leg);
     const legSources = [f.line_ud_ss_leg != null ? 'UD' : null, f.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean);
     const legBadge = legSources.length === 1 ? `${legSources[0]}-only` : legSources.join('+');
     const legMeta = [f.line_ud_ss_leg != null ? `UD Leg: ${f.line_ud_ss_leg}` : null, f.line_pp_ss_leg != null ? `PP Leg: ${f.line_pp_ss_leg}` : null].filter(Boolean).join(' · ');
@@ -13167,9 +13176,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const oppSSHistory = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ss');
     const oppSSR1History = buildHistoryBars(oppFights, h => h.sigStrR1, oppCompareSsR1Line, oppCompareSsR1Line, null, null, 'ss');
     // Opp body/leg "scored vs" charts — what this fighter's past opponents landed to
-    // body/leg, vs the upcoming opponent's body/leg line (UD first). Mirrors opp R1 SS.
-    const oppCompareBodyLine = oppEntry?.line_ud_ss_body ?? oppEntry?.line_pp_ss_body ?? null;
-    const oppCompareLegLine = oppEntry?.line_ud_ss_leg ?? oppEntry?.line_pp_ss_leg ?? null;
+    // body/leg, vs the upcoming opponent's body/leg line (active-platform aware, same as
+    // the self panels above). Mirrors opp R1 SS.
+    const oppCompareBodyLine = platformBodyLegLine(oppEntry?.line_ud_ss_body, oppEntry?.line_pp_ss_body);
+    const oppCompareLegLine = platformBodyLegLine(oppEntry?.line_ud_ss_leg, oppEntry?.line_pp_ss_leg);
     const oppBodySources = [oppEntry?.line_ud_ss_body != null ? 'UD' : null, oppEntry?.line_pp_ss_body != null ? 'PP' : null].filter(Boolean);
     const oppLegSources = [oppEntry?.line_ud_ss_leg != null ? 'UD' : null, oppEntry?.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean);
     const oppBodyBadge = oppBodySources.length === 1 ? `${oppBodySources[0]}-only` : oppBodySources.join('+');
