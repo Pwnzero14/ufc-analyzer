@@ -54,9 +54,12 @@ Written to **`lines_betr_manual_v1` ONLY** (14 fighters: 14 SS, 7 FP), captured 
 
 ## Emergency restore points (created this session)
 
-- **Git tag `known-good-2026-06-11-glowup19`** @ `3a060a7`, pushed to origin. ⚠️ Now **8 commits behind** the finished GLOW-UP series — for a current restore point, tag the series-complete commit: `git tag -a known-good-2026-06-12-glowup27 7325f79 -m "..." && git push origin known-good-2026-06-12-glowup27` (and optionally re-run the `git archive` zip to Desktop).
-- **Zip:** `OneDrive\Desktop\ufc_analyzer_snapshot_2026-06-11_glowup19_3a060a7.zip` (1.3 MB, `git archive` of tracked files — standalone restorable, syncs to cloud). Stale vs HEAD; regenerate if you want a current one.
-- Restore: `git reset --hard <tag>` OR extract the zip (dist included → loadable as-is).
+**Current (use these):**
+- **Git tag `known-good-2026-06-12-glowup27`** @ `e50ef05` (GLOW-UP series complete + body/leg + Betr), pushed to origin.
+- **Zip:** `OneDrive\Desktop\ufc_analyzer_snapshot_2026-06-12_glowup27_e50ef05.zip` (1.3 MB, 207 files, `git archive` of HEAD — standalone restorable, syncs to cloud).
+- Restore: `git reset --hard known-good-2026-06-12-glowup27` OR extract the zip (dist included → loadable as-is).
+
+**Older (superseded):** tag `known-good-2026-06-11-glowup19` @ `3a060a7` + zip `…2026-06-11_glowup19_3a060a7.zip`.
 
 ## Open / next-cadence
 
