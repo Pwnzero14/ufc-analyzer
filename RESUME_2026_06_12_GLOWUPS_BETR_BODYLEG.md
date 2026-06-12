@@ -1,6 +1,6 @@
 # Resume — GLOW-UP UI Series, Body/Leg Props (full), Betr Lines Entered
 
-**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `3a77b01` (GLOW-UP 31; 28+ series open — see section below). Prior series 19→27 closed at `7325f79`.
+**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `8d29c5e` (GLOW-UP 32; 28+ series open — see section below). Prior series 19→27 closed at `7325f79`.
 **Date:** 2026-06-12 (Friday, early AM — continues `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`).
 **Working tree:** clean except `.claude/settings.local.json` (modified, never staged) and untracked stray `UsersabdirAppData…Opera…/` dir (ignore).
 **Card:** UFC Freedom 250 (Topuria vs Gaethje main event). Lines ~120h old in last session — re-fetch closer to the card.
@@ -39,6 +39,7 @@ Three workstreams since the last resume, all shipped + pushed to both branches:
 
 Series 19→27 is closed (final = `7325f79`). The 28+ run starts here; log each level newest-first as it ships.
 
+- `8d29c5e` — **GLOW-UP 32** — modals & platform pills: modal spring-in, keycap polish, LED dots, active pill rings. Files: `analyzer.html` only. Pushed to both branches.
 - `3a77b01` — **GLOW-UP 31** — Slate Check command center: tri-color heroes, live dot, scanline, faded dividers. Files: `analyzer.html` only. Pushed to both branches.
 - `3f1ac9b` — **GLOW-UP 30** — Learning Drilldown banner: staged wash, spark icon, gradient headline, details stagger. Files: `analyzer.html` only. Pushed to both branches.
 - `1e0ec37` — **GLOW-UP 29** — Parlay Lab evolution: selection rails, health hero, crowned #1 suggestion, slip animations. Files: `analyzer.html` only. Pushed to both branches.
