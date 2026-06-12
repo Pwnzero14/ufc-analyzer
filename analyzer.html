@@ -6260,6 +6260,74 @@ html { scroll-behavior: smooth; }
 .oac-panel  .detail-panel-title { color: var(--text2); }
 
 
+/* ── GLOW-UP 29: Parlay Lab evolution ── */
+/* Pool + builder cards: same depth language as fighter rows */
+.parlay-pool, .parlay-builder {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.004)), var(--bg2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 6px 18px rgba(0,0,0,0.28);
+}
+
+/* Leg rows: selection becomes unmistakable */
+.parlay-leg-row.selected {
+  box-shadow: inset 2px 0 0 var(--gold), 0 0 14px rgba(248,198,74,0.1);
+}
+.parlay-leg-row.selected .parlay-leg-name { color: var(--gold); }
+.parlay-leg-row:hover { transform: translateX(2px); }
+.parlay-leg-dir.over  { box-shadow: 0 0 8px rgba(27,220,136,0.15); }
+.parlay-leg-dir.under { box-shadow: 0 0 8px rgba(255,108,136,0.15); }
+
+/* Slip legs animate in as you add them */
+.parlay-slip-leg { animation: glowViewIn 0.22s ease both; }
+.parlay-slip-remove { transition: color 0.12s ease, transform 0.12s ease; }
+.parlay-slip-remove:hover { transform: scale(1.25); }
+
+/* Health score: hero treatment by grade */
+.parlay-health-score {
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.parlay-health-score.excellent {
+  background-image: linear-gradient(180deg, #d8ffe9 15%, #1bdc88);
+  filter: drop-shadow(0 0 10px rgba(27,220,136,0.4));
+}
+.parlay-health-score.good {
+  background-image: linear-gradient(180deg, #c9f5dd 15%, rgba(27,220,136,0.7));
+  filter: drop-shadow(0 0 8px rgba(27,220,136,0.25));
+}
+.parlay-health-score.fair {
+  background-image: linear-gradient(180deg, #fff3d4 15%, var(--gold));
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.3));
+}
+.parlay-health-score.poor {
+  background-image: linear-gradient(180deg, #ffdde4 15%, #ff6c88);
+  filter: drop-shadow(0 0 8px rgba(255,108,136,0.3));
+}
+/* Excellent parlays earn a breathing border */
+.parlay-health:has(.parlay-health-score.excellent) {
+  border-color: rgba(27,220,136,0.35);
+  animation: parlayExcellent 3s ease-in-out infinite;
+}
+@keyframes parlayExcellent {
+  0%, 100% { box-shadow: 0 0 0 rgba(27,220,136,0); }
+  50%      { box-shadow: 0 0 18px rgba(27,220,136,0.18); }
+}
+
+/* Suggested parlays: podium language from Best Picks */
+.parlay-suggest-card { transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+.parlay-suggest-card:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+.parlay-suggest-title + .parlay-suggest-card {
+  border-color: rgba(248,198,74,0.35);
+  background: linear-gradient(90deg, rgba(248,198,74,0.05), transparent 50%), var(--bg2);
+}
+.parlay-suggest-title + .parlay-suggest-card .parlay-suggest-label::before {
+  content: '👑 '; font-size: 11px;
+}
+
+/* Correlation alerts: soft glow per verdict */
+.parlay-corr-alert.synergy  { box-shadow: 0 0 10px rgba(27,220,136,0.08); }
+.parlay-corr-alert.conflict { box-shadow: 0 0 10px rgba(255,108,136,0.08); }
+
+
 </style>
 </head>
 <body>
