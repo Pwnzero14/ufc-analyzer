@@ -6407,6 +6407,26 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 0 16px rgba(248,198,74,0.45);
 }
 
+
+/* ── GLOW-UP 35: Avatar = head-to-head trigger ── */
+/* The ⚔ button is gone — the fighter's face is the trigger now. Hover shows
+   a crossed-swords overlay so the affordance is discoverable. */
+.fighter-avatar-wrap { cursor: pointer; }
+.fighter-avatar::after {
+  content: '⚔';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 8, 16, 0.55);
+  color: var(--gold);
+  font-size: 14px; line-height: 1;
+  opacity: 0; transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.fighter-avatar-wrap:hover .fighter-avatar::after { opacity: 1; }
+.fighter-avatar-wrap:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(248,198,74,0.6), 0 0 16px rgba(248,198,74,0.25);
+}
+
 /* Trend captions sharpen on hover */
 .mh-trend { transition: color 0.15s ease; }
 .mh-stat:hover .mh-trend { color: var(--text); }

@@ -11004,6 +11004,40 @@ function buildFilledSpineWrapper(a, b) {
     </div>
   `;
 }
+// Open head-to-head for a fighter by name, with hardened opponent lookup and
+// toast feedback instead of silent failure.
+function openH2HByName(fighterName) {
+    if (!fighterName)
+        return;
+    const fEntry = _h2hFighterMap.get(fighterName.toLowerCase());
+    if (!fEntry) {
+        showToast(`No data loaded for ${prettyName(fighterName)} yet`);
+        return;
+    }
+    const oppRaw = (fEntry.opponent || '').toLowerCase().trim();
+    let oppEntry = oppRaw ? _h2hFighterMap.get(oppRaw) : undefined;
+    if (!oppEntry && oppRaw) {
+        for (const [key, val] of _h2hFighterMap) {
+            if (key.includes(oppRaw) || oppRaw.includes(key)) {
+                oppEntry = val;
+                break;
+            }
+        }
+    }
+    if (!oppEntry && oppRaw) {
+        const oppNorm = (normalizeName(oppRaw) || oppRaw).toLowerCase();
+        for (const [, val] of _h2hFighterMap) {
+            if ((normalizeName(val.name) || val.name).toLowerCase() === oppNorm) {
+                oppEntry = val;
+                break;
+            }
+        }
+    }
+    if (oppEntry)
+        renderH2HModal(fEntry, oppEntry);
+    else
+        showToast(`No opponent data for ${prettyName(fighterName)} yet — try a refetch`);
+}
 function buildFightSpine(fight) {
     const spine = document.createElement('div');
     spine.className = 'fight-spine';
@@ -13655,7 +13689,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     row.innerHTML = `
     <div class="fighter-main">
       <div class="fighter-info">
-        <div class="fighter-avatar-wrap"><div class="fighter-avatar"><span class="fighter-avatar-flag">${db.country || '🏴'}</span><img class="fighter-avatar-img" alt="" /></div><span class="fighter-avatar-country">${db.country || ''}</span></div>
+        <div class="fighter-avatar-wrap" title="Head-to-head vs ${prettyName(f.opponent || 'opponent')}"><div class="fighter-avatar"><span class="fighter-avatar-flag">${db.country || '🏴'}</span><img class="fighter-avatar-img" alt="" /></div><span class="fighter-avatar-country">${db.country || ''}</span></div>
         <div>
           <div class="fighter-name" title="${prettyName(f.name)}">${prettyName(f.name)}${streakEmoji}</div>
           <div class="fighter-record">${db.record || '—'} · ${db.style || '...'}${(() => { const oppStrength = calcOpponentStrengthScore(oppEntry?.db ?? null); const emoji = oppStrength.score >= 1.45 ? '🔴' : oppStrength.score >= 0.75 ? '🟡' : oppStrength.score > -0.2 ? '⚪' : '🟢'; return oppEntry?.db?.loaded ? ` <span title="${oppStrength.label}" style="font-size:11px;opacity:0.85">${emoji}</span>` : ''; })()}</div>
@@ -13776,7 +13810,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const lbsLabel = wm.lbsOver != null ? `${wm.lbsOver % 1 === 0 ? wm.lbsOver : wm.lbsOver.toFixed(1)} LB` : '';
         const tip = wm.source.replace(/"/g, '&quot;').replace(/</g, '&lt;');
         return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
-    })()}${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<button class="h2h-btn" data-fighter="${f.name}" title="Head-to-head vs ${f.opponent || 'opponent'}">⚔</button><span class="expand-arrow">▼</span></div>
+    })()}${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<span class="expand-arrow">▼</span></div>
     </div>
     <div class="fighter-detail"></div>`;
     // Lazy: defer building the detail panel HTML until the row is expanded.
@@ -17176,40 +17210,23 @@ function initAnalyzerCore() {
             nm.classList.remove('is-hidden');
             return;
         }
+        // Avatar click = head-to-head. The old ⚔ button was a 20px target whose
+        // misses fell through to the row-expand handler ("pulls down fight history
+        // instead"). The avatar is big, always visible, and unambiguous.
+        const avatarHit = e.target.closest('.fighter-avatar-wrap');
+        if (avatarHit) {
+            const rowEl = avatarHit.closest('.fighter-row');
+            const nm = rowEl?.dataset['name'] || '';
+            if (nm) {
+                e.stopPropagation();
+                openH2HByName(nm);
+                return;
+            }
+        }
         const h2hBtn = e.target.closest('.h2h-btn');
         if (h2hBtn) {
             e.stopPropagation();
-            const fighterName = h2hBtn.dataset['fighter'] || '';
-            const fEntry = _h2hFighterMap.get(fighterName.toLowerCase());
-            if (!fEntry) {
-                showToast(`No data loaded for ${prettyName(fighterName)} yet`);
-                return;
-            }
-            const oppRaw = (fEntry.opponent || '').toLowerCase().trim();
-            let oppEntry = oppRaw ? _h2hFighterMap.get(oppRaw) : undefined;
-            if (!oppEntry && oppRaw) {
-                // Fuzzy pass (guarded: an empty opponent used to match the map's first
-                // entry via includes('') — that was the "wrong/never opens" bug)
-                for (const [key, val] of _h2hFighterMap) {
-                    if (key.includes(oppRaw) || oppRaw.includes(key)) {
-                        oppEntry = val;
-                        break;
-                    }
-                }
-            }
-            if (!oppEntry && oppRaw) {
-                const oppNorm = (normalizeName(oppRaw) || oppRaw).toLowerCase();
-                for (const [, val] of _h2hFighterMap) {
-                    if ((normalizeName(val.name) || val.name).toLowerCase() === oppNorm) {
-                        oppEntry = val;
-                        break;
-                    }
-                }
-            }
-            if (oppEntry)
-                renderH2HModal(fEntry, oppEntry);
-            else
-                showToast(`No opponent data for ${prettyName(fighterName)} yet — try a refetch`);
+            openH2HByName(h2hBtn.dataset['fighter'] || '');
             return;
         }
         const main = e.target.closest('.fighter-main');
