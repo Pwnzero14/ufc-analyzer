@@ -19,6 +19,8 @@ export interface UFCFightHistory {
     kd?: number | null;
     sigStr?: number | null;
     sigStrR1?: number | null;
+    sigStrBody?: number | null;
+    sigStrLeg?: number | null;
     totStr?: number | null;
     td?: number | null;
     sub?: number | null;
@@ -34,6 +36,8 @@ export declare function parseFightDetailStats(html: string, fighterName: string,
     kd?: number | null;
     sigStr?: number | null;
     sigStrR1?: number | null;
+    sigStrBody?: number | null;
+    sigStrLeg?: number | null;
     totStr?: number | null;
     td?: number | null;
     sub?: number | null;

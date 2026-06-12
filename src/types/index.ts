@@ -68,6 +68,8 @@ export interface FightResult {
   fp_ud?: number | null;
   sigStr?: number | null;
   sigStrR1?: number | null; // sig strikes landed in round 1 only
+  sigStrBody?: number | null; // significant body strikes landed (all rounds)
+  sigStrLeg?: number | null;  // significant leg strikes landed (all rounds)
   totStr?: number | null;
   ctrlSecs?: number | null;
   timeSecs?: number | null;

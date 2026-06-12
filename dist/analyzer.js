@@ -747,7 +747,7 @@ function buildFighterDB(name, ufcData) {
             : null;
         return {
             opp: f.opponent, fp: fpP6, fp_p6: fpP6, fp_ud: fpUd,
-            sigStr: f.sigStr, sigStrR1: f.sigStrR1, totStr: f.totStr, ctrlSecs: f.ctrlSecs, timeSecs: f.timeSecs,
+            sigStr: f.sigStr, sigStrR1: f.sigStrR1, sigStrBody: f.sigStrBody, sigStrLeg: f.sigStrLeg, totStr: f.totStr, ctrlSecs: f.ctrlSecs, timeSecs: f.timeSecs,
             td: f.td, kd: f.kd, rev: f.rev, sub: f.sub, method: f.method, result: f.result, date: f.date ?? undefined, round: f.round ?? undefined,
             oppStats: f.oppStats,
         };
@@ -892,7 +892,7 @@ async function fetchFromUFCStats(name) {
         debugLog(`Alias: ${name} → ${aliased}`);
         name = aliased;
     }
-    const cacheKey = `ufcstats_v49_${name.toLowerCase().replace(/\s+/g, '_')}`;
+    const cacheKey = `ufcstats_v50_${name.toLowerCase().replace(/\s+/g, '_')}`;
     if (typeof chrome !== 'undefined' && chrome.storage) {
         const cached = await storageGet([cacheKey]);
         if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
@@ -12996,6 +12996,18 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         f.line_ud_ss_r1 != null ? `UD R1 SS: ${f.line_ud_ss_r1}` : null,
     ].filter(Boolean).join(' · ');
     const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
+    // Body/Leg sig strikes (Underdog + PrizePicks). History bars use per-fight body/leg
+    // landed from UFCStats (populated after the v50 cache re-fetch). UD listed first.
+    const bodyLine = f.line_ud_ss_body ?? f.line_pp_ss_body ?? null;
+    const bodySources = [f.line_ud_ss_body != null ? 'UD' : null, f.line_pp_ss_body != null ? 'PP' : null].filter(Boolean);
+    const bodyBadge = bodySources.length === 1 ? `${bodySources[0]}-only` : bodySources.join('+');
+    const bodyMeta = [f.line_ud_ss_body != null ? `UD Body: ${f.line_ud_ss_body}` : null, f.line_pp_ss_body != null ? `PP Body: ${f.line_pp_ss_body}` : null].filter(Boolean).join(' · ');
+    const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss');
+    const legLine = f.line_ud_ss_leg ?? f.line_pp_ss_leg ?? null;
+    const legSources = [f.line_ud_ss_leg != null ? 'UD' : null, f.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean);
+    const legBadge = legSources.length === 1 ? `${legSources[0]}-only` : legSources.join('+');
+    const legMeta = [f.line_ud_ss_leg != null ? `UD Leg: ${f.line_ud_ss_leg}` : null, f.line_pp_ss_leg != null ? `PP Leg: ${f.line_pp_ss_leg}` : null].filter(Boolean).join(' · ');
+    const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
     const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td');
     const ftHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.timeSecs)) ? Number(h.timeSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ft');
     const ctrlHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.ctrlSecs)) ? Number(h.ctrlSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ctrl', ctrlLine);
@@ -13706,6 +13718,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${ssR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">R1 Sig Strikes History vs Line ${ssR1Line} <span class="panel-confidence low">${ssR1Badge}</span></div>${ssR1HistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${ssR1Meta}</div></div>` : ''}
         ${oppCompareSsR1Line != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp R1 SS Scored vs ${f.name} · ${oppName} R1 SS line ${oppCompareSsR1Line} <span class="panel-confidence low">${oppSsR1Badge}</span></div>${oppFights.length ? oppSSR1History : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         ${(ssR1Line != null || oppCompareSsR1Line != null) ? `</div>` : ''}
+        ${(bodyLine != null || legLine != null) ? `<div class="stat-pair">` : ''}
+        ${bodyLine != null ? `<div class="detail-panel"><div class="detail-panel-title">Body Sig Strikes History vs Line ${bodyLine} <span class="panel-confidence low">${bodyBadge}</span></div>${bodyHistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${bodyMeta}</div></div>` : ''}
+        ${legLine != null ? `<div class="detail-panel"><div class="detail-panel-title">Leg Sig Strikes History vs Line ${legLine} <span class="panel-confidence low">${legBadge}</span></div>${legHistoryHTML}<div class="panel-meta"><div class="panel-meta-line"></div> ${legMeta}</div></div>` : ''}
+        ${(bodyLine != null || legLine != null) ? `</div>` : ''}
         <div class="stat-pair">
         <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine != null ? ` vs Line ${tdLine}` : ''}${trendChip(tdTrend, `TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'} · BT: ${f.line_betr_td || '—'}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length ? oppTDHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>

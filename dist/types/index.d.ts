@@ -47,6 +47,8 @@ export interface FightResult {
     fp_ud?: number | null;
     sigStr?: number | null;
     sigStrR1?: number | null;
+    sigStrBody?: number | null;
+    sigStrLeg?: number | null;
     totStr?: number | null;
     ctrlSecs?: number | null;
     timeSecs?: number | null;
