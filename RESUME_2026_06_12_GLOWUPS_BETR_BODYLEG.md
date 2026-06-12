@@ -1,6 +1,6 @@
 # Resume — GLOW-UP UI Series, Body/Leg Props (full), Betr Lines Entered
 
-**Branch:** `feature/sleek-theme-v1` (== `master` == `7325f79` + this resume commit, both pushed to origin `Pwnzero14/ufc-analyzer`).
+**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `7325f79` (GLOW-UP 27, series complete); HEAD is the trailing docs/resume commit.
 **Date:** 2026-06-12 (Friday, early AM — continues `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`).
 **Working tree:** clean except `.claude/settings.local.json` (modified, never staged) and untracked stray `UsersabdirAppData…Opera…/` dir (ignore).
 **Card:** UFC Freedom 250 (Topuria vs Gaethje main event). Lines ~120h old in last session — re-fetch closer to the card.
@@ -54,8 +54,8 @@ Written to **`lines_betr_manual_v1` ONLY** (14 fighters: 14 SS, 7 FP), captured 
 
 ## Emergency restore points (created this session)
 
-- **Git tag `known-good-2026-06-11-glowup19`** @ `3a060a7`, pushed to origin. (NOTE: now several GLOW-UP commits behind HEAD — if you want a fresh known-good at `6d3fd85`, tag again.)
-- **Zip:** `OneDrive\Desktop\ufc_analyzer_snapshot_2026-06-11_glowup19_3a060a7.zip` (1.3 MB, `git archive` of tracked files — standalone restorable, syncs to cloud).
+- **Git tag `known-good-2026-06-11-glowup19`** @ `3a060a7`, pushed to origin. ⚠️ Now **8 commits behind** the finished GLOW-UP series — for a current restore point, tag the series-complete commit: `git tag -a known-good-2026-06-12-glowup27 7325f79 -m "..." && git push origin known-good-2026-06-12-glowup27` (and optionally re-run the `git archive` zip to Desktop).
+- **Zip:** `OneDrive\Desktop\ufc_analyzer_snapshot_2026-06-11_glowup19_3a060a7.zip` (1.3 MB, `git archive` of tracked files — standalone restorable, syncs to cloud). Stale vs HEAD; regenerate if you want a current one.
 - Restore: `git reset --hard <tag>` OR extract the zip (dist included → loadable as-is).
 
 ## Open / next-cadence
