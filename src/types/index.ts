@@ -4,6 +4,8 @@ export interface Fighter {
   line_fp?: number | null;
   line_ss?: number | null;
   line_ss_r1?: number | null;  // Round 1 significant strikes (PrizePicks + Underdog)
+  line_ss_body?: number | null;  // Significant body strikes (PrizePicks + Underdog)
+  line_ss_leg?: number | null;   // Significant leg strikes (PrizePicks + Underdog)
   line_td?: number | null;
   line_ft?: number | null;
   // Control time line, stored in minutes for parity with FT (UFCStats shows mm:ss)

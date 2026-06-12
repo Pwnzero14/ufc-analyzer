@@ -29,9 +29,16 @@
       // combined value can't clobber the real per-fighter stat (see PrizePicks parser).
       if (title.includes('combo')) return;
 
-      // Classify by stat type
-      let lineType: 'ss' | 'ss_r1' | 'td' | 'fp' | null = null;
-      if (
+      // Classify by stat type. Body/Leg strike props are checked BEFORE the generic
+      // significant-strikes branch so they get their own buckets (their titles —
+      // "Significant Body/Leg Strikes" — don't match the generic substring anyway,
+      // but order keeps intent explicit).
+      let lineType: 'ss' | 'ss_r1' | 'ss_body' | 'ss_leg' | 'td' | 'fp' | null = null;
+      if (title.includes('strike') && title.includes('body')) {
+        lineType = 'ss_body';
+      } else if (title.includes('strike') && title.includes('leg')) {
+        lineType = 'ss_leg';
+      } else if (
         title.includes('significant strike') ||
         title === 'significant strikes'
       ) {
@@ -56,6 +63,8 @@
         fp: [5, 300],
         ss: [1, 300],
         ss_r1: [1, 150],
+        ss_body: [1, 200],
+        ss_leg: [0.5, 150],
         td: [0.5, 20],
       };
       const [min, max] = validation[lineType];
@@ -90,6 +99,8 @@
           line_fp: null,
           line_ss: null,
           line_ss_r1: null,
+          line_ss_body: null,
+          line_ss_leg: null,
           line_td: null,
           opponent,
         };
@@ -99,7 +110,7 @@
     });
 
     return Object.values(allFighters).filter(
-      (f) => f.line_fp || f.line_ss || f.line_ss_r1 || f.line_td
+      (f) => f.line_fp || f.line_ss || f.line_ss_r1 || f.line_ss_body || f.line_ss_leg || f.line_td
     );
   }
 

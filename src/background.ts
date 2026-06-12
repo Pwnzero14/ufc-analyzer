@@ -1269,6 +1269,8 @@ function mergeFighters(
       if (fighter.line_fp != null) merged.line_fp = fighter.line_fp;
       if (fighter.line_ss != null) merged.line_ss = fighter.line_ss;
       if (fighter.line_ss_r1 != null) merged.line_ss_r1 = fighter.line_ss_r1;
+      if (fighter.line_ss_body != null) merged.line_ss_body = fighter.line_ss_body;
+      if (fighter.line_ss_leg != null) merged.line_ss_leg = fighter.line_ss_leg;
       if (fighter.line_td != null) merged.line_td = fighter.line_td;
       if (fighter.line_ft != null) {
         const ftLine = normalizeFightTimeLineToMinutes(fighter.line_ft);
@@ -1737,8 +1739,8 @@ function hasEnoughPrizePicksStatCoverage(coverage: UnderdogCoverage, expectedFig
   );
 }
 
-function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> {
-  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> = {};
+function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> {
+  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null; ss_over_odds: number | null; ss_under_odds: number | null; td_over_odds: number | null; td_under_odds: number | null; ft_over_odds: number | null; ft_under_odds: number | null; ud_ss_over_avail: boolean | null; ud_ss_under_avail: boolean | null; ud_td_over_avail: boolean | null; ud_td_under_avail: boolean | null; ud_ft_over_avail: boolean | null; ud_ft_under_avail: boolean | null }> = {};
   const linesRaw = data?.over_under_lines || {};
   const lines = Array.isArray(linesRaw) ? linesRaw : Object.values(linesRaw);
   const appearancesRaw = data?.appearances || {};
@@ -1785,8 +1787,12 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
     // "(Combo)" props sum both fighters' totals — not an individual line. Skip so the
     // combined value can't clobber the real per-fighter stat (see PrizePicks parser).
     if (title.includes('combo')) continue;
-    let lineType: 'fp'|'ss'|'ss_r1'|'td'|'ft'|null = null;
-    if (title.includes('significant strike') || title === 'significant strikes') {
+    let lineType: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft'|null = null;
+    // Body/Leg strike props get their own buckets (checked first; their titles don't
+    // match the generic significant-strikes substring, but order keeps intent explicit).
+    if (title.includes('strike') && title.includes('body')) lineType = 'ss_body';
+    else if (title.includes('strike') && title.includes('leg')) lineType = 'ss_leg';
+    else if (title.includes('significant strike') || title === 'significant strikes') {
       // Round-1-only variants (e.g. "Sig Strikes Rd 1", "Round 1 Significant Strikes")
       // get their own bucket so their (much lower) value can't overwrite the
       // total-fight SS line. Detect round-specificity before the generic branch.
@@ -1849,6 +1855,8 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
         line_fp: null,
         line_ss: null,
         line_ss_r1: null,
+        line_ss_body: null,
+        line_ss_leg: null,
         line_td: null,
         line_ft: null,
         opponent: opponent || null,
@@ -1903,7 +1911,7 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
     if (opponent) fighters[name].opponent = opponent;
   }
 
-  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null || f.line_ft != null);
+  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null);
 }
 
 async function fetchUnderdogFromBackground(): Promise<UnderdogCoverage> {
@@ -1944,8 +1952,8 @@ async function fetchUnderdogFromBackground(): Promise<UnderdogCoverage> {
   return getUnderdogStatCoverage(mergedFighters);
 }
 
-function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> {
-  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> = {};
+function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> {
+  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> = {};
   const projections = Array.isArray(data?.data) ? data.data : [];
   const included = Array.isArray(data?.included) ? data.included : [];
 
@@ -1966,8 +1974,8 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     }
   }
 
-  const upsert = (name: string, type: 'fp'|'ss'|'ss_r1'|'td'|'ft', value: number, opponent: string | null = null) => {
-    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, line_ft: null, opponent };
+  const upsert = (name: string, type: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft', value: number, opponent: string | null = null) => {
+    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_ss_body: null, line_ss_leg: null, line_td: null, line_ft: null, opponent };
     const normalized = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
     // For SS and TD, keep the highest value seen — standard total-fight lines are always
     // greater than any round-specific duplicate that may slip through. (ss_r1 is its own
@@ -2003,9 +2011,12 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     // upsert (observed: Bo Nickal SS captured as 49.5 = 28.5 + Daukaus 20.5).
     if (stat.includes('combo')) continue;
     const isRound1 = /\brd\s*1\b|\bround\s*1\b|\br1\b|\b1st\s*round\b/.test(stat);
-    let lineType: 'fp'|'ss'|'ss_r1'|'td'|'ft'|null = null;
+    let lineType: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft'|null = null;
 
-    if (stat.includes('significant strike')) lineType = isRound1 ? 'ss_r1' : 'ss';
+    // Body/Leg strike props get their own buckets (checked before the generic SS branch).
+    if (stat.includes('strike') && stat.includes('body')) lineType = 'ss_body';
+    else if (stat.includes('strike') && stat.includes('leg')) lineType = 'ss_leg';
+    else if (stat.includes('significant strike')) lineType = isRound1 ? 'ss_r1' : 'ss';
     else if (stat.includes('takedown')) lineType = 'td';
     else if (stat.includes('fight time') || stat.includes('fighttime') || stat.includes('fight duration') || stat.includes('rounds')) lineType = 'ft';
     else if (stat.includes('fantasy score') || stat.includes('fantasy points')) lineType = 'fp';
@@ -2035,7 +2046,7 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     upsert(name, lineType, line, opponent);
   }
 
-  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null || f.line_ft != null);
+  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null);
 }
 
 async function fetchPrizePicksFromBackground(): Promise<UnderdogCoverage> {

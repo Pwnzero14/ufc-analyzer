@@ -103,7 +103,7 @@ type SourcePlatformKey = 'pick6'|'underdog'|'prizepicks'|'betr'|'draftkings_spor
 interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string; _platform?: SourcePlatformKey }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
-interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ss_under_available?: boolean|null; td_under_available?: boolean|null; fp_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
+interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_ss_body?: number|null; line_ud_ss_leg?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_ss_body?: number|null; line_pp_ss_leg?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_dk_ss?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ss_under_available?: boolean|null; td_under_available?: boolean|null; fp_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null }
 
 function createEmptyLean(verdict = ''): LeanResult {
   return { lean: 'none', conf: 0, reasons: [], verdict };
@@ -120,6 +120,8 @@ function createPlaceholderAnalyzerFighter(name: string, opponent: string): Analy
     line_ud: null,
     line_ud_ss: null,
     line_ud_ss_r1: null,
+    line_ud_ss_body: null,
+    line_ud_ss_leg: null,
     line_ud_td: null,
     line_ud_ft: null,
     line_ud_ctrl: null,
@@ -131,6 +133,8 @@ function createPlaceholderAnalyzerFighter(name: string, opponent: string): Analy
     line_pp: null,
     line_pp_ss: null,
     line_pp_ss_r1: null,
+    line_pp_ss_body: null,
+    line_pp_ss_leg: null,
     line_pp_td: null,
     line_pp_ft: null,
     line_pp_ctrl: null,
@@ -14205,6 +14209,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('ud', 'fp', f.line_ud)}
         ${lineCell('ud', 'ss', f.line_ud_ss)}
         ${(f.line_ud_ss_r1 != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>R1 SS</span></div><div class="line-value ud">${f.line_ud_ss_r1}</div></div>` : ''}
+        ${(f.line_ud_ss_body != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Body SS</span></div><div class="line-value ud">${f.line_ud_ss_body}</div></div>` : ''}
+        ${(f.line_ud_ss_leg != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Leg SS</span></div><div class="line-value ud">${f.line_ud_ss_leg}</div></div>` : ''}
         ${lineCell('ud', 'td', f.line_ud_td)}
         ${lineCell('ud', 'ft', f.line_ud_ft)}
         ${lineCell('ud', 'ctrl', f.line_ud_ctrl)}
@@ -14216,6 +14222,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('pp', 'fp', f.line_pp)}
         ${lineCell('pp', 'ss', f.line_pp_ss)}
         ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div></div>` : ''}
+        ${(f.line_pp_ss_body != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Body SS</span></div><div class="line-value pp">${f.line_pp_ss_body}</div></div>` : ''}
+        ${(f.line_pp_ss_leg != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Leg SS</span></div><div class="line-value pp">${f.line_pp_ss_leg}</div></div>` : ''}
         ${lineCell('pp', 'td', f.line_pp_td)}
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
@@ -14678,6 +14686,8 @@ interface RawLineFighter {
   line_fp?: number | null;
   line_ss?: number | null;
   line_ss_r1?: number | null;
+  line_ss_body?: number | null;
+  line_ss_leg?: number | null;
   line_td?: number | null;
   line_ft?: number | null;
   line_ctrl?: number | null;
@@ -14713,12 +14723,16 @@ interface MergedLineEntry {
   line_ud: number | null;
   line_ud_ss: number | null;
   line_ud_ss_r1: number | null;
+  line_ud_ss_body: number | null;
+  line_ud_ss_leg: number | null;
   line_ud_td: number | null;
   line_ud_ft: number | null;
   line_ud_ctrl: number | null;
   line_pp: number | null;
   line_pp_ss: number | null;
   line_pp_ss_r1: number | null;
+  line_pp_ss_body: number | null;
+  line_pp_ss_leg: number | null;
   line_pp_td: number | null;
   line_pp_ft: number | null;
   line_pp_ctrl: number | null;
@@ -14764,12 +14778,16 @@ function createMergedLineEntry(name: string): MergedLineEntry {
     line_ud: null,
     line_ud_ss: null,
     line_ud_ss_r1: null,
+    line_ud_ss_body: null,
+    line_ud_ss_leg: null,
     line_ud_td: null,
     line_ud_ft: null,
     line_ud_ctrl: null,
     line_pp: null,
     line_pp_ss: null,
     line_pp_ss_r1: null,
+    line_pp_ss_body: null,
+    line_pp_ss_leg: null,
     line_pp_td: null,
     line_pp_ft: null,
     line_pp_ctrl: null,
@@ -14882,6 +14900,8 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     entry.line_ud       = f.line_fp ?? f.line ?? null;
     entry.line_ud_ss    = f.line_ss ?? null;
     entry.line_ud_ss_r1 = f.line_ss_r1 ?? null;
+    entry.line_ud_ss_body = f.line_ss_body ?? null;
+    entry.line_ud_ss_leg  = f.line_ss_leg ?? null;
     entry.line_ud_td   = plausibleTd(f.line_td);
     entry.line_ud_ft   = f.line_ft ?? null;
     entry.line_ud_ctrl = f.line_ctrl ?? null;
@@ -14936,6 +14956,8 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     entry.line_pp       = f.line_fp ?? f.line ?? null;
     entry.line_pp_ss    = f.line_ss ?? null;
     entry.line_pp_ss_r1 = f.line_ss_r1 ?? null;
+    entry.line_pp_ss_body = f.line_ss_body ?? null;
+    entry.line_pp_ss_leg  = f.line_ss_leg ?? null;
     entry.line_pp_td    = plausibleTd(f.line_td);
     entry.line_pp_ft   = f.line_ft ?? null;
     entry.line_pp_ctrl = f.line_ctrl ?? null;

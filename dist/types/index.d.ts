@@ -3,6 +3,8 @@ export interface Fighter {
     line_fp?: number | null;
     line_ss?: number | null;
     line_ss_r1?: number | null;
+    line_ss_body?: number | null;
+    line_ss_leg?: number | null;
     line_td?: number | null;
     line_ft?: number | null;
     line_ctrl?: number | null;

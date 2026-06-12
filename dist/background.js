@@ -1288,6 +1288,10 @@ function mergeFighters(existing = [], incoming = []) {
                 merged.line_ss = fighter.line_ss;
             if (fighter.line_ss_r1 != null)
                 merged.line_ss_r1 = fighter.line_ss_r1;
+            if (fighter.line_ss_body != null)
+                merged.line_ss_body = fighter.line_ss_body;
+            if (fighter.line_ss_leg != null)
+                merged.line_ss_leg = fighter.line_ss_leg;
             if (fighter.line_td != null)
                 merged.line_td = fighter.line_td;
             if (fighter.line_ft != null) {
@@ -1770,7 +1774,13 @@ function parseUnderdogApiFighters(data) {
         if (title.includes('combo'))
             continue;
         let lineType = null;
-        if (title.includes('significant strike') || title === 'significant strikes') {
+        // Body/Leg strike props get their own buckets (checked first; their titles don't
+        // match the generic significant-strikes substring, but order keeps intent explicit).
+        if (title.includes('strike') && title.includes('body'))
+            lineType = 'ss_body';
+        else if (title.includes('strike') && title.includes('leg'))
+            lineType = 'ss_leg';
+        else if (title.includes('significant strike') || title === 'significant strikes') {
             // Round-1-only variants (e.g. "Sig Strikes Rd 1", "Round 1 Significant Strikes")
             // get their own bucket so their (much lower) value can't overwrite the
             // total-fight SS line. Detect round-specificity before the generic branch.
@@ -1833,6 +1843,8 @@ function parseUnderdogApiFighters(data) {
                 line_fp: null,
                 line_ss: null,
                 line_ss_r1: null,
+                line_ss_body: null,
+                line_ss_leg: null,
                 line_td: null,
                 line_ft: null,
                 opponent: opponent || null,
@@ -1896,7 +1908,7 @@ function parseUnderdogApiFighters(data) {
         if (opponent)
             fighters[name].opponent = opponent;
     }
-    return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null || f.line_ft != null);
+    return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null);
 }
 async function fetchUnderdogFromBackground() {
     const endpoints = CONFIG.api.underdog || [];
@@ -1958,7 +1970,7 @@ function parsePrizePicksApiFighters(data) {
     }
     const upsert = (name, type, value, opponent = null) => {
         if (!fighters[name])
-            fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, line_ft: null, opponent };
+            fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_ss_body: null, line_ss_leg: null, line_td: null, line_ft: null, opponent };
         const normalized = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
         // For SS and TD, keep the highest value seen — standard total-fight lines are always
         // greater than any round-specific duplicate that may slip through. (ss_r1 is its own
@@ -1997,7 +2009,12 @@ function parsePrizePicksApiFighters(data) {
             continue;
         const isRound1 = /\brd\s*1\b|\bround\s*1\b|\br1\b|\b1st\s*round\b/.test(stat);
         let lineType = null;
-        if (stat.includes('significant strike'))
+        // Body/Leg strike props get their own buckets (checked before the generic SS branch).
+        if (stat.includes('strike') && stat.includes('body'))
+            lineType = 'ss_body';
+        else if (stat.includes('strike') && stat.includes('leg'))
+            lineType = 'ss_leg';
+        else if (stat.includes('significant strike'))
             lineType = isRound1 ? 'ss_r1' : 'ss';
         else if (stat.includes('takedown'))
             lineType = 'td';
@@ -2025,7 +2042,7 @@ function parsePrizePicksApiFighters(data) {
         const opponent = opponentRaw && opponentRaw.split(' ').length >= 2 ? opponentRaw : null;
         upsert(name, lineType, line, opponent);
     }
-    return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_td != null || f.line_ft != null);
+    return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null);
 }
 async function fetchPrizePicksFromBackground() {
     const endpoints = [
