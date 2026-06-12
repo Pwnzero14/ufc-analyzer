@@ -6055,6 +6055,47 @@ button:not(:disabled):active { transform: scale(0.96); }
 }
 
 
+/* ── GLOW-UP 24: Best Picks podium pass ── */
+/* Medal ranks: #1 keeps the crown, #2 silver, #3 bronze, rest recede */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .best-pick-rank {
+  color: #c9d4e8; text-shadow: 0 0 8px rgba(201,212,232,0.4);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .best-pick-rank {
+  color: #d9a06b; text-shadow: 0 0 8px rgba(217,160,107,0.4);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(n+5) .best-pick-rank {
+  color: var(--text3); font-weight: 500;
+}
+
+/* Hero #1 row: gold wash overlay + hairlines (overlay so tier tint survives) */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) { position: relative; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2)::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(248,198,74,0.06), transparent 40%);
+  border-top: 1px solid rgba(248,198,74,0.18);
+  border-bottom: 1px solid rgba(248,198,74,0.1);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-line { font-size: 21px; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-name { font-size: 18px; }
+
+/* Entrance stagger for pick rows */
+.best-picks-section .best-pick-row:has(.bp-avatar) { animation: glowViewIn 0.25s ease both; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) { animation-delay: 0.03s; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) { animation-delay: 0.07s; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) { animation-delay: 0.11s; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(5) { animation-delay: 0.15s; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(6) { animation-delay: 0.19s; }
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(n+7) { animation-delay: 0.23s; }
+
+/* Hover: nudge + value brighten (rides the existing transition) */
+.best-pick-row[data-jump]:hover { transform: translateX(3px); }
+.best-pick-row:hover .best-pick-line { text-shadow: 0 0 18px rgba(244,247,255,0.35); }
+
+/* Parlay Lab legs: same hover language */
+.parlay-leg-row { transition: background 0.15s ease, transform 0.15s ease; }
+.parlay-leg-row:hover { transform: translateX(2px); }
+
+
 </style>
 </head>
 <body>
