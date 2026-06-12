@@ -85,9 +85,39 @@ Written to **`lines_betr_manual_v1` ONLY** (14 fighters: 14 SS, 7 FP), captured 
 
 **Older (superseded):** tag `known-good-2026-06-11-glowup19` @ `3a060a7` + zip `…2026-06-11_glowup19_3a060a7.zip`.
 
+## NEXT SESSION (start here) — DK bet handle ("% of bets placed") in H2H
+
+**Goal:** add DK's "% of bets placed" split (e.g. *Topuria 69% · 31% Gaethje*) to the **Head-to-Head** panel, as a bar under the existing `WIN PROBABILITY · DK implied` bar.
+
+**Investigation is DONE (2026-06-12) — don't re-derive. Findings:**
+- DK SS/TD props are **DOM-scraped** from the rendered page (`scrapeDKSportsbookProps()` in [content.ts:683-786](src/content.ts#L683)), NOT an API. DK **moneyline / trueOdds / countryCode** come from the REST sportscontent API (`refreshDKMoneylinesFromApi`, [background.ts:2318](src/background.ts#L2318), endpoint `…/sportscontent/dkusoh/v1/leagues/9034`).
+- The bet-handle is **NOT** in that REST leagues API (probed every key — only `markets[].marketType.betOfferTypeId` matched, unrelated).
+- It IS pushed over a **binary msgpack WebSocket** (`websocket?format=msgpack&locale=en`, initiator `dkDataLayer.js`). **Do NOT go down the WebSocket route** — binary frames + undocumented subscription protocol + MV3 service-worker lifecycle = too brittle for one stat.
+- **The win:** the percentages are in the **rendered DOM** on each fight's **event page** (`/event/<slug>/<id>`, e.g. `/event/ilia-topuria-vs-justin-gaethje/33525834`), inside the "Fight Lines" card → "% of bets placed" widget. So scrape the DOM, exactly like SS/TD.
+
+**The one nuance:** SS/TD render on the props/category page the auto-fetch already loads; "% of bets placed" only renders on the **per-fight event page**, whose pathname does **not** include `ufc` — so the current DK content-script trigger (`host.includes('sportsbook.draftkings.com') && pathname.includes('ufc')`, [content.ts:1014](src/content.ts#L1014)) skips it.
+
+**Plan (3 steps):**
+1. **Scrape** — extend [content.ts](src/content.ts) DK detection to also fire on `/event/…` pages; add a scraper for the "% of bets placed" widget → `{fighterNorm: pct}`. Locate by the "% of bets placed" text node, walk to its container, read the two percentages + the two fighter names (left/right). FIRST STEP next session: grab the widget `outerHTML` via the snippet below to target DK's obfuscated React classes precisely.
+2. **Store** — persist as `fight_bethandle_dk_v1` (mirror `fight_trueprob_dk_v1`, set near [background.ts:2360](src/background.ts#L2360)).
+3. **Display** — H2H panel renders a "bets placed" bar under the win-prob bar (H2H lives in the GLOW-UP 36 work, `analyzer.html` + analyzer.ts; win-prob bar text is `WIN PROBABILITY · DK implied, vig removed`).
+
+**Populate strategy:** start **opportunistic** (scrape whenever the user is on a DK event page — zero extra fetch load). Optional later: auto-fetch opens each event page (~14 loads/card) for full-card coverage.
+
+**Snippet to run first next session** (DK event tab console — grabs the widget HTML):
+```js
+const lab = [...document.querySelectorAll('*')].find(n => (n.textContent||'').trim().toLowerCase() === '% of bets placed');
+let box = lab; for (let i=0;i<4 && box?.parentElement;i++) box = box.parentElement;
+console.log(box ? box.outerHTML.slice(0, 3000) : 'NOT FOUND — scroll the bar into view first');
+```
+Diagnostic snippets from this session (untracked, in `snippets/`): `2026-06-12_dk_bet_handle_probe.js` (leagues-API key probe), `2026-06-12_dk_bet_handle_endpoint_sniff.js` (fetch/XHR sniffer).
+
+---
+
 ## Open / next-cadence
 
-1. **Body/Leg phase 3** — projection + lean + Best-Picks eligibility (lines + self/opp history all wired; only the lean engine missing).
+1. **DK bet handle in H2H** — see "NEXT SESSION" section above (investigation complete, ready to build).
+2. **Body/Leg phase 3** — projection + lean + Best-Picks eligibility (lines + self/opp history all wired; only the lean engine missing).
 2. **UFC Freedom 250 settle after Sat Jun 14** — settle unresolved props, verify counter → 0.
 3. Confirm Betr entry path (modal vs snippet) → update workflow memory.
 4. Carried, non-blocking: FIX B ghost-archive ([src/background.ts](src/background.ts)), Betr auto-clear.
