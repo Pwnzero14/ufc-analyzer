@@ -10835,24 +10835,29 @@ function spineMatchupHTML(a, b) {
     const fnA = da?.finishRate, fnB = db2?.finishRate;
     const fmt = (v) => v == null || !Number.isFinite(v) ? '<span class="spine-missing">—</span>' : v.toFixed(1);
     const fmtPct = (v) => v == null || !Number.isFinite(v) ? '<span class="spine-missing">—</span>' : `${Math.round(v * 100)}%`;
+    // GLOW-UP 20: each row gets a teal/gold share-of-total bar + winner glow
+    const row = (rawA, rawB, dispA, dispB, label) => {
+        const okA = rawA != null && Number.isFinite(rawA);
+        const okB = rawB != null && Number.isFinite(rawB);
+        const winA = okA && okB && rawA > rawB;
+        const winB = okA && okB && rawB > rawA;
+        let bar = '';
+        if (okA && okB && (rawA + rawB) > 0) {
+            const shareA = Math.round((rawA / (rawA + rawB)) * 100);
+            bar = `<div class="spine-adv-bar"><i class="adv-a" style="width:${shareA}%"></i><i class="adv-b" style="width:${100 - shareA}%"></i></div>`;
+        }
+        return `<div class="spine-matchup-row">
+        <span class="spine-val-a${winA ? ' adv-win' : ''}">${dispA}</span>
+        <span class="spine-row-label">${label}</span>
+        <span class="spine-val-b${winB ? ' adv-win' : ''}">${dispB}</span>
+      </div>${bar}`;
+    };
     return `
     <div class="spine-section">
       <div class="spine-section-head">MATCHUP</div>
-      <div class="spine-matchup-row">
-        <span class="spine-val-a">${fmt(ssA)}</span>
-        <span class="spine-row-label">SS/fight</span>
-        <span class="spine-val-b">${fmt(ssB)}</span>
-      </div>
-      <div class="spine-matchup-row">
-        <span class="spine-val-a">${fmt(absA)}</span>
-        <span class="spine-row-label">opp abs</span>
-        <span class="spine-val-b">${fmt(absB)}</span>
-      </div>
-      <div class="spine-matchup-row">
-        <span class="spine-val-a">${fmtPct(fnA)}</span>
-        <span class="spine-row-label">P(fin)</span>
-        <span class="spine-val-b">${fmtPct(fnB)}</span>
-      </div>
+      ${row(ssA, ssB, fmt(ssA), fmt(ssB), 'SS/fight')}
+      ${row(absA, absB, fmt(absA), fmt(absB), 'opp abs')}
+      ${row(fnA, fnB, fmtPct(fnA), fmtPct(fnB), 'P(fin)')}
     </div>
   `;
 }
@@ -10931,16 +10936,22 @@ function spineL5TrendsHTML(a, b) {
         const valsA = histA.map(h => pickStat(h, key)).filter(v => Number.isFinite(v));
         const valsB = histB.map(h => pickStat(h, key)).filter(v => Number.isFinite(v));
         const sparkA = valsA.length >= 2
-            ? renderSparkline(valsA.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_A, w: 70, h: 14 })
+            ? renderSparkline(valsA.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_A, w: 70, h: 14, area: true, glow: true })
             : '<span class="spine-missing">—</span>';
         const sparkB = valsB.length >= 2
-            ? renderSparkline(valsB.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_B, w: 70, h: 14 })
+            ? renderSparkline(valsB.map((v, i) => ({ t: i, v })), 'auto', { color: SPINE_COLOR_B, w: 70, h: 14, area: true, glow: true })
             : '<span class="spine-missing">—</span>';
+        const fmtLast = (vals) => {
+            if (!vals.length)
+                return '';
+            const v = vals[vals.length - 1];
+            return Number.isInteger(v) ? String(v) : v.toFixed(1);
+        };
         return `
       <div class="spine-trend-row">
-        <span class="spine-trend-cell">${sparkA}</span>
+        <span class="spine-trend-cell">${sparkA}<span class="spine-trend-val tv-a">${fmtLast(valsA)}</span></span>
         <span class="spine-trend-label">${label}</span>
-        <span class="spine-trend-cell">${sparkB}</span>
+        <span class="spine-trend-cell"><span class="spine-trend-val tv-b">${fmtLast(valsB)}</span>${sparkB}</span>
       </div>
     `;
     }).join('');
@@ -15434,9 +15445,15 @@ function renderSparkline(points, direction = 'auto', opts) {
     const stroke = opts?.color ?? (dir === 'up' ? '#5ee589' : '#ff5a73');
     const x0 = xs[0].toFixed(1), y0 = ys[0].toFixed(1);
     const x1 = xs[xs.length - 1].toFixed(1), y1 = ys[ys.length - 1].toFixed(1);
+    const areaHTML = opts?.area
+        ? `<polygon points="${x0},${(h - 1).toFixed(1)} ${coords} ${x1},${(h - 1).toFixed(1)}" fill="${stroke}" opacity="0.1"/>`
+        : '';
+    const glowHTML = opts?.glow ? `<circle cx="${x1}" cy="${y1}" r="4" fill="${stroke}" opacity="0.22"/>` : '';
     return `<svg class="line-sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">`
+        + areaHTML
         + `<polyline points="${coords}" stroke="${stroke}" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`
         + `<circle cx="${x0}" cy="${y0}" r="1.8" fill="#6c7080"/>`
+        + glowHTML
         + `<circle cx="${x1}" cy="${y1}" r="1.8" fill="${stroke}"/>`
         + `</svg>`;
 }

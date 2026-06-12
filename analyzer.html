@@ -5883,6 +5883,41 @@ html { scroll-behavior: smooth; }
 #histTip .ht-delta { font-weight: 700; font-size: 10px; }
 
 
+/* ── GLOW-UP 20: Center spine evolution — advantage bars, trend readouts ── */
+/* Tug-of-war share bar under each MATCHUP row (teal = left fighter, gold = right) */
+.spine-adv-bar {
+  display: flex; height: 3px; border-radius: 2px; overflow: hidden; gap: 1px;
+  margin: 1px 10px 4px;
+}
+.spine-adv-bar .adv-a { background: linear-gradient(90deg, rgba(94,229,224,0.85), rgba(94,229,224,0.3)); }
+.spine-adv-bar .adv-b { background: linear-gradient(90deg, rgba(255,210,74,0.3), rgba(255,210,74,0.85)); }
+.spine-val-a.adv-win { text-shadow: 0 0 8px rgba(94,229,224,0.55); }
+.spine-val-b.adv-win { text-shadow: 0 0 8px rgba(255,210,74,0.5); }
+
+/* Section heads: flanking hairlines, same family as drilldown panel titles */
+.spine-section-head { display: flex; align-items: center; gap: 8px; }
+.spine-section-head::before,
+.spine-section-head::after { content: ''; flex: 1; height: 1px; }
+.spine-section-head::before { background: linear-gradient(90deg, transparent, #232a3f); }
+.spine-section-head::after  { background: linear-gradient(90deg, #232a3f, transparent); }
+
+/* L5 trend rows: last-value readout beside each sparkline */
+.spine-trend-row { grid-template-columns: 1fr 24px 1fr; }
+.spine-trend-cell { gap: 4px; }
+.spine-trend-row .spine-trend-cell:first-child { justify-content: flex-end; }
+.spine-trend-row .spine-trend-cell:last-child  { justify-content: flex-start; }
+.spine-trend-val { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600; }
+.spine-trend-val.tv-a { color: #5ee5e0; }
+.spine-trend-val.tv-b { color: #ffd24a; }
+
+/* VS chip: slow breathing glow */
+.fight-spine:not(.fight-spine-empty)::before { animation: vsPulse 3.2s ease-in-out infinite; }
+@keyframes vsPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(248,198,74,0); }
+  50%      { box-shadow: 0 0 14px rgba(248,198,74,0.28); }
+}
+
+
 </style>
 </head>
 <body>
