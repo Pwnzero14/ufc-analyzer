@@ -12207,7 +12207,7 @@ function buildModelRivalryPanel(lean: LeanResult): string {
     </div>`;
   }).join('');
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel mr-panel">
     <div class="detail-panel-title">Model Rivalry</div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span class="style-matchup-chip style-chip-default" style="color:${consensusTone}">${consensusText}</span>
@@ -12289,7 +12289,7 @@ function buildFairValuePanel(lean: LeanResult): string {
     </div>`;
   }).join('');
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel fv-panel">
     <div class="detail-panel-title">Fair Value Generator</div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
       <div style="display:flex;align-items:baseline;gap:6px">
@@ -12349,7 +12349,7 @@ function buildPayoutEVPanel(
     </div>`;
   }).join('');
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel ev-panel">
     <div class="detail-panel-title">Payout EV</div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
       <div style="padding:3px 10px;border-radius:999px;background:${evBg};border:1px solid ${evColor}40">
@@ -12384,7 +12384,7 @@ function buildArchetypeLearnerPanel(
     .map((reason, index) => `<div class="lean-point"><span class="lean-point-icon ${index === 0 ? 'pos' : ''}">${index === 0 ? '↑' : '→'}</span><span>${reason}</span></div>`)
     .join('');
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel arch-panel">
     <div class="detail-panel-title">Archetype Learner</div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span class="style-matchup-chip style-chip-default">${formatCareerArchetypeLabel(profile.careerLabel)}</span>
@@ -12504,7 +12504,7 @@ function buildFightTimeSummaryPanel(db: FighterDB, oppDB: FighterDB | null, ftLi
 
   const oppLine = oppDB?.loaded ? `<div style="font-size:10px;color:var(--text3);margin-bottom:4px">Opponent finish rate: <strong style="color:${oppFinishRate>0.6?'#ff6464':oppFinishRate>0.35?'#efb84d':'#48c78e'}">${Math.round(oppFinishRate*100)}%</strong></div>` : '';
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel ftb-panel">
     <div class="detail-panel-title">Fight Time Breakdown</div>
     <div class="finish-split-wrap">${winsHtml}${lossHtml}</div>
     <div style="margin-top:10px">
@@ -12853,7 +12853,7 @@ function buildSimilarOpponentPanel(
     </div>
   </div>`;
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel soh-panel">
     <div class="detail-panel-title">Similar Opponent History</div>
     <div style="font-size:9.5px;color:var(--text3);margin-bottom:6px">
       Current opponent profile: <span style="color:var(--text2)">${archLabel} · ${currentOppProfile.style} · ${currentOppProfile.slpm.toFixed(1)} SLpM · ${currentOppProfile.tdAvgPerFight.toFixed(1)} TD/fight · ${currentOppProfile.tdDef}% TD def</span>
@@ -12920,7 +12920,7 @@ function buildOpponentQualityPanel(db: FighterDB, fpLine: number | null, ssLine:
   const passiveRows = passive.length >= 2 ? `<div class="oq-section-label">vs passive opp (opp <${PASSIVE_THRESH} SS · ${passive.length} fights)</div>${buildRow('FP over', pFP)}${buildRow('SS over', pSS)}` : '';
   if (!activeRows && !passiveRows) return '';
 
-  return `<div class="detail-panel">
+  return `<div class="detail-panel oac-panel">
     <div class="detail-panel-title">Opponent Activity Context</div>
     ${flagHtml ? `<div class="lean-reason" style="margin-bottom:8px">${flagHtml}</div>` : ''}
     <div style="font-size:9px;color:var(--text4);margin-bottom:4px">${withOppData.length} fights with opponent stat data</div>

@@ -6214,6 +6214,52 @@ html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 
+/* ── GLOW-UP 28: Models & Career panel suite ── */
+/* Fused panel pairs: shared shell + neutral hairline divider (no vs semantics) */
+.panel-pair {
+  position: relative;
+  gap: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.panel-pair:hover { border-color: var(--border2); }
+.panel-pair > .detail-panel { background: transparent; border: none; border-radius: 0; }
+.panel-pair > .detail-panel:first-child { padding-right: 17px; }
+.panel-pair > .detail-panel + .detail-panel { padding-left: 17px; }
+.panel-pair:has(> .detail-panel + .detail-panel)::before {
+  content: '';
+  position: absolute; left: 50%; top: 10px; bottom: 10px; width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, var(--border2) 18%, var(--border2) 82%, transparent);
+  pointer-events: none;
+}
+.panel-pair:not(:has(> .detail-panel + .detail-panel)) { grid-template-columns: 1fr; }
+@media (max-width: 1100px) {
+  .panel-pair::before { display: none; }
+  .panel-pair > .detail-panel + .detail-panel { border-top: 1px solid var(--border); }
+}
+
+/* Identity accents: each model panel gets its own color signature
+   (left edge + title tint), extending the Matchup Analyzer language */
+.mr-panel   { border-left: 2px solid rgba(127,136,255,0.5) !important; }
+.mr-panel   .detail-panel-title { color: var(--purple); }
+.fv-panel   { border-left: 2px solid rgba(248,198,74,0.5) !important; }
+.fv-panel   .detail-panel-title { color: var(--gold); }
+.ev-panel   { border-left: 2px solid rgba(32,223,143,0.45) !important; }
+.ev-panel   .detail-panel-title { color: var(--green); }
+.arch-panel { border-left: 2px solid rgba(255,138,61,0.5) !important; }
+.arch-panel .detail-panel-title { color: var(--orange); }
+.ftb-panel  { border-left: 2px solid rgba(86,195,255,0.5) !important; }
+.ftb-panel  .detail-panel-title { color: var(--blue); }
+.soh-panel  { border-left: 2px solid rgba(44,212,208,0.5) !important; }
+.soh-panel  .detail-panel-title { color: var(--cyan); }
+.oac-panel  { border-left: 2px solid rgba(201,212,232,0.35) !important; }
+.oac-panel  .detail-panel-title { color: var(--text2); }
+
+
 </style>
 </head>
 <body>
