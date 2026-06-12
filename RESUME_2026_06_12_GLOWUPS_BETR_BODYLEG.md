@@ -1,6 +1,6 @@
 # Resume — GLOW-UP UI Series, Body/Leg Props (full), Betr Lines Entered
 
-**Branch:** `feature/sleek-theme-v1` (== `master` == `4ac11d5` + this resume commit, both pushed to origin `Pwnzero14/ufc-analyzer`).
+**Branch:** `feature/sleek-theme-v1` (== `master` == `7325f79` + this resume commit, both pushed to origin `Pwnzero14/ufc-analyzer`).
 **Date:** 2026-06-12 (Friday, early AM — continues `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`).
 **Working tree:** clean except `.claude/settings.local.json` (modified, never staged) and untracked stray `UsersabdirAppData…Opera…/` dir (ignore).
 **Card:** UFC Freedom 250 (Topuria vs Gaethje main event). Lines ~120h old in last session — re-fetch closer to the card.
@@ -11,13 +11,14 @@
 
 Three workstreams since the last resume, all shipped + pushed to both branches:
 1. **Body/Leg Strikes props — FULLY DONE** (Underdog + PrizePicks): lines in the strip, SELF history-vs-line charts, AND opponent-scored panels. Cache now `ufcstats_v51_`. Only phase 3 (lean/projection/Best-Picks) remains.
-2. **GLOW-UP UI series 19→26** — a run of sleek-theme polish commits (mostly `analyzer.html`-only CSS/animation). Authored in UI co-work sessions; committed/pushed by request.
+2. **GLOW-UP UI series 19→27 (COMPLETE)** — a run of sleek-theme polish commits (mostly `analyzer.html`-only CSS/animation). GLOW-UP 27 is the final level of the series. Authored in UI co-work sessions; committed/pushed by request.
 3. **Betr lines entered** for Freedom 250 (manual, 14 SS + 7 FP) via `lines_betr_manual_v1`.
 
 ---
 
 ## Commits since last resume (newest → oldest, all on master + feature)
 
+- `7325f79` — GLOW-UP 27 (FINAL): finishing touches (scroll progress bar, hit-rate hero, gold caret, smooth jumps) — `analyzer.html`
 - `4ac11d5` — GLOW-UP 26: Line Movers polish (steam flicker, RLM glow, hover rails, section accents) — `analyzer.html`
 - `6d3fd85` — GLOW-UP 25: app chrome polish (glass header, tab glow, auto-fetch breath, logo jab) — `analyzer.html`
 - `149c37b` — GLOW-UP 24: Best Picks podium (medal ranks, hero #1 row, entrance stagger) — `analyzer.html`
