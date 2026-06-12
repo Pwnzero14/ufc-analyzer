@@ -6328,6 +6328,36 @@ html { scroll-behavior: smooth; }
 .parlay-corr-alert.conflict { box-shadow: 0 0 10px rgba(255,108,136,0.08); }
 
 
+/* ── GLOW-UP 30: Learning Drilldown banner ── */
+/* The model's voice gets a stage: teal-to-gold wash, edge bar, ambient glow */
+.learning-diagnostics-strip {
+  border-left: 3px solid rgba(44,212,208,0.55);
+  background: linear-gradient(110deg, rgba(44,212,208,0.1), rgba(44,212,208,0.03) 45%, rgba(248,198,74,0.045)), var(--bg2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.3), 0 0 28px rgba(44,212,208,0.05);
+}
+
+/* The lightning sparks */
+.ld-drilldown-icon { animation: ldSpark 3s ease-in-out infinite; }
+@keyframes ldSpark {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(248,198,74,0.4)); transform: translateY(0); }
+  50%      { filter: drop-shadow(0 0 10px rgba(248,198,74,0.8)); transform: translateY(-1px); }
+}
+
+/* Headline: gold gradient hero, same family as hit-rate/Proj FP */
+.ld-drilldown-title {
+  background: linear-gradient(180deg, #fff6dd 15%, var(--gold));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.22));
+}
+
+/* DETAILS expansion: fades in, stats follow in sequence */
+.ld-details:not([hidden]) { animation: glowViewIn 0.22s ease both; }
+.ld-details:not([hidden]) .ld-stat { animation: glowViewIn 0.3s ease both; }
+.ld-details:not([hidden]) .ld-stat:nth-child(3) { animation-delay: 0.06s; }
+.ld-details:not([hidden]) .ld-stat:nth-child(5) { animation-delay: 0.12s; }
+
+
 </style>
 </head>
 <body>
