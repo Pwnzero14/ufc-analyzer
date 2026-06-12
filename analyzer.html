@@ -5830,6 +5830,59 @@ html { scroll-behavior: smooth; }
 .vb-close { margin-left: auto; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; }
 .vb-close:hover { color: var(--text); }
 
+
+/* ── GLOW-UP 19: Drilldown chart evolution — tooltips, hit-rate meta ── */
+/* Quiet inline readout under the panel title: "3/9 over line ▰▰▱ avg 102.1" */
+.hist-meta {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 6px 2px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em;
+  color: var(--text3);
+}
+.hm-rate { font-weight: 700; }
+.hm-rate.over  { color: var(--green); }
+.hm-rate.under { color: var(--red); }
+.hm-rate.mixed { color: var(--gold); }
+.hm-track {
+  width: 42px; height: 3px; border-radius: 2px; overflow: hidden;
+  background: rgba(255,91,120,0.22);
+}
+.hm-track i { display: block; height: 100%; background: linear-gradient(90deg, rgba(32,223,143,0.7), var(--green)); }
+.hm-avg { color: var(--text3); }
+
+/* W/L result dot on the opponent label — wider column so names survive the dot */
+.history-opp { display: flex; align-items: center; gap: 3px; width: 94px; }
+.hist-res { width: 4px; height: 4px; border-radius: 50%; flex: none; }
+.hist-res.w { background: var(--green); box-shadow: 0 0 3px rgba(32,223,143,0.55); }
+.hist-res.l { background: var(--red);   box-shadow: 0 0 3px rgba(255,91,120,0.45); }
+
+/* Hover lift + smoother fills */
+.history-bar-row.has-tip:hover .history-bar-fill { filter: brightness(1.3) saturate(1.15); }
+.history-bar-row.has-tip:hover .history-bar-val { color: #fff; text-shadow: 0 0 6px rgba(255,255,255,0.3); }
+.history-bar-row.has-tip:hover .history-opp { color: var(--text); }
+.history-bar-fill { transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1), filter 0.15s ease; }
+
+/* Floating tooltip */
+#histTip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  background: rgba(13,18,33,0.96); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 8px 10px; min-width: 130px; max-width: 240px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.03);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  font-size: 10.5px; animation: glowViewIn 0.12s ease both;
+}
+#histTip[hidden] { display: none; }
+#histTip .ht-head { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 11px; color: var(--text); margin-bottom: 2px; }
+#histTip .ht-res { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600; }
+#histTip .ht-res.w { color: var(--green); }
+#histTip .ht-res.l { color: var(--red); }
+#histTip .ht-date { color: var(--text3); font-size: 9px; margin-top: 1px; }
+#histTip .ht-val { margin-top: 5px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; }
+#histTip .ht-val.over { color: var(--green); }
+#histTip .ht-val.under { color: var(--red); }
+#histTip .ht-line { color: var(--text2); font-weight: 400; font-size: 9.5px; }
+#histTip .ht-delta { font-weight: 700; font-size: 10px; }
+
+
 </style>
 </head>
 <body>

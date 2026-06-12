@@ -13381,7 +13381,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const oppName   = oppEntry ? oppEntry.name : (f.opponent || null);
   debugLog(`SS/TD chart: ${f.name} → oppEntry="${oppEntry?.name ?? 'NOT FOUND'}" oppSsLine=${oppSsLine} oppTdLine=${oppTdLine} (opp ss p6=${oppEntry?.line_p6_ss ?? '—'} ud=${oppEntry?.line_ud_ss ?? '—'} pp=${oppEntry?.line_pp_ss ?? '—'} bt=${oppEntry?.line_betr_ss ?? '—'} | opp td p6=${oppEntry?.line_p6_td ?? '—'} ud=${oppEntry?.line_ud_td ?? '—'} pp=${oppEntry?.line_pp_td ?? '—'} bt=${oppEntry?.line_betr_td ?? '—'})`);
 
-  type HistoryRow = { opp?: string | null; fp?: number | null; sigStr?: number | null; sigStrR1?: number | null; sigStrBody?: number | null; sigStrLeg?: number | null; td?: number | null; timeSecs?: number | null; ctrlSecs?: number | null };
+  type HistoryRow = { opp?: string | null; fp?: number | null; sigStr?: number | null; sigStrR1?: number | null; sigStrBody?: number | null; sigStrLeg?: number | null; td?: number | null; timeSecs?: number | null; ctrlSecs?: number | null; result?: string | null; method?: string | null; date?: string | null; round?: number | null };
 
   function formatMinutesAsClock(minutes: number | null | undefined): string {
     if (minutes == null || !Number.isFinite(minutes)) return '—';
@@ -13421,17 +13421,45 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
                : lineCTRL;
     const maxVal = Math.max(...values, (line || 0) * 1.3, 1);
 
-    return recentRows.map((h) => {
+    // ── GLOW-UP 19: drilldown chart evolution ─────────────────────────────
+    const fmtVal = (v: number): string => (labelFn === 'ft' || labelFn === 'ctrl')
+      ? formatMinutesAsClock(v)
+      : (Number.isInteger(v) ? String(v) : v.toFixed(1));
+    const escAttr = (x: string): string => x.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+    // Panel meta header: hit rate vs line + sample average (with avg marker in bars)
+    const avg = values.reduce((s2, v) => s2 + v, 0) / values.length;
+    let metaHTML = '';
+    if (line != null && line > 0) {
+      const overs = values.filter(v => v > line).length;
+      const rate = overs / values.length;
+      const chipCls = rate >= 0.6 ? 'over' : rate <= 0.4 ? 'under' : 'mixed';
+      const ratePct = Math.round(rate * 100);
+      metaHTML = `<div class="hist-meta"><span class="hm-rate ${chipCls}">${overs}/${values.length} over line</span><span class="hm-track" title="${ratePct}% of fights cleared the line"><i style="width:${ratePct}%"></i></span><span class="hm-avg">avg ${fmtVal(avg)}</span></div>`;
+    }
+
+    const rowsHTML = recentRows.map((h) => {
       const val = valFn(h);
       if (val == null) return '';
       const pct = Math.min(100, (val / maxVal) * 100);
       const linePct = line ? Math.min(100, (line / maxVal) * 100) : null;
       const isOver = line ? val > line : true;
-      const displayVal = (labelFn === 'ft' || labelFn === 'ctrl')
-        ? formatMinutesAsClock(val)
-        : (Number.isInteger(val) ? val : (val as number).toFixed(1));
-      return `<div class="history-bar-row">
-        <div class="history-opp">${h.opp || '?'}</div>
+      const displayVal = fmtVal(val);
+
+      // Result dot + tooltip payload (opp rows lack result/method — degrade gracefully)
+      const res = (h.result || '').toLowerCase();
+      const resCls = res === 'win' ? 'w' : res === 'loss' ? 'l' : '';
+      const m = (h.method || '').toUpperCase();
+      const methodAbbr = m.includes('KO') ? 'KO' : m.includes('SUB') ? 'SUB' : m.includes('DEC') ? 'DEC' : '';
+      const resText = resCls
+        ? `${resCls === 'w' ? 'W' : 'L'}${methodAbbr ? ' · ' + methodAbbr : ''}${h.round ? ' R' + h.round : ''}`
+        : '';
+      const delta = line != null && line > 0 ? val - line : null;
+      const deltaText = delta == null ? '' : (labelFn === 'ft' || labelFn === 'ctrl')
+        ? `${delta < 0 ? '-' : '+'}${formatMinutesAsClock(Math.abs(delta))}`
+        : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`;
+      return `<div class="history-bar-row has-tip" data-ht-opp="${escAttr(h.opp || '?')}" data-ht-res="${resCls}" data-ht-restext="${escAttr(resText)}" data-ht-date="${escAttr(h.date || '')}" data-ht-val="${escAttr(displayVal)}" data-ht-line="${line != null && line > 0 ? escAttr(fmtVal(line)) : ''}" data-ht-delta="${escAttr(deltaText)}" data-ht-over="${isOver ? '1' : '0'}">
+        <div class="history-opp">${resCls ? `<span class="hist-res ${resCls}"></span>` : ''}${h.opp || '?'}</div>
         <div class="history-bar-wrap">
           <div class="history-bar-fill ${isOver ? 'over-line' : 'under-line'}" data-fill-width="${pct}%" style="width:0%"></div>
           ${linePct != null ? `<div class="line-marker" style="left:${linePct}%"></div>` : ''}
@@ -13439,6 +13467,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         <div class="history-bar-val">${displayVal}</div>
       </div>`;
     }).join('');
+
+    return metaHTML + rowsHTML;
   }
 
   const fights    = db.history    || [];
@@ -17812,6 +17842,44 @@ function initAnalyzerCore(): void {
     }, { passive: true });
     backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   }
+
+  // ── GLOW-UP 19: floating tooltip for drilldown history bars ──────────────
+  const histTip = document.createElement('div');
+  histTip.id = 'histTip';
+  histTip.setAttribute('hidden', '');
+  document.body.appendChild(histTip);
+  let histTipRow: HTMLElement | null = null;
+  const escHt = (x: string): string => x.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  document.addEventListener('mousemove', (ev) => {
+    const row = (ev.target as HTMLElement | null)?.closest?.('.history-bar-row.has-tip') as HTMLElement | null;
+    if (!row) {
+      if (histTipRow) { histTipRow = null; histTip.setAttribute('hidden', ''); }
+      return;
+    }
+    if (row !== histTipRow) {
+      histTipRow = row;
+      const d = row.dataset;
+      const resCls = d['htRes'] === 'w' ? 'w' : d['htRes'] === 'l' ? 'l' : '';
+      const overCls = d['htOver'] === '1' ? 'over' : 'under';
+      histTip.innerHTML =
+        `<div class="ht-head">vs ${escHt(d['htOpp'] || '?')}</div>` +
+        (d['htRestext'] ? `<div class="ht-res ${resCls}">${escHt(d['htRestext'])}</div>` : '') +
+        (d['htDate'] ? `<div class="ht-date">${escHt(d['htDate'])}</div>` : '') +
+        `<div class="ht-val ${overCls}">${escHt(d['htVal'] || '')}` +
+        (d['htLine'] ? ` <span class="ht-line">vs line ${escHt(d['htLine'])}</span>` : '') +
+        (d['htDelta'] ? ` <span class="ht-delta">${escHt(d['htDelta'])}</span>` : '') +
+        `</div>`;
+      histTip.removeAttribute('hidden');
+    }
+    const pad = 13;
+    const r = histTip.getBoundingClientRect();
+    let x = ev.clientX + pad;
+    let y = ev.clientY + pad;
+    if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - pad;
+    if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - pad;
+    histTip.style.left = `${x}px`;
+    histTip.style.top = `${y}px`;
+  }, { passive: true });
 
   // One-time keyboard hint
   try {
