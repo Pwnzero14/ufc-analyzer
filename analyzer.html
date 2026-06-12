@@ -6134,6 +6134,49 @@ button:not(:disabled):active { transform: scale(0.96); }
 }
 
 
+/* ── GLOW-UP 26: Line Movers strip polish ── */
+/* Rows: hover tint, jump affordance on the name, direction accent rail */
+.movement-summary-row { padding: 4px 6px; }
+.movement-summary-row:hover { background: rgba(255,255,255,0.025); }
+.movement-summary-row:hover .movement-summary-fighter { color: var(--gold); }
+.movement-summary-row:hover .movement-summary-spark { opacity: 1; }
+.movement-summary-row:has(.movement-summary-delta.rise):hover {
+  box-shadow: inset 2px 0 0 rgba(0,232,122,0.55);
+}
+.movement-summary-row:has(.movement-summary-delta.drop):hover {
+  box-shadow: inset 2px 0 0 rgba(255,58,96,0.5);
+}
+.movement-summary-fighter { transition: color 0.12s ease; }
+
+/* STEAM: hot pill with a flicker — sharp action deserves heat */
+.movement-summary-steam {
+  padding: 1px 6px; border-radius: 8px;
+  background: rgba(255,106,61,0.12);
+  border: 1px solid rgba(255,106,61,0.4);
+  animation: steamFlicker 2.2s ease-in-out infinite;
+}
+@keyframes steamFlicker {
+  0%, 100% { text-shadow: 0 0 4px rgba(255,106,61,0.4); }
+  50%      { text-shadow: 0 0 10px rgba(255,106,61,0.8); }
+}
+
+/* RLM pills: directional glow */
+.rlm-tag.rlm-under { box-shadow: 0 0 8px rgba(127,136,255,0.25); }
+.rlm-tag.rlm-over  { box-shadow: 0 0 8px rgba(86,195,255,0.25); }
+
+/* Section headers: flanking hairline + glow, same family as the spine */
+.movement-summary-section-header.rise { text-shadow: 0 0 10px rgba(0,232,122,0.35); }
+.movement-summary-section-header.drop { text-shadow: 0 0 10px rgba(255,58,96,0.3); }
+.movement-summary-section-header::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+
+/* Deltas: weight via glow */
+.movement-summary-delta.rise { text-shadow: 0 0 8px rgba(0,232,122,0.35); }
+.movement-summary-delta.drop { text-shadow: 0 0 8px rgba(255,58,96,0.3); }
+
+
 </style>
 </head>
 <body>
