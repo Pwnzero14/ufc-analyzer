@@ -1,6 +1,6 @@
 # Resume — GLOW-UP UI Series, Body/Leg Props (full), Betr Lines Entered
 
-**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `7325f79` (GLOW-UP 27, series complete); HEAD is the trailing docs/resume commit.
+**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `01ba982` (GLOW-UP 28 — opens the new 28+ series; see section below). Prior series 19→27 closed at `7325f79`.
 **Date:** 2026-06-12 (Friday, early AM — continues `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`).
 **Working tree:** clean except `.claude/settings.local.json` (modified, never staged) and untracked stray `UsersabdirAppData…Opera…/` dir (ignore).
 **Card:** UFC Freedom 250 (Topuria vs Gaethje main event). Lines ~120h old in last session — re-fetch closer to the card.
@@ -18,7 +18,8 @@ Three workstreams since the last resume, all shipped + pushed to both branches:
 
 ## Commits since last resume (newest → oldest, all on master + feature)
 
-- `7325f79` — GLOW-UP 27 (FINAL): finishing touches (scroll progress bar, hit-rate hero, gold caret, smooth jumps) — `analyzer.html`
+- `01ba982` — **GLOW-UP 28** (opens 28+ series): Models & Career suite — fused panel pairs, per-panel identity accents — `analyzer.html` + `src/analyzer.ts` + dist
+- `7325f79` — GLOW-UP 27 (FINAL of 19→27): finishing touches (scroll progress bar, hit-rate hero, gold caret, smooth jumps) — `analyzer.html`
 - `4ac11d5` — GLOW-UP 26: Line Movers polish (steam flicker, RLM glow, hover rails, section accents) — `analyzer.html`
 - `6d3fd85` — GLOW-UP 25: app chrome polish (glass header, tab glow, auto-fetch breath, logo jab) — `analyzer.html`
 - `149c37b` — GLOW-UP 24: Best Picks podium (medal ranks, hero #1 row, entrance stagger) — `analyzer.html`
@@ -30,7 +31,17 @@ Three workstreams since the last resume, all shipped + pushed to both branches:
 - `896e85c` — **feat(props): opponent body/leg history panels** (cache v50→v51) — see prior resume for the 5-step detail.
 - (earlier body/leg phases `0fcbfab`/`25bff68`/`efb5fc7`, combo fix `2b84244`, placeability `11fdf8f`, prune snippet `2eb605f` — covered in `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`.)
 
-**GLOW-UP commit pattern (for next time):** user does the UI edit in co-work, then asks me to `rm -f .git/index.lock` → stage ONLY the named file(s) (usually just `analyzer.html`; 19/20 also had `src/analyzer.ts` + `dist/analyzer.js`+`.map`) → commit the given message → push BOTH branches. NEVER stage `.claude/settings.local.json` or the stray Opera dir.
+**GLOW-UP commit pattern (for next time):** user does the UI edit in co-work, then asks me to `rm -f .git/index.lock` → stage ONLY the named file(s) (usually just `analyzer.html`; 19/20/28 also had `src/analyzer.ts` + `dist/analyzer.js`+`.map`) → commit the given message → push BOTH branches. NEVER stage `.claude/settings.local.json` or the stray Opera dir.
+
+---
+
+## GLOW-UP 28+ series (NEW — open)
+
+Series 19→27 is closed (final = `7325f79`). The 28+ run starts here; log each level newest-first as it ships.
+
+- `01ba982` — **GLOW-UP 28** — Models & Career suite: fused panel pairs (shared-shell treatment extended to the Models + Career panels) with per-panel identity accents. Files: `analyzer.html` + `src/analyzer.ts` + `dist/analyzer.js` (`.map` unchanged this time). Pushed to both branches.
+
+(Same commit pattern as 19→27 above. Restore point still tag `known-good-2026-06-12-glowup27` @ `e50ef05` — cut a fresh tag/zip once the 28+ run settles.)
 
 ---
 
