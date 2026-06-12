@@ -1,6 +1,6 @@
 # Resume — GLOW-UP UI Series, Body/Leg Props (full), Betr Lines Entered
 
-**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `8967cbd` (GLOW-UP 33-34 + DK moneyline pipeline; 28+ series open — see section below). Prior series 19→27 closed at `7325f79`.
+**Branch:** `feature/sleek-theme-v1` (== `master`, both pushed to origin `Pwnzero14/ufc-analyzer`). Latest code @ `4a8171b` (GLOW-UP 35; 28+ series open — see section below). Prior series 19→27 closed at `7325f79`.
 **Date:** 2026-06-12 (Friday, early AM — continues `RESUME_2026_06_11_PLACEABILITY_COMBO_BODYLEG.md`).
 **Working tree:** clean except `.claude/settings.local.json` (modified, never staged) and untracked stray `UsersabdirAppData…Opera…/` dir (ignore).
 **Card:** UFC Freedom 250 (Topuria vs Gaethje main event). Lines ~120h old in last session — re-fetch closer to the card.
@@ -39,6 +39,7 @@ Three workstreams since the last resume, all shipped + pushed to both branches:
 
 Series 19→27 is closed (final = `7325f79`). The 28+ run starts here; log each level newest-first as it ships.
 
+- `4a8171b` — **GLOW-UP 35** — avatar opens head-to-head: removes the flaky ⚔ button, adds hover swords overlay + capture-before-expand. Files: `analyzer.html` + `src/analyzer.ts` + `dist/analyzer.js`+`.map`. Pushed to both branches.
 - `8967cbd` — **GLOW-UP 33-34 + DK moneyline pipeline** (combined, not pure CSS):
   - **GLOW-UP 33** — head-to-head overhaul with advantage bars.
   - **GLOW-UP 34** — center-spine H2H trigger + real fighter countries (via `src/analyzer/fighter-image.ts`).
