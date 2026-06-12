@@ -6024,6 +6024,37 @@ html { scroll-behavior: smooth; }
 @keyframes leanSheen { from { left: -45%; } to { left: 105%; } }
 
 
+/* ── GLOW-UP 23: Global motion pass ── */
+/* Card cascade: top-of-page items lead, the rest follow (caps at ~0.3s) */
+#cardContainer > *:nth-child(1)  { animation-delay: 0s; }
+#cardContainer > *:nth-child(2)  { animation-delay: 0.03s; }
+#cardContainer > *:nth-child(3)  { animation-delay: 0.06s; }
+#cardContainer > *:nth-child(4)  { animation-delay: 0.09s; }
+#cardContainer > *:nth-child(5)  { animation-delay: 0.12s; }
+#cardContainer > *:nth-child(6)  { animation-delay: 0.15s; }
+#cardContainer > *:nth-child(7)  { animation-delay: 0.18s; }
+#cardContainer > *:nth-child(8)  { animation-delay: 0.21s; }
+#cardContainer > *:nth-child(9)  { animation-delay: 0.24s; }
+#cardContainer > *:nth-child(10) { animation-delay: 0.27s; }
+#cardContainer > *:nth-child(n+11) { animation-delay: 0.3s; }
+
+/* Drilldown choreography: opp half of each fused pair lags its self half */
+.fighter-row.expanded .stat-pair > .detail-panel + .detail-panel { animation-delay: 0.08s; }
+
+/* Press feedback on every enabled control (no transition override —
+   existing per-button transitions keep their own easing) */
+button:not(:disabled):active { transform: scale(0.96); }
+
+/* Accessibility: respect reduced-motion preference app-wide */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
 </style>
 </head>
 <body>
