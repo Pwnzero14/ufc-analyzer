@@ -12,7 +12,7 @@ Four things shipped, all verified live and pushed to both branches:
 1. **FP-under placeability fix** — Pereira's unplaceable Pick6 FP-under removed; added an authoritative `fp_under_available` (Pick6 "Less" button) gate.
 2. **Corrected platform rules** (per user + the UD/PP apps): Underdog DOES offer dog FP-unders; PrizePicks/Betr offer SS both sides to all.
 3. **PrizePicks `(Combo)` SS fix** — combo line was clobbering individual SS (Bo Nickal 49.5 vs real 28.5).
-4. **NEW PROPS: Significant Body & Leg Strikes** (Underdog + PrizePicks) — phase 1 (display lines) + phase 2 (per-fight history-vs-line charts). Verified populated and looking like every other prop.
+4. **NEW PROPS: Significant Body & Leg Strikes** (Underdog + PrizePicks) — phase 1 (display lines) + phase 2 (SELF per-fight history-vs-line charts) + opponent-scored panels (`896e85c`). Verified populated and looking like every other prop. Cache now `ufcstats_v51_`.
 
 ---
 
@@ -46,14 +46,10 @@ Four things shipped, all verified live and pushed to both branches:
 - **Cache: `ufcstats_v50_` (was v49).** A fresh fetch re-fetches all histories to populate body/leg. Old `ufcstats_v49_*` keys are now orphaned — prune snippet `CURRENT_UFCSTATS_VERSION` should be bumped to 50 to reclaim them.
 - UI: LINES-strip cells (`UD Body`/`UD Leg`/`PP Body`/`PP Leg`) + drilldown `Body/Leg Sig Strikes History vs Line` panels via `buildHistoryBars(fights, h => h.sigStrBody|sigStrLeg, line, …, 'ss')`.
 
-**Deliberately NOT done (future):**
-- ⭐ **Opponent-scored body/leg panels — TOP NEXT-SESSION ITEM (user-requested).** Currently the SELF `Body/Leg Sig Strikes History` panels exist, but the matching `⚔️ Opp Body/Leg Scored vs <fighter>` panels do NOT (the self-only screenshots show the gap). To add (mirror how `oppSSR1History` works):
-  1. **Parser:** add body/leg to `parseFightDetailStatsOpponent` ([src/analyzer/parsers.ts](src/analyzer/parsers.ts) ~184) — same Head/Body/Leg table, take the OTHER fighter's column (`fIdx` flipped).
-  2. **Types:** add `sigStrBody`/`sigStrLeg` to `OppStats` (parsers.ts) and `OppFightResult` ([src/types/index.ts](src/types/index.ts) ~118).
-  3. **Build:** thread them where `db.oppHistory` is built (the opp-history mapping in [src/analyzer.ts](src/analyzer.ts), near the `oppStats`/`sigStrR1: os.sigStrR1 ?? null` block ~lines 970-980).
-  4. **Cache:** bump `ufcstats_v50_` → `v51` (opp parse changes the cached shape) so histories re-fetch.
-  5. **Charts:** add `oppBodyHistory`/`oppLegHistory` via `buildHistoryBars(oppFights, h => h.sigStrBody|sigStrLeg, oppBodyLine, …, 'ss')` (oppBodyLine = `oppEntry?.line_ud_ss_body ?? oppEntry?.line_pp_ss_body`), and render `⚔️ Opp Body/Leg Scored vs ${f.name}` panels next to the self Body/Leg panels (the stat-pair added at ~14328).
-- Projection/lean (`calcSSBodyLean` etc.) + Best-Picks eligibility — later phase.
+**Opponent body/leg panels — ✅ DONE (commit `896e85c`).** `parseFightDetailStatsOpponent` reads the Head/Body/Leg table for the opponent column (`oppIdx`); `sigStrBody`/`sigStrLeg` added to `OppStats`/`FightStats`/`OppFightResult` and threaded through the `db.oppHistory` map; **cache bumped v50→v51**; drilldown now renders Body and Leg each as a self|opp stat-pair (`Body Sig Strikes History` + `⚔️ Opp Body SS Scored`, same for Leg).
+
+**Still NOT done (future):**
+- Projection/lean (`calcSSBodyLean` etc.) + Best-Picks eligibility — later phase. Body/leg remain display+history only.
 
 ---
 
@@ -65,10 +61,11 @@ Four things shipped, all verified live and pushed to both branches:
 
 ## Open / next-cadence
 
-1. ⭐ **Opponent body/leg stat panels (user-requested top item)** — add `⚔️ Opp Body/Leg Scored vs <fighter>` charts to match the self panels. Full 5-step plan above ("Deliberately NOT done").
-2. **Body/Leg phase 3** (later): projection + lean + Best-Picks eligibility.
-3. **UFC Freedom 250 settle after Sat Jun 14** — unresolved props; settle + verify counter → 0.
-4. Carried, non-blocking: FIX B ghost-archive ([src/background.ts](src/background.ts)), Betr auto-clear.
+1. **Body/Leg phase 3** (later): projection + lean + Best-Picks eligibility (self + opp history + lines all wired; only the lean engine is missing).
+2. **UFC Freedom 250 settle after Sat Jun 14** — unresolved props; settle + verify counter → 0.
+3. Carried, non-blocking: FIX B ghost-archive ([src/background.ts](src/background.ts)), Betr auto-clear.
+
+> **Cache is now `ufcstats_v51_`** (v49→v50 body/leg self, v50→v51 opponent body/leg). Pre-v51 keys orphaned — prune snippet `CURRENT_UFCSTATS_VERSION` → 51 to reclaim.
 
 ## Standing workflow rule
 
