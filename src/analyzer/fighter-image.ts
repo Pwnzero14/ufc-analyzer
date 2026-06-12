@@ -68,3 +68,52 @@ export async function fetchFighterImageUrl(name: string): Promise<string | null>
     return null;
   }
 }
+
+// ── GLOW-UP 33b: fighter country from the same ufc.com athlete pages ──────
+// Separate cache from images so fighters with already-cached headshots still
+// get a one-time country fetch. Returns the country name, e.g. "Georgia".
+const _fighterCountryCache = new Map<string, string | null>();
+
+export async function fetchFighterCountry(name: string): Promise<string | null> {
+  const slug = nameToUfcSlug(name);
+  if (_fighterCountryCache.has(slug)) return _fighterCountryCache.get(slug) ?? null;
+
+  const cacheKey = `ufc_country_v1_${slug}`;
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const stored = await new Promise<Record<string, any>>(resolve =>
+      chrome.storage.local.get([cacheKey], resolve)
+    );
+    if (stored[cacheKey] !== undefined) {
+      _fighterCountryCache.set(slug, stored[cacheKey]);
+      return stored[cacheKey];
+    }
+  }
+
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 10000);
+  try {
+    const res = await fetch(`https://www.ufc.com/athlete/${slug}`, {
+      signal: ctl.signal,
+      headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+    });
+    clearTimeout(timer);
+    if (!res.ok) { _fighterCountryCache.set(slug, null); return null; }
+    const html = await res.text();
+    // <div class="c-bio__label">Place of Birth</div><div class="c-bio__text">Tbilisi, Georgia</div>
+    const m = html.match(/Place of Birth<\/div>\s*<div[^>]*>([^<]+)</i);
+    let country: string | null = null;
+    if (m?.[1]) {
+      const parts = m[1].split(',').map(x => x.trim()).filter(Boolean);
+      country = parts.length ? parts[parts.length - 1] : null;
+    }
+    _fighterCountryCache.set(slug, country);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ [cacheKey]: country });
+    }
+    return country;
+  } catch {
+    clearTimeout(timer);
+    _fighterCountryCache.set(slug, null);
+    return null;
+  }
+}

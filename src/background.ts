@@ -103,8 +103,15 @@ async function refreshFightOddsFromBestFightOdds(reason: string): Promise<number
       return 0;
     }
 
+    // Re-overlay DK moneylines — DK is the authoritative live book, BFO is
+    // only the wide-coverage base. Without this the refresh wiped DK values.
+    try {
+      const dkRes = await chrome.storage.local.get('fight_odds_dk_v1');
+      const dk = (dkRes['fight_odds_dk_v1'] as Record<string, number>) || {};
+      Object.assign(oddsByName, dk);
+    } catch { /* BFO-only fallback */ }
     await StorageService.setFightOddsMoneyline(oddsByName);
-    console.log(`[UFC Odds] Stored ${count} moneyline odds (${reason})`);
+    console.log(`[UFC Odds] Stored ${count} moneyline odds (${reason}, DK overlay applied)`);
     notifyAnalyzerTabs({ type: 'ODDS_UPDATED', count, reason });
     return count;
   } catch (error) {
@@ -1575,6 +1582,7 @@ async function autoBackupOnStartup(): Promise<void> {
     await initializeBetrLines();
 
     await refreshFightOddsFromBestFightOdds('startup');
+    void refreshDKMoneylinesFromApi('startup');
 
     // ── Startup catch-up settle ─────────────────────────────────────────
     // If the browser was closed during the event, alarms never fired.
@@ -1664,6 +1672,10 @@ const AUTO_SCRAPE_URLS: Record<'pick6'|'underdog'|'prizepicks'|'draftkings_sport
     'https://app.prizepicks.com/board',
   ],
   draftkings_sportsbook: [
+    // Moneylines FIRST (category=fight-odds, no subcategory → preferML branch).
+    // 2026-06-12: MLs were never scraped — this page was missing, so the odds
+    // store only ever held (stale) BestFightOdds medians.
+    'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fight-odds',
     // DraftKings Sportsbook UFC Fighter Props (SS + TD + Odds)
     // 2026-05-15: DK restructured params — category=fights, stat moved to nav_1
     'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=significant-strikes-o-u',
@@ -2293,12 +2305,103 @@ async function scrapePick6ActiveFallback(
   return store.pick6?.fighters?.length || 0;
 }
 
+// DK Sportsbook eventgroup JSON API — the same data the site renders, as
+// structured {fighter, oddsAmerican} pairs. UFC event group is 9034.
+const DK_EVENTGROUP_URLS = [
+  // DK sportscontent API — verified live 2026-06-12 (HTTP 200, flat shape:
+  // events/markets/selections arrays). The legacy v5 eventgroups endpoint
+  // now returns 403.
+  'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034',
+  'https://sportsbook.draftkings.com/sites/US-SB/api/v5/eventgroups/9034?format=json',
+];
+
+async function refreshDKMoneylinesFromApi(reason: string): Promise<number> {
+  for (const url of DK_EVENTGROUP_URLS) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(15000),
+        headers: { accept: 'application/json' },
+      });
+      if (!res.ok) { console.warn(`[UFC Odds] DK API HTTP ${res.status} (${reason})`); continue; }
+      const data: any = await res.json();
+      const out: Record<string, number> = {};
+
+      // Shape A (sportscontent, current): flat markets[] + selections[].
+      // Moneyline markets are matched by exact name; selections carry the
+      // fighter in participants[0].name / label and odds in displayOdds.american.
+      const markets = Array.isArray(data?.markets) ? data.markets : [];
+      const selections = Array.isArray(data?.selections) ? data.selections : [];
+      if (markets.length && selections.length) {
+        const mlMarketIds = new Set(
+          markets
+            .filter((m: any) => /^moneyline$/i.test(String(m?.name || '').trim()))
+            .map((m: any) => m?.id)
+        );
+        for (const sel of selections) {
+          if (!mlMarketIds.has(sel?.marketId)) continue;
+          const nm = normalizeOddsName(sel?.participants?.[0]?.name || sel?.label);
+          const oddsStr = String(sel?.displayOdds?.american ?? sel?.oddsAmerican ?? '').replace(/\u2212/g, '-');
+          const odds = parseInt(oddsStr, 10);
+          if (nm && Number.isFinite(odds) && odds !== 0) out[nm] = odds;
+        }
+      }
+
+      // Shape B (legacy v5 eventGroup) — kept for fallback compatibility
+      if (Object.keys(out).length < 2) {
+        const cats = data?.eventGroup?.offerCategories || [];
+        for (const cat of cats) {
+          for (const d of (cat?.offerSubcategoryDescriptors || [])) {
+            for (const row of (d?.offerSubcategory?.offers || [])) {
+              for (const offer of (Array.isArray(row) ? row : [])) {
+                if (!/moneyline/i.test(String(offer?.label || ''))) continue;
+                for (const oc of (offer?.outcomes || [])) {
+                  const nm = normalizeOddsName(oc?.participant || oc?.label);
+                  const odds = Number(String(oc?.oddsAmerican ?? '').replace(/\u2212/g, '-'));
+                  if (nm && Number.isFinite(odds) && odds !== 0) out[nm] = odds;
+                }
+              }
+            }
+          }
+        }
+      }
+      const n = Object.keys(out).length;
+      if (n >= 2) {
+        await mergeDKMoneylines(out);
+        console.log(`[UFC Odds] DK API moneylines: ${n} fighters (${reason})`);
+        return n;
+      }
+      console.warn(`[UFC Odds] DK API returned ${n} moneylines — structure changed? (${reason})`);
+    } catch (e) {
+      console.warn(`[UFC Odds] DK API ML fetch failed (${reason}):`, e);
+    }
+  }
+  return 0;
+}
+
 // Merge DK-scraped moneylines on top of existing BFO odds (DK is live and liquid).
+// DK values are ALSO persisted under fight_odds_dk_v1 so the periodic BFO
+// refresh (which rebuilds the main store) can re-overlay them — DK always wins.
 async function mergeDKMoneylines(dkOdds: Record<string, number>): Promise<void> {
   try {
-    const res = await chrome.storage.local.get('fight_odds_moneyline');
-    const existing: Record<string, number> = (res.fight_odds_moneyline as Record<string, number>) || {};
-    const merged = { ...existing, ...dkOdds };
+    // Normalize DK names to the same key format BFO entries use, so the
+    // analyzer's direct map lookup hits without the fuzzy fallback.
+    const dkNorm: Record<string, number> = {};
+    const JUNK = /\b(decision|submission|ko|tko|to win|wins by|fighter [ab]|round|points|draw|over|under|total)\b/i;
+    for (const [n, v] of Object.entries(dkOdds)) {
+      const key = normalizeOddsName(n);
+      if (key && !JUNK.test(key) && Number.isFinite(v)) dkNorm[key] = v;
+    }
+    if (!Object.keys(dkNorm).length) return;
+
+    const res = await chrome.storage.local.get(['fight_odds_moneyline', 'fight_odds_dk_v1']);
+    const existingDk: Record<string, number> = (res['fight_odds_dk_v1'] as Record<string, number>) || {};
+    // A real scrape (2+ fighters) replaces the DK store — keeps it scoped to
+    // the current card instead of accumulating stale names forever.
+    const dkAll = Object.keys(dkNorm).length >= 2 ? dkNorm : { ...existingDk, ...dkNorm };
+    await chrome.storage.local.set({ 'fight_odds_dk_v1': dkAll });
+
+    const existing: Record<string, number> = (res['fight_odds_moneyline'] as Record<string, number>) || {};
+    const merged = { ...existing, ...dkAll };
     await StorageService.setFightOddsMoneyline(merged);
     notifyAnalyzerTabs({ type: 'ODDS_UPDATED', count: Object.keys(merged).length, reason: 'dk-sportsbook' });
   } catch (e) {
@@ -2470,7 +2573,9 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
                   const out: Record<string, any> = {};
                   const href = (window.location.href || '').toLowerCase();
-                  const preferML = href.includes('category=fight-odds') && !href.includes('subcategory=');
+                  // ML page: explicit fight-odds param OR the bare leagues page (DK may strip
+                  // unknown params on redirect). Props pages have subcategory/nav_1.
+                  const preferML = (href.includes('category=fight-odds') || (!href.includes('subcategory=') && !href.includes('nav_1='))) && !href.includes('subcategory=');
                   const preferSS = href.includes('subcategory=significant-strikes-o-u');
                   const preferTD = href.includes('subcategory=takedowns-landed-o-u');
                   const preferFT = href.includes('subcategory=fight-time-o-u') || href.includes('subcategory=fight-time');
@@ -2689,24 +2794,19 @@ async function autoScrapeAllPlatforms(): Promise<any> {
                       if (!parent) continue;
                       const oddsEl = parent.querySelector('[class*="sportsbook-odds"], [class*="american"], button[aria-label*="odds"]');
                       if (!oddsEl) continue;
-                      const oddsText = ((oddsEl as HTMLElement).innerText || oddsEl.textContent || '').replace(/\s/g, '');
+                      // DK renders negatives with U+2212 (−), not ASCII hyphen
+                      const oddsText = ((oddsEl as HTMLElement).innerText || oddsEl.textContent || '').replace(/\u2212/g, '-').replace(/\s/g, '');
                       const oddsMatch = oddsText.match(/^([+-]\d{2,4})$/);
                       if (oddsMatch) {
                         moneylines[name] = parseInt(oddsMatch[1], 10);
                       }
                     }
 
-                    // Text-based fallback: fighter name line followed by odds line
-                    if (Object.keys(moneylines).length < 2) {
-                      const lines = pageText.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                      for (let i = 0; i < lines.length - 1; i++) {
-                        const nameMatch = lines[i].match(/^([A-Z][a-zA-Z'\s\-.]{3,35})$/);
-                        const oddsMatch = lines[i + 1].match(/^([+-]\d{2,4})$/);
-                        if (nameMatch && oddsMatch) {
-                          moneylines[nameMatch[1].trim()] = parseInt(oddsMatch[1], 10);
-                        }
-                      }
-                    }
+                    // NOTE: the line-scanning text fallback was removed 2026-06-12.
+                    // It mis-paired odds across DK's method-market columns (Gaethje
+                    // got Topuria's -525, Pereira/Gane both positive). Moneylines now
+                    // come from the DK eventgroup JSON API (see
+                    // refreshDKMoneylinesFromApi) — structurally paired, no guessing.
                   }
 
                   return {
@@ -2795,6 +2895,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
     console.log(`[UFC Auto-Scrape] AUTO-SCRAPE COMPLETE in ${totalElapsed}ms. Results: ${Object.entries(results).map(([p, c]) => `${p}=${c}`).join(', ')}`);
     autoScrapeInProgress = false;
     await refreshFightOddsFromBestFightOdds('auto-scrape');
+    await refreshDKMoneylinesFromApi('auto-scrape');
   }
 
   return { status: 'done', results, attempts };

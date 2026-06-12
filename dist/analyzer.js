@@ -5,7 +5,7 @@ import { _weightMissSignals, parseWeightMissFromTitle, severityFromLbs, MANUAL_W
 import { _newsCache, _newsAlertFighters, NEWS_INJURY_KEYWORDS, fetchFighterNews, } from './analyzer/news.js';
 import { calcFPForPlatform, getFightFantasyValueForPlatform, isFinish, deriveStyle, } from './analyzer/fantasy-scoring.js';
 import { DEFAULT_VENUE, resolveVenueFactor } from './analyzer/venue-factors.js';
-import { fetchFighterImageUrl } from './analyzer/fighter-image.js';
+import { fetchFighterImageUrl, fetchFighterCountry } from './analyzer/fighter-image.js';
 import { styleMatchupEdge, calcOpponentDefenseScore, calcMatchupPatternEdge, } from './analyzer/style-matchup.js';
 import { parseCareerStats, parseFightHistoryLinks, parseFightDetailStats, parseFightDetailStatsOpponent, } from './analyzer/parsers.js';
 import { detectStreak, calcWeightedAvgFP, calcFPStats, calcPerRoundFP, } from './analyzer/analytics-helpers.js';
@@ -188,6 +188,26 @@ function animateNumberText(el, value, durationMs = 700) {
             requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+}
+// Country name -> compact code for the avatar badge (fallback: first 3 letters)
+const COUNTRY_SHORT = {
+    'United States': 'USA', 'Brazil': 'BRA', 'Russia': 'RUS', 'United Kingdom': 'GBR',
+    'England': 'ENG', 'Ireland': 'IRL', 'Mexico': 'MEX', 'Canada': 'CAN', 'Australia': 'AUS',
+    'New Zealand': 'NZL', 'Georgia': 'GEO', 'Spain': 'ESP', 'France': 'FRA', 'Germany': 'GER',
+    'Poland': 'POL', 'Sweden': 'SWE', 'Netherlands': 'NED', 'Nigeria': 'NGR', 'Cameroon': 'CMR',
+    'South Africa': 'RSA', 'China': 'CHN', 'Japan': 'JPN', 'South Korea': 'KOR',
+    'Kazakhstan': 'KAZ', 'Kyrgyzstan': 'KGZ', 'Uzbekistan': 'UZB', 'Tajikistan': 'TJK',
+    'Azerbaijan': 'AZE', 'Armenia': 'ARM', 'Chile': 'CHI', 'Argentina': 'ARG', 'Peru': 'PER',
+    'Ecuador': 'ECU', 'Venezuela': 'VEN', 'Cuba': 'CUB', 'Jamaica': 'JAM', 'Italy': 'ITA',
+    'Switzerland': 'SUI', 'Austria': 'AUT', 'Czech Republic': 'CZE', 'Slovakia': 'SVK',
+    'Serbia': 'SRB', 'Croatia': 'CRO', 'Bosnia and Herzegovina': 'BIH', 'Moldova': 'MDA',
+    'Romania': 'ROU', 'Ukraine': 'UKR', 'Belarus': 'BLR', 'Lithuania': 'LTU', 'Iceland': 'ISL',
+    'Norway': 'NOR', 'Denmark': 'DEN', 'Finland': 'FIN', 'Portugal': 'POR', 'Morocco': 'MAR',
+    'Iran': 'IRI', 'Israel': 'ISR', 'Turkey': 'TUR', 'Thailand': 'THA', 'Philippines': 'PHI',
+    'Indonesia': 'INA', 'India': 'IND', 'Mongolia': 'MGL', 'Scotland': 'SCO', 'Wales': 'WAL',
+};
+function countryShort(c) {
+    return COUNTRY_SHORT[c] ?? c.slice(0, 3).toUpperCase();
 }
 // Hydrates any .bp-avatar-img[data-name] inside root from the cached headshot pipeline.
 function hydrateAvatarImgs(root) {
@@ -10987,6 +11007,14 @@ function buildFilledSpineWrapper(a, b) {
 function buildFightSpine(fight) {
     const spine = document.createElement('div');
     spine.className = 'fight-spine';
+    // Seamless H2H entry: the whole center spine is a big, reliable trigger
+    // (the tiny ⚔ button was a 20px target that took multiple tries).
+    if (fight.fighterB && !isPlaceholderFighter(fight.fighterA) && !isPlaceholderFighter(fight.fighterB)) {
+        const fb = fight.fighterB;
+        spine.classList.add('h2h-clickable');
+        spine.title = `Head-to-head: ${fight.fighterA.name} vs ${fb.name}`;
+        spine.addEventListener('click', () => renderH2HModal(fight.fighterA, fb));
+    }
     const roundsChip = `<span class="fight-spine-rounds" title="Scheduled rounds">${fight.rounds}R</span>`;
     const weightChip = weightClassChip(fight.weightClass);
     let ftBlock = '';
@@ -13885,6 +13913,18 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         }
     })
         .catch(() => { });
+    // Real nationality from ufc.com (cached) — replaces the old flag placeholder
+    void fetchFighterCountry(f.name)
+        .then(c => {
+        if (!c)
+            return;
+        const badge = row.querySelector('.fighter-avatar-country');
+        if (badge) {
+            badge.textContent = countryShort(c);
+            badge.title = c;
+        }
+    })
+        .catch(() => { });
     return row;
 }
 function expandRowDetailPanel(row) {
@@ -13998,17 +14038,29 @@ function renderH2HModal(a, b) {
     }
     // prettier-ignore
     function statRow(label, valA, valB, higherBetter = true) {
-        const na = valA == null ? null : Number(valA);
-        const nb = valB == null ? null : Number(valB);
+        // parseFloat (vs Number) so '48%'-style values still compare + render bars
+        const na = valA == null ? null : parseFloat(String(valA));
+        const nb = valB == null ? null : parseFloat(String(valB));
         let clsA = '', clsB = '';
-        if (na != null && nb != null && Number.isFinite(na) && Number.isFinite(nb) && na !== nb) {
-            const aBetter = higherBetter ? na > nb : na < nb;
-            clsA = aBetter ? 'h2h-win' : 'h2h-lose';
-            clsB = aBetter ? 'h2h-lose' : 'h2h-win';
+        let barHtml = '';
+        if (na != null && nb != null && Number.isFinite(na) && Number.isFinite(nb)) {
+            if (na !== nb) {
+                const aBetter = higherBetter ? na > nb : na < nb;
+                clsA = aBetter ? 'h2h-win' : 'h2h-lose';
+                clsB = aBetter ? 'h2h-lose' : 'h2h-win';
+            }
+            // GLOW-UP 33: center-out advantage bar (dominant side fills to 100%)
+            const absA = Math.abs(na), absB = Math.abs(nb);
+            const maxV = Math.max(absA, absB);
+            if (maxV > 0) {
+                const wA = Math.round((absA / maxV) * 100);
+                const wB = Math.round((absB / maxV) * 100);
+                barHtml = `<tr class="h2h-bar-row"><td colspan="3"><div class="h2h-adv-track"><div class="h2h-adv-half a"><i style="width:${wA}%"></i></div><div class="h2h-adv-half b"><i style="width:${wB}%"></i></div></div></td></tr>`;
+            }
         }
         const dispA = valA == null ? '—' : String(valA);
         const dispB = valB == null ? '—' : String(valB);
-        return `<tr><td class="${clsA}">${dispA}</td><td class="h2h-label">${label}</td><td class="${clsB}">${dispB}</td></tr>`;
+        return `<tr><td class="${clsA}">${dispA}</td><td class="h2h-label">${label}</td><td class="${clsB}">${dispB}</td></tr>${barHtml}`;
     }
     const ssLineA = a.line_p6_ss ?? a.line_ud_ss ?? a.line_pp_ss ?? a.line_betr_ss ?? null;
     const ssLineB = b.line_p6_ss ?? b.line_ud_ss ?? b.line_pp_ss ?? b.line_betr_ss ?? null;
@@ -14043,7 +14095,7 @@ function renderH2HModal(a, b) {
       <thead><tr><th class="h2h-side-a">${a.name.split(' ').pop()}</th><th></th><th class="h2h-side-b">${b.name.split(' ').pop()}</th></tr></thead>
       <tbody>
         <tr><td>${da.style || '—'}</td><td class="h2h-label">STYLE</td><td>${db2.style || '—'}</td></tr>
-        <tr><td>${da.country || '—'}</td><td class="h2h-label">COUNTRY</td><td>${db2.country || '—'}</td></tr>
+        <tr><td id="h2hCountryA">—</td><td class="h2h-label">COUNTRY</td><td id="h2hCountryB">—</td></tr>
         <tr><td colspan="3" class="h2h-section-head">LINES</td></tr>
         <tr><td>${lineA != null ? lineA : '—'}</td><td class="h2h-label">FP LINE</td><td>${lineB != null ? lineB : '—'}</td></tr>
         <tr><td>${ssLineA != null ? ssLineA : '—'}</td><td class="h2h-label">SS LINE</td><td>${ssLineB != null ? ssLineB : '—'}</td></tr>
@@ -14084,6 +14136,11 @@ function renderH2HModal(a, b) {
             imgB.src = urlB;
             imgB.style.display = 'block';
         }
+        // Country names from the same athlete pages
+        void fetchFighterCountry(a.name).then(c => { const el = document.getElementById('h2hCountryA'); if (el && c)
+            el.textContent = c; });
+        void fetchFighterCountry(b.name).then(c => { const el = document.getElementById('h2hCountryB'); if (el && c)
+            el.textContent = c; });
     });
 }
 // ── DATA LOADING ──────────────────────────────────────────────────────────
@@ -17124,13 +17181,26 @@ function initAnalyzerCore() {
             e.stopPropagation();
             const fighterName = h2hBtn.dataset['fighter'] || '';
             const fEntry = _h2hFighterMap.get(fighterName.toLowerCase());
-            if (!fEntry)
+            if (!fEntry) {
+                showToast(`No data loaded for ${prettyName(fighterName)} yet`);
                 return;
-            const oppName = (fEntry.opponent || '').toLowerCase();
-            let oppEntry = _h2hFighterMap.get(oppName);
-            if (!oppEntry) {
+            }
+            const oppRaw = (fEntry.opponent || '').toLowerCase().trim();
+            let oppEntry = oppRaw ? _h2hFighterMap.get(oppRaw) : undefined;
+            if (!oppEntry && oppRaw) {
+                // Fuzzy pass (guarded: an empty opponent used to match the map's first
+                // entry via includes('') — that was the "wrong/never opens" bug)
                 for (const [key, val] of _h2hFighterMap) {
-                    if (key.includes(oppName) || oppName.includes(key)) {
+                    if (key.includes(oppRaw) || oppRaw.includes(key)) {
+                        oppEntry = val;
+                        break;
+                    }
+                }
+            }
+            if (!oppEntry && oppRaw) {
+                const oppNorm = (normalizeName(oppRaw) || oppRaw).toLowerCase();
+                for (const [, val] of _h2hFighterMap) {
+                    if ((normalizeName(val.name) || val.name).toLowerCase() === oppNorm) {
                         oppEntry = val;
                         break;
                     }
@@ -17138,6 +17208,8 @@ function initAnalyzerCore() {
             }
             if (oppEntry)
                 renderH2HModal(fEntry, oppEntry);
+            else
+                showToast(`No opponent data for ${prettyName(fighterName)} yet — try a refetch`);
             return;
         }
         const main = e.target.closest('.fighter-main');
