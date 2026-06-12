@@ -291,6 +291,10 @@ async function loadFighterClvDrift(): Promise<void> {
 // ── WEIGHT-MISS DETECTION ──────────────────────────────────────────────────
 // Extracted to ./analyzer/weight-miss.ts — re-exported via the import above.
 let fightOddsMoneylineByName: Record<string, number> = {};
+// DK bonus payloads captured alongside moneylines (representing-country codes
+// and DK's own vig-free win probabilities).
+let dkCountryByName: Record<string, string> = {};
+let dkTrueProbByName: Record<string, number> = {};
 let currentSearch = '';
 let currentSort = 'default';
 let sourceVisibility: Record<'p6'|'ud'|'pp'|'betr'|'dk', boolean> = {
@@ -14612,14 +14616,21 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     })
     .catch(() => { /* cosmetic only */ });
 
-  // Real nationality from ufc.com (cached) — replaces the old flag placeholder
-  void fetchFighterCountry(f.name)
-    .then(c => {
-      if (!c) return;
-      const badge = row.querySelector('.fighter-avatar-country');
-      if (badge) { badge.textContent = countryShort(c); (badge as HTMLElement).title = c; }
-    })
-    .catch(() => { /* cosmetic only */ });
+  // Country badge: DK's representing-country code wins (it's what fans expect —
+  // Pereira BRA, Topuria GEO), ufc.com birthplace is the fallback.
+  const dkCc = resolveFromDkMap(dkCountryByName, f.name);
+  if (dkCc) {
+    const badge = row.querySelector('.fighter-avatar-country');
+    if (badge) { badge.textContent = dkCc; (badge as HTMLElement).title = `Representing: ${dkCc} (DK)`; }
+  } else {
+    void fetchFighterCountry(f.name)
+      .then(c => {
+        if (!c) return;
+        const badge = row.querySelector('.fighter-avatar-country');
+        if (badge) { badge.textContent = countryShort(c); (badge as HTMLElement).title = c; }
+      })
+      .catch(() => { /* cosmetic only */ });
+  }
 
   return row;
 }
@@ -14788,6 +14799,34 @@ function renderH2HModal(a: AnalyzerFighter, b: AnalyzerFighter): void {
         <div class="h2h-fighter-record">${db2.record || '—'}</div>
       </div>
     </div>
+    ${(() => {
+      // GLOW-UP 36: DK-implied win probability, vig removed. Only renders when
+      // both moneylines are present (they should be, post-DK-API pipeline).
+      // Prefer DK's own vig-free trueOdds probabilities; fall back to
+      // normalizing the displayed moneylines ourselves.
+      const tpA = resolveFromDkMap(dkTrueProbByName, a.name);
+      const tpB = resolveFromDkMap(dkTrueProbByName, b.name);
+      let rawA: number, rawB: number;
+      if (tpA != null && tpB != null && tpA > 0 && tpB > 0) {
+        rawA = tpA; rawB = tpB;
+      } else {
+        const mlA = moneyA, mlB = moneyB;
+        if (mlA == null || mlB == null || !Number.isFinite(mlA) || !Number.isFinite(mlB)) return '';
+        const imp = (ml: number): number => ml < 0 ? (-ml) / ((-ml) + 100) : 100 / (ml + 100);
+        rawA = imp(mlA); rawB = imp(mlB);
+      }
+      const total = rawA + rawB;
+      if (!(total > 0)) return '';
+      const pA = Math.round((rawA / total) * 100);
+      const pB = 100 - pA;
+      return `<div class="h2h-prob-strip">
+        <span class="h2h-prob-val a">${pA}%</span>
+        <div class="h2h-prob-track"><i class="a" style="width:${pA}%"></i><i class="b" style="width:${pB}%"></i></div>
+        <span class="h2h-prob-val b">${pB}%</span>
+      </div>
+      <div class="h2h-prob-label">WIN PROBABILITY · DK implied, vig removed</div>`;
+    })()}
+    <div class="h2h-common">${spineCommonOppsHTML(a, b)}</div>
     <table class="h2h-table">
       <thead><tr><th class="h2h-side-a">${a.name.split(' ').pop()}</th><th></th><th class="h2h-side-b">${b.name.split(' ').pop()}</th></tr></thead>
       <tbody>
@@ -14868,6 +14907,16 @@ function namesMatch(a: string, b: string): boolean {
     if (aAbbrev || bAbbrev || aFirst[0] === bFirst[0]) return true;
   }
   return false;
+}
+
+function resolveFromDkMap<T>(map: Record<string, T>, name: string): T | null {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  if (map[normalized] !== undefined) return map[normalized];
+  for (const [k, v] of Object.entries(map)) {
+    if (namesMatch(k, normalized)) return v;
+  }
+  return null;
 }
 
 function resolveMoneylineFromMap(name: string): number | null {
@@ -15647,8 +15696,10 @@ async function loadData(): Promise<void> {
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
-      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY]);
+      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1']);
       const rawOdds = result[STORAGE_ODDS_KEY];
+      dkCountryByName = (result['fighter_countries_dk_v1'] as Record<string, string>) || {};
+      dkTrueProbByName = (result['fight_trueprob_dk_v1'] as Record<string, number>) || {};
       fightOddsMoneylineByName = {};
       if (rawOdds && typeof rawOdds === 'object') {
         for (const [name, val] of Object.entries(rawOdds as Record<string, unknown>)) {

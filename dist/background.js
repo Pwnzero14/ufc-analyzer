@@ -2299,6 +2299,8 @@ async function refreshDKMoneylinesFromApi(reason) {
                 const mlMarketIds = new Set(markets
                     .filter((m) => /^moneyline$/i.test(String(m?.name || '').trim()))
                     .map((m) => m?.id));
+                const countries = {};
+                const trueProbs = {};
                 for (const sel of selections) {
                     if (!mlMarketIds.has(sel?.marketId))
                         continue;
@@ -2307,6 +2309,22 @@ async function refreshDKMoneylinesFromApi(reason) {
                     const odds = parseInt(oddsStr, 10);
                     if (nm && Number.isFinite(odds) && odds !== 0)
                         out[nm] = odds;
+                    // Bonus payloads in the same selections (found 2026-06-12):
+                    // representing-country code + DK's own vig-free odds.
+                    if (nm) {
+                        const cc = String(sel?.participants?.[0]?.countryCode || '').trim().toUpperCase();
+                        if (/^[A-Z]{2,3}$/.test(cc))
+                            countries[nm] = cc;
+                        const tOdds = Number(sel?.trueOdds);
+                        if (Number.isFinite(tOdds) && tOdds > 1)
+                            trueProbs[nm] = parseFloat((1 / tOdds).toFixed(4));
+                    }
+                }
+                if (Object.keys(countries).length >= 2) {
+                    chrome.storage.local.set({ 'fighter_countries_dk_v1': countries });
+                }
+                if (Object.keys(trueProbs).length >= 2) {
+                    chrome.storage.local.set({ 'fight_trueprob_dk_v1': trueProbs });
                 }
             }
             // Shape B (legacy v5 eventGroup) — kept for fallback compatibility
