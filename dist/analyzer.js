@@ -1732,6 +1732,13 @@ function getScheduledRoundsContext(fighterName) {
     if (headliner && (headliner.f1 === normalizedName || headliner.f2 === normalizedName)) {
         return { rounds: 5, source: 'inferred_main_event' };
     }
+    // Co-main is nearly always 5R (title/interim/contender fights).
+    if (upcomingCardPairs.length >= 2) {
+        const coMain = upcomingCardPairs[1];
+        if (coMain.f1 === normalizedName || coMain.f2 === normalizedName) {
+            return { rounds: 5, source: 'inferred_co_main' };
+        }
+    }
     if (cardRounds === 3)
         return { rounds: 3, source: 'card' };
     return { rounds: null, source: 'unknown' };
@@ -2705,7 +2712,7 @@ function calcEnhancedFPConfidence(fighterName, lean, score, db, history, line, s
         const formatFit = clampNumber(1 - (db.fiveRoundRate ?? 0) * 0.60, 0.55, 1);
         roundContextFactor = clampNumber(durationFit * 0.65 + formatFit * 0.35, 0.45, 0.95);
     }
-    if (roundContext.source === 'inferred_main_event') {
+    if (roundContext.source === 'inferred_main_event' || roundContext.source === 'inferred_co_main') {
         roundContextFactor = Math.max(0.40, roundContextFactor - 0.05);
     }
     const edgePoints = effectiveFP != null ? Math.abs(effectiveFP - line) : Math.abs(score) * 4.5;
@@ -6815,17 +6822,15 @@ function renderBestPicks(container, renderSeq = 0) {
         bestPickLeanCache.clear();
         bestPickConfidenceCache.clear();
         bestPickReasonCache.clear();
-        // Drop negatively-correlated same-fight pairs: when two fighters from one
-        // fight appear in the same section on DIFFERENT stat types, only one is kept.
-        // FP wins cross-stat ties (FP captures total fight outcome — the favorite's
-        // FP-OVER is the better bet to keep than the dog's high-edge SS/TD/FT pick
-        // that depends on a non-dominant fight). Mechanism: e.g. grappler FP-OVER
-        // suppresses opponent SS, so picking both is fighting yourself. Same-stat
-        // both fighters in section is allowed (positive correlation, high-volume
-        // fight scenario).
+        // Drop negatively-correlated same-fight pairs.  Two layers:
+        // 1. Cross-stat: if a fight has an FP pick, non-FP picks from that fight are
+        //    dropped (FP captures total fight outcome).  Different non-FP stats from
+        //    the same fight are also blocked (first stat seen wins).
+        // 2. FP zero-sum: at most one FP pick per fight per section — both fighters
+        //    going FP-OVER or FP-UNDER is contradictory.
+        // Non-FP same-stat pairs (e.g. both SS-OVER) are allowed: positive
+        // correlation in high-volume fights.
         const dedupeNegCorrelatedSameFight = (sorted, dir, limit, minTarget = 0) => {
-            // Pre-scan: identify fights that have an FP pick somewhere in the sorted list.
-            // If a fight has an FP pick, we prefer it over any non-FP cross-stat conflict.
             const fightHasFpPick = new Set();
             for (const f of sorted) {
                 const oppName = (f.opponent || '').toLowerCase();
@@ -6838,6 +6843,7 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             const result = [];
             const fightFirstStat = new Map();
+            const fightFpSeen = new Set();
             for (const f of sorted) {
                 if (result.length >= limit)
                     break;
@@ -6846,8 +6852,6 @@ function renderBestPicks(container, renderSeq = 0) {
                 const lean = getBestPickLeanForDir(f, dir);
                 const source = lean?._source || 'fp';
                 if (fightKey) {
-                    // Cross-stat conflict resolution: if this fight has an FP pick, only
-                    // accept FP source for this fight. Drops non-FP picks that would conflict.
                     if (fightHasFpPick.has(fightKey) && source !== 'fp')
                         continue;
                     const existing = fightFirstStat.get(fightKey);
@@ -6855,16 +6859,13 @@ function renderBestPicks(container, renderSeq = 0) {
                         continue;
                     if (!existing)
                         fightFirstStat.set(fightKey, source);
+                    if (source === 'fp' && fightFpSeen.has(fightKey))
+                        continue;
+                    if (source === 'fp')
+                        fightFpSeen.add(fightKey);
                 }
                 result.push(f);
             }
-            // Backfill to reach minTarget: the strict pass keeps ~1 pick per fight, which can
-            // leave a section sparse on a one-sided card (e.g. only 2-3 placeable unders).
-            // When below minTarget, append the remaining candidates that were dropped ONLY for
-            // same-fight / cross-stat correlation — skipping fighters already shown — up to the
-            // hard limit. They already carry the ⚡/⬇ corr tag so the correlation stays visible,
-            // and the best uncorrelated picks still rank first. Never pads with unplaceable
-            // picks (those were already filtered out of `sorted` by isCandidateUsable).
             if (result.length < minTarget) {
                 const have = new Set(result.map((x) => x.name.toLowerCase()));
                 for (const f of sorted) {
@@ -6873,8 +6874,23 @@ function renderBestPicks(container, renderSeq = 0) {
                     const key = f.name.toLowerCase();
                     if (have.has(key))
                         continue;
+                    const oppName2 = (f.opponent || '').toLowerCase();
+                    const fk = oppName2 ? [key, oppName2].sort().join('|') : '';
+                    const lean2 = getBestPickLeanForDir(f, dir);
+                    const src2 = lean2?._source || 'fp';
+                    if (fk && src2 === 'fp' && fightFpSeen.has(fk))
+                        continue;
+                    if (fk && fightHasFpPick.has(fk) && src2 !== 'fp')
+                        continue;
+                    const ex = fk ? fightFirstStat.get(fk) : undefined;
+                    if (ex && ex !== src2)
+                        continue;
                     result.push(f);
                     have.add(key);
+                    if (fk && src2 === 'fp')
+                        fightFpSeen.add(fk);
+                    if (fk && !fightFirstStat.has(fk))
+                        fightFirstStat.set(fk, src2);
                 }
             }
             return result;
@@ -8359,7 +8375,9 @@ async function generatePredictions(container) {
         // Trust scrape's 5 if present; otherwise title-based main-event match wins
         // over scrape's default of 3 (round count isn't exposed on UFCStats pre-fight).
         const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
-        const rounds = scrapedRounds === 5 ? 5 : (isMainEvent ? 5 : (scrapedRounds ?? 3));
+        const isCoMain = !isMainEvent && upcomingCardPairs.length >= 2 &&
+            upcomingCardPairs[1].f1 === pair.f1 && upcomingCardPairs[1].f2 === pair.f2;
+        const rounds = scrapedRounds === 5 ? 5 : ((isMainEvent || isCoMain) ? 5 : (scrapedRounds ?? 3));
         // Fetch UFCStats data for both fighters (uses 24h cache)
         const [f1Stats, f2Stats] = await Promise.all([
             fetchFromUFCStats(pair.f1),
@@ -13065,9 +13083,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const _headliner = findHeadlinerPair();
     const _isMainEventFighter = _normFighterName != null && _headliner != null &&
         (_headliner.f1 === _normFighterName || _headliner.f2 === _normFighterName);
-    // Scrape defaults to 3 for upcoming events (round count isn't exposed pre-fight),
-    // so trust it only when it found 5; otherwise main-event inference wins.
-    const isFiveRound = _cardRounds === 5 || _isMainEventFighter;
+    const _isCoMainFighter = !_isMainEventFighter && _normFighterName != null &&
+        upcomingCardPairs.length >= 2 &&
+        (upcomingCardPairs[1].f1 === _normFighterName || upcomingCardPairs[1].f2 === _normFighterName);
+    const isFiveRound = _cardRounds === 5 || _isMainEventFighter || _isCoMainFighter;
     // Expected average actual fight durations (accounting for all finish rates in that format)
     const FIVE_ROUND_MINS = 15.0;
     const THREE_ROUND_MINS = 9.0;

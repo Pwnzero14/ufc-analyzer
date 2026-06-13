@@ -249,7 +249,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     else if (request.type === 'AUTO_SCRAPE_LINES') {
-        autoScrapeAllPlatforms().then(sendResponse).catch((e) => {
+        autoScrapeAllPlatforms().then(async (result) => {
+            await fetchDKBetHandles('auto-fetch-button');
+            sendResponse(result);
+        }).catch((e) => {
             console.error('[UFC] Auto-scrape error:', e);
             sendResponse({ status: 'error', error: e.message });
         });
@@ -1628,7 +1631,7 @@ async function autoBackupOnStartup() {
         await initializeBetrLines();
         await refreshFightOddsFromBestFightOdds('startup');
         void refreshDKMoneylinesFromApi('startup');
-        void fetchDKBetHandles('startup');
+        // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
         // ── Startup catch-up settle ─────────────────────────────────────────
         // If the browser was closed during the event, alarms never fired.
         // On startup: if an event is currently in progress (or ended < 28h ago)
@@ -3105,7 +3108,7 @@ async function autoScrapeAllPlatforms() {
         autoScrapeInProgress = false;
         await refreshFightOddsFromBestFightOdds('auto-scrape');
         await refreshDKMoneylinesFromApi('auto-scrape');
-        await fetchDKBetHandles('auto-scrape');
+        // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
     }
     return { status: 'done', results, attempts };
 }
