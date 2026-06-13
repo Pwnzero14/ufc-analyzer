@@ -7012,6 +7012,118 @@ html { scroll-behavior: smooth; }
 .stat-card-fp .stat-card-foot { color: rgba(86,195,255,0.35); }
 
 
+/* ── GLOW-UP 42: Card structure evolution ── */
+/* Fight dividers (MAIN EVENT / CO-MAIN / PRELIM) get glass badges,
+   enhanced divider lines, and the sticky column header gets accent polish. */
+
+/* --- Fight badges: glass + inner glow --- */
+.fight-badge {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fight-badge::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  pointer-events: none;
+}
+.fight-badge:hover {
+  transform: translateY(-1px);
+}
+
+/* Main event: gold glass + shimmer sweep */
+.fight-badge.main {
+  background: linear-gradient(135deg, rgba(240,192,64,0.22), rgba(240,192,64,0.10) 60%, rgba(240,192,64,0.04));
+  box-shadow: 0 0 14px rgba(240,192,64,0.20), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.fight-badge.main::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; bottom: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.08), transparent);
+  animation: badgeShimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes badgeShimmer {
+  0%, 100% { left: -100%; }
+  50%      { left: 140%; }
+}
+.fight-badge.main:hover {
+  box-shadow: 0 0 22px rgba(240,192,64,0.30), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Co-main: blue glass */
+.fight-badge.co {
+  background: linear-gradient(135deg, rgba(77,176,255,0.18), rgba(77,176,255,0.06) 60%, rgba(77,176,255,0.02));
+  box-shadow: 0 0 12px rgba(77,176,255,0.16), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.fight-badge.co:hover {
+  box-shadow: 0 0 20px rgba(77,176,255,0.25), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* Main card: subtle depth */
+.fight-badge.card {
+  background: linear-gradient(135deg, rgba(50,58,88,0.32), rgba(50,58,88,0.14));
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Divider lines: gradient sweep --- */
+.fgh-main .fight-group-line {
+  background: linear-gradient(90deg, transparent 0%, rgba(240,192,64,0.50) 20%, rgba(240,192,64,0.50) 80%, transparent 100%);
+  box-shadow: 0 0 8px rgba(240,192,64,0.25), 0 1px 0 rgba(240,192,64,0.08);
+}
+.fgh-co .fight-group-line {
+  background: linear-gradient(90deg, transparent 0%, rgba(77,176,255,0.45) 20%, rgba(77,176,255,0.45) 80%, transparent 100%);
+  box-shadow: 0 0 8px rgba(77,176,255,0.20), 0 1px 0 rgba(77,176,255,0.06);
+}
+.fgh-card .fight-group-line {
+  background: linear-gradient(90deg, transparent 0%, var(--border2) 20%, var(--border2) 80%, transparent 100%);
+}
+.fgh-prelim .fight-group-line {
+  background: linear-gradient(90deg, transparent 0%, var(--border) 25%, var(--border) 75%, transparent 100%);
+}
+
+/* --- Cancel/restore buttons: refined hover --- */
+.fight-cancel-btn {
+  transition: opacity 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.fight-cancel-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255,58,96,0.15);
+}
+
+/* --- Sticky column header: accent underline + label separators --- */
+.fighter-header-row {
+  background: linear-gradient(180deg, rgba(6,7,16,0.97), rgba(10,14,26,0.95));
+  border-bottom: 1px solid rgba(248,198,74,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 1px 0 rgba(248,198,74,0.06);
+}
+.fighter-header-row::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.12), transparent);
+  pointer-events: none;
+}
+
+/* Label separators: gold-tinted dividers */
+.fhr-label + .fhr-label {
+  border-left-color: rgba(248,198,74,0.12);
+}
+
+/* Labels: subtle glow on the center stat header */
+.fhr-label.fhr-center {
+  text-shadow: 0 0 10px rgba(248,198,74,0.12);
+}
+
+
 </style>
 </head>
 <body>
