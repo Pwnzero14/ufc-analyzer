@@ -6900,6 +6900,118 @@ html { scroll-behavior: smooth; }
 .panel-pair:has(.soh-panel):hover { border-color: rgba(44,212,208,0.22); }
 
 
+/* ── GLOW-UP 41: Stat card heroes ── */
+/* FP & SS summary cards get glass treatment, stat-type accents,
+   hero number glow, enhanced deltas, and hover lift. */
+
+/* --- Base card: frosted glass upgrade --- */
+.stat-card {
+  background: linear-gradient(
+    155deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.012) 45%,
+    rgba(0,0,0,0.06) 100%
+  );
+  border-color: rgba(255,255,255,0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
+  pointer-events: none;
+}
+
+/* --- FP card: cyan/blue identity --- */
+.stat-card-fp {
+  background: linear-gradient(155deg, rgba(86,195,255,0.08), rgba(44,212,208,0.03) 55%, rgba(0,0,0,0.04));
+  border-color: rgba(86,195,255,0.25);
+  box-shadow: inset 0 0 0 1px rgba(86,195,255,0.04);
+}
+.stat-card-fp .stat-card-label {
+  color: rgba(86,195,255,0.75);
+  text-shadow: 0 0 8px rgba(86,195,255,0.2);
+}
+
+/* --- SS card: teal identity --- */
+.stat-card-ss {
+  background: linear-gradient(155deg, rgba(44,212,208,0.08), rgba(44,212,208,0.02) 55%, rgba(0,0,0,0.04));
+  border-color: rgba(44,212,208,0.25);
+  box-shadow: inset 0 0 0 1px rgba(44,212,208,0.04);
+}
+.stat-card-ss .stat-card-label {
+  color: rgba(44,212,208,0.75);
+  text-shadow: 0 0 8px rgba(44,212,208,0.2);
+}
+
+/* --- Hero numbers: subtle glow --- */
+.stat-card-num {
+  text-shadow: 0 0 10px rgba(244,247,255,0.15);
+}
+.stat-card-fp .stat-card-num {
+  text-shadow: 0 0 12px rgba(86,195,255,0.2);
+}
+.stat-card-ss .stat-row-val {
+  text-shadow: 0 0 10px rgba(44,212,208,0.18);
+}
+
+/* --- Row labels: softer than text3 but colored --- */
+.stat-card-fp .stat-row-label { color: rgba(86,195,255,0.45); }
+.stat-card-ss .stat-row-label { color: rgba(44,212,208,0.45); }
+
+/* --- Delta blocks: enhanced glow + depth --- */
+.stat-delta-block.delta-plus {
+  background: linear-gradient(135deg, rgba(0,232,122,0.16), rgba(0,232,122,0.08));
+  border-color: rgba(0,232,122,0.40);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.stat-delta-block.delta-minus {
+  background: linear-gradient(135deg, rgba(255,58,96,0.16), rgba(255,58,96,0.08));
+  border-color: rgba(255,58,96,0.40);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.stat-delta-val {
+  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.delta-plus .stat-delta-val {
+  text-shadow: 0 0 8px rgba(0,232,122,0.3);
+}
+.delta-minus .stat-delta-val {
+  text-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+
+/* --- Hover: lift + type glow --- */
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 1px rgba(255,255,255,0.08);
+}
+.stat-card-fp:hover {
+  border-color: rgba(86,195,255,0.45);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(86,195,255,0.10);
+}
+.stat-card-ss:hover {
+  border-color: rgba(44,212,208,0.45);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(44,212,208,0.10);
+}
+
+/* Hover intensifies hero numbers */
+.stat-card-fp:hover .stat-card-num {
+  text-shadow: 0 0 16px rgba(86,195,255,0.35);
+}
+.stat-card-ss:hover .stat-row-val {
+  text-shadow: 0 0 14px rgba(44,212,208,0.30);
+}
+
+/* --- Footer range: subtle stat color --- */
+.stat-card-fp .stat-card-foot { color: rgba(86,195,255,0.35); }
+
+
 </style>
 </head>
 <body>
