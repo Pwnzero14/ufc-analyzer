@@ -7131,6 +7131,67 @@ html { scroll-behavior: smooth; }
 }
 
 
+/* ── GLOW-UP 43: Fight spine evolution ── */
+/* Inner chip glow-ups and deeper accents for the spine elements.
+   H2H hover already handled in GLOW-UP 34; VS pill in GLOW-UP 9. */
+
+/* --- Rounds chip: outer glow ring --- */
+.fight-spine-rounds {
+  box-shadow: 0 0 8px rgba(240,192,64,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+  text-shadow: 0 0 6px rgba(240,192,64,0.30);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fight-spine.h2h-clickable:hover .fight-spine-rounds {
+  box-shadow: 0 0 14px rgba(240,192,64,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+  transform: scale(1.06);
+}
+
+/* --- Weight class: brighten on hover --- */
+.fight-spine-weight { transition: color 0.2s ease; }
+.fight-spine.h2h-clickable:hover .fight-spine-weight { color: var(--text2); }
+
+/* --- FT block: deeper purple glass + value glow --- */
+.fight-spine-ft {
+  background: linear-gradient(135deg, rgba(146,125,255,0.10), rgba(146,125,255,0.04));
+  box-shadow: 0 0 6px rgba(146,125,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.fight-spine-ft-value { text-shadow: 0 0 8px rgba(146,125,255,0.30); }
+
+/* --- CTRL chip: teal accent --- */
+.fight-spine-ctrl {
+  background: rgba(44,212,208,0.06);
+  border-color: rgba(44,212,208,0.20);
+  color: rgba(44,212,208,0.75);
+}
+
+/* --- Correlation warning: breathing glow --- */
+.fight-spine-corr {
+  box-shadow: 0 0 8px rgba(255,90,115,0.12);
+  animation: corrPulse 3s ease-in-out infinite;
+}
+@keyframes corrPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,90,115,0.12); }
+  50%      { box-shadow: 0 0 14px rgba(255,90,115,0.22); }
+}
+
+/* --- Top edge badge: shimmer sweep --- */
+.fight-spine-top-edge { position: relative; overflow: hidden; }
+.fight-spine-top-edge::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; bottom: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(255,210,74,0.10), transparent);
+  animation: badgeShimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* --- VS pill: lift on hover (extend existing GLOW-UP 9/34) --- */
+.fight-spine.h2h-clickable:hover::before {
+  transform: scale(1.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
 </style>
 </head>
 <body>
