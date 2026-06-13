@@ -6453,6 +6453,13 @@ html { scroll-behavior: smooth; }
   color: var(--text3); text-align: center; margin-bottom: 8px;
 }
 
+/* Bet-handle bar: gold/purple to distinguish from win-prob */
+.h2h-handle-strip { margin-top: 0; }
+.h2h-handle-strip .h2h-prob-val.a { color: var(--gold); filter: drop-shadow(0 0 6px rgba(248,198,74,0.35)); }
+.h2h-handle-strip .h2h-prob-val.b { color: var(--purple); filter: drop-shadow(0 0 6px rgba(127,136,255,0.35)); }
+.h2h-handle-track i.a { background: linear-gradient(90deg, rgba(248,198,74,0.45), rgba(248,198,74,0.95)); }
+.h2h-handle-track i.b { background: linear-gradient(90deg, rgba(127,136,255,0.95), rgba(127,136,255,0.45)); }
+
 /* Common opponents block borrows the spine styling; give it modal framing */
 .h2h-common {
   margin: 4px 0 10px; padding: 8px 12px;

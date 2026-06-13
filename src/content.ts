@@ -788,6 +788,46 @@ function scrapeDKSportsbookProps() {
   }
 }
 
+function scrapeDKBetHandle(): Array<{ name: string; pct: number }> {
+  try {
+    const results: Array<{ name: string; pct: number }> = [];
+    const widgets = document.querySelectorAll('[data-testid="bet-breakdown"]');
+    if (widgets.length === 0) {
+      const fallback = [...document.querySelectorAll('*')].find(
+        (n) => (n.textContent || '').trim().toLowerCase() === '% of bets placed'
+      );
+      if (fallback) {
+        let box: Element | null = fallback;
+        for (let i = 0; i < 5 && box?.parentElement; i++) box = box.parentElement;
+        if (box) {
+          const names = box.querySelectorAll('.cb-bet-breakdown__team-name');
+          const pcts = box.querySelectorAll('.cb-bet-breakdown__team-percentage');
+          for (let i = 0; i < names.length && i < pcts.length; i++) {
+            const name = (names[i].textContent || '').trim();
+            const pct = parseInt((pcts[i].textContent || '').replace('%', ''), 10);
+            if (name && Number.isFinite(pct)) results.push({ name, pct });
+          }
+        }
+      }
+      return results;
+    }
+    widgets.forEach((w) => {
+      const names = w.querySelectorAll('.cb-bet-breakdown__team-name');
+      const pcts = w.querySelectorAll('.cb-bet-breakdown__team-percentage');
+      for (let i = 0; i < names.length && i < pcts.length; i++) {
+        const name = (names[i].textContent || '').trim();
+        const pct = parseInt((pcts[i].textContent || '').replace('%', ''), 10);
+        if (name && Number.isFinite(pct)) results.push({ name, pct });
+      }
+    });
+    console.log(`[UFC Ext] DK bet-handle: found ${results.length} entries`, results);
+    return results;
+  } catch (error) {
+    console.error('[UFC Ext] DK bet-handle scrape failed:', error);
+    return [];
+  }
+}
+
 function getScrapeProfile(platform) {
   const base = SCRAPE_CONFIG.scrape;
   if (platform === 'pick6') {
@@ -1006,6 +1046,17 @@ async function main(): Promise<void> {
         platform: 'prizepicks',
         data: { fighters },
       });
+      return;
+    }
+
+    // DraftKings Event page — "% of bets placed" scrape (opportunistic)
+    if (host.includes('sportsbook.draftkings.com') && window.location.pathname.startsWith('/event/')) {
+      console.log('[UFC Ext] DK event page detected, scraping bet-handle...');
+      await new Promise((r) => setTimeout(r, 2000));
+      const handles = scrapeDKBetHandle();
+      if (handles.length >= 2) {
+        chrome.runtime.sendMessage({ type: 'BET_HANDLE_CAPTURED', data: handles });
+      }
       return;
     }
 

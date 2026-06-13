@@ -224,6 +224,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleLinesCaptured(request.platform, request.data).catch((e) => {
       console.error('[UFC] Message handler error:', e);
     });
+  } else if (request.type === 'BET_HANDLE_CAPTURED') {
+    const entries = request.data as Array<{ name: string; pct: number }>;
+    if (Array.isArray(entries) && entries.length >= 2) {
+      const map: Record<string, number> = {};
+      for (const e of entries) {
+        const nm = normalizeOddsName(e.name);
+        if (nm && Number.isFinite(e.pct)) map[nm] = e.pct;
+      }
+      if (Object.keys(map).length >= 2) {
+        chrome.storage.local.get(['fight_bethandle_dk_v1'], (res) => {
+          const existing = (res['fight_bethandle_dk_v1'] as Record<string, number>) || {};
+          const merged = { ...existing, ...map };
+          chrome.storage.local.set({ 'fight_bethandle_dk_v1': merged }, () => {
+            console.log('[UFC] Stored DK bet-handle (merged):', merged);
+          });
+        });
+      }
+    }
   } else if (request.type === 'PICK6_PICK_GROUP_DETECTED') {
     // Cache the pickGroup so auto-fetch can construct working URLs (the bare /category/N URLs
     // redirect to the DK homepage without pickGroup). Updates only if changed to avoid noise.
@@ -1583,6 +1601,7 @@ async function autoBackupOnStartup(): Promise<void> {
 
     await refreshFightOddsFromBestFightOdds('startup');
     void refreshDKMoneylinesFromApi('startup');
+    void fetchDKBetHandles('startup');
 
     // ── Startup catch-up settle ─────────────────────────────────────────
     // If the browser was closed during the event, alarms never fired.
@@ -2425,6 +2444,191 @@ async function mergeDKMoneylines(dkOdds: Record<string, number>): Promise<void> 
   }
 }
 
+async function fetchDKBetHandles(reason: string): Promise<number> {
+  const apiUrl = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034';
+  try {
+    // Build a set of fighters on the upcoming card so we only scrape those events.
+    const cardNames = new Set<string>();
+    try {
+      const card = await fetchUpcomingUFCCard(false);
+      if (card?.fighters) {
+        for (const f of card.fighters) {
+          const n1 = normalizeOddsName(f.f1);
+          const n2 = normalizeOddsName(f.f2);
+          if (n1) cardNames.add(n1.toLowerCase());
+          if (n2) cardNames.add(n2.toLowerCase());
+          const s1 = f.f1.trim().split(/\s+/).pop()?.toLowerCase();
+          const s2 = f.f2.trim().split(/\s+/).pop()?.toLowerCase();
+          if (s1) cardNames.add(s1);
+          if (s2) cardNames.add(s2);
+        }
+      }
+    } catch { /* proceed unfiltered if card lookup fails */ }
+
+    // No platform-store fallback: Pick6/UD/PP can post early lines for future
+    // events (e.g. Conor/Max next month) which would leak non-card fights.
+
+    const res = await fetch(apiUrl, {
+      signal: AbortSignal.timeout(15000),
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) {
+      console.warn(`[UFC BetHandle] DK API HTTP ${res.status} (${reason})`);
+      return 0;
+    }
+    const data: any = await res.json();
+
+    const events: any[] = Array.isArray(data?.events) ? data.events : [];
+    const markets: any[] = Array.isArray(data?.markets) ? data.markets : [];
+    const selections: any[] = Array.isArray(data?.selections) ? data.selections : [];
+
+    // Build event URLs from moneyline markets (one per fight).
+    const mlMarketIds = new Set(
+      markets
+        .filter((m: any) => /^moneyline$/i.test(String(m?.name || '').trim()))
+        .map((m: any) => m?.id)
+    );
+    const eventFighters: Record<string, string[]> = {};
+    for (const sel of selections) {
+      if (!mlMarketIds.has(sel?.marketId)) continue;
+      const mkt = markets.find((m: any) => m?.id === sel?.marketId);
+      const eid = String(mkt?.eventId || sel?.eventId || '');
+      if (!eid) continue;
+      const nm = String(sel?.participants?.[0]?.name || sel?.label || '').trim();
+      if (nm) {
+        if (!eventFighters[eid]) eventFighters[eid] = [];
+        eventFighters[eid].push(nm);
+      }
+    }
+
+    // Filter to only events with fighters on the upcoming card.
+    const matchesCard = (names: string[]): boolean => {
+      if (cardNames.size === 0) return true;
+      return names.some((n) => {
+        const norm = normalizeOddsName(n)?.toLowerCase();
+        if (norm && cardNames.has(norm)) return true;
+        const surname = n.trim().split(/\s+/).pop()?.toLowerCase();
+        return !!(surname && surname.length >= 3 && cardNames.has(surname));
+      });
+    };
+
+    const eventUrls: Array<{ url: string; eventId: string }> = [];
+    let skipped = 0;
+    for (const [eid, fighters] of Object.entries(eventFighters)) {
+      if (!matchesCard(fighters)) { skipped++; continue; }
+      const slug = fighters
+        .slice(0, 2)
+        .join('-vs-')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'fight';
+      eventUrls.push({
+        url: `https://sportsbook.draftkings.com/event/${slug}/${eid}`,
+        eventId: eid,
+      });
+    }
+
+    if (eventUrls.length === 0) {
+      console.warn(`[UFC BetHandle] No matching events found in DK API (skipped ${skipped} non-card events) (${reason})`);
+      return 0;
+    }
+
+    console.log(`[UFC BetHandle] Discovered ${eventUrls.length} event pages, skipped ${skipped} non-card (${reason})`);
+
+    // Scrape event pages in batches of 3 to avoid overwhelming Chrome.
+    const allHandles: Record<string, number> = {};
+    const BATCH = 3;
+
+    for (let i = 0; i < eventUrls.length; i += BATCH) {
+      const batch = eventUrls.slice(i, i + BATCH);
+      const tabs: number[] = [];
+
+      for (const { url } of batch) {
+        try {
+          const tab = await chrome.tabs.create({ url, active: false });
+          if (tab.id != null) tabs.push(tab.id);
+        } catch { /* skip */ }
+      }
+
+      // Wait for pages to render the bet-handle widget.
+      for (const tabId of tabs) {
+        try { await waitForTabLoad(tabId, 12000); } catch { /* timeout ok */ }
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+
+      // Inject scraper directly — more reliable than waiting for content script.
+      for (const tabId of tabs) {
+        try {
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              const out: Array<{ name: string; pct: number }> = [];
+              const widgets = document.querySelectorAll('[data-testid="bet-breakdown"]');
+              if (widgets.length === 0) {
+                const fallback = Array.from(document.querySelectorAll('*')).find(
+                  (n) => (n.textContent || '').trim().toLowerCase() === '% of bets placed'
+                );
+                if (fallback) {
+                  let box: Element | null = fallback;
+                  for (let j = 0; j < 5 && box?.parentElement; j++) box = box.parentElement;
+                  if (box) {
+                    const names = box.querySelectorAll('.cb-bet-breakdown__team-name');
+                    const pcts = box.querySelectorAll('.cb-bet-breakdown__team-percentage');
+                    for (let j = 0; j < names.length && j < pcts.length; j++) {
+                      const name = (names[j].textContent || '').trim();
+                      const pct = parseInt((pcts[j].textContent || '').replace('%', ''), 10);
+                      if (name && Number.isFinite(pct)) out.push({ name, pct });
+                    }
+                  }
+                }
+                return out;
+              }
+              widgets.forEach((w) => {
+                const names = w.querySelectorAll('.cb-bet-breakdown__team-name');
+                const pcts = w.querySelectorAll('.cb-bet-breakdown__team-percentage');
+                for (let j = 0; j < names.length && j < pcts.length; j++) {
+                  const name = (names[j].textContent || '').trim();
+                  const pct = parseInt((pcts[j].textContent || '').replace('%', ''), 10);
+                  if (name && Number.isFinite(pct)) out.push({ name, pct });
+                }
+              });
+              return out;
+            },
+          });
+
+          const entries = result?.result as Array<{ name: string; pct: number }> | undefined;
+          if (Array.isArray(entries)) {
+            for (const e of entries) {
+              const nm = normalizeOddsName(e.name);
+              if (nm && Number.isFinite(e.pct)) allHandles[nm] = e.pct;
+            }
+          }
+        } catch (e) {
+          console.warn(`[UFC BetHandle] Scrape failed for tab ${tabId}:`, e);
+        }
+      }
+
+      // Close tabs.
+      for (const tabId of tabs) {
+        try { await chrome.tabs.remove(tabId); } catch { /* already closed */ }
+      }
+    }
+
+    const count = Object.keys(allHandles).length;
+    if (count >= 2) {
+      await chrome.storage.local.set({ 'fight_bethandle_dk_v1': allHandles });
+      console.log(`[UFC BetHandle] Stored ${count} fighters (${reason}):`, allHandles);
+      notifyAnalyzerTabs({ type: 'BET_HANDLE_UPDATED', count });
+    } else {
+      console.warn(`[UFC BetHandle] Only ${count} entries — widget may not be available yet (${reason})`);
+    }
+    return count;
+  } catch (e) {
+    console.warn(`[UFC BetHandle] fetch failed (${reason}):`, e);
+    return 0;
+  }
+}
+
 async function autoScrapeAllPlatforms(): Promise<any> {
   if (autoScrapeInProgress) {
     return { status: 'already_running' };
@@ -2912,6 +3116,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
     autoScrapeInProgress = false;
     await refreshFightOddsFromBestFightOdds('auto-scrape');
     await refreshDKMoneylinesFromApi('auto-scrape');
+    await fetchDKBetHandles('auto-scrape');
   }
 
   return { status: 'done', results, attempts };

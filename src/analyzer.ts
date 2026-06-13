@@ -295,6 +295,7 @@ let fightOddsMoneylineByName: Record<string, number> = {};
 // and DK's own vig-free win probabilities).
 let dkCountryByName: Record<string, string> = {};
 let dkTrueProbByName: Record<string, number> = {};
+let dkBetHandleByName: Record<string, number> = {};
 let currentSearch = '';
 let currentSort = 'default';
 let sourceVisibility: Record<'p6'|'ud'|'pp'|'betr'|'dk', boolean> = {
@@ -14826,6 +14827,17 @@ function renderH2HModal(a: AnalyzerFighter, b: AnalyzerFighter): void {
       </div>
       <div class="h2h-prob-label">WIN PROBABILITY · DK implied, vig removed</div>`;
     })()}
+    ${(() => {
+      const hA = resolveFromDkMap(dkBetHandleByName, a.name);
+      const hB = resolveFromDkMap(dkBetHandleByName, b.name);
+      if (hA == null || hB == null) return '';
+      return `<div class="h2h-prob-strip h2h-handle-strip">
+        <span class="h2h-prob-val a">${hA}%</span>
+        <div class="h2h-prob-track h2h-handle-track"><i class="a" style="width:${hA}%"></i><i class="b" style="width:${hB}%"></i></div>
+        <span class="h2h-prob-val b">${hB}%</span>
+      </div>
+      <div class="h2h-prob-label">% OF BETS PLACED · DK public money</div>`;
+    })()}
     <div class="h2h-common">${spineCommonOppsHTML(a, b)}</div>
     <table class="h2h-table">
       <thead><tr><th class="h2h-side-a">${a.name.split(' ').pop()}</th><th></th><th class="h2h-side-b">${b.name.split(' ').pop()}</th></tr></thead>
@@ -15696,10 +15708,11 @@ async function loadData(): Promise<void> {
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
-      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1']);
+      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1']);
       const rawOdds = result[STORAGE_ODDS_KEY];
       dkCountryByName = (result['fighter_countries_dk_v1'] as Record<string, string>) || {};
       dkTrueProbByName = (result['fight_trueprob_dk_v1'] as Record<string, number>) || {};
+      dkBetHandleByName = (result['fight_bethandle_dk_v1'] as Record<string, number>) || {};
       fightOddsMoneylineByName = {};
       if (rawOdds && typeof rawOdds === 'object') {
         for (const [name, val] of Object.entries(rawOdds as Record<string, unknown>)) {
@@ -16046,6 +16059,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     }
     if (msg.type === 'ODDS_UPDATED') {
       console.log('[UFC Analyzer] Odds updated:', msg.count);
+      requestDataReload();
+    }
+    if (msg.type === 'BET_HANDLE_UPDATED') {
+      console.log('[UFC Analyzer] Bet-handle updated:', msg.count);
       requestDataReload();
     }
     if (msg.type === 'ARCHIVE_SETTLED') {

@@ -56,6 +56,10 @@ declare function clickButtonByLabels(context: any, labels: any, waitMs?: number)
 declare function clickPrizePicksButton(labels: any, waitMs?: number): Promise<boolean>;
 declare function scrapePrizePicksAllStats(): Promise<any[]>;
 declare function scrapeDKSportsbookProps(): unknown[];
+declare function scrapeDKBetHandle(): Array<{
+    name: string;
+    pct: number;
+}>;
 declare function getScrapeProfile(platform: any): {
     maxAttempts: number;
     attemptIntervalMs: number;
