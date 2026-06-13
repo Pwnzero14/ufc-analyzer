@@ -6538,6 +6538,368 @@ html { scroll-behavior: smooth; }
 }
 
 
+/* ── GLOW-UP 37: Lines strip evolution ── */
+/* Line cells get frosted-glass treatment with stat-type color washes,
+   glowing platform values, animated movement arrows, and a crowned best-line. */
+
+/* --- Base cell: glass panel --- */
+.line-cell {
+  background: linear-gradient(
+    165deg,
+    rgba(255,255,255,0.045) 0%,
+    rgba(255,255,255,0.015) 40%,
+    rgba(0,0,0,0.05) 100%
+  );
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.line-cell::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  opacity: 0.7;
+}
+
+/* --- Stat-type color washes --- */
+.line-cell.fp {
+  background: linear-gradient(165deg, rgba(86,195,255,0.08), rgba(86,195,255,0.02) 60%, transparent);
+  border-color: rgba(86,195,255,0.22);
+}
+.line-cell.ss {
+  background: linear-gradient(165deg, rgba(44,212,208,0.10), rgba(44,212,208,0.03) 60%, transparent);
+  border-color: rgba(44,212,208,0.28);
+  box-shadow: inset 0 0 0 1px rgba(44,212,208,0.06);
+}
+.line-cell.td {
+  background: linear-gradient(165deg, rgba(248,198,74,0.07), rgba(248,198,74,0.02) 60%, transparent);
+  border-color: rgba(248,198,74,0.22);
+}
+.line-cell.ctrl {
+  background: linear-gradient(165deg, rgba(127,136,255,0.07), rgba(127,136,255,0.02) 60%, transparent);
+  border-color: rgba(127,136,255,0.22);
+}
+.line-cell.ft {
+  background: linear-gradient(165deg, rgba(146,125,255,0.07), rgba(146,125,255,0.02) 60%, transparent);
+  border-color: rgba(146,125,255,0.22);
+}
+
+/* --- Platform label glow --- */
+.line-platform {
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+.line-cell:hover .line-platform { color: var(--text2); }
+
+/* --- Line value: subtle text glow per platform --- */
+.line-value.p6   { text-shadow: 0 0 10px rgba(86,195,255,0.25); }
+.line-value.ud   { text-shadow: 0 0 10px rgba(127,136,255,0.25); }
+.line-value.betr { text-shadow: 0 0 10px rgba(255,138,61,0.25); }
+.line-value.pp   { text-shadow: 0 0 10px rgba(44,212,208,0.25); }
+.line-value.dk   { text-shadow: 0 0 10px rgba(0,200,83,0.25); }
+
+/* --- Hover: lift + stat-type glow --- */
+.line-cell:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35), 0 0 1px rgba(255,255,255,0.1);
+}
+.line-cell.fp:hover {
+  border-color: rgba(86,195,255,0.45);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(86,195,255,0.12);
+}
+.line-cell.ss:hover {
+  border-color: rgba(44,212,208,0.50);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(44,212,208,0.14);
+}
+.line-cell.td:hover {
+  border-color: rgba(248,198,74,0.45);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(248,198,74,0.12);
+}
+.line-cell.ctrl:hover {
+  border-color: rgba(127,136,255,0.45);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(127,136,255,0.12);
+}
+.line-cell.ft:hover {
+  border-color: rgba(146,125,255,0.45);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(146,125,255,0.12);
+}
+
+/* Hover intensifies glow on values */
+.line-cell:hover .line-value.p6   { text-shadow: 0 0 14px rgba(86,195,255,0.45); }
+.line-cell:hover .line-value.ud   { text-shadow: 0 0 14px rgba(127,136,255,0.45); }
+.line-cell:hover .line-value.betr { text-shadow: 0 0 14px rgba(255,138,61,0.45); }
+.line-cell:hover .line-value.pp   { text-shadow: 0 0 14px rgba(44,212,208,0.45); }
+.line-cell:hover .line-value.dk   { text-shadow: 0 0 14px rgba(0,200,83,0.45); }
+
+/* --- Movement arrows: micro-pulse --- */
+@keyframes mvPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.line-movement.mv-up {
+  text-shadow: 0 0 6px rgba(32,223,143,0.5);
+  animation: mvPulse 2.4s ease-in-out infinite;
+}
+.line-movement.mv-down {
+  text-shadow: 0 0 6px rgba(255,91,120,0.5);
+  animation: mvPulse 2.4s ease-in-out infinite;
+}
+
+/* --- Best-line crown treatment --- */
+.line-cell.best-line {
+  border-color: rgba(0,232,122,0.30);
+  background: linear-gradient(165deg, rgba(0,232,122,0.10), rgba(0,232,122,0.03) 55%, transparent);
+  box-shadow: 0 0 12px rgba(0,232,122,0.08);
+}
+.line-cell.best-line::after {
+  content: '★';
+  position: absolute;
+  top: 2px; right: 3px;
+  font-size: 7px;
+  color: var(--green);
+  opacity: 0.6;
+  filter: drop-shadow(0 0 3px rgba(0,232,122,0.5));
+}
+.line-cell.best-line:hover {
+  border-color: rgba(0,232,122,0.55);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 20px rgba(0,232,122,0.18);
+}
+.line-cell.best-line:hover::after { opacity: 1; }
+
+/* --- Platform-source cells (src-*) keep identity on hover --- */
+.line-cell.src-p6:hover { border-color: rgba(86,195,255,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(86,195,255,0.12); }
+.line-cell.src-ud:hover { border-color: rgba(127,136,255,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(127,136,255,0.12); }
+.line-cell.src-pp:hover { border-color: rgba(44,212,208,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(44,212,208,0.12); }
+.line-cell.src-betr:hover { border-color: rgba(255,138,61,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(255,138,61,0.12); }
+
+/* --- Platform lines strip gap tightening --- */
+.platform-lines { gap: 5px; }
+
+/* --- Shimmer sweep on row hover (one-shot) --- */
+@keyframes cellShimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
+}
+.fighter-row:hover .line-cell::before {
+  animation: cellShimmer 0.8s ease forwards;
+}
+
+
+/* ── GLOW-UP 38: Lean panels suite ── */
+/* Pro/risk columns get colored side rails, verdict badges get gradient glow,
+   points stagger in on expand, Top Drivers callout gets enhanced depth. */
+
+/* --- Pro/Risk columns: colored left rail + subtle wash --- */
+.lean-reason-col.pro {
+  border-left: 2px solid rgba(20,209,128,0.50);
+  background: linear-gradient(135deg, rgba(20,209,128,0.06), rgba(12,18,31,0.62) 60%);
+  box-shadow: inset 2px 0 12px rgba(20,209,128,0.06);
+}
+.lean-reason-col.risk {
+  border-left: 2px solid rgba(255,108,136,0.50);
+  background: linear-gradient(135deg, rgba(255,108,136,0.06), rgba(12,18,31,0.62) 60%);
+  box-shadow: inset 2px 0 12px rgba(255,108,136,0.06);
+}
+.lean-reason-col.neutral {
+  border-left: 2px solid rgba(248,198,74,0.35);
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(12,18,31,0.62) 60%);
+}
+
+/* Column head labels get a subtle glow */
+.lean-reason-col.pro .lean-reason-head {
+  text-shadow: 0 0 10px rgba(20,209,128,0.3);
+}
+.lean-reason-col.risk .lean-reason-head {
+  text-shadow: 0 0 10px rgba(255,108,136,0.3);
+}
+
+/* --- Lean points: stagger entrance on drilldown expand --- */
+@keyframes leanPointIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.fighter-row.expanded .lean-point {
+  animation: leanPointIn 0.25s ease both;
+}
+.fighter-row.expanded .lean-point:nth-child(1) { animation-delay: 0.04s; }
+.fighter-row.expanded .lean-point:nth-child(2) { animation-delay: 0.08s; }
+.fighter-row.expanded .lean-point:nth-child(3) { animation-delay: 0.12s; }
+.fighter-row.expanded .lean-point:nth-child(4) { animation-delay: 0.16s; }
+.fighter-row.expanded .lean-point:nth-child(5) { animation-delay: 0.20s; }
+.fighter-row.expanded .lean-point:nth-child(6) { animation-delay: 0.24s; }
+
+/* Point icons: enhanced color contrast + micro scale */
+.lean-point-icon.pos {
+  filter: drop-shadow(0 0 4px rgba(32,223,143,0.4));
+}
+.lean-point-icon.neg {
+  filter: drop-shadow(0 0 4px rgba(255,91,120,0.4));
+}
+
+/* --- Verdict badge: gradient border + glow --- */
+.lean-verdict {
+  border-radius: 5px;
+  border-left: 3px solid var(--green);
+  background: linear-gradient(135deg, rgba(0,232,122,0.07), rgba(0,232,122,0.02) 70%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+  position: relative;
+  overflow: hidden;
+}
+.lean-verdict::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(0,232,122,0.03));
+  pointer-events: none;
+}
+.lean-verdict.under {
+  border-left-color: var(--red);
+  background: linear-gradient(135deg, rgba(255,58,96,0.07), rgba(255,58,96,0.02) 70%);
+}
+.lean-verdict.under::before {
+  background: linear-gradient(90deg, transparent, rgba(255,58,96,0.03));
+}
+.lean-verdict.push {
+  border-left-color: var(--gold);
+  background: linear-gradient(135deg, rgba(240,192,64,0.07), rgba(240,192,64,0.02) 70%);
+}
+.lean-verdict.push::before {
+  background: linear-gradient(90deg, transparent, rgba(240,192,64,0.03));
+}
+
+/* --- Top Drivers callout: depth + glow treatment --- */
+.top-drivers {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.top-drivers::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}
+.top-drivers.over {
+  border-left: 2px solid rgba(20,209,128,0.55);
+  background: linear-gradient(135deg, rgba(20,209,128,0.08), rgba(20,209,128,0.02) 50%, rgba(12,18,31,0.62));
+}
+.top-drivers.under {
+  border-left: 2px solid rgba(255,108,136,0.55);
+  background: linear-gradient(135deg, rgba(255,108,136,0.08), rgba(255,108,136,0.02) 50%, rgba(12,18,31,0.62));
+}
+
+/* Driver rank badges: glow */
+.top-drivers.over .top-driver-rank {
+  box-shadow: 0 0 8px rgba(20,209,128,0.25);
+}
+.top-drivers.under .top-driver-rank {
+  box-shadow: 0 0 8px rgba(255,108,136,0.25);
+}
+
+/* Top drivers heading glow */
+.top-drivers.over .top-drivers-head {
+  text-shadow: 0 0 8px rgba(20,209,128,0.3);
+}
+.top-drivers.under .top-drivers-head {
+  text-shadow: 0 0 8px rgba(255,108,136,0.3);
+}
+
+/* --- Lean badge in header strip: confidence glow --- */
+.lean-badge.lean-over {
+  box-shadow: 0 0 8px rgba(0,232,122,0.15);
+}
+.lean-badge.lean-under {
+  box-shadow: 0 0 8px rgba(255,58,96,0.15);
+}
+
+/* --- Lean confidence inline: visual bar --- */
+.lean-conf-inline {
+  position: relative;
+}
+
+
+/* ── GLOW-UP 39: Detail panel identities ── */
+/* Every panel gets its accent reflected in hover glow, title-line color,
+   and a subtle wash background. Remaining panels get first-time identities. */
+
+/* --- Missing panel identities (not covered in GLOW-UP 28) --- */
+.style-matchup-panel  { border-left: 2px solid rgba(255,138,61,0.45) !important; }
+.style-matchup-panel  .detail-panel-title { color: var(--orange); }
+.line-timeline-panel  { border-left: 2px solid rgba(248,198,74,0.45) !important; }
+.line-timeline-panel  .detail-panel-title { color: var(--gold); }
+.ma-panel.ma-ss       { border-left: 2px solid rgba(44,212,208,0.45) !important; }
+.ma-panel.ma-ss       .detail-panel-title { color: var(--cyan); }
+.ma-panel.ma-ctrl     { border-left: 2px solid rgba(255,91,120,0.45) !important; }
+.ma-panel.ma-ctrl     .detail-panel-title { color: var(--red); }
+
+/* --- Title divider line picks up panel accent --- */
+.mr-panel   .detail-panel-title::after { background: rgba(127,136,255,0.25); }
+.fv-panel   .detail-panel-title::after { background: rgba(248,198,74,0.25); }
+.ev-panel   .detail-panel-title::after { background: rgba(32,223,143,0.22); }
+.arch-panel .detail-panel-title::after { background: rgba(255,138,61,0.25); }
+.ftb-panel  .detail-panel-title::after { background: rgba(86,195,255,0.25); }
+.soh-panel  .detail-panel-title::after { background: rgba(44,212,208,0.25); }
+.oac-panel  .detail-panel-title::after { background: rgba(201,212,232,0.18); }
+.style-matchup-panel .detail-panel-title::after { background: rgba(255,138,61,0.22); }
+.line-timeline-panel .detail-panel-title::after { background: rgba(248,198,74,0.22); }
+.ma-panel.ma-ss  .detail-panel-title::after { background: rgba(44,212,208,0.22); }
+.ma-panel.ma-ctrl .detail-panel-title::after { background: rgba(255,91,120,0.22); }
+
+/* --- Hover: accent glow per panel --- */
+.mr-panel:hover   { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(127,136,255,0.08); }
+.fv-panel:hover   { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(248,198,74,0.08); }
+.ev-panel:hover   { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(32,223,143,0.08); }
+.arch-panel:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(255,138,61,0.08); }
+.ftb-panel:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(86,195,255,0.08); }
+.soh-panel:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(44,212,208,0.08); }
+.oac-panel:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(201,212,232,0.05); }
+.style-matchup-panel:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(255,138,61,0.08); }
+.line-timeline-panel:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(248,198,74,0.08); }
+.ma-panel.ma-ss:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(44,212,208,0.08); }
+.ma-panel.ma-ctrl:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 26px rgba(0,0,0,0.3), 0 0 18px rgba(255,91,120,0.08); }
+
+/* --- Detail panel transition for hover glow --- */
+.detail-panel {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+/* --- Detail panel entrance: stagger on expand --- */
+@keyframes panelSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fighter-row.expanded .detail-panel {
+  animation: panelSlideIn 0.3s ease both;
+}
+.fighter-row.expanded .detail-grid > :nth-child(1) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(1) { animation-delay: 0.03s; }
+.fighter-row.expanded .detail-grid > :nth-child(2) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(2) { animation-delay: 0.06s; }
+.fighter-row.expanded .detail-grid > :nth-child(3) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(3) { animation-delay: 0.09s; }
+.fighter-row.expanded .detail-grid > :nth-child(4) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(4) { animation-delay: 0.12s; }
+.fighter-row.expanded .detail-grid > :nth-child(5) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(5) { animation-delay: 0.15s; }
+.fighter-row.expanded .detail-grid > :nth-child(6) .detail-panel,
+.fighter-row.expanded .detail-grid > .detail-panel:nth-child(6) { animation-delay: 0.18s; }
+
+/* --- Panel-pair hover: accent bleed from child panels --- */
+.panel-pair:has(.mr-panel):hover { border-color: rgba(127,136,255,0.25); }
+.panel-pair:has(.fv-panel):hover { border-color: rgba(248,198,74,0.25); }
+.panel-pair:has(.ev-panel):hover { border-color: rgba(32,223,143,0.22); }
+.panel-pair:has(.arch-panel):hover { border-color: rgba(255,138,61,0.22); }
+.panel-pair:has(.ftb-panel):hover { border-color: rgba(86,195,255,0.22); }
+.panel-pair:has(.soh-panel):hover { border-color: rgba(44,212,208,0.22); }
+
+
 </style>
 </head>
 <body>

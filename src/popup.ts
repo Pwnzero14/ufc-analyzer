@@ -8,11 +8,11 @@ import { AllLines } from './types/index.js';
  */
 
 const PLATFORMS = [
-  { id: 'pick6' as const, label: CONFIG.platforms.pick6.label, color: CONFIG.platforms.pick6.color },
-  { id: 'underdog' as const, label: CONFIG.platforms.underdog.label, color: CONFIG.platforms.underdog.color },
-  { id: 'betr' as const, label: CONFIG.platforms.betr.label, color: CONFIG.platforms.betr.color },
-  { id: 'prizepicks' as const, label: CONFIG.platforms.prizepicks.label, color: CONFIG.platforms.prizepicks.color },
-  { id: 'draftkings_sportsbook' as const, label: 'DraftKings Sportsbook', color: '#f59e0b' },
+  { id: 'pick6' as const, label: CONFIG.platforms.pick6.label, color: CONFIG.platforms.pick6.color, cls: 'p6' },
+  { id: 'underdog' as const, label: CONFIG.platforms.underdog.label, color: CONFIG.platforms.underdog.color, cls: 'ud' },
+  { id: 'betr' as const, label: CONFIG.platforms.betr.label, color: CONFIG.platforms.betr.color, cls: 'betr' },
+  { id: 'prizepicks' as const, label: CONFIG.platforms.prizepicks.label, color: CONFIG.platforms.prizepicks.color, cls: 'pp' },
+  { id: 'draftkings_sportsbook' as const, label: 'DraftKings Sportsbook', color: '#f59e0b', cls: 'dk' },
 ];
 
 function timeAgo(ts?: number): string {
@@ -36,7 +36,7 @@ function render(lines: AllLines): void {
     const row = document.createElement('div');
     row.className = 'platform-row';
     row.innerHTML = `
-      <div class="platform-name">
+      <div class="platform-name ${p.cls}">
         <div class="dot" style="background:${p.color}"></div>
         ${p.label}
       </div>

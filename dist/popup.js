@@ -5,11 +5,11 @@ import { CONFIG } from './config/index.js';
  * Displays captured lines and provides buttons for actions
  */
 const PLATFORMS = [
-    { id: 'pick6', label: CONFIG.platforms.pick6.label, color: CONFIG.platforms.pick6.color },
-    { id: 'underdog', label: CONFIG.platforms.underdog.label, color: CONFIG.platforms.underdog.color },
-    { id: 'betr', label: CONFIG.platforms.betr.label, color: CONFIG.platforms.betr.color },
-    { id: 'prizepicks', label: CONFIG.platforms.prizepicks.label, color: CONFIG.platforms.prizepicks.color },
-    { id: 'draftkings_sportsbook', label: 'DraftKings Sportsbook', color: '#f59e0b' },
+    { id: 'pick6', label: CONFIG.platforms.pick6.label, color: CONFIG.platforms.pick6.color, cls: 'p6' },
+    { id: 'underdog', label: CONFIG.platforms.underdog.label, color: CONFIG.platforms.underdog.color, cls: 'ud' },
+    { id: 'betr', label: CONFIG.platforms.betr.label, color: CONFIG.platforms.betr.color, cls: 'betr' },
+    { id: 'prizepicks', label: CONFIG.platforms.prizepicks.label, color: CONFIG.platforms.prizepicks.color, cls: 'pp' },
+    { id: 'draftkings_sportsbook', label: 'DraftKings Sportsbook', color: '#f59e0b', cls: 'dk' },
 ];
 function timeAgo(ts) {
     if (!ts)
@@ -32,7 +32,7 @@ function render(lines) {
         const row = document.createElement('div');
         row.className = 'platform-row';
         row.innerHTML = `
-      <div class="platform-name">
+      <div class="platform-name ${p.cls}">
         <div class="dot" style="background:${p.color}"></div>
         ${p.label}
       </div>
