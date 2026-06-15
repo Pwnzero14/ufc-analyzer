@@ -307,11 +307,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     else if (request.type === 'GRADE_ARCHIVE') {
         // includeZeroResults: re-settle records that were previously stored as 0 (likely a bad parse)
-        fetchAndSettleFromUFCStats({ forceEventName: request.forceEventName, includeZeroResults: true })
+        // recentOnly defaults true — only walk the most-recent card. Send allEvents:true for a full sweep.
+        fetchAndSettleFromUFCStats({ forceEventName: request.forceEventName, includeZeroResults: true, recentOnly: request.allEvents !== true })
             .then(async (result) => {
             if (result.settled > 0) {
                 const bf = await PropArchiveService.backfillUnresolvedFromKnownOutcomes({ minHoursBetweenRuns: 0 });
                 result.settled += bf.changed;
+            }
+            // Refresh analyzer tabs when anything changed — settled results OR purged ghosts.
+            if (result.settled > 0 || (result.purged ?? 0) > 0) {
                 notifyAnalyzerTabs({ type: 'ARCHIVE_SETTLED', settled: result.settled });
             }
             void updatePendingBadge();
@@ -670,6 +674,11 @@ async function fetchFightDetails(url) {
         // Per-round Totals: first data row = Round 1 (same column layout as Totals).
         const r1Row = perRoundTbody.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || '';
         const r1Cells = [...r1Row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
+        // Sig Strikes table (tbody[2]): cols [fighter, Sig.Str "X of Y", Sig.Str%, Head, Body, Leg, Distance, Clinch, Ground].
+        // Body/Leg landed counts back the platforms' "ss body" / "ss leg" props, which Totals doesn't expose.
+        const sigStrikesTbody = allTbodies[2] || '';
+        const sigRow = sigStrikesTbody.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || '';
+        const sigCells = [...sigRow.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => c[1]);
         // UFCStats separates per-fighter values using <p> tags (not <br>).
         // Split on </p> or <br>, strip tags, drop empties, return value at idx.
         const cellVal = (cellHtml, idx) => {
@@ -696,7 +705,11 @@ async function fetchFightDetails(url) {
             const sub = parseInt(cellVal(cells[7] ?? '', i)) || 0;
             const rev = parseInt(cellVal(cells[8] ?? '', i)) || 0;
             const ctrl = parseCtrlTime(cellVal(cells[9] ?? '', i) || '0:00');
-            result.push({ name: names[i], won: statuses[i] === 'W', ss, ssR1, totalStr, td, kd, rev, sub, ctrlSecs: ctrl, method, round, fightTimeMins });
+            const bodyM = cellVal(sigCells[4] ?? '', i).match(/(\d+)\s+of\s+\d+/);
+            const ssBody = bodyM ? parseInt(bodyM[1]) : 0;
+            const legM = cellVal(sigCells[5] ?? '', i).match(/(\d+)\s+of\s+\d+/);
+            const ssLeg = legM ? parseInt(legM[1]) : 0;
+            result.push({ name: names[i], won: statuses[i] === 'W', ss, ssR1, totalStr, td, kd, rev, sub, ctrlSecs: ctrl, method, round, fightTimeMins, ssBody, ssLeg });
         }
         return result;
     }
@@ -720,6 +733,7 @@ async function fetchAndSettleFromUFCStats(opts) {
 }
 async function _fetchAndSettleFromUFCStats(opts) {
     let settled = 0, skipped = 0;
+    let _purgedGhosts = 0;
     const errors = [];
     // Inline normalizers matching PropArchiveService logic
     const _baseNorm = (s) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -734,6 +748,10 @@ async function _fetchAndSettleFromUFCStats(opts) {
     const _normName = (s) => { const base = _baseNorm(s); return _aliasLC[base] || base; };
     const _normEvent = (s) => s.replace(/\s+/g, ' ').trim().toLowerCase();
     const _normProp = (v) => {
+        if (/^ss[\s_]*body$/i.test(v))
+            return 'ss_body';
+        if (/^ss[\s_]*leg$/i.test(v))
+            return 'ss_leg';
         if (/^ss$/i.test(v))
             return 'ss';
         if (/^td$/i.test(v))
@@ -767,6 +785,17 @@ async function _fetchAndSettleFromUFCStats(opts) {
             console.log('[UFC Settle] No unresolved records — archive is up to date');
             return { settled: 0, skipped: 0, errors: [] };
         }
+        // Record every (fighter|event|prop)→result we resolve this run. Used at write time to
+        // re-apply onto a FRESH archive read, so a concurrent storage write (e.g. startup
+        // line-archiving) can't clobber the settle — and the settle can't clobber it either.
+        const _resKey = (fighter, event, propType) => `${_normName(String(fighter || ''))}|${_normEvent(String(event || ''))}|${_normProp(String(propType || ''))}`;
+        const resolvedKeys = new Map();
+        // For each event we successfully matched + parsed on UFCStats, record the roster of fighter
+        // surnames that actually fought. Any unresolved row under a graded event whose fighter is NOT
+        // in that roster is a foreign ghost (e.g. UFC 329 Max/Conor lines archived under a finished
+        // card) that can never settle — purge it in the final write so it stops re-haunting the count.
+        const _surname = (s) => _baseNorm(String(s || '')).split(' ').filter(Boolean).pop() || '';
+        const eventRosterSurnames = new Map(); // normEvent -> surnames present on the card
         // Bulk apply: set result on matching archive records in-memory (no per-call read-modify-write).
         // Returns number of records updated.
         function applyResult(names, event, propType, result) {
@@ -786,12 +815,44 @@ async function _fetchAndSettleFromUFCStats(opts) {
                 if (Number.isFinite(Number(row.result)) && !opts?.includeZeroResults)
                     continue; // already resolved
                 row.result = result;
+                resolvedKeys.set(_resKey(String(row.fighter || ''), nEvent, nProp), result);
                 count++;
             }
             return count;
         }
-        const eventNames = [...new Set(unresolved.map(r => r.event))];
+        let eventNames = [...new Set(unresolved.map(r => r.event))];
         console.log(`[UFC Settle] ${unresolved.length} unresolved records across ${eventNames.length} event(s): ${eventNames.join(' | ')}`);
+        // recentOnly: by default only settle the most-recent card. Past events are already in the
+        // archive — re-walking a dozen of them on every SETTLE NOW re-fetches their UFCStats pages
+        // for nothing. Keep every event whose newest unresolved record is within 3 days of the
+        // newest overall (groups a card with its dual-name twin, e.g. "Freedom 250" + "Topuria vs
+        // Gaethje", which share a date). forceEventName always overrides this.
+        if (opts?.recentOnly && !opts?.forceEventName && eventNames.length > 1) {
+            const nowTs = Date.now();
+            const futureGrace = 12 * 60 * 60 * 1000; // event-day timing slack
+            const newestOf = (ev) => {
+                const ds = unresolved.filter(r => r.event === ev).map(r => Date.parse(String(r.date))).filter(Number.isFinite);
+                return ds.length ? Math.max(...ds) : 0;
+            };
+            const perEvent = new Map(eventNames.map(ev => [ev, newestOf(ev)]));
+            // Anchor on the most recent event that has ALREADY HAPPENED. Future cards (e.g. this week's
+            // not-yet-fought Kape vs. Horiguchi, whose pending lines now carry the newest date) can't be
+            // settled on UFCStats and must not become the anchor — otherwise the real graded card with
+            // its ghosts gets skipped. Drop future events from the settle scope entirely.
+            const pastEntries = [...perEvent.entries()].filter(([, ts]) => ts > 0 && ts <= nowTs + futureGrace);
+            if (pastEntries.length) {
+                const globalNewest = Math.max(...pastEntries.map(([, ts]) => ts));
+                const WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+                const kept = eventNames.filter(ev => {
+                    const ts = perEvent.get(ev) ?? 0;
+                    return ts > 0 && ts <= nowTs + futureGrace && globalNewest - ts <= WINDOW_MS;
+                });
+                if (kept.length && kept.length < eventNames.length) {
+                    console.log(`[UFC Settle] recentOnly: limiting to ${kept.length} of ${eventNames.length} event(s): ${kept.join(' | ')}`);
+                    eventNames = kept;
+                }
+            }
+        }
         // Fetch completed events list from UFCStats
         const listHtml = await ufcstatsFetchText('http://www.ufcstats.com/statistics/events/completed?page=all', {
             signal: AbortSignal.timeout(15000),
@@ -867,6 +928,17 @@ async function _fetchAndSettleFromUFCStats(opts) {
             }
             console.log(`[UFC Settle] Parsed ${allFightResults.length} fighter results from ${fightUrls.length} fights`);
             matchedEventCache.push({ date: match.date, results: allFightResults });
+            // Record this event's actual roster (by surname) so foreign unresolved rows can be purged.
+            {
+                const surnames = new Set();
+                for (const f of allFightResults) {
+                    const s = _surname(f.name);
+                    if (s)
+                        surnames.add(s);
+                }
+                if (surnames.size)
+                    eventRosterSurnames.set(_normEvent(archiveEvent), surnames);
+            }
             // Map last-name → full name so "M Aswell" can match "Michael Aswell Jr"
             const lastNameMap = new Map();
             for (const f of allFightResults) {
@@ -927,6 +999,8 @@ async function _fetchAndSettleFromUFCStats(opts) {
                 const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
                 const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
                     + applyResult(nameVariants, archiveEvent, 'SS_R1', f.ssR1)
+                    + applyResult(nameVariants, archiveEvent, 'ss_body', f.ssBody)
+                    + applyResult(nameVariants, archiveEvent, 'ss_leg', f.ssLeg)
                     + applyResult(nameVariants, archiveEvent, 'TD', f.td)
                     + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
                     + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
@@ -1013,12 +1087,18 @@ async function _fetchAndSettleFromUFCStats(opts) {
                 console.log(`[UFC Settle] Fallback matched "${archiveEvent}" via fighter surname lookup`);
                 // Build last-name → UFCStats result lookup for the matched card
                 const cardLastNameMap = new Map();
+                const fbSurnames = new Set();
                 for (const f of matchedEntry.results) {
                     if (!f.name)
                         continue;
                     const last = f.name.trim().split(/\s+/).pop().toLowerCase();
                     cardLastNameMap.set(last, f);
+                    const s = _surname(f.name);
+                    if (s)
+                        fbSurnames.add(s);
                 }
+                if (fbSurnames.size)
+                    eventRosterSurnames.set(_normEvent(archiveEvent), fbSurnames);
                 // Iterate fighters actually stored in the archive under this sub-event,
                 // look them up in the card results by last name, then settle.
                 const archiveFighters = [...new Set(unresolved.filter(r => r.event === archiveEvent).map(r => r.fighter))];
@@ -1036,6 +1116,8 @@ async function _fetchAndSettleFromUFCStats(opts) {
                     const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
                     const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
                         + applyResult([archiveName], archiveEvent, 'SS_R1', f.ssR1)
+                        + applyResult([archiveName], archiveEvent, 'ss_body', f.ssBody)
+                        + applyResult([archiveName], archiveEvent, 'ss_leg', f.ssLeg)
                         + applyResult([archiveName], archiveEvent, 'TD', f.td)
                         + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
                         + applyResult([archiveName], archiveEvent, 'Fantasy_PP', fpPP)
@@ -1048,16 +1130,46 @@ async function _fetchAndSettleFromUFCStats(opts) {
                 }
             }
         }
-        // Single write for all in-memory modifications (avoids per-record read-modify-write races)
-        if (settled > 0) {
-            await new Promise((res, rej) => chrome.storage.local.set({ prop_archive_v1: archive }, () => {
-                const err = chrome.runtime?.lastError;
-                if (err)
-                    rej(new Error(err.message));
-                else
-                    res();
-            }));
-            console.log(`[UFC Settle] Wrote ${archive.length} records to storage`);
+        // Single write for all modifications. Re-read the archive FRESH immediately before writing
+        // and re-apply our resolved results onto it, rather than writing the snapshot we read at the
+        // top. During startup, line-restoration archives new rows concurrently; writing the stale
+        // snapshot back would clobber those additions (and a concurrent write would clobber our
+        // results — which silently dropped a whole settle run on 2026-06-15). Merging by key is safe
+        // in both directions.
+        if (settled > 0 || eventRosterSurnames.size > 0) {
+            // Run the read-modify-write under PropArchiveService's write lock so it can't race with
+            // auto-scrape addProps (whose stale snapshot was restoring purged ghosts every cycle).
+            let reapplied = 0;
+            let keptLen = 0;
+            await PropArchiveService.mutate((freshArchive) => {
+                const kept = [];
+                for (const row of freshArchive) {
+                    const lineOk = Number.isFinite(Number(row.line)) && Number(row.line) > 0;
+                    const hasResult = Number.isFinite(Number(row.result));
+                    // Purge foreign ghosts: an unresolved row under an event we just graded, whose fighter
+                    // isn't on that event's UFCStats roster, can never settle (e.g. UFC 329 Max/Conor lines
+                    // archived under the finished Freedom 250 card). Drop it.
+                    if (lineOk && !hasResult) {
+                        const roster = eventRosterSurnames.get(_normEvent(String(row.event || '')));
+                        if (roster && roster.size >= 2 && !roster.has(_surname(String(row.fighter || '')))) {
+                            _purgedGhosts++;
+                            continue; // drop
+                        }
+                    }
+                    // Re-apply this run's resolved results (touch unresolved rows, plus zero-results on re-settle).
+                    if (lineOk && (!hasResult || (opts?.includeZeroResults && Number(row.result) === 0))) {
+                        const r = resolvedKeys.get(_resKey(String(row.fighter || ''), String(row.event || ''), String(row.propType || '')));
+                        if (r !== undefined) {
+                            row.result = r;
+                            reapplied++;
+                        }
+                    }
+                    kept.push(row);
+                }
+                keptLen = kept.length;
+                return kept;
+            });
+            console.log(`[UFC Settle] Wrote ${keptLen} records to storage (re-applied ${reapplied} results, purged ${_purgedGhosts} foreign ghost(s)) [locked]`);
             // Post-write verification — confirms values actually landed in storage
             const _verify = await new Promise((res) => chrome.storage.local.get(['prop_archive_v1'], res));
             const _written = Array.isArray(_verify.prop_archive_v1) ? _verify.prop_archive_v1 : [];
@@ -1076,7 +1188,7 @@ async function _fetchAndSettleFromUFCStats(opts) {
     }
     // After settlement, check if all records are now resolved — if so, clear Betr lines
     // since the event is over and manually-entered Betr lines are no longer needed.
-    if (settled > 0) {
+    if (settled > 0 || _purgedGhosts > 0) {
         try {
             const postRaw = await new Promise((res) => chrome.storage.local.get(['prop_archive_v1'], res));
             const postArchive = Array.isArray(postRaw.prop_archive_v1) ? postRaw.prop_archive_v1 : [];
@@ -1089,8 +1201,8 @@ async function _fetchAndSettleFromUFCStats(opts) {
             console.error('[UFC Settle] Post-settle Betr cleanup check failed:', e);
         }
     }
-    console.log(`[UFC Settle] Done — settled=${settled}, skipped=${skipped}, errors=${errors.length}`);
-    return { settled, skipped, errors };
+    console.log(`[UFC Settle] Done — settled=${settled}, purged=${_purgedGhosts}, skipped=${skipped}, errors=${errors.length}`);
+    return { settled, skipped, errors, purged: _purgedGhosts };
 }
 function toArchivePropTypeFromLineKey(lineKey, platform) {
     const key = lineKey.toLowerCase();
@@ -1138,6 +1250,40 @@ async function archivePlatformPropLines(platform, fighters) {
     const card = await fetchUpcomingUFCCard(false);
     if (!card || !isAtOrAfterUfcLondon(card.date))
         return;
+    // Card-membership authority. Platforms post far-future marquee bouts (e.g. next month's
+    // UFC 329 Max Holloway vs Conor McGregor) and keep finished-event lines up; archiving any
+    // fighter NOT on the current UFCStats card creates unsettleable ghosts that regenerate on
+    // every fetch. Build a surname-tolerant set from the card and gate on it.
+    const cardNames = new Set();
+    const cardSurnames = new Set();
+    const surnameOf = (n) => String(n || '').trim().toLowerCase().replace(/[^a-z\s']/g, '').split(/\s+/).filter(Boolean).pop() || '';
+    for (const bout of card.fighters || []) {
+        for (const nm of [bout?.f1, bout?.f2]) {
+            const norm = String(nm || '').trim().toLowerCase();
+            if (!norm)
+                continue;
+            cardNames.add(norm);
+            const last = surnameOf(norm);
+            if (last.length >= 3)
+                cardSurnames.add(last);
+        }
+    }
+    const onCard = (n) => {
+        const norm = String(n || '').trim().toLowerCase();
+        if (!norm)
+            return false;
+        if (cardNames.has(norm))
+            return true;
+        const last = surnameOf(norm);
+        return last.length >= 3 && cardSurnames.has(last);
+    };
+    // Early bail: if the card is known and NOT ONE fighter in this batch is on it, the whole
+    // batch is a foreign event (future marquee or stale finished card) — skip before the
+    // event-name rewrite below can mislabel legit rows.
+    if (cardNames.size > 0 && !fighters.some(f => onCard(f?.name) || onCard(f?.opponent))) {
+        console.log(`[UFC Archive] Skipping ${fighters.length}-fighter ${platform} batch — none on current card "${card.event}" (foreign/future event)`);
+        return;
+    }
     const inferredEvent = inferEventFromSlate(fighters) || inferEventFromStoreSlate();
     const overlap = countCardOverlap(card, fighters);
     if (inferredEvent)
@@ -1155,6 +1301,15 @@ async function archivePlatformPropLines(platform, fighters) {
         archiveEventName = fallback;
     }
     if (archiveEventName !== card.event) {
+        // The card pointer has moved on (e.g. to next week's event) but these lines are for a
+        // different, inferred event. If that inferred event already has SETTLED rows, it's over —
+        // re-archiving now would stamp its lines with the NEW card's date (toIsoDate(card.date)),
+        // spawning fresh result:NaN rows that the settler resolves and the next fetch recreates
+        // (the "back to 29" oscillation). Skip: its pre-fight lines are already archived.
+        if (await eventHasSettledRows(archiveEventName)) {
+            console.log(`[UFC Archive] Skipping re-archive — "${archiveEventName}" is already settled/over (card has moved to "${card.event}")`);
+            return;
+        }
         console.warn(`[UFC Archive] Card mismatch detected (overlap=${overlap}), using inferred event: ${archiveEventName}`);
         await rewriteRecentArchiveEventName(card.event, archiveEventName);
     }
@@ -1171,6 +1326,10 @@ async function archivePlatformPropLines(platform, fighters) {
         const opponentKey = normalizeFighterName(opponent);
         // Skip cancelled fighters
         if (fighterKey && cancelled.has(fighterKey))
+            continue;
+        // Card-membership gate: only archive fighters actually on the current card (or whose
+        // opponent is) — drops far-future/foreign fighters mixed into a batch.
+        if (cardNames.size > 0 && !onCard(fighter) && !onCard(opponent))
             continue;
         const isRostered = fighterKey ? roster.has(fighterKey) : false;
         const isOpponentRostered = opponentKey ? roster.has(opponentKey) : false;
@@ -1198,6 +1357,22 @@ async function archivePlatformPropLines(platform, fighters) {
         return;
     await PropArchiveService.addProps(records);
     console.log(`[UFC Archive] Archived ${records.length} ${platform} prop lines for ${archiveEventName}`);
+}
+// True if the archive already holds at least one settled (finite-result) row for this event —
+// i.e. the event has happened and been graded. Used to block pointless post-event re-archiving.
+async function eventHasSettledRows(event) {
+    try {
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const target = norm(event);
+        if (!target)
+            return false;
+        const payload = await new Promise((resolve) => chrome.storage.local.get(['prop_archive_v1'], (r) => resolve(r || {})));
+        const rows = Array.isArray(payload.prop_archive_v1) ? payload.prop_archive_v1 : [];
+        return rows.some(r => norm(r?.event) === target && Number.isFinite(Number(r?.result)));
+    }
+    catch {
+        return false;
+    }
 }
 async function rewriteRecentArchiveEventName(fromEvent, toEvent) {
     try {

@@ -143,61 +143,78 @@ export class PropArchiveService {
     static async setAllRecords(records) {
         await this.chromeSet({ [ARCHIVE_KEY]: records });
     }
+    static runExclusive(fn) {
+        const run = this._writeChain.then(fn, fn);
+        this._writeChain = run.then(() => undefined, () => undefined);
+        return run;
+    }
+    /** Atomically read-modify-write the whole archive under the write lock. */
+    static async mutate(fn) {
+        await this.runExclusive(async () => {
+            const rows = await this.getAllRecords();
+            const next = await fn(rows);
+            await this.setAllRecords(next);
+        });
+    }
     static async addProp(record) {
         const normalized = normalizeRecord(record);
         if (!normalized)
             return;
-        const all = await this.getAllRecords();
-        const idx = all.findIndex((r) => recordKey(r) === recordKey(normalized));
-        if (idx >= 0) {
-            const merged = { ...all[idx], ...normalized };
-            if (all[idx].line != null && normalized.line == null)
-                merged.line = all[idx].line;
-            if (Number.isNaN(normalized.result) && Number.isFinite(all[idx].result))
-                merged.result = all[idx].result;
-            // openLine is captured once (first write with a line) and never overwritten.
-            if (all[idx].openLine != null)
-                merged.openLine = all[idx].openLine;
-            else if (merged.openLine == null && merged.line != null)
-                merged.openLine = merged.line;
-            all[idx] = merged;
-        }
-        else {
-            if (normalized.openLine == null && normalized.line != null)
-                normalized.openLine = normalized.line;
-            all.push(normalized);
-        }
-        await this.setAllRecords(all);
+        await this.runExclusive(async () => {
+            const all = await this.getAllRecords();
+            const idx = all.findIndex((r) => recordKey(r) === recordKey(normalized));
+            if (idx >= 0) {
+                const merged = { ...all[idx], ...normalized };
+                if (all[idx].line != null && normalized.line == null)
+                    merged.line = all[idx].line;
+                if (Number.isNaN(normalized.result) && Number.isFinite(all[idx].result))
+                    merged.result = all[idx].result;
+                // openLine is captured once (first write with a line) and never overwritten.
+                if (all[idx].openLine != null)
+                    merged.openLine = all[idx].openLine;
+                else if (merged.openLine == null && merged.line != null)
+                    merged.openLine = merged.line;
+                all[idx] = merged;
+            }
+            else {
+                if (normalized.openLine == null && normalized.line != null)
+                    normalized.openLine = normalized.line;
+                all.push(normalized);
+            }
+            await this.setAllRecords(all);
+        });
     }
     static async addProps(records) {
         if (!Array.isArray(records) || !records.length)
             return;
-        const all = await this.getAllRecords();
-        const byKey = new Map(all.map((r) => [recordKey(r), r]));
-        for (const rec of records) {
-            const normalized = normalizeRecord(rec);
-            if (!normalized)
-                continue;
-            const key = recordKey(normalized);
-            const prev = byKey.get(key);
-            if (!prev) {
-                if (normalized.openLine == null && normalized.line != null)
-                    normalized.openLine = normalized.line;
-                byKey.set(key, normalized);
-                continue;
+        await this.runExclusive(async () => {
+            const all = await this.getAllRecords();
+            const byKey = new Map(all.map((r) => [recordKey(r), r]));
+            for (const rec of records) {
+                const normalized = normalizeRecord(rec);
+                if (!normalized)
+                    continue;
+                const key = recordKey(normalized);
+                const prev = byKey.get(key);
+                if (!prev) {
+                    if (normalized.openLine == null && normalized.line != null)
+                        normalized.openLine = normalized.line;
+                    byKey.set(key, normalized);
+                    continue;
+                }
+                const merged = { ...prev, ...normalized };
+                if (prev.line != null && normalized.line == null)
+                    merged.line = prev.line;
+                if (Number.isNaN(normalized.result) && Number.isFinite(prev.result))
+                    merged.result = prev.result;
+                if (prev.openLine != null)
+                    merged.openLine = prev.openLine;
+                else if (merged.openLine == null && merged.line != null)
+                    merged.openLine = merged.line;
+                byKey.set(key, merged);
             }
-            const merged = { ...prev, ...normalized };
-            if (prev.line != null && normalized.line == null)
-                merged.line = prev.line;
-            if (Number.isNaN(normalized.result) && Number.isFinite(prev.result))
-                merged.result = prev.result;
-            if (prev.openLine != null)
-                merged.openLine = prev.openLine;
-            else if (merged.openLine == null && merged.line != null)
-                merged.openLine = merged.line;
-            byKey.set(key, merged);
-        }
-        await this.setAllRecords(Array.from(byKey.values()));
+            await this.setAllRecords(Array.from(byKey.values()));
+        });
     }
     static async updateResult(fighter, event, propType, result, options) {
         const normalizedFighter = normalizeName(fighter);
@@ -206,60 +223,62 @@ export class PropArchiveService {
         const numericResult = Number(result);
         if (!normalizedFighter || !normalizedEvent || !Number.isFinite(numericResult))
             return false;
-        const all = await this.getAllRecords();
-        const candidates = all.filter((row) => {
-            if (normalizeName(row.fighter) !== normalizedFighter)
+        return this.runExclusive(async () => {
+            const all = await this.getAllRecords();
+            const candidates = all.filter((row) => {
+                if (normalizeName(row.fighter) !== normalizedFighter)
+                    return false;
+                if (String(normalizePropType(row.propType)).toLowerCase() !== normalizedProp)
+                    return false;
+                return true;
+            });
+            if (!candidates.length)
                 return false;
-            if (String(normalizePropType(row.propType)).toLowerCase() !== normalizedProp)
-                return false;
-            return true;
-        });
-        if (!candidates.length)
-            return false;
-        const exactEvent = candidates.filter((row) => normalizeEvent(row.event) === normalizedEvent);
-        const targetDateTs = options?.date ? Date.parse(options.date) : NaN;
-        const normalizedOpponent = normalizeName(options?.opponent || '');
-        let targetRows = [];
-        if (exactEvent.length > 0) {
-            targetRows = exactEvent;
-        }
-        else if (Number.isFinite(targetDateTs)) {
-            const dated = candidates
-                .map((row) => ({ row, ts: Date.parse(row.date) }))
-                .filter((x) => Number.isFinite(x.ts));
-            let nearestDelta = Infinity;
-            for (const x of dated) {
-                const delta = Math.abs(x.ts - targetDateTs);
-                if (delta < nearestDelta)
-                    nearestDelta = delta;
+            const exactEvent = candidates.filter((row) => normalizeEvent(row.event) === normalizedEvent);
+            const targetDateTs = options?.date ? Date.parse(options.date) : NaN;
+            const normalizedOpponent = normalizeName(options?.opponent || '');
+            let targetRows = [];
+            if (exactEvent.length > 0) {
+                targetRows = exactEvent;
             }
-            if (nearestDelta <= this.RESULT_MATCH_WINDOW_MS) {
-                targetRows = dated
-                    .filter((x) => Math.abs(x.ts - targetDateTs) === nearestDelta)
-                    .map((x) => x.row);
-                if (normalizedOpponent) {
-                    const oppMatches = targetRows.filter((row) => normalizeName(row.opponent) === normalizedOpponent);
-                    if (oppMatches.length)
-                        targetRows = oppMatches;
+            else if (Number.isFinite(targetDateTs)) {
+                const dated = candidates
+                    .map((row) => ({ row, ts: Date.parse(row.date) }))
+                    .filter((x) => Number.isFinite(x.ts));
+                let nearestDelta = Infinity;
+                for (const x of dated) {
+                    const delta = Math.abs(x.ts - targetDateTs);
+                    if (delta < nearestDelta)
+                        nearestDelta = delta;
+                }
+                if (nearestDelta <= this.RESULT_MATCH_WINDOW_MS) {
+                    targetRows = dated
+                        .filter((x) => Math.abs(x.ts - targetDateTs) === nearestDelta)
+                        .map((x) => x.row);
+                    if (normalizedOpponent) {
+                        const oppMatches = targetRows.filter((row) => normalizeName(row.opponent) === normalizedOpponent);
+                        if (oppMatches.length)
+                            targetRows = oppMatches;
+                    }
                 }
             }
-        }
-        if (!targetRows.length && candidates.length === 1) {
-            targetRows = [candidates[0]];
-        }
-        if (!targetRows.length)
-            return false;
-        let changed = false;
-        const targetSet = new Set(targetRows);
-        for (const row of all) {
-            if (!targetSet.has(row))
-                continue;
-            row.result = numericResult;
-            changed = true;
-        }
-        if (changed)
-            await this.setAllRecords(all);
-        return changed;
+            if (!targetRows.length && candidates.length === 1) {
+                targetRows = [candidates[0]];
+            }
+            if (!targetRows.length)
+                return false;
+            let changed = false;
+            const targetSet = new Set(targetRows);
+            for (const row of all) {
+                if (!targetSet.has(row))
+                    continue;
+                row.result = numericResult;
+                changed = true;
+            }
+            if (changed)
+                await this.setAllRecords(all);
+            return changed;
+        });
     }
     static async getFighterHistory(fighter) {
         const normalizedFighter = normalizeName(fighter);
@@ -300,49 +319,57 @@ export class PropArchiveService {
         if (Number.isFinite(lastRun) && lastRun > 0 && now - lastRun < minHoursBetweenRuns * 60 * 60 * 1000) {
             return { changed: 0, unresolvedBefore: 0, unresolvedAfter: 0 };
         }
-        const all = await this.getAllRecords();
-        const eligibleRows = eventIncludes
-            ? all.filter((r) => normalizeEvent(r.event).includes(eventIncludes))
-            : all;
-        const known = eligibleRows.filter((r) => Number.isFinite(Number(r.result)));
-        const unresolved = eligibleRows.filter((r) => Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result)));
-        const unresolvedBefore = unresolved.length;
-        let changed = 0;
-        for (const row of unresolved) {
-            const fighter = normalizeName(row.fighter);
-            const prop = String(normalizePropType(row.propType)).toLowerCase();
-            const candidates = known
-                .filter((k) => normalizeName(k.fighter) === fighter)
-                .filter((k) => String(normalizePropType(k.propType)).toLowerCase() === prop);
-            if (!candidates.length)
-                continue;
-            let best = null;
-            let bestScore = Infinity;
-            for (const c of candidates) {
-                const s = scoreBackfillCandidate(row, c);
-                if (s < bestScore) {
-                    bestScore = s;
-                    best = c;
+        return this.runExclusive(async () => {
+            const all = await this.getAllRecords();
+            const eligibleRows = eventIncludes
+                ? all.filter((r) => normalizeEvent(r.event).includes(eventIncludes))
+                : all;
+            const known = eligibleRows.filter((r) => Number.isFinite(Number(r.result)));
+            const unresolved = eligibleRows.filter((r) => Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result)));
+            const unresolvedBefore = unresolved.length;
+            let changed = 0;
+            for (const row of unresolved) {
+                const fighter = normalizeName(row.fighter);
+                const prop = String(normalizePropType(row.propType)).toLowerCase();
+                const candidates = known
+                    .filter((k) => normalizeName(k.fighter) === fighter)
+                    .filter((k) => String(normalizePropType(k.propType)).toLowerCase() === prop);
+                if (!candidates.length)
+                    continue;
+                let best = null;
+                let bestScore = Infinity;
+                for (const c of candidates) {
+                    const s = scoreBackfillCandidate(row, c);
+                    if (s < bestScore) {
+                        bestScore = s;
+                        best = c;
+                    }
                 }
+                if (!best || !Number.isFinite(Number(best.result)))
+                    continue;
+                if (bestScore > maxScore)
+                    continue;
+                row.result = Number(best.result);
+                changed += 1;
             }
-            if (!best || !Number.isFinite(Number(best.result)))
-                continue;
-            if (bestScore > maxScore)
-                continue;
-            row.result = Number(best.result);
-            changed += 1;
-        }
-        if (changed > 0) {
-            await this.setAllRecords(all);
-        }
-        const unresolvedAfter = all.filter((r) => {
-            if (eventIncludes && !normalizeEvent(r.event).includes(eventIncludes))
-                return false;
-            return Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result));
-        }).length;
-        await this.chromeSet({ [BACKFILL_META_KEY]: { lastRunMs: now } });
-        return { changed, unresolvedBefore, unresolvedAfter };
+            if (changed > 0) {
+                await this.setAllRecords(all);
+            }
+            const unresolvedAfter = all.filter((r) => {
+                if (eventIncludes && !normalizeEvent(r.event).includes(eventIncludes))
+                    return false;
+                return Number.isFinite(Number(r.line)) && Number(r.line) > 0 && !Number.isFinite(Number(r.result));
+            }).length;
+            await this.chromeSet({ [BACKFILL_META_KEY]: { lastRunMs: now } });
+            return { changed, unresolvedBefore, unresolvedAfter };
+        });
     }
 }
 PropArchiveService.RESULT_MATCH_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+// ── Write serialization ────────────────────────────────────────────────
+// prop_archive_v1 is read-modify-written from several places (auto-scrape addProps,
+// the settle write, event-name rewrites). Without a lock these interleave and clobber
+// each other (e.g. a scrape's stale snapshot restores ghost rows the settle just purged).
+// runExclusive chains every mutation onto a single promise so they run one at a time.
+PropArchiveService._writeChain = Promise.resolve();
 //# sourceMappingURL=PropArchiveService.js.map

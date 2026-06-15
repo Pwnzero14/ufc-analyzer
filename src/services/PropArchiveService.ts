@@ -141,51 +141,76 @@ export class PropArchiveService {
     await this.chromeSet({ [ARCHIVE_KEY]: records });
   }
 
+  // ── Write serialization ────────────────────────────────────────────────
+  // prop_archive_v1 is read-modify-written from several places (auto-scrape addProps,
+  // the settle write, event-name rewrites). Without a lock these interleave and clobber
+  // each other (e.g. a scrape's stale snapshot restores ghost rows the settle just purged).
+  // runExclusive chains every mutation onto a single promise so they run one at a time.
+  private static _writeChain: Promise<unknown> = Promise.resolve();
+  static runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this._writeChain.then(fn, fn);
+    this._writeChain = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  /** Atomically read-modify-write the whole archive under the write lock. */
+  static async mutate(fn: (rows: PropArchiveRecord[]) => PropArchiveRecord[] | Promise<PropArchiveRecord[]>): Promise<void> {
+    await this.runExclusive(async () => {
+      const rows = await this.getAllRecords();
+      const next = await fn(rows);
+      await this.setAllRecords(next);
+    });
+  }
+
   static async addProp(record: PropArchiveRecord): Promise<void> {
     const normalized = normalizeRecord(record);
     if (!normalized) return;
 
-    const all = await this.getAllRecords();
-    const idx = all.findIndex((r) => recordKey(r) === recordKey(normalized));
-    if (idx >= 0) {
-      const merged = { ...all[idx], ...normalized };
-      if (all[idx].line != null && normalized.line == null) merged.line = all[idx].line;
-      if (Number.isNaN(normalized.result) && Number.isFinite(all[idx].result)) merged.result = all[idx].result;
-      // openLine is captured once (first write with a line) and never overwritten.
-      if (all[idx].openLine != null) merged.openLine = all[idx].openLine;
-      else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
-      all[idx] = merged;
-    } else {
-      if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
-      all.push(normalized);
-    }
-    await this.setAllRecords(all);
+    await this.runExclusive(async () => {
+      const all = await this.getAllRecords();
+      const idx = all.findIndex((r) => recordKey(r) === recordKey(normalized));
+      if (idx >= 0) {
+        const merged = { ...all[idx], ...normalized };
+        if (all[idx].line != null && normalized.line == null) merged.line = all[idx].line;
+        if (Number.isNaN(normalized.result) && Number.isFinite(all[idx].result)) merged.result = all[idx].result;
+        // openLine is captured once (first write with a line) and never overwritten.
+        if (all[idx].openLine != null) merged.openLine = all[idx].openLine;
+        else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
+        all[idx] = merged;
+      } else {
+        if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
+        all.push(normalized);
+      }
+      await this.setAllRecords(all);
+    });
   }
 
   static async addProps(records: PropArchiveRecord[]): Promise<void> {
     if (!Array.isArray(records) || !records.length) return;
-    const all = await this.getAllRecords();
-    const byKey = new Map<string, PropArchiveRecord>(all.map((r) => [recordKey(r), r]));
+    await this.runExclusive(async () => {
+      const all = await this.getAllRecords();
+      const byKey = new Map<string, PropArchiveRecord>(all.map((r) => [recordKey(r), r]));
 
-    for (const rec of records) {
-      const normalized = normalizeRecord(rec);
-      if (!normalized) continue;
-      const key = recordKey(normalized);
-      const prev = byKey.get(key);
-      if (!prev) {
-        if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
-        byKey.set(key, normalized);
-        continue;
+      for (const rec of records) {
+        const normalized = normalizeRecord(rec);
+        if (!normalized) continue;
+        const key = recordKey(normalized);
+        const prev = byKey.get(key);
+        if (!prev) {
+          if (normalized.openLine == null && normalized.line != null) normalized.openLine = normalized.line;
+          byKey.set(key, normalized);
+          continue;
+        }
+        const merged = { ...prev, ...normalized };
+        if (prev.line != null && normalized.line == null) merged.line = prev.line;
+        if (Number.isNaN(normalized.result) && Number.isFinite(prev.result)) merged.result = prev.result;
+        if (prev.openLine != null) merged.openLine = prev.openLine;
+        else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
+        byKey.set(key, merged);
       }
-      const merged = { ...prev, ...normalized };
-      if (prev.line != null && normalized.line == null) merged.line = prev.line;
-      if (Number.isNaN(normalized.result) && Number.isFinite(prev.result)) merged.result = prev.result;
-      if (prev.openLine != null) merged.openLine = prev.openLine;
-      else if (merged.openLine == null && merged.line != null) merged.openLine = merged.line;
-      byKey.set(key, merged);
-    }
 
-    await this.setAllRecords(Array.from(byKey.values()));
+      await this.setAllRecords(Array.from(byKey.values()));
+    });
   }
 
   static async updateResult(
@@ -201,6 +226,7 @@ export class PropArchiveService {
     const numericResult = Number(result);
     if (!normalizedFighter || !normalizedEvent || !Number.isFinite(numericResult)) return false;
 
+    return this.runExclusive(async () => {
     const all = await this.getAllRecords();
     const candidates = all.filter((row) => {
       if (normalizeName(row.fighter) !== normalizedFighter) return false;
@@ -255,6 +281,7 @@ export class PropArchiveService {
     }
     if (changed) await this.setAllRecords(all);
     return changed;
+    });
   }
 
   static async getFighterHistory(fighter: string): Promise<PropArchiveRecord[]> {
@@ -307,6 +334,7 @@ export class PropArchiveService {
       return { changed: 0, unresolvedBefore: 0, unresolvedAfter: 0 };
     }
 
+    return this.runExclusive(async () => {
     const all = await this.getAllRecords();
     const eligibleRows = eventIncludes
       ? all.filter((r) => normalizeEvent(r.event).includes(eventIncludes))
@@ -355,5 +383,6 @@ export class PropArchiveService {
 
     await this.chromeSet({ [BACKFILL_META_KEY]: { lastRunMs: now } });
     return { changed, unresolvedBefore, unresolvedAfter };
+    });
   }
 }

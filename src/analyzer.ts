@@ -15406,7 +15406,15 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
       f.line_p6 != null || f.line_ud != null || f.line_betr != null ||
       f.line_pp != null || f.line_p6_ss != null || f.line_ud_ss != null ||
       f.line_betr_ss != null || f.line_pp_ss != null || f.line_dk_ss != null;
-    const pruned = entries.filter((f) => !!dbMap[f.name]?.loaded || hasRealLines(f) || isUpcomingCardFighter(f.name));
+    // When the upcoming card is known, it's the authority: drop fighters who aren't on it even
+    // if they have lines. Platforms post far-future marquee bouts (next month's UFC 329 Max
+    // Holloway vs Conor McGregor) and stale finished-event lines; without this gate those leak
+    // onto the slate. strictCardNameMatch tolerates platform name variants, so real card
+    // fighters survive. Falls back to the line/lookup heuristic only when the card is unknown.
+    const cardKnown = upcomingCardPairs.length > 0;
+    const pruned = cardKnown
+      ? entries.filter((f) => isUpcomingCardFighter(f.name))
+      : entries.filter((f) => !!dbMap[f.name]?.loaded || hasRealLines(f));
     if (pruned.length >= 8) {
       entries = pruned;
       const keep = new Set(entries.map((e) => e.name));

@@ -5,6 +5,10 @@ export declare class PropArchiveService {
     private static chromeSet;
     private static getAllRecords;
     private static setAllRecords;
+    private static _writeChain;
+    static runExclusive<T>(fn: () => Promise<T>): Promise<T>;
+    /** Atomically read-modify-write the whole archive under the write lock. */
+    static mutate(fn: (rows: PropArchiveRecord[]) => PropArchiveRecord[] | Promise<PropArchiveRecord[]>): Promise<void>;
     static addProp(record: PropArchiveRecord): Promise<void>;
     static addProps(records: PropArchiveRecord[]): Promise<void>;
     static updateResult(fighter: string, event: string, propType: PropType, result: number, options?: {
