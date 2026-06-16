@@ -8466,6 +8466,164 @@ div[style*="height:4px;background:rgba(255,255,255,0.05)"] {
   transform: translateY(-1px);
 }
 
+/* ── GLOW-UP 58: Archive deep tissue ── */
+/* Pred rows, settle banner, backtesting, grading bars,
+   per-event row detail, CLV chips, hit-rate bar glow. */
+
+/* --- Pred row: hover accent + glass lift --- */
+.pred-row {
+  border-radius: 4px;
+  transition: background 0.15s ease, box-shadow 0.12s ease;
+}
+.pred-row:hover {
+  background: rgba(125,145,190,0.04);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+}
+
+/* --- Pred fighter name: brighten on row hover --- */
+.pred-fighter {
+  transition: color 0.12s ease;
+}
+.pred-row:hover .pred-fighter {
+  color: #fff;
+}
+
+/* --- Pending settle banner: animated left-edge pulse --- */
+.pending-settle-banner::before {
+  animation: settlePulse 2.5s ease-in-out infinite;
+}
+@keyframes settlePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(248,198,74,0.4); }
+  50%      { box-shadow: 0 0 16px rgba(248,198,74,0.7); }
+}
+.pending-settle-banner {
+  backdrop-filter: blur(4px);
+  transition: box-shadow 0.2s ease;
+}
+.pending-settle-banner:hover {
+  box-shadow: 0 4px 16px rgba(248,198,74,0.1);
+}
+
+/* --- Backtesting: sparkline panel glass --- */
+.bt-spark-panel {
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(125,145,190,0.06);
+  transition: border-color 0.2s ease;
+}
+.bt-spark-panel:hover {
+  border-color: rgba(125,145,190,0.12);
+}
+
+/* --- Backtesting: bankroll panel glass --- */
+.bt-bankroll-panel {
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(125,145,190,0.06);
+  transition: border-color 0.2s ease;
+}
+.bt-bankroll-panel:hover {
+  border-color: rgba(125,145,190,0.12);
+}
+
+/* --- Backtesting: stat label hover brighten --- */
+.bt-stat-label {
+  transition: color 0.12s ease;
+}
+.bt-stat-card:hover .bt-stat-label {
+  color: var(--text);
+}
+
+/* --- Backtesting: grade letter glow --- */
+.bt-grade-letter {
+  transition: text-shadow 0.15s ease;
+}
+.bt-grade-badge:hover .bt-grade-letter {
+  text-shadow: 0 0 12px rgba(248,198,74,0.5);
+}
+
+/* --- Backtesting: grade desc hover --- */
+.bt-grade-desc {
+  transition: color 0.12s ease;
+}
+.bt-grade-badge:hover .bt-grade-desc {
+  color: var(--text2, var(--text));
+}
+
+/* --- Grade bar: pct value glow on hover --- */
+.grade-bar-bg:hover .grade-bar-pct,
+.grade-bar-bg:hover + .grade-bar-pct {
+  text-shadow: 0 0 6px currentColor;
+}
+
+/* --- Archive empty state: glass card --- */
+.archive-empty-state {
+  backdrop-filter: blur(6px);
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+  border-radius: 10px;
+}
+.archive-empty-icon {
+  transition: transform 0.2s ease;
+}
+.archive-empty-state:hover .archive-empty-icon {
+  transform: scale(1.1);
+}
+
+/* --- Archive stat badge: inner glow by color --- */
+.archive-stat-badge {
+  position: relative;
+  overflow: hidden;
+}
+.archive-stat-badge::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0; width: 3px;
+  background: var(--asb-color, var(--text-muted));
+  box-shadow: 0 0 8px var(--asb-color, transparent);
+  transition: box-shadow 0.15s ease;
+}
+.archive-stat-badge:hover::after {
+  box-shadow: 0 0 14px var(--asb-color, transparent);
+}
+
+/* --- CLV stat chips (inline style → attribute targeting) --- */
+div[style*="border-left:2px solid"] {
+  backdrop-filter: blur(4px);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+div[style*="border-left:2px solid"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* --- Per-event delete button: subtle on hover --- */
+.event-row button {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.event-row:hover button {
+  opacity: 0.6;
+}
+.event-row button:hover {
+  opacity: 1;
+}
+
+/* --- Hit rate bar: glow trail --- */
+.rate-hero-bar > span {
+  transition: box-shadow 0.2s ease;
+}
+.rate-hero:hover .rate-hero-bar > span {
+  box-shadow: 0 0 14px currentColor;
+}
+
+/* --- Backtesting spark title: mono accent --- */
+.bt-spark-title {
+  letter-spacing: 0.06em;
+  transition: color 0.12s ease;
+}
+.bt-spark-panel:hover .bt-spark-title {
+  color: var(--text);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
