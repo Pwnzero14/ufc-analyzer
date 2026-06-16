@@ -9103,6 +9103,154 @@ div[style*="border-left:2px solid"]:hover {
   border-top: 2px solid rgba(255,108,136,0.2);
 }
 
+/* ── GLOW-UP 61: Fight spine & expanded depth ── */
+/* Spine interior chips glass, expanded row depth, detail-panel title
+   glow underlines, line-movement micro-pulse, expand arrow glow. */
+
+/* --- Fight spine: deeper glass + inner light --- */
+.fight-spine:not(.fight-spine-empty) {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* --- Rounds chip: glass pill with glow --- */
+.fight-spine-rounds {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 0 8px rgba(240,192,64,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fight-pair:hover .fight-spine-rounds {
+  box-shadow: 0 0 14px rgba(240,192,64,0.22), inset 0 1px 0 rgba(255,255,255,0.06);
+  transform: scale(1.06);
+}
+
+/* --- Weight class text: brighten on pair hover --- */
+.fight-spine-weight {
+  transition: color 0.2s ease;
+}
+.fight-pair:hover .fight-spine-weight {
+  color: var(--text2);
+}
+
+/* --- Fight-time block: glass depth + value glow --- */
+.fight-spine-ft {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(146,125,255,0.05), 0 2px 6px rgba(0,0,0,0.12);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.fight-pair:hover .fight-spine-ft {
+  border-color: rgba(146,125,255,0.45);
+  box-shadow: inset 0 1px 0 rgba(146,125,255,0.08), 0 0 12px rgba(146,125,255,0.12);
+}
+.fight-spine-ft-value {
+  transition: text-shadow 0.2s ease;
+}
+.fight-pair:hover .fight-spine-ft-value {
+  text-shadow: 0 0 10px rgba(146,125,255,0.35);
+}
+
+/* --- Correlation badge: glass + hover intensify --- */
+.fight-spine-corr {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 0 6px rgba(255,90,115,0.08);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fight-pair:hover .fight-spine-corr {
+  box-shadow: 0 0 12px rgba(255,90,115,0.18);
+  transform: scale(1.04);
+}
+
+/* --- Top-edge chip: subtle breathing --- */
+.fight-spine-top-edge {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fight-pair:hover .fight-spine-top-edge {
+  box-shadow: 0 0 14px rgba(255,210,74,0.28);
+  transform: scale(1.04);
+}
+
+/* --- Control time chip: glass depth --- */
+.fight-spine-ctrl {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease, color 0.15s ease;
+}
+.fight-pair:hover .fight-spine-ctrl {
+  box-shadow: 0 0 8px rgba(255,255,255,0.04);
+  color: var(--text);
+}
+
+/* --- VS badge: hover brighten --- */
+.fight-spine:not(.fight-spine-empty)::before {
+  transition: text-shadow 0.2s ease, box-shadow 0.2s ease;
+}
+.fight-pair:hover .fight-spine:not(.fight-spine-empty)::before {
+  text-shadow: 0 0 12px rgba(248,198,74,0.7);
+  box-shadow: 0 0 10px rgba(248,198,74,0.15);
+}
+
+/* --- Expanded row: deeper glass treatment --- */
+.fighter-row.expanded {
+  background: rgba(255,255,255,0.02);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Detail panel title: colored glow underline --- */
+.detail-panel-title::after {
+  transition: box-shadow 0.2s ease;
+}
+.ma-fp .detail-panel-title::after {
+  box-shadow: 0 1px 6px rgba(86,195,255,0.15);
+}
+.ma-ss .detail-panel-title::after {
+  box-shadow: 0 1px 6px rgba(44,212,208,0.15);
+}
+.ma-td .detail-panel-title::after {
+  box-shadow: 0 1px 6px rgba(248,198,74,0.12);
+}
+.ma-ctrl .detail-panel-title::after {
+  box-shadow: 0 1px 6px rgba(146,125,255,0.12);
+}
+.ma-ft .detail-panel-title::after {
+  box-shadow: 0 1px 6px rgba(146,125,255,0.12);
+}
+
+/* --- Line movement: micro-pulse on appear --- */
+@keyframes mvPulse {
+  0%   { opacity: 0; transform: translateY(2px); }
+  60%  { opacity: 1; transform: translateY(-1px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.line-movement {
+  animation: mvPulse 0.3s ease-out both;
+}
+.line-movement.mv-up {
+  text-shadow: 0 0 6px rgba(0,232,122,0.35);
+}
+.line-movement.mv-down {
+  text-shadow: 0 0 6px rgba(255,58,96,0.30);
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-movement { animation: none; }
+}
+
+/* --- Expand arrow: glow on hover --- */
+.expand-arrow {
+  transition: transform 0.2s ease, color 0.2s ease, filter 0.2s ease;
+}
+.fighter-row:hover .expand-arrow {
+  color: var(--gold);
+  filter: drop-shadow(0 0 4px rgba(248,198,74,0.3));
+}
+.fighter-row.expanded .expand-arrow {
+  color: var(--gold);
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.45));
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
