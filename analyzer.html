@@ -7192,6 +7192,69 @@ html { scroll-behavior: smooth; }
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* ── GLOW-UP 45: Line Movers container evolution ── */
+/* Glass wrapper, header accent, section badges, sparkline glow, platform chips. */
+
+/* --- Container: glass card --- */
+.movement-summary-grid {
+  background: linear-gradient(145deg, rgba(22,28,42,0.90), rgba(16,20,32,0.96));
+  border-color: rgba(71,90,128,0.22);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* --- Header: warm gold underline + glass --- */
+.movement-summary-header {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), transparent);
+  border-bottom-color: rgba(248,198,74,0.12);
+  transition: background 0.2s ease;
+}
+.movement-summary-header:hover {
+  background: linear-gradient(135deg, rgba(248,198,74,0.08), rgba(248,198,74,0.02));
+}
+.movement-summary-title {
+  text-shadow: 0 0 10px rgba(248,198,74,0.30);
+}
+
+/* --- Section count badges: directional tint --- */
+.movement-summary-section-header.rise .movement-summary-section-count {
+  background: rgba(0,232,122,0.12);
+  color: rgba(0,232,122,0.85);
+}
+.movement-summary-section-header.drop .movement-summary-section-count {
+  background: rgba(255,58,96,0.12);
+  color: rgba(255,90,115,0.85);
+}
+
+/* --- Sparklines: subtle glow behind the SVG --- */
+.movement-summary-spark {
+  filter: drop-shadow(0 0 3px rgba(248,198,74,0.20));
+}
+
+/* --- Platform chips: glass pills --- */
+.movement-summary-platforms {
+  letter-spacing: 0.04em;
+  opacity: 0.70;
+  transition: opacity 0.15s ease;
+}
+.movement-summary-row:hover .movement-summary-platforms { opacity: 1; }
+
+/* --- Line values: subtle tabular rhythm --- */
+.movement-summary-line {
+  color: var(--text2);
+  transition: color 0.15s ease;
+}
+.movement-summary-row:hover .movement-summary-line { color: var(--text); }
+
+/* --- Drifters section header: amber accent --- */
+.movement-summary-section-header.drift {
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(248,198,74,0.25);
+}
+.movement-summary-section-header.drift .movement-summary-section-count {
+  background: rgba(248,198,74,0.10);
+  color: rgba(248,198,74,0.80);
+}
+
 /* ── GLOW-UP 44: Drilldown panel evolution ── */
 /* History bars, detail panels, section heads, and panel meta — the
    expanded fighter drilldown gets glass depth and subtle color coding. */
