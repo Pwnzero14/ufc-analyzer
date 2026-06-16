@@ -9404,6 +9404,130 @@ div[style*="border-left:2px solid"]:hover {
   box-shadow: 0 0 8px rgba(255,138,61,0.2);
 }
 
+/* ── GLOW-UP 63: Modals, toasts & Best Picks depth ── */
+/* Modal glass, toast glass, Best Picks row stagger, data tab popover,
+   tier-colored line glow, section count pills, refresh button. */
+
+/* --- Modal box: glass depth + top light --- */
+.modal-box {
+  background: linear-gradient(170deg, rgba(22,28,42,0.96), rgba(12,16,28,0.98));
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.modal-box::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,138,61,0.25), transparent);
+  pointer-events: none;
+}
+.modal-title {
+  text-shadow: 0 0 14px rgba(255,138,61,0.3);
+}
+
+/* --- Toast: glass + gold glow --- */
+.toast {
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  background: linear-gradient(135deg, rgba(22,28,42,0.92), rgba(14,18,30,0.96));
+  border-color: rgba(248,198,74,0.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 12px rgba(248,198,74,0.08);
+}
+
+/* --- Best Picks: row entrance stagger --- */
+@keyframes bpRowSlide {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.best-pick-row {
+  animation: bpRowSlide 0.25s ease both;
+}
+.best-pick-row:nth-child(3)  { animation-delay: 0.03s; }
+.best-pick-row:nth-child(4)  { animation-delay: 0.06s; }
+.best-pick-row:nth-child(5)  { animation-delay: 0.09s; }
+.best-pick-row:nth-child(6)  { animation-delay: 0.12s; }
+.best-pick-row:nth-child(7)  { animation-delay: 0.15s; }
+.best-pick-row:nth-child(n+8) { animation-delay: 0.18s; }
+@media (prefers-reduced-motion: reduce) {
+  .best-pick-row { animation: none; }
+}
+
+/* --- Best Picks: med/low tier line glow --- */
+.best-pick-row.tier-med.over  .best-pick-line {
+  text-shadow: 0 0 14px rgba(27,220,136,0.30);
+}
+.best-pick-row.tier-med.under .best-pick-line {
+  text-shadow: 0 0 14px rgba(255,108,136,0.30);
+}
+.best-pick-row.tier-low.over  .best-pick-line {
+  text-shadow: 0 0 10px rgba(27,220,136,0.18);
+}
+.best-pick-row.tier-low.under .best-pick-line {
+  text-shadow: 0 0 10px rgba(255,108,136,0.18);
+}
+
+/* --- Section count badge: glass pill --- */
+.best-picks-count {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* --- Section chevron: rotation spring --- */
+.section-chevron {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s ease;
+}
+
+/* --- Data tabs popover: glass dropdown --- */
+.data-tabs-popover {
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  background: linear-gradient(170deg, rgba(22,28,42,0.94), rgba(14,18,30,0.98));
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.data-tabs-popover .tab-btn {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.data-tabs-popover .tab-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.04);
+}
+
+/* --- Refresh button: glass hover --- */
+.refresh-btn {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.15s ease;
+}
+.refresh-btn:hover {
+  box-shadow: 0 0 8px rgba(248,198,74,0.12);
+  border-color: rgba(248,198,74,0.3);
+  color: var(--gold);
+}
+
+/* --- Archive accuracy badge: subtle lean-color glow --- */
+.archive-accuracy-badge {
+  transition: color 0.15s ease;
+}
+
+/* --- Opp-allows badge: subtle brighten on row hover --- */
+.fighter-row:hover .opp-allows-badge {
+  opacity: 1;
+  color: var(--text2);
+}
+
+/* --- Consensus lean chip: gold glow --- */
+.consensus-lean {
+  text-shadow: 0 0 6px rgba(248,198,74,0.25);
+  transition: text-shadow 0.15s ease;
+}
+.fighter-row:hover .consensus-lean {
+  text-shadow: 0 0 10px rgba(248,198,74,0.45);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
