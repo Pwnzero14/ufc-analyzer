@@ -7956,6 +7956,168 @@ td:hover .bias-heat-n {
   opacity: 0.8;
 }
 
+/* ── GLOW-UP 55: Calibration kinetic layer ── */
+/* Event chip stagger entrance, stat row hover reveal, edge chip stat
+   glow, heatmap cell ambient pulse, curve section radial vignette. */
+
+/* --- Event chips: stagger fade-in entrance --- */
+@keyframes calibChipEntrance {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.calib-event-grid .calib-event-chip {
+  animation: calibChipEntrance 0.3s ease-out both;
+}
+.calib-event-grid .calib-event-chip:nth-child(1) { animation-delay: 0s; }
+.calib-event-grid .calib-event-chip:nth-child(2) { animation-delay: 0.04s; }
+.calib-event-grid .calib-event-chip:nth-child(3) { animation-delay: 0.08s; }
+.calib-event-grid .calib-event-chip:nth-child(4) { animation-delay: 0.12s; }
+.calib-event-grid .calib-event-chip:nth-child(5) { animation-delay: 0.16s; }
+.calib-event-grid .calib-event-chip:nth-child(6) { animation-delay: 0.20s; }
+.calib-event-grid .calib-event-chip:nth-child(7) { animation-delay: 0.24s; }
+.calib-event-grid .calib-event-chip:nth-child(8) { animation-delay: 0.28s; }
+
+/* --- Event chip: border-left color from hit rate --- */
+.calib-event-chip:hover {
+  border-left-color: var(--cyan);
+}
+
+/* --- Bias stat row: hover highlight bar --- */
+.bias-stat-row {
+  transition: background 0.12s ease, padding-left 0.12s ease;
+  border-radius: 3px;
+  padding: 3px 4px;
+  margin: 0 -4px;
+}
+.bias-stat-row:hover {
+  background: rgba(125,145,190,0.04);
+  padding-left: 6px;
+}
+
+/* --- Bias stat n-count: reveal on row hover --- */
+.bias-stat-n {
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
+}
+.bias-stat-row:hover .bias-stat-n {
+  opacity: 0.8;
+}
+
+/* --- Bias bar fill: shimmer highlight on hover --- */
+.bias-bar-fill {
+  position: relative;
+  overflow: hidden;
+}
+.bias-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.4s ease;
+}
+.bias-stat-row:hover .bias-bar-fill::after {
+  left: 120%;
+}
+
+/* --- Edge chip: stat value glow on hover --- */
+.bias-edge-stat {
+  transition: text-shadow 0.12s ease, color 0.12s ease;
+}
+.bias-edge-chip:hover .bias-edge-stat {
+  text-shadow: 0 0 6px currentColor;
+  color: #fff;
+}
+
+/* --- Edge chip: n-count reveal on hover --- */
+.bias-edge-n {
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+.bias-edge-chip:hover .bias-edge-n {
+  opacity: 0.75;
+}
+
+/* --- Edge chip: val highlight --- */
+.bias-edge-val {
+  transition: color 0.12s ease;
+  font-variant-numeric: tabular-nums;
+}
+.bias-edge-chip:hover .bias-edge-val {
+  color: var(--text);
+}
+
+/* --- Heatmap: non-empty cell subtle inner glow pulse on hover --- */
+.bias-heat-cell:not(.empty) {
+  transition: box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+/* --- Heatmap header: platform name glow --- */
+.bias-heatmap th {
+  transition: color 0.12s ease;
+}
+.bias-heatmap th:not(:first-child):hover {
+  color: var(--text);
+  text-shadow: 0 0 6px rgba(255,255,255,0.08);
+}
+
+/* --- Calibration Curve section: top vignette --- */
+.best-picks-section:has([style*="align-items:flex-end"]) .section-body {
+  background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(44,212,208,0.02), transparent 70%);
+}
+
+/* --- Diagnosis grid: entrance animation --- */
+@keyframes diagCardSlideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.calib-diag-grid .calib-diag-card {
+  animation: diagCardSlideIn 0.25s ease-out both;
+}
+.calib-diag-grid .calib-diag-card:nth-child(2) { animation-delay: 0.05s; }
+.calib-diag-grid .calib-diag-card:nth-child(3) { animation-delay: 0.10s; }
+.calib-diag-grid .calib-diag-card:nth-child(4) { animation-delay: 0.15s; }
+.calib-diag-grid .calib-diag-card:nth-child(5) { animation-delay: 0.20s; }
+
+/* --- Recal table: predicted column mono styling --- */
+.calib-recal-table td:nth-child(2) {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* --- Recal table: recalibrated column emphasis --- */
+.calib-recal-table td:nth-child(3) {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+/* --- Recal table: N column subtle --- */
+.calib-recal-table td:nth-child(6) {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+.calib-recal-table tbody tr:hover td:nth-child(6) {
+  opacity: 1;
+}
+
+/* --- Per-stat calibration dots: ambient glow on container hover --- */
+div[style*="Per-Stat Calibration"] {
+  transition: border-color 0.2s ease;
+}
+div[style*="Per-Stat Calibration"]:hover {
+  border-color: rgba(44,212,208,0.15);
+}
+
+/* --- Calibration hero: score ring hover scale --- */
+.calib-score-ring {
+  transition: transform 0.3s ease;
+}
+.calib-score-ring:hover {
+  transform: scale(1.06);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
