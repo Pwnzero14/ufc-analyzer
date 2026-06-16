@@ -8241,6 +8241,231 @@ div[style*="Per-Stat Calibration"]:hover {
   border-color: rgba(125,145,190,0.12);
 }
 
+/* ── GLOW-UP 57: Archive tab evolution ── */
+/* Event rows, rate heroes, archive stat badges, grade bars,
+   learning summary, weights details, per-event polish. */
+
+/* --- Event row: glass hover + left accent --- */
+.event-row {
+  border-radius: 6px;
+  margin: 0 -4px;
+  padding: 9px 14px 9px 18px;
+  position: relative;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.event-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  width: 3px; height: 0;
+  background: var(--cyan);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.15s ease, top 0.15s ease;
+}
+.event-row:hover {
+  background: rgba(125,145,190,0.04);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.event-row:hover::before {
+  height: 60%;
+  top: 20%;
+}
+
+/* --- Event pct: glow on hover --- */
+.event-pct {
+  transition: text-shadow 0.15s ease;
+}
+.event-row:hover .event-pct {
+  text-shadow: 0 0 10px currentColor;
+}
+
+/* --- Rate hero: glass card + bar shimmer --- */
+.rate-hero {
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+  border-radius: 10px;
+  transition: border-color 0.2s ease;
+}
+.rate-hero:hover {
+  border-color: rgba(125,145,190,0.12);
+}
+.rate-hero-num {
+  background: linear-gradient(180deg, #fff 20%, currentColor);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.rate-hero-bar {
+  position: relative;
+  overflow: hidden;
+}
+.rate-hero-bar > span {
+  box-shadow: 0 0 8px currentColor;
+  position: relative;
+  overflow: hidden;
+}
+.rate-hero-bar > span::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: rateBarShimmer 3s ease-in-out infinite;
+}
+@keyframes rateBarShimmer {
+  0%   { left: -100%; }
+  50%  { left: 120%; }
+  100% { left: 120%; }
+}
+.rate-hero-sub {
+  transition: color 0.15s ease;
+}
+.rate-hero:hover .rate-hero-sub {
+  color: var(--text2, var(--text));
+}
+
+/* --- Archive stat badge: glass depth + glow --- */
+.archive-stat-badge {
+  backdrop-filter: blur(6px);
+  background: rgba(125,145,190,0.04);
+  border: 1px solid rgba(125,145,190,0.06);
+}
+.archive-stat-badge:hover {
+  border-color: rgba(125,145,190,0.15);
+}
+
+/* --- Archive accuracy badge: subtle pulse --- */
+.archive-accuracy-badge {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.archive-accuracy-badge:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 12px rgba(248,198,74,0.15);
+}
+
+/* --- Grade bar: glass track + fill glow --- */
+.grade-bar-bg {
+  background: rgba(125,145,190,0.06);
+  border: 1px solid rgba(125,145,190,0.04);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+}
+.grade-bar-fill {
+  position: relative;
+  overflow: hidden;
+}
+.grade-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: gradeBarShimmer 4s ease-in-out infinite;
+}
+@keyframes gradeBarShimmer {
+  0%   { left: -100%; }
+  40%  { left: 120%; }
+  100% { left: 120%; }
+}
+.grade-bar-pct {
+  font-variant-numeric: tabular-nums;
+  transition: text-shadow 0.15s ease;
+}
+
+/* --- Weights details: glass expand --- */
+.weights-details {
+  transition: background 0.15s ease;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.weights-details[open] {
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+}
+.weights-details summary {
+  cursor: pointer;
+  transition: color 0.12s ease, text-shadow 0.12s ease;
+}
+.weights-details[open] summary {
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+/* --- Learning summary stat chips (inline styles → container targeting) --- */
+div[style*="flex:1;min-width:78px"] {
+  backdrop-filter: blur(4px);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+div[style*="flex:1;min-width:78px"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* --- Learning summary best/worst pills --- */
+span[style*="rgba(56,176,0,0.1)"],
+span[style*="rgba(255,80,80,0.08)"] {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+span[style*="rgba(56,176,0,0.1)"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(56,176,0,0.15);
+}
+span[style*="rgba(255,80,80,0.08)"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(255,80,80,0.15);
+}
+
+/* --- Learning delta rows: bar container glow --- */
+div[style*="height:4px;background:rgba(255,255,255,0.05)"] {
+  border-radius: 3px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);
+}
+
+/* --- Inline empty message: glass style --- */
+.inline-empty-msg {
+  backdrop-filter: blur(4px);
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* --- LS cell values: hover lift --- */
+.ls-cell-val {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.ls-cell-val:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+.ls-high, .ls-best {
+  box-shadow: inset 0 0 6px rgba(72,199,142,0.1);
+}
+.ls-low, .ls-worst {
+  box-shadow: inset 0 0 6px rgba(255,100,100,0.1);
+}
+
+/* --- LS lean chips: subtle glow --- */
+.ls-lean-over {
+  box-shadow: 0 0 6px rgba(0,232,122,0.1);
+  transition: box-shadow 0.12s ease;
+}
+.ls-lean-over:hover {
+  box-shadow: 0 0 10px rgba(0,232,122,0.2);
+}
+.ls-lean-under {
+  box-shadow: 0 0 6px rgba(255,58,96,0.1);
+  transition: box-shadow 0.12s ease;
+}
+.ls-lean-under:hover {
+  box-shadow: 0 0 10px rgba(255,58,96,0.2);
+}
+
+/* --- LS spread chips: glass backing --- */
+.ls-spread-chip {
+  backdrop-filter: blur(4px);
+  transition: transform 0.1s ease;
+}
+.ls-spread-chip:hover {
+  transform: translateY(-1px);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
