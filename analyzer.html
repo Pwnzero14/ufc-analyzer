@@ -7650,6 +7650,118 @@ a:not([class]):hover { color: #6fe3dd; }
   border-bottom-color: transparent;
 }
 
+/* ── GLOW-UP 53: Calibration Plus Ultra ── */
+/* Score ring breathing, grade glow, trend pulse, softness identity,
+   diagnosis severity depth, edge direction color. */
+
+/* --- Score ring: slow breathing glow --- */
+.calib-score-ring {
+  animation: calibRingBreathe 4s ease-in-out infinite;
+}
+@keyframes calibRingBreathe {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(32,223,143,0.25)); }
+  50%      { filter: drop-shadow(0 0 28px rgba(32,223,143,0.45)); }
+}
+
+/* --- Score number: hero gradient --- */
+.calib-score-num {
+  background: linear-gradient(180deg, #d8ffe9 15%, var(--green));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- Diagnosis severity: deeper color identity --- */
+.calib-diag-card[style*="--diag-color: var(--red)"],
+.calib-diag-card[style*="--diag-color:var(--red)"] {
+  background: rgba(255,58,96,0.04);
+  border-left-width: 4px;
+}
+.calib-diag-card[style*="--diag-color: var(--amber)"],
+.calib-diag-card[style*="--diag-color:var(--amber)"] {
+  background: rgba(240,192,64,0.04);
+  border-left-width: 4px;
+}
+
+/* --- Diagnosis badge: color-matched glow --- */
+.calib-diag-badge {
+  transition: transform 0.15s ease;
+}
+.calib-diag-card:hover .calib-diag-badge {
+  transform: scale(1.08);
+}
+
+/* --- Recal table grade letters: color glow by grade --- */
+.calib-recal-table td:nth-child(5) {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* --- "Degrading" trend label: warning pulse --- */
+.calib-event-grid + div,
+[style*="color:var(--red)"][style*="font-weight:700"] {
+  animation: calibDegradePulse 3s ease-in-out infinite;
+}
+@keyframes calibDegradePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.65; }
+}
+
+/* --- Platform softness labels: color-coded identity --- */
+.bias-plat-softness {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+}
+/* TIGHT = red-tinted (hard to beat) */
+.bias-plat-card[style*="--plat-color: var(--red)"] .bias-plat-softness,
+.bias-plat-card[style*="--plat-color:var(--red)"] .bias-plat-softness {
+  background: rgba(255,58,96,0.12);
+  color: var(--red);
+}
+
+/* --- Edge chips: directional color identity --- */
+.bias-edge-dir {
+  transition: text-shadow 0.15s ease;
+}
+.bias-edge-chip:hover .bias-edge-dir {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* --- Bias bar track: glass depth --- */
+.bias-bar-track {
+  background: rgba(125,145,190,0.06);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid rgba(125,145,190,0.06);
+}
+
+/* --- Event chips: color-code by hit rate --- */
+.calib-event-chip {
+  border-left: 3px solid transparent;
+}
+
+/* --- Heatmap cells: stronger glow on hover --- */
+.bias-heatmap td:hover:not(.bias-heat-label) {
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.2), 0 0 6px rgba(255,255,255,0.04);
+  transform: scale(1.04);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* --- Recal arrow: animate on row hover --- */
+.calib-recal-table tbody tr:hover .calib-recal-arrow {
+  opacity: 1;
+  color: var(--gold);
+}
+
+/* --- Overconfidence section: red top-edge accent --- */
+.best-picks-section:has(.calib-diag-grid) {
+  border-top: 1px solid rgba(255,58,96,0.12);
+}
+
+/* --- Calibration Curve section: teal accent --- */
+.best-picks-section:has([style*="align-items:flex-end"]) > .best-picks-header::before {
+  background: linear-gradient(180deg, var(--cyan), rgba(44,212,208,0.5)) !important;
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
