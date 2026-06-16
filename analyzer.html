@@ -7255,6 +7255,60 @@ html { scroll-behavior: smooth; }
   color: rgba(248,198,74,0.80);
 }
 
+/* ── GLOW-UP 47: Learning Drilldown stat cards ── */
+/* Inner stat blocks, footer, details toggle, values, and dividers. */
+
+/* --- Stat cards: glass separation --- */
+.ld-stat {
+  background: rgba(10,14,24,0.40);
+  border: 1px solid rgba(44,212,208,0.10);
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.ld-stat:hover {
+  border-color: rgba(44,212,208,0.25);
+  box-shadow: 0 0 10px rgba(44,212,208,0.08);
+}
+
+/* --- Stat values: cyan glow reinforcement --- */
+.ld-value {
+  text-shadow: 0 0 10px rgba(44,212,208,0.30);
+}
+
+/* --- Labels: subtle brighten on stat hover --- */
+.ld-label { transition: color 0.15s ease; }
+.ld-stat:hover .ld-label { color: var(--text2); }
+
+/* --- Footer summary: glass divider --- */
+.ld-footer {
+  border-top-color: rgba(44,212,208,0.15);
+  border-top-style: solid;
+}
+
+/* --- Details toggle: deeper glass + glow on hover --- */
+.ld-details-toggle {
+  box-shadow: 0 0 6px rgba(44,212,208,0.08);
+}
+.ld-details-toggle:hover {
+  box-shadow: 0 0 12px rgba(44,212,208,0.18);
+}
+
+/* --- Dividers: teal-to-transparent gradient --- */
+.ld-divider {
+  background: linear-gradient(180deg, rgba(44,212,208,0.35), rgba(44,212,208,0.08));
+}
+
+/* --- Meta text: subtle fade-in on details expand --- */
+.ld-meta { transition: color 0.2s ease; }
+.ld-stat:hover .ld-meta { color: var(--text); }
+
+/* --- Hit rate percentage: size bump + gold when high --- */
+.ld-value[style*="color: var(--green)"],
+.ld-value[style*="color: var(--cyan)"] {
+  text-shadow: 0 0 14px rgba(44,212,208,0.40);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
