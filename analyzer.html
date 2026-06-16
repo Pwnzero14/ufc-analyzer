@@ -8624,6 +8624,309 @@ div[style*="border-left:2px solid"]:hover {
   color: var(--text);
 }
 
+/* ── GLOW-UP 59: Parlay Lab evolution ── */
+/* Pool/builder glass, leg row depth, suggest cards glow, synergy cards
+   glass + hover lift, health panel glass, correlation alerts depth. */
+
+/* --- Parlay Lab header: glass + title glow --- */
+.parlay-lab-header {
+  backdrop-filter: blur(8px);
+  background: rgba(125,145,190,0.04);
+  border-color: rgba(125,145,190,0.08);
+  position: relative;
+  overflow: hidden;
+}
+.parlay-lab-header::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--orange), rgba(248,198,74,0.6), var(--orange));
+  opacity: 0.6;
+}
+.parlay-lab-title {
+  text-shadow: 0 0 16px rgba(255,165,0,0.3);
+}
+.parlay-lab-subtitle {
+  transition: color 0.15s ease;
+}
+.parlay-lab-header:hover .parlay-lab-subtitle {
+  color: var(--text2, var(--text));
+}
+
+/* --- Pool & Builder panels: glass depth --- */
+.parlay-pool,
+.parlay-builder {
+  backdrop-filter: blur(6px);
+  background: rgba(125,145,190,0.03);
+  border-color: rgba(125,145,190,0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.parlay-pool:hover,
+.parlay-builder:hover {
+  border-color: rgba(125,145,190,0.14);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* --- Pool title: accent underline --- */
+.parlay-pool-title {
+  position: relative;
+  padding-bottom: 6px;
+}
+.parlay-pool-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 40px; height: 2px;
+  background: var(--orange);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+/* --- Builder title: accent underline --- */
+.parlay-builder-title {
+  position: relative;
+  padding-bottom: 6px;
+}
+.parlay-builder-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 40px; height: 2px;
+  background: var(--gold);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+/* --- Leg row: glass hover + selected glow --- */
+.parlay-leg-row {
+  border-radius: 6px;
+  position: relative;
+}
+.parlay-leg-row:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.parlay-leg-row.selected {
+  box-shadow: 0 0 12px rgba(248,198,74,0.08), inset 0 0 0 1px rgba(248,198,74,0.15);
+}
+
+/* --- Leg check: transition color --- */
+.parlay-leg-check {
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.parlay-leg-row:hover .parlay-leg-check {
+  color: var(--text2);
+}
+.parlay-leg-row.selected .parlay-leg-check {
+  transform: scale(1.15);
+}
+
+/* --- Leg name: hover brighten --- */
+.parlay-leg-name {
+  transition: color 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-name {
+  color: #fff;
+}
+
+/* --- Leg stat badge: glass --- */
+.parlay-leg-stat {
+  backdrop-filter: blur(4px);
+  transition: background 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-stat {
+  background: rgba(125,145,190,0.1);
+}
+
+/* --- Leg line: mono tabular + hover glow --- */
+.parlay-leg-line {
+  font-variant-numeric: tabular-nums;
+  transition: text-shadow 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-line {
+  text-shadow: 0 0 6px rgba(255,255,255,0.15);
+}
+
+/* --- Leg conf: reveal on hover --- */
+.parlay-leg-conf {
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-conf {
+  opacity: 1;
+}
+
+/* --- Dir badges: enhanced glow --- */
+.parlay-leg-dir.over {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-dir.over {
+  box-shadow: 0 0 12px rgba(27,220,136,0.25);
+  background: rgba(27,220,136,0.15);
+}
+.parlay-leg-dir.under {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.parlay-leg-row:hover .parlay-leg-dir.under {
+  box-shadow: 0 0 12px rgba(255,108,136,0.25);
+  background: rgba(255,108,136,0.15);
+}
+
+/* --- Slip empty: glass + pulsing border --- */
+.parlay-slip-empty {
+  border: 1px dashed rgba(125,145,190,0.12);
+  border-radius: 8px;
+  padding: 24px 16px;
+  transition: border-color 0.2s ease;
+}
+.parlay-builder:hover .parlay-slip-empty {
+  border-color: rgba(248,198,74,0.2);
+}
+
+/* --- Slip leg: glass + hover glow --- */
+.parlay-slip-leg {
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+  border-radius: 4px;
+}
+.parlay-slip-leg:hover {
+  background: rgba(248,198,74,0.04);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* --- Health panel: glass depth + score glow --- */
+.parlay-health {
+  backdrop-filter: blur(6px);
+  background: rgba(125,145,190,0.03);
+  border-color: rgba(125,145,190,0.08);
+  transition: border-color 0.2s ease;
+}
+.parlay-health:hover {
+  border-color: rgba(125,145,190,0.14);
+}
+.parlay-health-title {
+  transition: color 0.12s ease;
+}
+.parlay-health:hover .parlay-health-title {
+  color: var(--text);
+}
+
+/* --- Correlation alerts: hover lift --- */
+.parlay-corr-alert {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  border-radius: 4px;
+}
+.parlay-corr-alert:hover {
+  transform: translateX(2px);
+}
+.parlay-corr-alert.synergy:hover {
+  box-shadow: 0 0 14px rgba(27,220,136,0.12);
+}
+.parlay-corr-alert.conflict:hover {
+  box-shadow: 0 0 14px rgba(255,108,136,0.12);
+}
+
+/* --- Suggested parlay cards: glass + gold top accent --- */
+.parlay-suggest-card {
+  backdrop-filter: blur(6px);
+  background: rgba(125,145,190,0.03);
+  position: relative;
+  overflow: hidden;
+}
+.parlay-suggest-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--gold), rgba(248,198,74,0.3));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.parlay-suggest-card:hover::before {
+  opacity: 1;
+}
+
+/* --- Suggest label: glow on hover --- */
+.parlay-suggest-label {
+  transition: text-shadow 0.15s ease;
+}
+.parlay-suggest-card:hover .parlay-suggest-label {
+  text-shadow: 0 0 10px rgba(248,198,74,0.35);
+}
+
+/* --- Suggest score: reveal on hover --- */
+.parlay-suggest-score {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+.parlay-suggest-card:hover .parlay-suggest-score {
+  opacity: 1;
+}
+
+/* --- Suggest legs: brighten on hover --- */
+.parlay-suggest-legs {
+  transition: color 0.12s ease;
+}
+.parlay-suggest-card:hover .parlay-suggest-legs {
+  color: var(--text);
+}
+
+/* --- Synergy section title: glow --- */
+.synergy-pairs-title {
+  text-shadow: 0 0 12px rgba(27,220,136,0.2);
+}
+
+/* --- Synergy pair cards: glass + hover lift --- */
+.synergy-pair-card {
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, background 0.15s ease;
+}
+.synergy-pair-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+}
+
+/* --- Synergy plus sign: pulse on hover --- */
+.synergy-pair-plus {
+  transition: transform 0.15s ease, text-shadow 0.15s ease;
+}
+.synergy-pair-card:hover .synergy-pair-plus {
+  transform: scale(1.2);
+  text-shadow: 0 0 8px rgba(27,220,136,0.4);
+}
+
+/* --- Synergy impact: glow on hover --- */
+.synergy-pair-impact {
+  transition: text-shadow 0.12s ease;
+}
+.synergy-pair-card:hover .synergy-pair-impact {
+  text-shadow: 0 0 8px rgba(27,220,136,0.3);
+}
+
+/* --- Synergy added tag: glow on hover --- */
+.synergy-pair-added {
+  transition: text-shadow 0.12s ease;
+}
+.synergy-pair-card:hover .synergy-pair-added {
+  text-shadow: 0 0 8px rgba(248,198,74,0.3);
+}
+
+/* --- Synergy reason: brighten on hover --- */
+.synergy-pair-reason {
+  transition: color 0.12s ease;
+}
+.synergy-pair-card:hover .synergy-pair-reason {
+  color: var(--text2);
+}
+
+/* --- Synergy pair leg text: hover brighten --- */
+.synergy-pair-leg {
+  transition: color 0.12s ease;
+}
+.synergy-pair-card:hover .synergy-pair-leg {
+  color: var(--text);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
