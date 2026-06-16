@@ -208,4 +208,11 @@ export const NAME_ALIASES: Record<string, string> = {
   'Azamat Murazakov':    'Azamat Murzakanov',
   'A Murazakov':         'Azamat Murzakanov',
   'Darya Zheleznyakova': 'Daria Zhelezniakova',
+  // Underdog lists this fighter's full legal name; UFCStats + the card use the short form.
+  // Without the alias namesMatch fails (last names "Matos" ≠ "Oliveira") so the SS line never
+  // attaches to the card fighter (and his opponent's opp-SS shows blank too).
+  'Vinicius De Oliveira Prestes De Matos': 'Vinicius Oliveira',
+  'Vinicius De Oliveira': 'Vinicius Oliveira',
+  // Platforms use her given name "Beatriz"; UFCStats fighter page is "Bia Mesquita".
+  'Beatriz Mesquita':    'Bia Mesquita',
 };

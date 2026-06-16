@@ -14318,7 +14318,11 @@ function normalizeName(name) {
     if (!name || name === 'null' || name === 'undefined')
         return null;
     let n = name.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').trim();
-    n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ');
+    // Strip diacritics so "Vin\u00EDcius" matches "Vinicius" (UFCStats/card uses plain ASCII).
+    n = n.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
+    // Drop platform country tags like "Andre (Bra) Lima" \u2192 "Andre Lima".
+    n = n.replace(/\([^)]*\)/g, ' ');
+    n = n.replace(/\./g, '').replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
     n = n.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     return NAME_ALIASES[n] || n;
 }
@@ -14436,14 +14440,20 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
     function isValidFighterName(name) {
         if (!name || typeof name !== 'string')
             return false;
-        if (name.includes(':') || name.includes('(') || name.includes(')'))
+        if (name.includes(':'))
+            return false; // event / prop labels
+        // Validate the NORMALIZED name: normalizeName strips country tags ("Andre (Bra) Lima")
+        // and collapses verbose/aliased forms ("Vinicius De Oliveira Prestes De Matos" →
+        // "Vinicius Oliveira"). Validating the raw name dropped both before they could attach.
+        const norm = normalizeName(name);
+        if (!norm)
             return false;
-        if (name.length < 4 || name.length > 50)
+        if (norm.length < 4 || norm.length > 50)
             return false;
-        const words = name.trim().split(/\s+/);
+        const words = norm.trim().split(/\s+/);
         if (words.length < 2 || words.length > 5)
             return false;
-        if (!/^[A-Z]/.test(name))
+        if (!/^[A-Z]/.test(norm))
             return false;
         return true;
     }
