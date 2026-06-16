@@ -8927,6 +8927,182 @@ div[style*="border-left:2px solid"]:hover {
   color: var(--text);
 }
 
+/* ── GLOW-UP 60: Parlay Lab active state ── */
+/* Slip legs, health score hero, correlation alerts, active synergy,
+   selected row depth, parlay count badge, suggest card podium. */
+
+/* --- Slip leg: glass card with left accent --- */
+.parlay-slip-leg {
+  position: relative;
+  padding-left: 14px;
+  backdrop-filter: blur(4px);
+  background: rgba(248,198,74,0.03);
+  border: 1px solid rgba(248,198,74,0.06);
+}
+.parlay-slip-leg::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 2px;
+  background: var(--gold);
+  border-radius: 0 2px 2px 0;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, height 0.15s ease;
+}
+.parlay-slip-leg:hover::before {
+  opacity: 1;
+  top: 10%; bottom: 10%;
+}
+
+/* --- Slip remove button: red glow on hover --- */
+.parlay-slip-remove {
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  transition: color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+.parlay-slip-remove:hover {
+  background: rgba(255,108,136,0.12);
+  box-shadow: 0 0 8px rgba(255,108,136,0.15);
+}
+
+/* --- Health score: hero gradient text --- */
+.parlay-health-score {
+  font-variant-numeric: tabular-nums;
+}
+.parlay-health-score.excellent {
+  background: linear-gradient(180deg, #a8ffda 15%, #1bdc88);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.parlay-health-score.good {
+  background: linear-gradient(180deg, #c4f5da 15%, rgba(27,220,136,0.7));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.parlay-health-score.fair {
+  background: linear-gradient(180deg, #fff4c8 15%, var(--gold));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.parlay-health-score.poor {
+  background: linear-gradient(180deg, #ffc8d0 15%, #ff6c88);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- Health label: uppercase shimmer --- */
+.parlay-health-label {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.12s ease;
+}
+.parlay-health:hover .parlay-health-label {
+  color: var(--text2);
+}
+
+/* --- Correlation alerts: glass + left border glow --- */
+.parlay-corr-alert {
+  backdrop-filter: blur(4px);
+  position: relative;
+  overflow: hidden;
+}
+.parlay-corr-alert.synergy::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0; width: 2px;
+  box-shadow: 0 0 8px rgba(27,220,136,0.4);
+}
+.parlay-corr-alert.conflict::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0; width: 2px;
+  box-shadow: 0 0 8px rgba(255,108,136,0.4);
+}
+.parlay-corr-alert.caution::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0; width: 2px;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+
+/* --- Active synergy card: breathing border --- */
+@keyframes synergyActivePulse {
+  0%, 100% { border-color: rgba(27,220,136,0.35); box-shadow: 0 0 8px rgba(27,220,136,0.08); }
+  50%      { border-color: rgba(27,220,136,0.55); box-shadow: 0 0 16px rgba(27,220,136,0.15); }
+}
+.synergy-pair-card.synergy-active {
+  animation: synergyActivePulse 3s ease-in-out infinite;
+}
+
+/* --- Selected leg row: gold left accent --- */
+.parlay-leg-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 15%; bottom: 15%;
+  width: 3px;
+  background: var(--gold);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(248,198,74,0.3);
+}
+
+/* --- Suggest card #1: gold crown treatment --- */
+.parlay-suggest-title + .parlay-suggest-card {
+  border-color: rgba(248,198,74,0.25);
+  background: rgba(248,198,74,0.03);
+}
+.parlay-suggest-title + .parlay-suggest-card::before {
+  opacity: 0.6;
+}
+
+/* --- Suggest card #2 and #3: silver/bronze --- */
+.parlay-suggest-card:nth-of-type(2) {
+  border-color: rgba(192,192,210,0.15);
+}
+.parlay-suggest-card:nth-of-type(3) {
+  border-color: rgba(205,127,50,0.15);
+}
+
+/* --- Leg count badge (header) --- */
+.parlay-lab-header span[style*="border-radius"] {
+  backdrop-filter: blur(4px);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.parlay-lab-header span[style*="border-radius"]:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px rgba(248,198,74,0.15);
+}
+
+/* --- Synergy pair: active card content brighten --- */
+.synergy-pair-card.synergy-active .synergy-pair-leg {
+  color: var(--text);
+}
+.synergy-pair-card.synergy-active .synergy-pair-reason {
+  color: var(--text2);
+}
+.synergy-pair-card.synergy-active .synergy-pair-impact {
+  text-shadow: 0 0 8px rgba(27,220,136,0.3);
+}
+
+/* --- Parlay builder: empty → filled transition --- */
+.parlay-builder:has(.parlay-slip-leg) {
+  border-color: rgba(248,198,74,0.12);
+}
+
+/* --- Health panel: score-dependent top accent --- */
+.parlay-health:has(.parlay-health-score.excellent) {
+  border-top: 2px solid rgba(27,220,136,0.3);
+}
+.parlay-health:has(.parlay-health-score.good) {
+  border-top: 2px solid rgba(27,220,136,0.2);
+}
+.parlay-health:has(.parlay-health-score.fair) {
+  border-top: 2px solid rgba(248,198,74,0.2);
+}
+.parlay-health:has(.parlay-health-score.poor) {
+  border-top: 2px solid rgba(255,108,136,0.2);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
