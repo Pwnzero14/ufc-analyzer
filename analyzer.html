@@ -7373,6 +7373,60 @@ html { scroll-behavior: smooth; }
 /* --- Sort label: brighten on sort-group hover --- */
 .sort-group:hover .sort-label { color: var(--text2); }
 
+/* ── GLOW-UP 49: Fighter identity micro-elements ── */
+/* Consistency badges, form dots, record text, style tags. */
+
+/* --- Consistency badges: glass depth + hover glow --- */
+.consistency-badge {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.fighter-row:hover .consistency-badge { transform: translateY(-1px); }
+.consistency-high {
+  box-shadow: 0 0 8px rgba(0,232,122,0.12);
+}
+.fighter-row:hover .consistency-high {
+  box-shadow: 0 0 14px rgba(0,232,122,0.25);
+}
+.consistency-mid {
+  box-shadow: 0 0 8px rgba(240,192,64,0.10);
+}
+.fighter-row:hover .consistency-mid {
+  box-shadow: 0 0 14px rgba(240,192,64,0.22);
+}
+.consistency-low {
+  box-shadow: 0 0 8px rgba(255,58,96,0.10);
+}
+.fighter-row:hover .consistency-low {
+  box-shadow: 0 0 14px rgba(255,58,96,0.22);
+}
+
+/* --- Form dots: hover expansion + stronger glow --- */
+.form-dot { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.fighter-row:hover .form-dot { transform: scale(1.2); }
+.fighter-row:hover .form-dot.win  { box-shadow: 0 0 8px rgba(0,232,122,0.65); }
+.fighter-row:hover .form-dot.loss { box-shadow: 0 0 8px rgba(255,58,96,0.55); }
+
+/* --- Record text: brighten on row hover --- */
+.fighter-record { transition: color 0.15s ease; }
+.fighter-row:hover .fighter-record { color: var(--text2); }
+
+/* --- Style chip: glass depth + hover glow --- */
+[class*="style-chip-"] {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease;
+}
+.fighter-row:hover [class*="style-chip-"] {
+  box-shadow: 0 0 8px rgba(255,255,255,0.06);
+}
+
+/* --- Fighter name: subtle text-shadow on row hover --- */
+.fighter-row:hover .fighter-name {
+  text-shadow: 0 0 12px rgba(255,255,255,0.08);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
