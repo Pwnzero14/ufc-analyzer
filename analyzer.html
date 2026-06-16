@@ -9528,6 +9528,135 @@ div[style*="border-left:2px solid"]:hover {
   text-shadow: 0 0 10px rgba(248,198,74,0.45);
 }
 
+/* ── GLOW-UP 64: Risk boxes, style chips & MA verdict depth ── */
+/* Early-finish risk glass, finish splits, style chip hover glow,
+   history bar stagger, MA verdict/conf polish, panel-pair accent. */
+
+/* --- Early-finish risk box: glass + risk-colored glow --- */
+.ft-combined-risk {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 8px 12px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: box-shadow 0.2s ease;
+}
+.detail-panel:hover .ft-combined-risk {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* --- Finish split sections: glass cards --- */
+.finish-split-section {
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 4px;
+  padding: 6px 8px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.finish-split-header {
+  transition: color 0.15s ease;
+}
+
+/* --- Style chips: per-type hover glow --- */
+[class*="style-chip-"] {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.style-chip-ss:hover {
+  box-shadow: 0 0 10px rgba(99,179,237,0.20);
+  transform: translateY(-1px);
+}
+.style-chip-gg:hover {
+  box-shadow: 0 0 10px rgba(160,174,192,0.15);
+  transform: translateY(-1px);
+}
+.style-chip-sg:hover {
+  box-shadow: 0 0 10px rgba(239,184,84,0.20);
+  transform: translateY(-1px);
+}
+.style-chip-gs:hover {
+  box-shadow: 0 0 10px rgba(159,122,234,0.20);
+  transform: translateY(-1px);
+}
+.style-chip-bs:hover, .style-chip-sb:hover {
+  box-shadow: 0 0 10px rgba(72,199,142,0.18);
+  transform: translateY(-1px);
+}
+
+/* --- History bar entrance stagger --- */
+@keyframes histBarSlide {
+  from { opacity: 0; transform: scaleX(0); }
+  to   { opacity: 1; transform: scaleX(1); }
+}
+.fighter-row.expanded .history-bar-fill {
+  transform-origin: left center;
+  animation: histBarSlide 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.fighter-row.expanded .history-bar-row:nth-child(2) .history-bar-fill { animation-delay: 0.03s; }
+.fighter-row.expanded .history-bar-row:nth-child(3) .history-bar-fill { animation-delay: 0.06s; }
+.fighter-row.expanded .history-bar-row:nth-child(4) .history-bar-fill { animation-delay: 0.09s; }
+.fighter-row.expanded .history-bar-row:nth-child(5) .history-bar-fill { animation-delay: 0.12s; }
+.fighter-row.expanded .history-bar-row:nth-child(6) .history-bar-fill { animation-delay: 0.15s; }
+.fighter-row.expanded .history-bar-row:nth-child(7) .history-bar-fill { animation-delay: 0.18s; }
+.fighter-row.expanded .history-bar-row:nth-child(n+8) .history-bar-fill { animation-delay: 0.21s; }
+@media (prefers-reduced-motion: reduce) {
+  .fighter-row.expanded .history-bar-fill { animation: none; }
+}
+
+/* --- MA verdict chip: glass + hover lift --- */
+.ma-verdict-chip {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ma-verdict-chip.over:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(0,232,122,0.25);
+}
+.ma-verdict-chip.under:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(255,58,96,0.22);
+}
+
+/* --- MA confidence bar: shimmer fill --- */
+.ma-conf-fill {
+  position: relative;
+  overflow: hidden;
+}
+.ma-conf-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; bottom: 0;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: confShimmer 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ma-conf-fill::after { animation: none; }
+}
+
+/* --- MA confidence number: directional color --- */
+.ma-conf-num {
+  transition: text-shadow 0.15s ease;
+}
+
+/* --- Panel pair: colored top accent per content --- */
+.panel-pair:has(.ma-panel.ma-ss) {
+  border-top: 1px solid rgba(44,212,208,0.10);
+}
+.panel-pair:has(.ma-panel.ma-ctrl) {
+  border-top: 1px solid rgba(255,91,120,0.10);
+}
+
+/* --- MA value dim: hover reveal --- */
+.ma-value-dim {
+  transition: color 0.15s ease, font-style 0.15s ease;
+}
+.detail-panel:hover .ma-value-dim {
+  color: var(--text2);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
