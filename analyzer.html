@@ -7762,6 +7762,200 @@ a:not([class]):hover { color: #6fe3dd; }
   background: linear-gradient(180deg, var(--cyan), rgba(44,212,208,0.5)) !important;
 }
 
+/* ── GLOW-UP 54: Calibration deep tissue ── */
+/* Score label, summary prose, diagnosis interiors, trend chart glass,
+   event chip stats, recal value glow, active banner, bias overview stats. */
+
+/* --- Score label: uppercase shimmer --- */
+.calib-score-label {
+  letter-spacing: 0.14em;
+  transition: color 0.2s ease;
+}
+.calib-score-ring:hover .calib-score-label {
+  color: var(--green);
+}
+
+/* --- Summary text: readable soft glow on hover --- */
+.calib-summary-text {
+  transition: color 0.2s ease;
+  line-height: 1.65;
+}
+.calib-summary:hover .calib-summary-text {
+  color: var(--text2, var(--text));
+}
+
+/* --- Diagnosis card interiors: action line glow, title hover --- */
+.calib-diag-action {
+  transition: text-shadow 0.15s ease, color 0.15s ease;
+}
+.calib-diag-card:hover .calib-diag-action {
+  text-shadow: 0 0 8px rgba(44,212,208,0.35);
+}
+.calib-diag-title {
+  transition: color 0.15s ease;
+}
+.calib-diag-card:hover .calib-diag-title {
+  color: #fff;
+}
+.calib-diag-body {
+  transition: color 0.15s ease;
+}
+.calib-diag-card:hover .calib-diag-body {
+  color: var(--text2, rgba(255,255,255,0.72));
+}
+
+/* --- Trend chart container: glass depth --- */
+.calib-trend-chart {
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+  border-radius: 8px;
+  padding: 4px;
+}
+.calib-trend-svg circle {
+  transition: r 0.15s ease;
+  filter: drop-shadow(0 0 3px currentColor);
+}
+.calib-trend-svg circle:hover {
+  r: 6;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.calib-trend-svg path[stroke] {
+  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.3));
+}
+
+/* --- Event chip stat value: color inherit on hover --- */
+.calib-event-stat {
+  transition: color 0.12s ease;
+  font-variant-numeric: tabular-nums;
+}
+.calib-event-chip:hover .calib-event-stat {
+  color: var(--text);
+}
+
+/* --- Recal table: adjusted value glow + delta color coding --- */
+.calib-recal-adjusted {
+  text-shadow: 0 0 6px rgba(44,212,208,0.2);
+  color: var(--cyan);
+}
+.calib-recal-delta {
+  font-variant-numeric: tabular-nums;
+  transition: text-shadow 0.15s ease;
+}
+.calib-recal-table tbody tr:hover .calib-recal-delta {
+  text-shadow: 0 0 6px currentColor;
+}
+.calib-recal-table tbody tr:hover .calib-recal-adjusted {
+  text-shadow: 0 0 10px rgba(44,212,208,0.4);
+}
+
+/* --- Recal table: range column mono font --- */
+.calib-recal-table td:first-child {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+/* --- Recal per-stat chips: glass row styling --- */
+.calib-recal-table + div[style*="flex-wrap"] {
+  background: rgba(125,145,190,0.03);
+  border-radius: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(125,145,190,0.05);
+}
+
+/* --- "Recalibration Active" banner: enhanced glow --- */
+div[style*="rgba(0,232,122,0.06)"] {
+  backdrop-filter: blur(4px);
+  box-shadow: 0 0 12px rgba(0,232,122,0.06), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: box-shadow 0.2s ease;
+}
+div[style*="rgba(0,232,122,0.06)"]:hover {
+  box-shadow: 0 0 20px rgba(0,232,122,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* --- Bias platform overview stats: tabular + hover color --- */
+.bias-plat-overview {
+  transition: border-color 0.15s ease;
+}
+.bias-plat-card:hover .bias-plat-overview {
+  border-color: rgba(125,145,190,0.2);
+}
+.bias-plat-stat {
+  transition: color 0.12s ease;
+  font-variant-numeric: tabular-nums;
+}
+.bias-plat-card:hover .bias-plat-stat {
+  color: var(--text2, var(--text));
+}
+
+/* --- Bias platform name: subtle glow on hover --- */
+.bias-plat-name {
+  transition: text-shadow 0.15s ease, color 0.15s ease;
+}
+.bias-plat-card:hover .bias-plat-name {
+  text-shadow: 0 0 8px rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* --- Bias stat label: mono identity --- */
+.bias-stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.03em;
+  transition: color 0.12s ease;
+}
+.bias-plat-card:hover .bias-stat-label {
+  color: var(--cyan);
+}
+
+/* --- Bias stat edge value: glow on hover --- */
+.bias-stat-edge {
+  font-variant-numeric: tabular-nums;
+  transition: text-shadow 0.12s ease;
+}
+.bias-plat-card:hover .bias-stat-edge {
+  text-shadow: 0 0 6px currentColor;
+}
+
+/* --- Bias edge finder: enhanced glass border --- */
+.bias-edge-finder {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.bias-edge-finder:hover {
+  border-left-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(44,212,208,0.08);
+}
+
+/* --- Bias edge chip: arrow glow --- */
+.bias-edge-arrow {
+  transition: color 0.12s ease;
+}
+.bias-edge-chip:hover .bias-edge-arrow {
+  color: var(--cyan);
+}
+.bias-edge-plat {
+  transition: color 0.12s ease;
+}
+.bias-edge-chip:hover .bias-edge-plat {
+  color: var(--text);
+}
+
+/* --- Bias heatmap label column: hover brightens --- */
+.bias-heat-label {
+  transition: color 0.12s ease;
+}
+tr:hover .bias-heat-label {
+  color: #fff;
+}
+
+/* --- Bias heatmap n-counts: slightly brighter on hover --- */
+.bias-heat-n {
+  transition: opacity 0.12s ease;
+}
+td:hover .bias-heat-n {
+  opacity: 0.8;
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
