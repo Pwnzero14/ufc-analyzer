@@ -8118,6 +8118,129 @@ div[style*="Per-Stat Calibration"]:hover {
   transform: scale(1.06);
 }
 
+/* ── GLOW-UP 56: Calibration final polish ── */
+/* Softness label identity (soft/neutral), bias bar color coding,
+   heatmap ambient glow, section icon treatments, recal chip glow. */
+
+/* --- Softness label: SOFT = green-tinted pill --- */
+.bias-plat-card .bias-plat-softness[style*="var(--green)"] {
+  background: rgba(0,232,122,0.10);
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+
+/* --- Softness label: NEUTRAL = muted pill --- */
+.bias-plat-card .bias-plat-softness[style*="var(--text-muted)"] {
+  background: rgba(125,145,190,0.08);
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+
+/* --- Bias bar: positive bars get green glow, negative get red --- */
+.bias-bar-fill.positive {
+  box-shadow: 0 0 8px rgba(0,232,122,0.25);
+}
+.bias-bar-fill.negative {
+  box-shadow: 0 0 8px rgba(255,58,96,0.25);
+}
+
+/* --- Bias platform card: top-edge accent from --plat-color --- */
+.bias-plat-card {
+  border-top: 2px solid var(--plat-color, rgba(125,145,190,0.1));
+}
+
+/* --- Heatmap: cell ambient inner glow for colored cells --- */
+.bias-heat-cell:not(.empty) {
+  text-shadow: 0 0 4px rgba(0,0,0,0.2);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+/* --- Heatmap: first column (stat label) left accent --- */
+.bias-heat-label {
+  border-left: 2px solid var(--cyan);
+  padding-left: 8px !important;
+}
+
+/* --- Recal per-stat chips row: individual chip glow --- */
+.calib-recal-table ~ div[style*="flex-wrap"] > span,
+.calib-recal-table ~ div[style*="flex-wrap"] > div {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.calib-recal-table ~ div[style*="flex-wrap"] > span:hover,
+.calib-recal-table ~ div[style*="flex-wrap"] > div:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* --- Calibration sections: section-header icon color cycling --- */
+.best-picks-section:has(.calib-diag-grid) .best-picks-header .best-picks-title {
+  color: var(--red);
+}
+.best-picks-section:has(.calib-trend-chart) .best-picks-header .best-picks-title {
+  color: var(--amber);
+}
+.best-picks-section:has(.calib-recal-table) .best-picks-header .best-picks-title {
+  color: var(--cyan);
+}
+.best-picks-section:has(.bias-plat-grid) .best-picks-header .best-picks-title {
+  color: var(--green);
+}
+
+/* --- Event chip: hover border glow --- */
+.calib-event-chip:hover {
+  box-shadow: 0 0 10px rgba(44,212,208,0.12), 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* --- Trend chart: hover lift --- */
+.calib-trend-chart {
+  transition: box-shadow 0.2s ease;
+}
+.calib-trend-chart:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 0 8px rgba(44,212,208,0.04);
+}
+
+/* --- Recal table header: sticky + glass --- */
+.calib-recal-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.calib-recal-table th {
+  backdrop-filter: blur(8px);
+  background: rgba(20,22,36,0.85);
+}
+
+/* --- Bias edge finder title: glow accent --- */
+.bias-edge-finder::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -3px;
+  width: 3px; height: 100%;
+  background: linear-gradient(180deg, var(--cyan), rgba(44,212,208,0.3));
+  border-radius: 3px 0 0 3px;
+  transition: width 0.15s ease;
+}
+.bias-edge-finder {
+  position: relative;
+  border-left: none;
+}
+.bias-edge-finder:hover::before {
+  width: 4px;
+}
+
+/* --- Calibration hero summary: glass card --- */
+.calib-summary {
+  background: rgba(125,145,190,0.03);
+  border: 1px solid rgba(125,145,190,0.06);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: border-color 0.2s ease;
+}
+.calib-summary:hover {
+  border-color: rgba(125,145,190,0.12);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
