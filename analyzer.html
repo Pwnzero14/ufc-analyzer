@@ -7309,6 +7309,70 @@ html { scroll-behavior: smooth; }
   text-shadow: 0 0 14px rgba(44,212,208,0.40);
 }
 
+/* ── GLOW-UP 48: Filter bar command strip ── */
+/* Toolbar glass, sort pill glow, search input depth, source toggle polish. */
+
+/* --- Filter bar top: glass depth + subtle bottom edge --- */
+.filter-bar-top {
+  background: rgba(8,11,22,0.70);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  backdrop-filter: blur(8px) saturate(1.15);
+  border-bottom-color: rgba(255,255,255,0.05);
+}
+
+/* --- Filter bar bottom: glass depth + gold accent edge --- */
+.filter-bar-bottom {
+  background: rgba(8,11,22,0.55);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  backdrop-filter: blur(8px) saturate(1.15);
+  border-bottom-color: rgba(248,198,74,0.08);
+}
+
+/* --- Sort buttons: glass + active gold glow --- */
+.sort-btn {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+  transition: all 0.15s ease;
+}
+.sort-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 0 6px rgba(255,255,255,0.04);
+}
+.sort-btn.active {
+  box-shadow: 0 0 10px rgba(248,198,74,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+/* --- Search input: glass depth + gold focus glow --- */
+.search-input {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+.search-input:focus {
+  box-shadow: 0 0 10px rgba(248,198,74,0.15);
+  background: rgba(255,255,255,0.05);
+}
+
+/* --- Source toggle label: glass hover --- */
+.source-toggle-label {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+.source-toggle-label:hover {
+  box-shadow: 0 0 8px rgba(255,255,255,0.05);
+}
+.source-toggle-label.is-filtered {
+  box-shadow: 0 0 10px rgba(248,198,74,0.12);
+}
+
+/* --- Platform pill age tags: subtle glow when stale --- */
+.pill-freshness.pill-stale {
+  text-shadow: 0 0 6px rgba(255,58,96,0.30);
+}
+
+/* --- Sort label: brighten on sort-group hover --- */
+.sort-group:hover .sort-label { color: var(--text2); }
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
