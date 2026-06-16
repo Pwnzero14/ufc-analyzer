@@ -7255,6 +7255,89 @@ html { scroll-behavior: smooth; }
   color: rgba(248,198,74,0.80);
 }
 
+/* ── GLOW-UP 46: Best Picks card interiors ── */
+/* Fighter names, reason text, tier badges, platform chips, avatars,
+   and a crown treatment for the #1 pick. */
+
+/* --- #1 pick: gold crown glow --- */
+.best-picks-section .best-pick-row:nth-child(2) {
+  background: linear-gradient(90deg, rgba(248,198,74,0.06), transparent 60%);
+}
+.best-picks-section .best-pick-row:nth-child(2) .best-pick-name {
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(248,198,74,0.25);
+}
+.best-picks-section .best-pick-row:nth-child(2) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.50), 0 0 10px rgba(248,198,74,0.20);
+}
+
+/* --- Fighter names: weight + tracking on hover --- */
+.best-pick-name { transition: color 0.15s ease, letter-spacing 0.2s ease; }
+.best-pick-row:hover .best-pick-name { letter-spacing: 0.08em; }
+
+/* --- Reason text: brighten on hover --- */
+.best-pick-reason { transition: color 0.15s ease; }
+.best-pick-row:hover .best-pick-reason { color: var(--text2); }
+
+/* --- Tier badges: glass depth + subtle glow --- */
+.best-pick-tier.high {
+  box-shadow: 0 0 8px rgba(27,220,136,0.20), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.best-pick-tier.med {
+  box-shadow: 0 0 6px rgba(248,198,74,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.best-pick-tier.low {
+  box-shadow: 0 0 4px rgba(255,108,136,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* --- Platform chips: glass pill on hover --- */
+.best-pick-platform {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.best-pick-row:hover .best-pick-platform {
+  background: rgba(71,90,128,0.15);
+  border-color: rgba(71,90,128,0.30);
+}
+
+/* --- Avatar ring: breathing pulse on high tier --- */
+.best-pick-row.tier-high .bp-avatar {
+  animation: avatarPulse 3s ease-in-out infinite;
+}
+@keyframes avatarPulse {
+  0%, 100% { box-shadow: 0 0 0 1px currentColor, 0 2px 6px rgba(0,0,0,0.4); }
+  50%      { box-shadow: 0 0 0 2px currentColor, 0 2px 10px rgba(0,0,0,0.4), 0 0 12px currentColor; }
+}
+
+/* --- Correlation conflict badge: sharper --- */
+.best-pick-conflict {
+  box-shadow: 0 0 6px rgba(248,198,74,0.15);
+  transition: box-shadow 0.15s ease;
+}
+.best-pick-row:hover .best-pick-conflict {
+  box-shadow: 0 0 10px rgba(248,198,74,0.30);
+}
+
+/* --- Line shop badge: blue glow --- */
+.best-pick-lineshop {
+  box-shadow: 0 0 6px rgba(99,179,237,0.12);
+}
+
+/* --- Over/Under type label: glow reinforcement --- */
+.best-pick-type.over  { text-shadow: 0 0 6px rgba(0,232,122,0.30); }
+.best-pick-type.under { text-shadow: 0 0 6px rgba(255,58,96,0.25); }
+
+/* --- Section header: glass accent --- */
+.best-picks-header {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+  transition: background 0.2s ease;
+}
+.best-picks-section.over .best-picks-header {
+  border-bottom-color: rgba(0,232,122,0.15);
+}
+.best-picks-section.under .best-picks-header {
+  border-bottom-color: rgba(255,58,96,0.15);
+}
+
 /* ── GLOW-UP 44: Drilldown panel evolution ── */
 /* History bars, detail panels, section heads, and panel meta — the
    expanded fighter drilldown gets glass depth and subtle color coding. */
