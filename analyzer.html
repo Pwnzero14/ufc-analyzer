@@ -9810,6 +9810,123 @@ div[style*="border-left:2px solid"]:hover {
   transition: box-shadow 0.15s ease;
 }
 
+/* ── GLOW-UP 70: Movement summary & micro-kinetics ── */
+/* Movement grid glass, header gold accent, row entrance stagger,
+   section count pills, sparkline hover, global focus ring. */
+
+/* --- Movement summary grid: glass + gold top accent --- */
+.movement-summary-grid {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  background: rgba(14,18,30,0.85);
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+  position: relative;
+  overflow: hidden;
+}
+.movement-summary-grid::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.20), transparent);
+  pointer-events: none;
+}
+
+/* --- Movement header: glass strip + hover brighten --- */
+.movement-summary-header {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background: rgba(255,255,255,0.02);
+  transition: background 0.15s ease;
+}
+.movement-summary-header:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+/* --- Movement title: gold text glow --- */
+.movement-summary-title {
+  text-shadow: 0 0 8px rgba(248,198,74,0.25);
+}
+
+/* --- Movement section headers: glass pill + count glow --- */
+.movement-summary-section-header {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.movement-summary-section-count {
+  transition: transform 0.12s ease;
+}
+.movement-summary-section-header:hover .movement-summary-section-count {
+  transform: scale(1.10);
+}
+
+/* --- Movement rows: stagger entrance --- */
+@keyframes mvRowSlide {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.movement-summary-body .movement-summary-row {
+  animation: mvRowSlide 0.18s ease both;
+}
+.movement-summary-body .movement-summary-row:nth-child(2)  { animation-delay: 0.02s; }
+.movement-summary-body .movement-summary-row:nth-child(3)  { animation-delay: 0.04s; }
+.movement-summary-body .movement-summary-row:nth-child(4)  { animation-delay: 0.06s; }
+.movement-summary-body .movement-summary-row:nth-child(5)  { animation-delay: 0.08s; }
+.movement-summary-body .movement-summary-row:nth-child(n+6) { animation-delay: 0.10s; }
+@media (prefers-reduced-motion: reduce) {
+  .movement-summary-body .movement-summary-row { animation: none; }
+}
+
+/* --- Movement sparkline: brighten on row hover --- */
+.movement-summary-spark svg {
+  transition: filter 0.15s ease;
+}
+.movement-summary-row:hover .movement-summary-spark svg {
+  filter: brightness(1.3) drop-shadow(0 0 3px rgba(248,198,74,0.3));
+}
+
+/* --- Movement platforms: subtle glow on hover --- */
+.movement-summary-platforms {
+  transition: color 0.12s ease;
+}
+.movement-summary-row:hover .movement-summary-platforms {
+  color: var(--text2);
+}
+
+/* --- RLM pills: glass + hover lift --- */
+.rlm-tag {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.rlm-tag:hover {
+  transform: translateY(-1px);
+}
+.rlm-tag.rlm-under:hover {
+  box-shadow: 0 0 14px rgba(127,136,255,0.35);
+}
+.rlm-tag.rlm-over:hover {
+  box-shadow: 0 0 14px rgba(86,195,255,0.35);
+}
+
+/* --- Global focus-visible ring: gold outline --- */
+:focus-visible {
+  outline: 2px solid rgba(248,198,74,0.45);
+  outline-offset: 2px;
+}
+button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
+  outline: 2px solid rgba(248,198,74,0.45);
+  outline-offset: 1px;
+  box-shadow: 0 0 8px rgba(248,198,74,0.12);
+}
+
+/* --- Selection highlight: gold-tinted --- */
+::selection {
+  background: rgba(248,198,74,0.25);
+  color: #fff;
+}
+
 /* ── GLOW-UP 69: Fighter identity polish & synergy depth ── */
 /* Form dots breathing, country badge glass, fighter name hover,
    synergy pair glass, bias-edge finder depth. */
