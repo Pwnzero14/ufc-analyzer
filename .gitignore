@@ -5,10 +5,15 @@ Thumbs.db
 
 # Runtime/debug state
 .checkpoint/
+.claude/launch.json
 .claude/worktrees/
 .opera-debug-profile/
 .opera-live-debug/
 backups/
+
+# Stray copies of the extension's browser-profile storage (binary, irreplaceable
+# line data — keep local, never commit to source control)
+Users*Opera*Extension Settings*/
 
 # Recovery/backup artifacts
 recover-storage.js
