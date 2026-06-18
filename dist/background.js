@@ -3486,6 +3486,29 @@ async function fetchUpcomingUFCCard(forceRefresh = false) {
             }
             fighters.push({ f1, f2, scheduledRounds, weightClass: weightClass ?? undefined });
         }
+        // UFCStats upcoming event pages don't expose the scheduled-round count in a
+        // parseable cell, so the loop above leaves every fight at 3R (confirmed via a
+        // storage dump: the main event itself came back as scheduledRounds:3). The
+        // event NAME, however, reliably encodes the headliner
+        // ("UFC Fight Night: Kape vs. Horiguchi"). Match those surnames to the scraped
+        // fight and promote it to 5R so downstream round logic (badges, projection
+        // normalization, predictor) has a real main-event signal instead of guessing
+        // by array position.
+        const headlinerMatch = (nextEvent.name || '').match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
+        if (headlinerMatch) {
+            const surname = (s) => s.trim().toLowerCase().split(/\s+/).pop() || '';
+            const h1 = surname(headlinerMatch[1]);
+            const h2 = surname(headlinerMatch[2]);
+            const nameHas = (full, sn) => {
+                if (!sn)
+                    return false;
+                const parts = full.trim().toLowerCase().split(/\s+/);
+                return parts[parts.length - 1] === sn || parts.includes(sn);
+            };
+            const mainEvent = fighters.find((f) => (nameHas(f.f1, h1) || nameHas(f.f2, h1)) && (nameHas(f.f1, h2) || nameHas(f.f2, h2)));
+            if (mainEvent)
+                mainEvent.scheduledRounds = 5;
+        }
         const card = {
             event: nextEvent.name,
             date: nextEvent.date,

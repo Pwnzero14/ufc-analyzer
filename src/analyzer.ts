@@ -477,10 +477,9 @@ type UpcomingCardResponse = { card?: UpcomingCard | null };
 let currentVenueFactor: VenueFactorEntry = DEFAULT_VENUE;
 let currentVenueLabel: string = '';
 
-function buildEventDisplayName(event: string, fighters: Array<{ f1: string; f2: string }> | undefined): string {
-  // If event already contains "vs" (e.g. "UFC Fight Night: Della Maddalena vs. Prates"), don't append again
+function buildEventDisplayName(event: string, fighters: Array<{ f1: string; f2: string; scheduledRounds?: number }> | undefined): string {
   if (/\bvs\.?\b/i.test(event)) return event;
-  const pair = fighters?.[0];
+  const pair = fighters?.find(f => f.scheduledRounds === 5) || fighters?.[0];
   if (!pair) return event;
   const lastName = (s: string) => s.trim().split(/\s+/).pop() || s;
   return `${event}: ${lastName(pair.f1)} vs. ${lastName(pair.f2)}`;
@@ -722,6 +721,15 @@ function findHeadlinerPair(): { f1: string; f2: string } | null {
       return { f1: pair.f1, f2: pair.f2 };
     }
   }
+
+  // Fallback: the pair with scraped 5R is the main event — reliable for
+  // identification even though we don't trust scraped rounds for projections.
+  for (const pair of upcomingCardPairs) {
+    if (scheduledRoundsMap.get(pair.f1) === 5 && scheduledRoundsMap.get(pair.f2) === 5) {
+      return { f1: pair.f1, f2: pair.f2 };
+    }
+  }
+
   return null;
 }
 
@@ -11299,6 +11307,22 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
   const out: FightPair[] = [];
   const totalFights = Math.ceil(activeFighters.length / 2);
 
+  // Identify the main event by the (now title-authoritative) headliner pair rather
+  // than array position — UFCStats upcoming-card order is NOT reliably main-first,
+  // so `fightIndex === 0` would award the 5R badge to whatever prelim happens to be
+  // first. Compute once; compare each pair's fighters by name (tolerant) below.
+  const headlinerPair = findHeadlinerPair();
+  const fightIsMainEvent = (a: AnalyzerFighter, b: AnalyzerFighter | null): boolean => {
+    if (!headlinerPair || !b) return false;
+    const na = normalizeName(a?.name);
+    const nb = normalizeName(b?.name);
+    if (!na || !nb) return false;
+    const inPair = (n: string): boolean =>
+      n === headlinerPair.f1 || n === headlinerPair.f2 ||
+      strictCardNameMatch(n, headlinerPair.f1) || strictCardNameMatch(n, headlinerPair.f2);
+    return inPair(na) && inPair(nb);
+  };
+
   // Slate-wide top-edge scan — confidence on whichever leaned stat scores highest.
   let topEdgeName = '';
   let topEdgeConf = 0;
@@ -11320,7 +11344,7 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
     const weightClass = cardPair?.weightClass;
     const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
     const correlation = b ? computeFightCorrelation(a, b) : null;
-    const rounds: 3 | 5 = fightIndex === 0 ? 5 : 3;
+    const rounds: 3 | 5 = fightIsMainEvent(a, b) ? 5 : 3;
     const topEdge = !!topEdgeName && (a.name === topEdgeName || b?.name === topEdgeName);
     out.push({
       fighterA: a,
@@ -15755,9 +15779,16 @@ async function loadData(): Promise<void> {
         filteredDraftKings,
       ]);
       if (inferredEventNameFromLines) {
-        upcomingEventName = inferredEventNameFromLines;
+        // Only adopt the line-inferred name when we have NO real UFCStats card
+        // title. inferEventNameFromPayloads returns the highest-line-count pair
+        // (frequently a fully-covered PRELIM, not the headliner), so clobbering a
+        // real "...: Kape vs. Horiguchi" title would make findHeadlinerPair parse
+        // the wrong surnames and hand 5R projections to a prelim. Keep the inferred
+        // name only as the documented fallback (findHeadlinerPair already reads
+        // `upcomingEventName || inferredEventNameFromLines`).
+        if (!upcomingEventName) upcomingEventName = inferredEventNameFromLines;
         const nameEl = document.getElementById('eventName');
-        if (nameEl) nameEl.textContent = inferredEventNameFromLines;
+        if (nameEl) nameEl.textContent = upcomingEventName || inferredEventNameFromLines;
       }
       await processData({
         pick6: pruneOrphanFighters(filteredPick6),

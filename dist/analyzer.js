@@ -339,10 +339,9 @@ const scheduledRoundsMap = new Map();
 let currentVenueFactor = DEFAULT_VENUE;
 let currentVenueLabel = '';
 function buildEventDisplayName(event, fighters) {
-    // If event already contains "vs" (e.g. "UFC Fight Night: Della Maddalena vs. Prates"), don't append again
     if (/\bvs\.?\b/i.test(event))
         return event;
-    const pair = fighters?.[0];
+    const pair = fighters?.find(f => f.scheduledRounds === 5) || fighters?.[0];
     if (!pair)
         return event;
     const lastName = (s) => s.trim().split(/\s+/).pop() || s;
@@ -607,6 +606,13 @@ function findHeadlinerPair() {
             return false;
         };
         if (matches(h1) && matches(h2)) {
+            return { f1: pair.f1, f2: pair.f2 };
+        }
+    }
+    // Fallback: the pair with scraped 5R is the main event — reliable for
+    // identification even though we don't trust scraped rounds for projections.
+    for (const pair of upcomingCardPairs) {
+        if (scheduledRoundsMap.get(pair.f1) === 5 && scheduledRoundsMap.get(pair.f2) === 5) {
             return { f1: pair.f1, f2: pair.f2 };
         }
     }
@@ -10796,6 +10802,22 @@ function cardPositionForFightIndex(fightIndex, totalFights) {
 function buildFights(activeFighters) {
     const out = [];
     const totalFights = Math.ceil(activeFighters.length / 2);
+    // Identify the main event by the (now title-authoritative) headliner pair rather
+    // than array position — UFCStats upcoming-card order is NOT reliably main-first,
+    // so `fightIndex === 0` would award the 5R badge to whatever prelim happens to be
+    // first. Compute once; compare each pair's fighters by name (tolerant) below.
+    const headlinerPair = findHeadlinerPair();
+    const fightIsMainEvent = (a, b) => {
+        if (!headlinerPair || !b)
+            return false;
+        const na = normalizeName(a?.name);
+        const nb = normalizeName(b?.name);
+        if (!na || !nb)
+            return false;
+        const inPair = (n) => n === headlinerPair.f1 || n === headlinerPair.f2 ||
+            strictCardNameMatch(n, headlinerPair.f1) || strictCardNameMatch(n, headlinerPair.f2);
+        return inPair(na) && inPair(nb);
+    };
     // Slate-wide top-edge scan — confidence on whichever leaned stat scores highest.
     let topEdgeName = '';
     let topEdgeConf = 0;
@@ -10821,7 +10843,7 @@ function buildFights(activeFighters) {
         const weightClass = cardPair?.weightClass;
         const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
         const correlation = b ? computeFightCorrelation(a, b) : null;
-        const rounds = fightIndex === 0 ? 5 : 3;
+        const rounds = fightIsMainEvent(a, b) ? 5 : 3;
         const topEdge = !!topEdgeName && (a.name === topEdgeName || b?.name === topEdgeName);
         out.push({
             fighterA: a,
@@ -15162,10 +15184,18 @@ async function loadData() {
                 filteredDraftKings,
             ]);
             if (inferredEventNameFromLines) {
-                upcomingEventName = inferredEventNameFromLines;
+                // Only adopt the line-inferred name when we have NO real UFCStats card
+                // title. inferEventNameFromPayloads returns the highest-line-count pair
+                // (frequently a fully-covered PRELIM, not the headliner), so clobbering a
+                // real "...: Kape vs. Horiguchi" title would make findHeadlinerPair parse
+                // the wrong surnames and hand 5R projections to a prelim. Keep the inferred
+                // name only as the documented fallback (findHeadlinerPair already reads
+                // `upcomingEventName || inferredEventNameFromLines`).
+                if (!upcomingEventName)
+                    upcomingEventName = inferredEventNameFromLines;
                 const nameEl = document.getElementById('eventName');
                 if (nameEl)
-                    nameEl.textContent = inferredEventNameFromLines;
+                    nameEl.textContent = upcomingEventName || inferredEventNameFromLines;
             }
             await processData({
                 pick6: pruneOrphanFighters(filteredPick6),
