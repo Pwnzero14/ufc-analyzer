@@ -9657,6 +9657,154 @@ div[style*="border-left:2px solid"]:hover {
   color: var(--text2);
 }
 
+/* ── GLOW-UP 65: Intelligence strip & column header ── */
+/* Platform pills glass, MH stat hover, fighter header frost,
+   source toggles, QA badges deeper, slate banner depth. */
+
+/* --- Platform pills: glass depth + active breathing --- */
+.platform-pill {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.platform-pill.active {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 6px rgba(0,0,0,0.15);
+}
+.platform-pill.p6.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(86,195,255,0.12); }
+.platform-pill.ud.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(168,120,255,0.12); }
+.platform-pill.betr.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(255,138,61,0.12); }
+.platform-pill.pp.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(44,212,208,0.12); }
+.platform-pill.dk.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(245,158,11,0.12); }
+
+/* --- Pill age badges: glass micro-chips --- */
+.pill-age {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease;
+}
+.pill-age.stale {
+  box-shadow: 0 0 6px rgba(255,58,96,0.15);
+}
+.pill-age.aging {
+  box-shadow: 0 0 4px rgba(248,198,74,0.10);
+}
+
+/* --- Model health stat: hover intensify --- */
+.mh-stat {
+  transition: transform 0.15s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.mh-stat:hover {
+  background: rgba(255,255,255,0.02);
+}
+.mh-stat:hover .mh-value {
+  filter: drop-shadow(0 0 12px rgba(248,198,74,0.5));
+}
+.mh-stat:hover .mh-label {
+  color: var(--text2);
+}
+
+/* --- Model health strip: deeper glass frost --- */
+.model-health-strip {
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  position: relative;
+  overflow: hidden;
+}
+.model-health-strip::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.10), rgba(44,212,208,0.10), transparent);
+  pointer-events: none;
+}
+
+/* --- Fighter header row: deeper frost + hover labels --- */
+.fighter-header-row {
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+}
+.fhr-label {
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.fhr-label:hover {
+  color: var(--text);
+  text-shadow: 0 0 8px rgba(248,198,74,0.15);
+}
+
+/* --- Source toggles: glass pills --- */
+.source-toggle {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.15s ease;
+}
+.source-toggle.active {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.source-toggle:hover:not(.active) {
+  background: rgba(255,255,255,0.03);
+}
+
+/* --- Source toggle label: glass + hover --- */
+.source-toggle-label {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* --- QA panel: glass backdrop --- */
+.qa-panel {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  position: relative;
+  overflow: hidden;
+}
+.qa-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  pointer-events: none;
+}
+
+/* --- Slate banner: deeper glass --- */
+.slate-banner {
+  backdrop-filter: blur(8px) saturate(1.15);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+}
+
+/* --- Learning drilldown: glass interiors + hover --- */
+.learning-diagnostics-strip {
+  backdrop-filter: blur(8px) saturate(1.15);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  transition: box-shadow 0.2s ease;
+}
+.learning-diagnostics-strip:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 28px rgba(0,0,0,0.35), 0 0 20px rgba(44,212,208,0.06);
+}
+
+/* --- LD drilldown sub-text: brighten on hover --- */
+.ld-drilldown-content {
+  transition: color 0.15s ease;
+}
+.learning-diagnostics-strip:hover .ld-drilldown-content {
+  color: var(--text);
+}
+
+/* --- Auto-fetch button: deeper glow + pulse --- */
+@keyframes fetchPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(32,223,143,0.16), inset 0 1px 0 rgba(255,255,255,0.08); }
+  50%      { box-shadow: 0 0 22px rgba(32,223,143,0.28), inset 0 1px 0 rgba(255,255,255,0.10); }
+}
+.auto-fetch-btn {
+  animation: fetchPulse 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auto-fetch-btn { animation: none; }
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
