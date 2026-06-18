@@ -2034,18 +2034,14 @@ function getScheduledRoundsContext(
   const normalizedName = normalizeName(fighterName);
   if (!normalizedName) return { rounds: null, source: 'unknown' };
 
-  const cardRounds = scheduledRoundsMap.get(normalizedName);
-  // Trust scrape only when it found 5R (literal "5" cell). Scrape defaults to 3 for
-  // upcoming events because round-count isn't exposed on UFCStats pre-fight pages,
-  // so a "3" from scrape is meaningless — fall through to main-event inference first.
-  if (cardRounds === 5) return { rounds: 5, source: 'card' };
-
   const headliner = findHeadlinerPair();
   if (headliner && (headliner.f1 === normalizedName || headliner.f2 === normalizedName)) {
     return { rounds: 5, source: 'inferred_main_event' };
   }
 
-  if (cardRounds === 3) return { rounds: 3, source: 'card' };
+  // Non-main-event fights default to 3R. Don't trust scraped 5R — UFCStats
+  // pre-fight pages don't reliably expose round counts.
+  return { rounds: 3, source: 'card' };
   return { rounds: null, source: 'unknown' };
 }
 
@@ -8749,11 +8745,8 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
 
   const headliner = findHeadlinerPair();
   for (const pair of upcomingCardPairs) {
-    const scrapedRounds = scheduledRoundsMap.get(pair.f1) ?? scheduledRoundsMap.get(pair.f2);
-    // Trust scrape's 5 if present; otherwise title-based main-event match wins
-    // over scrape's default of 3 (round count isn't exposed on UFCStats pre-fight).
     const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
-    const rounds = isMainEvent ? 5 : (scrapedRounds ?? 3);
+    const rounds = isMainEvent ? 5 : 3;
 
     // Fetch UFCStats data for both fighters (uses 24h cache)
     const [f1Stats, f2Stats] = await Promise.all([
@@ -11327,10 +11320,7 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
     const weightClass = cardPair?.weightClass;
     const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
     const correlation = b ? computeFightCorrelation(a, b) : null;
-    const aRounds = scheduledRoundsMap.get(normalizeName(a.name) || a.name) ?? null;
-    const bRounds = b ? scheduledRoundsMap.get(normalizeName(b.name) || b.name) ?? null : null;
-    const scheduled = aRounds || bRounds;
-    const rounds: 3 | 5 = scheduled === 5 ? 5 : fightIndex === 0 ? 5 : 3;
+    const rounds: 3 | 5 = fightIndex === 0 ? 5 : 3;
     const topEdge = !!topEdgeName && (a.name === topEdgeName || b?.name === topEdgeName);
     out.push({
       fighterA: a,
@@ -13615,13 +13605,12 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // Fallback: FT line > 12.5 min. Default: 3 rounds.
   const _ftLine = platformStatLine(f, 'ft');
   const _normFighterName = normalizeName(f.name);
-  const _cardRounds = _normFighterName ? scheduledRoundsMap.get(_normFighterName) : undefined;
   // Title-based main-event lookup (UFCStats event-page fight order is not reliable
   // for upcoming cards, so we identify the headliner by parsing the event title).
   const _headliner = findHeadlinerPair();
   const _isMainEventFighter = _normFighterName != null && _headliner != null &&
     (_headliner.f1 === _normFighterName || _headliner.f2 === _normFighterName);
-  const isFiveRound = _cardRounds === 5 || _isMainEventFighter;
+  const isFiveRound = _isMainEventFighter;
   // Expected average actual fight durations (accounting for all finish rates in that format)
   const FIVE_ROUND_MINS  = 15.0;
   const THREE_ROUND_MINS = 9.0;
