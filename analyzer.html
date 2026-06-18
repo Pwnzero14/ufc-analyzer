@@ -9810,6 +9810,132 @@ div[style*="border-left:2px solid"]:hover {
   transition: box-shadow 0.15s ease;
 }
 
+/* ── GLOW-UP 69: Fighter identity polish & synergy depth ── */
+/* Form dots breathing, country badge glass, fighter name hover,
+   synergy pair glass, bias-edge finder depth. */
+
+/* --- Form dots: breathing glow on recent result --- */
+@keyframes formDotPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(0,232,122,0.5); }
+  50%      { box-shadow: 0 0 10px rgba(0,232,122,0.8); }
+}
+.form-dot.win:first-child {
+  animation: formDotPulse 2.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .form-dot.win:first-child { animation: none; }
+}
+
+/* --- Form dots: hover scale on row --- */
+.form-dot {
+  transition: transform 0.12s ease;
+}
+.fighter-row:hover .form-dot {
+  transform: scale(1.25);
+}
+
+/* --- Country mini-badge: glass depth --- */
+.fighter-avatar-country {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.fighter-row:hover .fighter-avatar-country {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+/* --- Fighter name: hover text-shadow glow --- */
+.fighter-name {
+  transition: text-shadow 0.15s ease;
+}
+.fighter-row:hover .fighter-name {
+  text-shadow: 0 0 10px rgba(255,255,255,0.12);
+}
+.fighter-row.lean-over-row:hover .fighter-name {
+  text-shadow: 0 0 10px rgba(0,232,122,0.20);
+}
+.fighter-row.lean-under-row:hover .fighter-name {
+  text-shadow: 0 0 10px rgba(255,58,96,0.18);
+}
+
+/* --- Fighter record: subtle brighten on hover --- */
+.fighter-record {
+  transition: color 0.15s ease;
+}
+.fighter-row:hover .fighter-record {
+  color: var(--text2);
+}
+
+/* --- Synergy pair cards: glass + green depth --- */
+.synergy-pair-card {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.synergy-pair-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), 0 0 10px rgba(27,220,136,0.10);
+}
+
+/* --- Synergy active card: deeper green glow --- */
+.synergy-pair-card.synergy-active {
+  box-shadow: 0 0 12px rgba(27,220,136,0.12), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.synergy-pair-card.synergy-active:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), 0 0 18px rgba(27,220,136,0.20);
+}
+
+/* --- Synergy plus sign: pulse when active --- */
+@keyframes synergyPlusPulse {
+  0%, 100% { text-shadow: 0 0 6px rgba(27,220,136,0.3); }
+  50%      { text-shadow: 0 0 12px rgba(27,220,136,0.6); }
+}
+.synergy-pair-card.synergy-active .synergy-pair-plus {
+  animation: synergyPlusPulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .synergy-pair-card.synergy-active .synergy-pair-plus { animation: none; }
+}
+
+/* --- Synergy impact score: green text glow --- */
+.synergy-pair-impact {
+  text-shadow: 0 0 6px rgba(27,220,136,0.25);
+  transition: text-shadow 0.15s ease;
+}
+.synergy-pair-card:hover .synergy-pair-impact {
+  text-shadow: 0 0 12px rgba(27,220,136,0.45);
+}
+
+/* --- Synergy pair "added" badge: gold glow --- */
+.synergy-pair-added {
+  text-shadow: 0 0 6px rgba(248,198,74,0.25);
+}
+
+/* --- Bias edge finder: glass depth --- */
+.bias-edge-finder {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Bias edge chips: glass + hover glow --- */
+.bias-edge-chip {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+.bias-edge-chip:hover {
+  box-shadow: 0 0 8px rgba(44,212,208,0.15);
+  transform: translateY(-1px);
+}
+
+/* --- Empty state: glass + subtle animation --- */
+.empty-state {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 /* ── GLOW-UP 68: Betr panel, view tabs & report card rows ── */
 /* Betr entry glass, input focus rings, save/add buttons,
    view tab bar depth, tab count pills, report card rows. */
