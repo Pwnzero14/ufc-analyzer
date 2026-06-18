@@ -9657,6 +9657,159 @@ div[style*="border-left:2px solid"]:hover {
   color: var(--text2);
 }
 
+/* ── GLOW-UP 66: H2H modal & report card depth ── */
+/* Fighter images, VS badge, table rows, advantage bars,
+   lean badges, section heads, report card glass. */
+
+/* --- H2H modal box: orange top accent --- */
+.h2h-modal-box {
+  position: relative;
+  overflow: hidden;
+}
+.h2h-modal-box::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 8%; right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(44,212,208,0.3) 30%, rgba(255,138,61,0.3) 70%, transparent);
+  pointer-events: none;
+}
+
+/* --- Fighter images: side-colored glow ring --- */
+.h2h-img-wrap {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.h2h-fighter-col.h2h-side-a .h2h-img-wrap {
+  box-shadow: 0 0 12px rgba(44,212,208,0.15);
+}
+.h2h-fighter-col.h2h-side-b .h2h-img-wrap {
+  box-shadow: 0 0 12px rgba(255,138,61,0.15);
+}
+.h2h-fighter-col:hover .h2h-img-wrap {
+  transform: scale(1.06);
+}
+.h2h-fighter-col.h2h-side-a:hover .h2h-img-wrap {
+  box-shadow: 0 0 20px rgba(44,212,208,0.30);
+}
+.h2h-fighter-col.h2h-side-b:hover .h2h-img-wrap {
+  box-shadow: 0 0 20px rgba(255,138,61,0.30);
+}
+
+/* --- Fighter names: side-colored text glow --- */
+.h2h-fighter-name {
+  transition: text-shadow 0.2s ease;
+}
+.h2h-fighter-col.h2h-side-a .h2h-fighter-name {
+  text-shadow: 0 0 10px rgba(44,212,208,0.20);
+}
+.h2h-fighter-col.h2h-side-b .h2h-fighter-name {
+  text-shadow: 0 0 10px rgba(255,138,61,0.20);
+}
+.h2h-fighter-col.h2h-side-a:hover .h2h-fighter-name {
+  text-shadow: 0 0 16px rgba(44,212,208,0.40);
+}
+.h2h-fighter-col.h2h-side-b:hover .h2h-fighter-name {
+  text-shadow: 0 0 16px rgba(255,138,61,0.40);
+}
+
+/* --- VS badge: gold glow treatment --- */
+.h2h-vs {
+  text-shadow: 0 0 8px rgba(248,198,74,0.30);
+  transition: text-shadow 0.2s ease;
+}
+.h2h-fighters:hover .h2h-vs {
+  text-shadow: 0 0 14px rgba(248,198,74,0.55);
+  color: var(--gold);
+}
+
+/* --- H2H lean badges: glass + directional glow --- */
+.h2h-lean {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease;
+}
+.h2h-lean.over {
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.30);
+  text-shadow: 0 0 6px rgba(0,232,122,0.30);
+}
+.h2h-lean.under {
+  background: rgba(255,58,96,0.08);
+  border: 1px solid rgba(255,58,96,0.30);
+  text-shadow: 0 0 6px rgba(255,58,96,0.25);
+}
+
+/* --- H2H advantage bars: shimmer sweep --- */
+@keyframes h2hBarShimmer {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.6; }
+}
+.h2h-adv-half i {
+  position: relative;
+  overflow: hidden;
+}
+.h2h-adv-half i::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; bottom: 0;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: h2hBarShimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .h2h-adv-half i::after { animation: none; }
+}
+
+/* --- H2H section heads: type-colored hairlines --- */
+.h2h-section-head::before {
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.18)) !important;
+}
+.h2h-section-head::after {
+  background: linear-gradient(90deg, rgba(248,198,74,0.18), transparent) !important;
+}
+
+/* --- H2H table header: side-colored glow --- */
+.h2h-table th.h2h-side-a {
+  text-shadow: 0 0 8px rgba(44,212,208,0.25);
+}
+.h2h-table th.h2h-side-b {
+  text-shadow: 0 0 8px rgba(255,138,61,0.25);
+}
+
+/* --- Report card modal: glass + orange top accent --- */
+.report-modal-box {
+  position: relative;
+  overflow: hidden;
+}
+.report-modal-box::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,138,61,0.3), transparent);
+  pointer-events: none;
+}
+
+/* --- Report card event header: orange glow --- */
+.rc-event-name {
+  text-shadow: 0 0 12px rgba(255,138,61,0.25);
+}
+
+/* --- Report card summary: glass strip --- */
+.rc-summary {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Report card fight badge: glass depth --- */
+.rc-fight-badge {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease;
+}
+
 /* ── GLOW-UP 65: Intelligence strip & column header ── */
 /* Platform pills glass, MH stat hover, fighter header frost,
    source toggles, QA badges deeper, slate banner depth. */
