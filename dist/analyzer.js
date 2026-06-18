@@ -1732,13 +1732,6 @@ function getScheduledRoundsContext(fighterName) {
     if (headliner && (headliner.f1 === normalizedName || headliner.f2 === normalizedName)) {
         return { rounds: 5, source: 'inferred_main_event' };
     }
-    // Co-main is nearly always 5R (title/interim/contender fights).
-    if (upcomingCardPairs.length >= 2) {
-        const coMain = upcomingCardPairs[1];
-        if (coMain.f1 === normalizedName || coMain.f2 === normalizedName) {
-            return { rounds: 5, source: 'inferred_co_main' };
-        }
-    }
     if (cardRounds === 3)
         return { rounds: 3, source: 'card' };
     return { rounds: null, source: 'unknown' };
@@ -8375,9 +8368,7 @@ async function generatePredictions(container) {
         // Trust scrape's 5 if present; otherwise title-based main-event match wins
         // over scrape's default of 3 (round count isn't exposed on UFCStats pre-fight).
         const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
-        const isCoMain = !isMainEvent && upcomingCardPairs.length >= 2 &&
-            upcomingCardPairs[1].f1 === pair.f1 && upcomingCardPairs[1].f2 === pair.f2;
-        const rounds = scrapedRounds === 5 ? 5 : ((isMainEvent || isCoMain) ? 5 : (scrapedRounds ?? 3));
+        const rounds = scrapedRounds === 5 ? 5 : (isMainEvent ? 5 : (scrapedRounds ?? 3));
         // Fetch UFCStats data for both fighters (uses 24h cache)
         const [f1Stats, f2Stats] = await Promise.all([
             fetchFromUFCStats(pair.f1),
@@ -13083,10 +13074,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const _headliner = findHeadlinerPair();
     const _isMainEventFighter = _normFighterName != null && _headliner != null &&
         (_headliner.f1 === _normFighterName || _headliner.f2 === _normFighterName);
-    const _isCoMainFighter = !_isMainEventFighter && _normFighterName != null &&
-        upcomingCardPairs.length >= 2 &&
-        (upcomingCardPairs[1].f1 === _normFighterName || upcomingCardPairs[1].f2 === _normFighterName);
-    const isFiveRound = _cardRounds === 5 || _isMainEventFighter || _isCoMainFighter;
+    const isFiveRound = _cardRounds === 5 || _isMainEventFighter;
     // Expected average actual fight durations (accounting for all finish rates in that format)
     const FIVE_ROUND_MINS = 15.0;
     const THREE_ROUND_MINS = 9.0;
