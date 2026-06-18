@@ -9810,6 +9810,180 @@ div[style*="border-left:2px solid"]:hover {
   transition: box-shadow 0.15s ease;
 }
 
+/* ── GLOW-UP 68: Betr panel, view tabs & report card rows ── */
+/* Betr entry glass, input focus rings, save/add buttons,
+   view tab bar depth, tab count pills, report card rows. */
+
+/* --- Betr review title: gold text glow --- */
+.betr-review-title {
+  text-shadow: 0 0 8px rgba(255,138,61,0.20);
+}
+
+/* --- Betr grid header: glass underline --- */
+.betr-grid-head {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding-bottom: 6px;
+}
+.betr-grid-col.fp {
+  text-shadow: 0 0 6px rgba(77,176,255,0.25);
+}
+.betr-grid-col.ss {
+  text-shadow: 0 0 6px rgba(248,198,74,0.25);
+}
+
+/* --- Betr row: glass + hover lift --- */
+.betr-row {
+  padding: 4px 2px;
+  border-radius: 4px;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.betr-row:hover {
+  background: rgba(255,255,255,0.02);
+  transform: translateX(2px);
+}
+
+/* --- Betr inputs: glass depth + focus glow by type --- */
+.betr-input {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.betr-input:focus {
+  border-color: rgba(248,198,74,0.35);
+  box-shadow: 0 0 8px rgba(248,198,74,0.12);
+}
+.betr-input.fp:focus {
+  border-color: rgba(77,176,255,0.40);
+  box-shadow: 0 0 8px rgba(77,176,255,0.18);
+}
+.betr-input.ss:focus {
+  border-color: rgba(248,198,74,0.40);
+  box-shadow: 0 0 8px rgba(248,198,74,0.18);
+}
+
+/* --- Betr save button: green glow + hover lift --- */
+.betr-save-btn {
+  box-shadow: 0 0 12px rgba(27,220,136,0.20);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.betr-save-btn:hover {
+  box-shadow: 0 0 20px rgba(27,220,136,0.35);
+  transform: translateY(-1px);
+}
+
+/* --- Betr add-row button: blue glow on hover --- */
+.betr-add-row-btn {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.betr-add-row-btn:hover {
+  box-shadow: 0 0 10px rgba(77,176,255,0.20);
+  transform: translateY(-1px);
+}
+
+/* --- Betr remove button: red glow on hover --- */
+.betr-remove-btn {
+  transition: color 0.12s ease, text-shadow 0.12s ease, transform 0.12s ease;
+}
+.betr-remove-btn:hover {
+  text-shadow: 0 0 8px rgba(255,58,96,0.40);
+  transform: scale(1.20);
+}
+
+/* --- Betr queue image: glass border + hover lift --- */
+.betr-queue-img {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.betr-queue-img:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  transform: scale(1.04);
+}
+
+/* --- Manual entry (BETR LINES) button: orange glass --- */
+.manual-entry-btn {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 0 8px rgba(255,112,48,0.10);
+}
+.manual-entry-btn:hover {
+  box-shadow: 0 0 14px rgba(255,112,48,0.25);
+  border-color: rgba(255,112,48,0.5);
+  transform: translateY(-1px);
+}
+
+/* --- View tab bar: glass frost strip --- */
+.view-tabs {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Tab count pills: glass depth --- */
+.view-tabs .tab-count {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.12s ease;
+}
+.view-tabs .tab-btn:hover .tab-count {
+  transform: scale(1.08);
+}
+
+/* --- Primary tab (AI BEST PICKS): gold pulse when active --- */
+@keyframes bestPicksTabGlow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 0 rgba(248,198,74,0); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 12px rgba(248,198,74,0.15); }
+}
+.view-tabs .tab-btn-primary.active {
+  animation: bestPicksTabGlow 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-tabs .tab-btn-primary.active { animation: none; }
+}
+
+/* --- Report card matchup rows: glass + stagger --- */
+@keyframes rcRowSlide {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.rc-fighter-row {
+  animation: rcRowSlide 0.2s ease both;
+  transition: background 0.12s ease;
+}
+.rc-fighter-row:nth-child(2) { animation-delay: 0.04s; }
+.rc-fighter-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-fighter-row { animation: none; }
+}
+
+/* --- Report card lean chips: glass + directional glow --- */
+.rc-lean-chip {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: box-shadow 0.15s ease;
+}
+.rc-lean-chip.rc-over {
+  box-shadow: 0 0 6px rgba(34,197,94,0.15);
+}
+.rc-lean-chip.rc-under {
+  box-shadow: 0 0 6px rgba(239,68,68,0.15);
+}
+
+/* --- Report card fight badges: glass depth --- */
+.rc-fight-badge {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.rc-fight-badge.rc-badge-main-event {
+  box-shadow: 0 0 8px rgba(249,115,22,0.12);
+}
+.rc-fight-badge.rc-badge-co-main {
+  box-shadow: 0 0 8px rgba(45,212,208,0.10);
+}
+
 /* ── GLOW-UP 67: Line timeline, steam badges & popover depth ── */
 /* Timeline chart glass, dot glow, steam/reverse-steam glass,
    sharp-move badge, sort-trend popover, slate-check strip. */
