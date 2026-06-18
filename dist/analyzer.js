@@ -595,8 +595,17 @@ function findHeadlinerPair() {
     const h1 = m[1].trim();
     const h2 = m[2].trim();
     for (const pair of upcomingCardPairs) {
-        const matches = (raw) => strictCardNameMatch(raw, pair.f1) || strictCardNameMatch(raw, pair.f2) ||
-            namesMatch(normalizeName(raw) || raw, pair.f1) || namesMatch(normalizeName(raw) || raw, pair.f2);
+        const matches = (raw) => {
+            if (strictCardNameMatch(raw, pair.f1) || strictCardNameMatch(raw, pair.f2))
+                return true;
+            const nr = normalizeName(raw) || raw.toLowerCase().trim();
+            if (namesMatch(nr, pair.f1) || namesMatch(nr, pair.f2))
+                return true;
+            // Event titles use surname only — match against last word of full name
+            if (pair.f1.endsWith(' ' + nr) || pair.f2.endsWith(' ' + nr))
+                return true;
+            return false;
+        };
         if (matches(h1) && matches(h2)) {
             return { f1: pair.f1, f2: pair.f2 };
         }
@@ -8368,7 +8377,7 @@ async function generatePredictions(container) {
         // Trust scrape's 5 if present; otherwise title-based main-event match wins
         // over scrape's default of 3 (round count isn't exposed on UFCStats pre-fight).
         const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
-        const rounds = scrapedRounds === 5 ? 5 : (isMainEvent ? 5 : (scrapedRounds ?? 3));
+        const rounds = isMainEvent ? 5 : (scrapedRounds ?? 3);
         // Fetch UFCStats data for both fighters (uses 24h cache)
         const [f1Stats, f2Stats] = await Promise.all([
             fetchFromUFCStats(pair.f1),
