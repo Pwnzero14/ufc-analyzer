@@ -9810,6 +9810,145 @@ div[style*="border-left:2px solid"]:hover {
   transition: box-shadow 0.15s ease;
 }
 
+/* ── GLOW-UP 67: Line timeline, steam badges & popover depth ── */
+/* Timeline chart glass, dot glow, steam/reverse-steam glass,
+   sharp-move badge, sort-trend popover, slate-check strip. */
+
+/* --- Line timeline chart: glass + gold grid lines --- */
+.line-timeline-chart {
+  background: rgba(6,7,16,0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 8px rgba(0,0,0,0.25);
+}
+
+/* --- Timeline dots: glow ring on hover --- */
+.line-timeline-dot {
+  box-shadow: 0 0 4px rgba(248,198,74,0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.line-timeline-dot:hover {
+  box-shadow: 0 0 10px rgba(248,198,74,0.50);
+}
+
+/* --- Timeline open marker: gold shimmer --- */
+.line-timeline-open-marker {
+  position: relative;
+}
+@keyframes openMarkerPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.9; }
+}
+.line-timeline-open-marker {
+  animation: openMarkerPulse 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-timeline-open-marker { animation: none; }
+}
+
+/* --- Steam badge: fire glow + glass --- */
+.steam-badge {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 0 8px rgba(255,106,61,0.15);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.steam-badge:hover {
+  box-shadow: 0 0 14px rgba(255,106,61,0.30);
+  transform: translateY(-1px);
+}
+
+/* --- Reverse steam badge: ice glow + glass --- */
+.reverse-steam-badge {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 0 8px rgba(100,181,246,0.15);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.reverse-steam-badge:hover {
+  box-shadow: 0 0 14px rgba(100,181,246,0.30);
+  transform: translateY(-1px);
+}
+
+/* --- Sharp move badge: gold text glow --- */
+.sharp-move-badge {
+  text-shadow: 0 0 8px rgba(248,198,74,0.25);
+  transition: text-shadow 0.15s ease;
+}
+.fighter-row:hover .sharp-move-badge {
+  text-shadow: 0 0 14px rgba(248,198,74,0.45);
+}
+
+/* --- Sort/trend trigger: glass depth --- */
+.sort-trend-trigger {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.sort-trend-trigger:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 8px rgba(248,198,74,0.08);
+}
+.sort-trend-trigger[aria-expanded="true"] {
+  box-shadow: 0 0 12px rgba(248,198,74,0.15);
+}
+
+/* --- Sort/trend popover: glass + orange top accent --- */
+.sort-trend-popover {
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  background: linear-gradient(170deg, rgba(22,28,42,0.94), rgba(14,18,30,0.98));
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  position: relative;
+}
+.sort-trend-popover::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.25), transparent);
+  pointer-events: none;
+}
+
+/* --- Sort/trend section labels: gold accent --- */
+.sort-trend-section-label {
+  text-shadow: 0 0 6px rgba(248,198,74,0.15);
+}
+
+/* --- Slate check strip: glass depth + status glow --- */
+.slate-check-bar {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Slate check issue badges: hover glow --- */
+.qa-issue-chip {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.qa-issue-chip:hover {
+  transform: translateY(-1px);
+}
+.qa-issue-chip.qa-issue-err:hover {
+  box-shadow: 0 0 8px rgba(229,62,62,0.20);
+}
+.qa-issue-chip.qa-issue-warn:hover {
+  box-shadow: 0 0 8px rgba(248,198,74,0.15);
+}
+
+/* --- Trend window buttons: subtle glass --- */
+.trend-window-group button {
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.trend-window-group button:hover {
+  box-shadow: 0 0 6px rgba(255,255,255,0.04);
+}
+.trend-window-group button.active {
+  box-shadow: 0 0 8px rgba(248,198,74,0.12);
+}
+
 /* ── GLOW-UP 65: Intelligence strip & column header ── */
 /* Platform pills glass, MH stat hover, fighter header frost,
    source toggles, QA badges deeper, slate banner depth. */
