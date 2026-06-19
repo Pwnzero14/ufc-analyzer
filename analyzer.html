@@ -10618,6 +10618,76 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   border: 1px solid rgba(255,255,255,0.06);
 }
 
+/* ── GLOW-UP 72: Learning Summary depth & interactivity ── */
+/* Stat chips hover lift + glow, best/worst badges hover, delta rows
+   left accent + name brighten, delta bar glow, weights body glass. */
+
+/* --- Stat chips: hover lift + colored glow --- */
+.learn-stat-chip {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  cursor: default;
+}
+.learn-stat-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* --- Best/Worst badges: hover glow + scale --- */
+.learn-badge-best, .learn-badge-worst {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+}
+.learn-badge-best:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 12px rgba(56,176,0,0.25);
+}
+.learn-badge-worst:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 12px rgba(255,80,80,0.25);
+}
+
+/* --- Delta rows: left accent on hover + name brighten --- */
+.learn-delta-row {
+  position: relative;
+}
+.learn-delta-row::before {
+  content: ''; position: absolute; left: -2px; top: 20%; bottom: 20%;
+  width: 2px; border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.learn-delta-row:hover::before {
+  background: linear-gradient(180deg, var(--amber, #f5a623), transparent);
+  box-shadow: 0 0 6px rgba(245,166,35,0.3);
+}
+.learn-delta-row:hover .learn-delta-name {
+  color: #fff !important;
+  text-shadow: 0 0 6px rgba(255,255,255,0.12);
+}
+
+/* --- Delta bar: subtle glow on row hover --- */
+.learn-delta-row:hover .learn-delta-bar {
+  box-shadow: 0 0 6px rgba(255,255,255,0.08);
+}
+
+/* --- Delta total: brighten on hover --- */
+.learn-delta-row:hover .learn-delta-total {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* --- Weights body: glass when expanded --- */
+.weights-body {
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  background: rgba(255,255,255,0.015);
+  border-radius: 0 0 4px 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  margin-top: 4px;
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */

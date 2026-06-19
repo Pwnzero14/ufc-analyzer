@@ -8878,15 +8878,15 @@ function renderPredictionsHtml(
         const totalErr = Math.abs(p.delta.ss || 0) + Math.abs(p.delta.td || 0) + Math.abs(p.delta.fp || 0);
         const errColor = totalErr < 15 ? 'var(--green)' : totalErr < 30 ? 'var(--amber)' : 'var(--red)';
         const barPct = Math.min(100, (totalErr / 45) * 100);
-        return `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);border-radius:4px;transition:background 120ms" onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='transparent'">
-          <span style="min-width:100px;color:var(--text);font-weight:500">${p.fighter}</span>
+        return `<div class="learn-delta-row" style="display:flex;gap:8px;align-items:center;padding:5px 4px;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.04);border-radius:4px;transition:background 120ms" onmouseover="this.style.background='rgba(255,255,255,0.025)'" onmouseout="this.style.background='transparent'">
+          <span class="learn-delta-name" style="min-width:100px;color:var(--text);font-weight:500">${p.fighter}</span>
           <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">SS ${ssDelta}</span>
           <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">TD ${tdDelta}</span>
           <span style="min-width:50px;color:var(--text-muted);font-variant-numeric:tabular-nums">FP ${fpDelta}</span>
-          <div style="flex:1;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;min-width:36px" title="|Δ| magnitude">
+          <div class="learn-delta-bar" style="flex:1;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;min-width:36px" title="|Δ| magnitude">
             <div style="height:100%;width:${barPct.toFixed(0)}%;background:${errColor};border-radius:2px"></div>
           </div>
-          <span style="color:${errColor};font-variant-numeric:tabular-nums;min-width:42px;text-align:right;font-weight:600">±${totalErr.toFixed(1)}</span>
+          <span class="learn-delta-total" style="color:${errColor};font-variant-numeric:tabular-nums;min-width:42px;text-align:right;font-weight:600">±${totalErr.toFixed(1)}</span>
         </div>`;
       }).join('');
 
@@ -8907,7 +8907,7 @@ function renderPredictionsHtml(
     const chipColor = (v: number) => v < 8 ? 'var(--green)' : v < 16 ? 'var(--amber)' : 'var(--red)';
     const statChip = (label: string, val: number) => {
       const c = chipColor(val);
-      return `<div style="flex:1;min-width:78px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:2px solid ${c};border-radius:6px;display:flex;flex-direction:column;gap:2px">
+      return `<div class="learn-stat-chip" style="flex:1;min-width:78px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:2px solid ${c};border-radius:6px;display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Avg |Δ| ${label}</span>
         <span style="font-size:15px;font-weight:600;color:${c};font-variant-numeric:tabular-nums">±${val.toFixed(1)}</span>
       </div>`;
@@ -8918,8 +8918,8 @@ function renderPredictionsHtml(
       ${statChip('FP', s.avgAbsDeltaFP)}
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;font-size:10px">
-      <span style="padding:3px 9px;background:rgba(56,176,0,0.1);border:1px solid rgba(56,176,0,0.28);border-radius:10px;color:var(--green);font-weight:500">▲ Best · ${s.bestPrediction}</span>
-      <span style="padding:3px 9px;background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.28);border-radius:10px;color:var(--red);font-weight:500">▼ Worst · ${s.worstPrediction}</span>
+      <span class="learn-badge-best" style="padding:3px 9px;background:rgba(56,176,0,0.1);border:1px solid rgba(56,176,0,0.28);border-radius:10px;color:var(--green);font-weight:500">▲ Best · ${s.bestPrediction}</span>
+      <span class="learn-badge-worst" style="padding:3px 9px;background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.28);border-radius:10px;color:var(--red);font-weight:500">▼ Worst · ${s.worstPrediction}</span>
     </div>
     <div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px;color:var(--text-muted);flex-wrap:wrap">
       <details class="weights-details"><summary>Weights — click to expand</summary><div class="weights-body">${wAdj}</div></details>
