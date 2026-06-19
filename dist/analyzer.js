@@ -163,6 +163,16 @@ let recentLineMoves = [];
 let latestValueSpikeByFighter = {};
 let isDataLoadInFlight = false;
 let queuedDataReload = false;
+// Re-render coalescing. An auto-scrape cycle broadcasts ~5 separate messages
+// (LINES_UPDATED per platform + ODDS_UPDATED + BET_HANDLE_UPDATED) seconds apart,
+// each of which used to force its own full UI rebuild → visible repeated "page
+// reloading" flicker. requestDataReload() now fires leading-edge then coalesces a
+// burst into one trailing render; the periodic heartbeat skips the rebuild entirely
+// when the underlying line data hasn't actually changed (see lastLoadedLinesSig).
+const DATA_RELOAD_MIN_GAP_MS = 1200;
+let lastReloadFireTs = 0;
+let dataReloadTrailingTimer = null;
+let lastLoadedLinesSig = '';
 let bestPicksRenderSeq = 0;
 // Display-only name prettifier — restores apostrophes the fantasy platforms strip
 // (e.g. "Sean Omalley" -> "Sean O'Malley"). Lookups, keys, and storage keep the raw name.
@@ -15198,6 +15208,10 @@ async function loadData() {
             await loadLineHistory();
             await loadConfidenceMemoryEngine();
             const result = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1']);
+            // Signature from the RAW storage values (before the betr manual-override
+            // mutation below), so the periodic heartbeat — which reads raw storage —
+            // compares apples to apples.
+            const loadedSig = lineDataSigFromResult(result);
             const rawOdds = result[STORAGE_ODDS_KEY];
             dkCountryByName = result['fighter_countries_dk_v1'] || {};
             dkTrueProbByName = result['fight_trueprob_dk_v1'] || {};
@@ -15252,6 +15266,9 @@ async function loadData() {
                 prizepicks: pruneOrphanFighters(filteredPrizePicks),
                 draftkings_sportsbook: pruneOrphanFighters(filteredDraftKings),
             });
+            // Record what we just rendered (raw-storage basis) so the periodic
+            // heartbeat can skip a no-op rebuild when the data signature is unchanged.
+            lastLoadedLinesSig = loadedSig;
         }
         else {
             fightOddsMoneylineByName = {};
@@ -15273,17 +15290,65 @@ async function loadData() {
         }
     }
 }
+// Cheap change-signature of everything loadData renders from, so the periodic
+// heartbeat can skip a full rebuild when nothing actually changed. capturedAt
+// moves whenever a platform re-stores lines; counts catch odds/bet-handle churn.
+function lineDataSigFromResult(result) {
+    const parts = [];
+    for (const k of STORAGE_LINE_KEYS) {
+        const p = result[k];
+        parts.push(`${k}:${p?.capturedAt ?? 0}:${p?.fighters?.length ?? 0}`);
+    }
+    const odds = result[STORAGE_ODDS_KEY];
+    parts.push(`odds:${odds && typeof odds === 'object' ? Object.keys(odds).length : 0}`);
+    const bh = result['fight_bethandle_dk_v1'];
+    parts.push(`bh:${bh && typeof bh === 'object' ? Object.keys(bh).length : 0}`);
+    return parts.join('|');
+}
 function requestDataReload(delayMs = 0) {
+    const fire = () => { lastReloadFireTs = Date.now(); void loadData(); };
+    // Explicit delay (e.g. LINES_DROPPED waits 1.5s for the write to settle):
+    // schedule a single trailing fire, replacing any pending one.
     if (delayMs > 0) {
-        setTimeout(() => { void loadData(); }, delayMs);
+        if (dataReloadTrailingTimer)
+            clearTimeout(dataReloadTrailingTimer);
+        dataReloadTrailingTimer = setTimeout(() => { dataReloadTrailingTimer = null; fire(); }, delayMs);
         return;
     }
-    void loadData();
+    const since = Date.now() - lastReloadFireTs;
+    if (since >= DATA_RELOAD_MIN_GAP_MS) {
+        // Leading edge — render immediately so single updates feel instant.
+        if (dataReloadTrailingTimer) {
+            clearTimeout(dataReloadTrailingTimer);
+            dataReloadTrailingTimer = null;
+        }
+        fire();
+    }
+    else if (!dataReloadTrailingTimer) {
+        // Inside the cooldown — collapse this and any further calls into one
+        // trailing render at the end of the window.
+        dataReloadTrailingTimer = setTimeout(() => { dataReloadTrailingTimer = null; fire(); }, DATA_RELOAD_MIN_GAP_MS - since);
+    }
+    // else: a trailing render is already queued; this call is coalesced into it.
 }
 function startPeriodicDataReload(intervalMs = 60000) {
     if (periodicRefreshTimer)
         clearInterval(periodicRefreshTimer);
-    periodicRefreshTimer = setInterval(() => { requestDataReload(); }, intervalMs);
+    // Heartbeat / safety net only. Real changes arrive via background
+    // LINES_UPDATED/ODDS_UPDATED messages and render immediately; here we just
+    // catch anything missed — and crucially we DON'T rebuild the page when the
+    // data signature is unchanged, so it no longer flickers every minute while idle.
+    periodicRefreshTimer = setInterval(() => {
+        void (async () => {
+            try {
+                const r = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, 'fight_bethandle_dk_v1']);
+                if (lineDataSigFromResult(r) === lastLoadedLinesSig)
+                    return; // nothing new — no render
+            }
+            catch { /* fall through and reload on read error */ }
+            requestDataReload();
+        })();
+    }, intervalMs);
 }
 async function processData(data) {
     // Snapshot current fighter line values BEFORE mergeAndEnrich overwrites allFighters.
