@@ -11999,6 +11999,230 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   background: rgba(0,0,0,0.015);
 }
 
+/* ── GLOW-UP 79: Lean Over & Under — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Fighter card: lean-scoped depth + colored left accent === */
+.fighter-row.lean-over-row .fighter-card {
+  border-left: 3px solid rgba(0,232,122,0.30);
+  background: linear-gradient(90deg, rgba(0,232,122,0.03), transparent 25%),
+              linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(0,0,0,0.22),
+    0 0 0 1px rgba(0,232,122,0.06);
+}
+.fighter-row.lean-under-row .fighter-card {
+  border-left: 3px solid rgba(255,58,96,0.30);
+  background: linear-gradient(90deg, rgba(255,58,96,0.03), transparent 25%),
+              linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(0,0,0,0.22),
+    0 0 0 1px rgba(255,58,96,0.06);
+}
+
+/* Card hover: lean-colored outer glow */
+.fighter-row.lean-over-row .fighter-card:hover {
+  border-left-color: rgba(0,232,122,0.50);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 28px rgba(0,0,0,0.30),
+    0 0 24px rgba(0,232,122,0.08),
+    0 0 0 1px rgba(0,232,122,0.12);
+}
+.fighter-row.lean-under-row .fighter-card:hover {
+  border-left-color: rgba(255,58,96,0.50);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 28px rgba(0,0,0,0.30),
+    0 0 24px rgba(255,58,96,0.08),
+    0 0 0 1px rgba(255,58,96,0.12);
+}
+
+/* Tame the 3D hover — keep subtle lift, drop the rotateX */
+.fighter-row.lean-over-row .fighter-card:hover,
+.fighter-row.lean-under-row .fighter-card:hover {
+  transform: translateY(-3px) scale(1.005);
+}
+
+/* === Fighter name: lean-colored glow instead of generic shimmer === */
+.fighter-row.lean-over-row .fighter-name {
+  background: linear-gradient(90deg, var(--text), rgba(0,232,122,0.65), var(--text));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: textShimmer 6s ease-in-out infinite;
+}
+.fighter-row.lean-under-row .fighter-name {
+  background: linear-gradient(90deg, var(--text), rgba(255,120,148,0.65), var(--text));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: textShimmer 6s ease-in-out infinite;
+}
+
+/* === Avatar: enhanced lean-colored rings === */
+.fighter-row.lean-over-row .fighter-avatar {
+  box-shadow:
+    0 0 0 1.5px rgba(0,232,122,0.12),
+    0 0 0 3px rgba(0,232,122,0.35),
+    0 0 12px rgba(0,232,122,0.12),
+    0 3px 8px rgba(0,0,0,0.40);
+}
+.fighter-row.lean-over-row:hover .fighter-avatar {
+  box-shadow:
+    0 0 0 1.5px rgba(0,232,122,0.20),
+    0 0 0 3px rgba(0,232,122,0.55),
+    0 0 18px rgba(0,232,122,0.20),
+    0 4px 12px rgba(0,0,0,0.50);
+}
+.fighter-row.lean-under-row .fighter-avatar {
+  box-shadow:
+    0 0 0 1.5px rgba(255,58,96,0.12),
+    0 0 0 3px rgba(255,58,96,0.33),
+    0 0 12px rgba(255,58,96,0.10),
+    0 3px 8px rgba(0,0,0,0.40);
+}
+.fighter-row.lean-under-row:hover .fighter-avatar {
+  box-shadow:
+    0 0 0 1.5px rgba(255,58,96,0.20),
+    0 0 0 3px rgba(255,58,96,0.55),
+    0 0 18px rgba(255,58,96,0.18),
+    0 4px 12px rgba(0,0,0,0.50);
+}
+
+/* === Lean badge: PREMIUM gradient pill === */
+.lean-badge {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+}
+.lean-badge.lean-over {
+  background: linear-gradient(135deg, rgba(0,232,122,0.14), rgba(0,232,122,0.04)) !important;
+  border: 1px solid rgba(0,232,122,0.30) !important;
+  color: #5dffa8 !important;
+  box-shadow: 0 0 14px rgba(0,232,122,0.12), 0 2px 8px rgba(0,0,0,0.20);
+  text-shadow: 0 0 8px rgba(0,232,122,0.30);
+}
+.lean-badge.lean-under {
+  background: linear-gradient(135deg, rgba(255,58,96,0.14), rgba(255,58,96,0.04)) !important;
+  border: 1px solid rgba(255,58,96,0.30) !important;
+  color: #ff94a8 !important;
+  box-shadow: 0 0 14px rgba(255,58,96,0.12), 0 2px 8px rgba(0,0,0,0.20);
+  text-shadow: 0 0 8px rgba(255,58,96,0.25);
+}
+/* Lean badge hover */
+.fighter-row:hover .lean-badge.lean-over {
+  box-shadow: 0 0 22px rgba(0,232,122,0.18), 0 2px 8px rgba(0,0,0,0.20);
+  transform: scale(1.03);
+  border-color: rgba(0,232,122,0.45) !important;
+}
+.fighter-row:hover .lean-badge.lean-under {
+  box-shadow: 0 0 22px rgba(255,58,96,0.16), 0 2px 8px rgba(0,0,0,0.20);
+  transform: scale(1.03);
+  border-color: rgba(255,58,96,0.45) !important;
+}
+
+/* === Line cells: glass pill evolution === */
+.lean-over-row .line-cell,
+.lean-under-row .line-cell {
+  background: linear-gradient(155deg, rgba(255,255,255,0.04), rgba(0,0,0,0.03));
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 6px rgba(0,0,0,0.15);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.lean-over-row .line-cell:hover,
+.lean-under-row .line-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.25);
+}
+
+/* Line value: refined typography */
+.lean-over-row .line-value,
+.lean-under-row .line-value {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+/* === Stat cards: deeper glass + lean glow hover === */
+.lean-over-row .stat-card,
+.lean-under-row .stat-card {
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 12px rgba(0,0,0,0.20);
+}
+.lean-over-row .stat-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(0,232,122,0.06);
+}
+.lean-under-row .stat-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(255,58,96,0.06);
+}
+
+/* Stat card hero number: larger + glow */
+.lean-over-row .stat-card-num,
+.lean-under-row .stat-card-num {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+/* === Consistency badge: refined === */
+.lean-over-row .consistency-badge,
+.lean-under-row .consistency-badge {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* === Row dividers: cleaner separation === */
+.lean-over-row .fighter-card,
+.lean-under-row .fighter-card {
+  border-radius: 10px;
+  margin-bottom: 3px;
+}
+
+/* === Fighter record: refined typography === */
+.lean-over-row .fighter-record,
+.lean-under-row .fighter-record {
+  letter-spacing: 0.04em;
+}
+
+/* === Style tags: glass pills === */
+.lean-over-row .fighter-style-tag,
+.lean-under-row .fighter-style-tag {
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* === Delta blocks in stat cards: refined === */
+.lean-over-row .stat-delta-block,
+.lean-under-row .stat-delta-block {
+  border-radius: 6px;
+}
+.lean-over-row .stat-delta-block.delta-plus {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(0,232,122,0.06);
+}
+.lean-under-row .stat-delta-block.delta-minus {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(255,58,96,0.06);
+}
+
+/* === Lean sheen: faster + lean-colored === */
+.lean-over-row:hover .lean-badge.lean-over::after {
+  background: linear-gradient(105deg, transparent, rgba(0,232,122,0.20), transparent);
+}
+.lean-under-row:hover .lean-badge.lean-under::after {
+  background: linear-gradient(105deg, transparent, rgba(255,58,96,0.18), transparent);
+}
+
 /* ── GLOW-UP 78: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Keyframes === */
