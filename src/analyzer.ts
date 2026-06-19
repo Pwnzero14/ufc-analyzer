@@ -8905,27 +8905,78 @@ function renderPredictionsHtml(
     </div>` : '';
 
     const chipColor = (v: number) => v < 8 ? 'var(--green)' : v < 16 ? 'var(--amber)' : 'var(--red)';
+    const chipGrade = (v: number) => v < 8 ? 'good' : v < 16 ? 'mid' : 'bad';
     const statChip = (label: string, val: number) => {
       const c = chipColor(val);
-      return `<div class="learn-stat-chip" style="flex:1;min-width:78px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:2px solid ${c};border-radius:6px;display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Avg |Δ| ${label}</span>
-        <span style="font-size:15px;font-weight:600;color:${c};font-variant-numeric:tabular-nums">±${val.toFixed(1)}</span>
+      const g = chipGrade(val);
+      const pct = Math.min(100, Math.round((val / 40) * 100));
+      return `<div class="learn-stat-chip" data-grade="${g}">
+        <div class="learn-chip-header"><span class="learn-chip-dot" style="background:${c}"></span><span class="learn-chip-label">Avg |Δ| ${label}</span></div>
+        <span class="learn-chip-value" style="color:${c}">±${val.toFixed(1)}</span>
+        <div class="learn-chip-bar-track"><div class="learn-chip-bar-fill" style="width:${pct}%;background:${c}"></div></div>
       </div>`;
     };
-    learnBody = `${pendingBanner}<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    const overallAvg = (s.avgAbsDeltaSS + s.avgAbsDeltaTD + s.avgAbsDeltaFP) / 3;
+    const overallGrade = overallAvg < 10 ? 'A' : overallAvg < 18 ? 'B' : overallAvg < 28 ? 'C' : 'D';
+    const overallColor = overallAvg < 10 ? 'var(--green)' : overallAvg < 18 ? 'var(--amber)' : 'var(--red)';
+
+    const sortedDeltas = latestLearn.predictions
+      .filter(p => Number.isFinite(p.delta.ss) || Number.isFinite(p.delta.fp))
+      .map(p => {
+        const totalErr = Math.abs(p.delta.ss || 0) + Math.abs(p.delta.td || 0) + Math.abs(p.delta.fp || 0);
+        return { ...p, totalErr };
+      })
+      .sort((a, b) => a.totalErr - b.totalErr);
+
+    const rankedRows = sortedDeltas.map((p, idx) => {
+      const ssDelta = Number.isFinite(p.delta.ss) ? `${p.delta.ss > 0 ? '+' : ''}${p.delta.ss.toFixed(1)}` : '—';
+      const tdDelta = Number.isFinite(p.delta.td) ? `${p.delta.td > 0 ? '+' : ''}${p.delta.td.toFixed(1)}` : '—';
+      const fpDelta = Number.isFinite(p.delta.fp) ? `${p.delta.fp > 0 ? '+' : ''}${p.delta.fp.toFixed(1)}` : '—';
+      const errColor = p.totalErr < 15 ? 'var(--green)' : p.totalErr < 30 ? 'var(--amber)' : 'var(--red)';
+      const barPct = Math.min(100, (p.totalErr / 45) * 100);
+      const g = p.totalErr < 15 ? 'good' : p.totalErr < 30 ? 'mid' : 'bad';
+      return `<div class="learn-delta-row" data-grade="${g}">
+        <span class="learn-delta-rank">${idx + 1}</span>
+        <span class="learn-delta-name">${p.fighter}</span>
+        <span class="learn-delta-stat">SS ${ssDelta}</span>
+        <span class="learn-delta-stat">TD ${tdDelta}</span>
+        <span class="learn-delta-stat">FP ${fpDelta}</span>
+        <div class="learn-delta-bar"><div class="learn-delta-bar-fill" style="width:${barPct.toFixed(0)}%;background:${errColor}"></div></div>
+        <span class="learn-delta-total" style="color:${errColor}">±${p.totalErr.toFixed(1)}</span>
+      </div>`;
+    }).join('');
+
+    learnBody = `${pendingBanner}
+    <div class="learn-hero">
+      <div class="learn-grade-ring" style="--grade-color:${overallColor}"><span class="learn-grade-letter">${overallGrade}</span></div>
+      <div class="learn-hero-meta">
+        <div class="learn-hero-title">Prediction Accuracy</div>
+        <div class="learn-hero-subtitle">Avg |Δ| ${overallAvg.toFixed(1)} across ${sortedDeltas.length} fighters</div>
+        <div class="learn-hero-badges">
+          <span class="learn-badge-best">▲ Best · ${s.bestPrediction}</span>
+          <span class="learn-badge-worst">▼ Worst · ${s.worstPrediction}</span>
+        </div>
+      </div>
+    </div>
+    <div class="learn-chips-row">
       ${statChip('SS', s.avgAbsDeltaSS)}
       ${statChip('TD', s.avgAbsDeltaTD)}
       ${statChip('FP', s.avgAbsDeltaFP)}
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;font-size:10px">
-      <span class="learn-badge-best" style="padding:3px 9px;background:rgba(56,176,0,0.1);border:1px solid rgba(56,176,0,0.28);border-radius:10px;color:var(--green);font-weight:500">▲ Best · ${s.bestPrediction}</span>
-      <span class="learn-badge-worst" style="padding:3px 9px;background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.28);border-radius:10px;color:var(--red);font-weight:500">▼ Worst · ${s.worstPrediction}</span>
-    </div>
-    <div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px;color:var(--text-muted);flex-wrap:wrap">
+    <div class="learn-meta-row">
       <details class="weights-details"><summary>Weights — click to expand</summary><div class="weights-body">${wAdj}</div></details>
-      <span><span style="text-transform:uppercase;letter-spacing:0.08em;font-size:9px;opacity:0.75">Trends</span> ${s.trendUpdates}</span>
+      <span class="learn-trend-label"><span class="learn-trend-tag">Trends</span> ${s.trendUpdates}</span>
     </div>
-    ${deltaRows}`;
+    <div class="learn-delta-header">
+      <span class="learn-dh-rank">#</span>
+      <span class="learn-dh-name">Fighter</span>
+      <span class="learn-dh-stat">SS</span>
+      <span class="learn-dh-stat">TD</span>
+      <span class="learn-dh-stat">FP</span>
+      <span class="learn-dh-bar">Error</span>
+      <span class="learn-dh-total">|Δ|</span>
+    </div>
+    ${rankedRows}`;
   } else {
     // Show learn button if we have unsettled predictions and settled archive data
     const unsettled = (preds).find(p => !p.settled);
