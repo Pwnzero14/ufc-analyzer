@@ -11999,6 +11999,676 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   background: rgba(0,0,0,0.015);
 }
 
+/* ── GLOW-UP 78: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Keyframes === */
+@keyframes parlay-score-breathe {
+  0%, 100% { filter: drop-shadow(0 0 10px currentColor); }
+  50% { filter: drop-shadow(0 0 22px currentColor); }
+}
+@keyframes parlay-row-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes synergy-glow {
+  0%, 100% { border-color: rgba(27,220,136,0.18); }
+  50% { border-color: rgba(27,220,136,0.35); }
+}
+
+/* === Lab header: gradient title + glass depth === */
+.parlay-lab-header {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, rgba(255,165,0,0.06), rgba(255,165,0,0.015) 50%, transparent);
+  border: 1px solid rgba(255,165,0,0.18);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 24px rgba(0,0,0,0.25);
+}
+.parlay-lab-header::after {
+  height: 3px;
+  background: linear-gradient(90deg, var(--orange), rgba(248,198,74,0.5) 50%, rgba(255,165,0,0.1) 85%, transparent);
+  opacity: 0.8;
+  border-radius: 12px 12px 0 0;
+}
+.parlay-lab-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  background: linear-gradient(135deg, #ffa500, #ffd280, #ffa500);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 12px rgba(255,165,0,0.30));
+}
+.parlay-lab-subtitle {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.40);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.parlay-lab-header:hover {
+  border-color: rgba(255,165,0,0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 24px rgba(0,0,0,0.25),
+    0 0 24px rgba(255,165,0,0.06);
+}
+
+/* === Pool & Builder panels: deep glass containers === */
+.parlay-pool,
+.parlay-builder {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(170deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005) 40%, rgba(0,0,0,0.06));
+  border: 1px solid rgba(125,145,190,0.12);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 24px rgba(0,0,0,0.25),
+    0 20px 48px rgba(0,0,0,0.20);
+  overflow: hidden;
+  position: relative;
+}
+.parlay-pool::before,
+.parlay-builder::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  z-index: 1;
+}
+.parlay-pool::before {
+  background: linear-gradient(90deg, var(--orange), rgba(255,165,0,0.2) 60%, transparent);
+  opacity: 0.5;
+}
+.parlay-builder::before {
+  background: linear-gradient(90deg, var(--gold), rgba(248,198,74,0.2) 60%, transparent);
+  opacity: 0.5;
+}
+.parlay-pool:hover,
+.parlay-builder:hover {
+  border-color: rgba(125,145,190,0.20);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 24px rgba(0,0,0,0.25),
+    0 20px 48px rgba(0,0,0,0.20),
+    0 0 20px rgba(125,145,190,0.04);
+}
+
+/* === Pool/Builder titles: gradient text + refined === */
+.parlay-pool-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(135deg, #ffa500, #ffd280);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.parlay-pool-title::after {
+  width: 50px;
+  background: linear-gradient(90deg, var(--orange), transparent);
+  opacity: 0.4;
+}
+.parlay-builder-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(135deg, #f8c64a, #ffe4a0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.parlay-builder-title::after {
+  width: 50px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+  opacity: 0.4;
+}
+
+/* === Leg rows: entrance animation + refined depth === */
+.parlay-leg-row {
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 2px 0;
+  border: 1px solid transparent;
+  animation: parlay-row-enter 0.25s ease-out both;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.parlay-leg-row:nth-child(1)  { animation-delay: 0.02s; }
+.parlay-leg-row:nth-child(2)  { animation-delay: 0.04s; }
+.parlay-leg-row:nth-child(3)  { animation-delay: 0.06s; }
+.parlay-leg-row:nth-child(4)  { animation-delay: 0.08s; }
+.parlay-leg-row:nth-child(5)  { animation-delay: 0.10s; }
+.parlay-leg-row:nth-child(6)  { animation-delay: 0.12s; }
+.parlay-leg-row:nth-child(7)  { animation-delay: 0.14s; }
+.parlay-leg-row:nth-child(8)  { animation-delay: 0.16s; }
+.parlay-leg-row:nth-child(9)  { animation-delay: 0.18s; }
+.parlay-leg-row:nth-child(10) { animation-delay: 0.20s; }
+.parlay-leg-row:hover {
+  background: rgba(255,255,255,0.03);
+  transform: translateX(3px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  border-color: rgba(255,255,255,0.04);
+}
+
+/* Selected row: gold card treatment */
+.parlay-leg-row.selected {
+  background: linear-gradient(90deg, rgba(248,198,74,0.10), rgba(248,198,74,0.03) 50%, transparent);
+  border: 1px solid rgba(248,198,74,0.25);
+  box-shadow:
+    inset 3px 0 0 0 var(--gold),
+    0 0 14px rgba(248,198,74,0.08);
+}
+.parlay-leg-row.selected .parlay-leg-name {
+  color: var(--gold);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(248,198,74,0.20);
+}
+.parlay-leg-row.selected .parlay-leg-check {
+  color: var(--gold);
+  filter: drop-shadow(0 0 4px rgba(248,198,74,0.40));
+}
+.parlay-leg-row.selected:hover {
+  background: linear-gradient(90deg, rgba(248,198,74,0.14), rgba(248,198,74,0.04) 50%, transparent);
+  border-color: rgba(248,198,74,0.35);
+}
+
+/* === Leg name: refined typography === */
+.parlay-leg-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: color 0.12s, text-shadow 0.12s;
+}
+.parlay-leg-row:hover .parlay-leg-name {
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255,255,255,0.10);
+}
+
+/* === Direction badges: pill with colored bg === */
+.parlay-leg-dir {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.06em;
+}
+.parlay-leg-dir.over {
+  background: rgba(27,220,136,0.12);
+  border: 1px solid rgba(27,220,136,0.22);
+  color: #1bdc88;
+  box-shadow: 0 0 8px rgba(27,220,136,0.12);
+}
+.parlay-leg-dir.under {
+  background: rgba(255,108,136,0.10);
+  border: 1px solid rgba(255,108,136,0.20);
+  color: #ff6c88;
+  box-shadow: 0 0 8px rgba(255,108,136,0.10);
+}
+.parlay-leg-row:hover .parlay-leg-dir.over {
+  background: rgba(27,220,136,0.18);
+  box-shadow: 0 0 14px rgba(27,220,136,0.22);
+}
+.parlay-leg-row:hover .parlay-leg-dir.under {
+  background: rgba(255,108,136,0.15);
+  box-shadow: 0 0 14px rgba(255,108,136,0.22);
+}
+
+/* === Stat badge: glass pill === */
+.parlay-leg-stat {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.06em;
+}
+.parlay-leg-row:hover .parlay-leg-stat {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.10);
+}
+
+/* === Line value: bold + glass pill === */
+.parlay-leg-line {
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255,255,255,0.025);
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.04);
+  min-width: 36px;
+  text-align: center;
+}
+.parlay-leg-row:hover .parlay-leg-line {
+  background: rgba(255,255,255,0.05);
+  text-shadow: 0 0 8px rgba(255,255,255,0.15);
+}
+.parlay-leg-row.selected .parlay-leg-line {
+  color: var(--gold);
+  background: rgba(248,198,74,0.06);
+  border-color: rgba(248,198,74,0.12);
+}
+
+/* === Confidence: refined reveal === */
+.parlay-leg-conf {
+  font-size: 9px;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+.parlay-leg-row:hover .parlay-leg-conf { opacity: 0.9; }
+.parlay-leg-row.selected .parlay-leg-conf { opacity: 0.7; color: var(--gold); }
+
+/* === Check mark: refined === */
+.parlay-leg-check {
+  font-size: 13px;
+  transition: color 0.15s, transform 0.15s, filter 0.15s;
+}
+.parlay-leg-row:hover .parlay-leg-check {
+  color: var(--text);
+}
+
+/* === Avatar: refined in parlay rows === */
+.parlay-leg-row .bp-avatar {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.parlay-leg-row:hover .bp-avatar {
+  transform: scale(1.12);
+  box-shadow: 0 0 8px rgba(255,255,255,0.08);
+}
+.parlay-leg-row.selected .bp-avatar {
+  box-shadow: 0 0 0 1.5px rgba(248,198,74,0.40), 0 0 8px rgba(248,198,74,0.15);
+}
+
+/* === Health panel: premium glass card === */
+.parlay-health {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: linear-gradient(170deg, rgba(255,255,255,0.025), rgba(0,0,0,0.04));
+  border: 1px solid rgba(125,145,190,0.12);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 6px 18px rgba(0,0,0,0.20);
+  position: relative;
+  overflow: hidden;
+}
+.parlay-health::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(125,145,190,0.3), transparent 60%);
+  z-index: 1;
+}
+
+/* Health title: refined */
+.parlay-health-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 8px;
+}
+.parlay-health:hover .parlay-health-title {
+  color: rgba(255,255,255,0.65);
+}
+
+/* Health score: massive + breathing glow */
+.parlay-health-score {
+  font-size: 36px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.parlay-health-score.excellent {
+  background: linear-gradient(180deg, #a8ffda, #1bdc88);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 16px rgba(27,220,136,0.40));
+  animation: parlay-score-breathe 3s ease-in-out infinite;
+}
+.parlay-health-score.good {
+  background: linear-gradient(180deg, #c4f5da, rgba(27,220,136,0.7));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(27,220,136,0.25));
+}
+.parlay-health-score.fair {
+  background: linear-gradient(180deg, #fff4c8, var(--gold));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(248,198,74,0.30));
+}
+.parlay-health-score.poor {
+  background: linear-gradient(180deg, #ffc8d0, #ff6c88);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(255,108,136,0.30));
+}
+
+/* Health label */
+.parlay-health-label {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.35);
+}
+
+/* Excellent health: green accent edge */
+.parlay-health:has(.parlay-health-score.excellent)::before {
+  background: linear-gradient(90deg, rgba(27,220,136,0.6), rgba(27,220,136,0.1) 60%, transparent);
+}
+.parlay-health:has(.parlay-health-score.excellent) {
+  border-color: rgba(27,220,136,0.25);
+}
+
+/* === Correlation alerts: glass cards === */
+.parlay-corr-alert {
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
+}
+.parlay-corr-alert:hover {
+  transform: translateX(2px);
+  background: rgba(255,255,255,0.02);
+}
+.parlay-corr-alert.synergy {
+  border-left: 2px solid rgba(27,220,136,0.35);
+}
+.parlay-corr-alert.synergy:hover {
+  box-shadow: 0 0 12px rgba(27,220,136,0.10);
+}
+.parlay-corr-alert.conflict {
+  border-left: 2px solid rgba(255,108,136,0.35);
+}
+.parlay-corr-alert.conflict:hover {
+  box-shadow: 0 0 12px rgba(255,108,136,0.10);
+}
+
+/* === Slip legs: premium gold cards === */
+.parlay-slip-leg {
+  border-radius: 8px;
+  padding: 8px 14px;
+  padding-left: 16px;
+  backdrop-filter: blur(6px);
+  background: linear-gradient(90deg, rgba(248,198,74,0.05), rgba(248,198,74,0.01) 50%, transparent);
+  border: 1px solid rgba(248,198,74,0.10);
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
+  margin-bottom: 4px;
+}
+.parlay-slip-leg::before {
+  width: 3px;
+  background: linear-gradient(180deg, var(--gold), rgba(248,198,74,0.3));
+  border-radius: 0 3px 3px 0;
+  opacity: 0.6;
+}
+.parlay-slip-leg:hover {
+  background: linear-gradient(90deg, rgba(248,198,74,0.08), rgba(248,198,74,0.02) 50%, transparent);
+  border-color: rgba(248,198,74,0.18);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+}
+.parlay-slip-leg:hover::before {
+  opacity: 1;
+}
+/* Slip leg name: gold text */
+.parlay-slip-leg .parlay-leg-name {
+  color: rgba(248,198,74,0.85);
+  font-weight: 700;
+}
+.parlay-slip-leg:hover .parlay-leg-name {
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(248,198,74,0.20);
+}
+/* Slip remove: refined */
+.parlay-slip-remove {
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  transition: color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+.parlay-slip-remove:hover {
+  background: rgba(255,108,136,0.15);
+  box-shadow: 0 0 10px rgba(255,108,136,0.20);
+  transform: scale(1.15);
+}
+
+/* === Suggested Parlays: premium cards === */
+.parlay-suggest-section {
+  margin-top: 16px;
+}
+.parlay-suggest-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(135deg, #f8c64a, #ffe4a0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.20));
+  margin-bottom: 10px;
+}
+
+.parlay-suggest-card {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));
+  border: 1px solid rgba(248,198,74,0.10);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.parlay-suggest-card::before {
+  height: 2px;
+  background: linear-gradient(90deg, var(--gold), rgba(248,198,74,0.2) 60%, transparent);
+  opacity: 0.3;
+  border-radius: 10px 10px 0 0;
+}
+.parlay-suggest-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(248,198,74,0.22);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 16px rgba(248,198,74,0.06);
+}
+.parlay-suggest-card:hover::before {
+  opacity: 0.8;
+}
+/* #1 suggested: gold hero treatment */
+.parlay-suggest-title + .parlay-suggest-card {
+  border-color: rgba(248,198,74,0.25);
+  background: linear-gradient(135deg, rgba(248,198,74,0.07), rgba(248,198,74,0.02) 40%, transparent),
+              linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20), 0 0 18px rgba(248,198,74,0.05);
+}
+.parlay-suggest-title + .parlay-suggest-card::before {
+  opacity: 0.7;
+}
+/* Suggest label: refined */
+.parlay-suggest-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.parlay-suggest-card:hover .parlay-suggest-label {
+  text-shadow: 0 0 12px rgba(248,198,74,0.35);
+}
+/* Suggest legs: better typography */
+.parlay-suggest-legs {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.55);
+}
+.parlay-suggest-card:hover .parlay-suggest-legs {
+  color: rgba(255,255,255,0.80);
+}
+/* Suggest score: refined */
+.parlay-suggest-score {
+  font-size: 9px;
+  color: rgba(255,255,255,0.30);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
+.parlay-suggest-card:hover .parlay-suggest-score {
+  color: rgba(255,255,255,0.55);
+}
+
+/* === Synergy Pairs: premium green section === */
+.synergy-pairs-section {
+  margin-top: 20px;
+}
+.synergy-pairs-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(135deg, #1bdc88, #6affc0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(27,220,136,0.20));
+  margin-bottom: 3px;
+}
+.synergy-pairs-subtitle {
+  font-size: 9.5px;
+  color: rgba(255,255,255,0.30);
+  margin-bottom: 12px;
+}
+
+/* Synergy card: glass + green accent */
+.synergy-pair-card {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(170deg, rgba(27,220,136,0.02), rgba(0,0,0,0.02));
+  border: 1px solid rgba(27,220,136,0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.synergy-pair-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(27,220,136,0.5), rgba(27,220,136,0.1) 60%, transparent);
+  opacity: 0.3;
+  transition: opacity 0.15s;
+  border-radius: 10px 10px 0 0;
+  z-index: 1;
+}
+.synergy-pair-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(27,220,136,0.25);
+  background: linear-gradient(170deg, rgba(27,220,136,0.04), rgba(0,0,0,0.02));
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 16px rgba(27,220,136,0.06);
+}
+.synergy-pair-card:hover::before { opacity: 0.8; }
+
+/* Active synergy (both legs selected): green glow */
+.synergy-pair-card.synergy-active {
+  border-color: rgba(27,220,136,0.30);
+  background: linear-gradient(135deg, rgba(27,220,136,0.08), rgba(27,220,136,0.02) 50%, transparent);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20), 0 0 20px rgba(27,220,136,0.08);
+  animation: synergy-glow 3s ease-in-out infinite;
+}
+.synergy-pair-card.synergy-active::before { opacity: 0.9; }
+
+/* Synergy plus sign: prominent */
+.synergy-pair-plus {
+  font-size: 14px;
+  font-weight: 900;
+  color: #1bdc88;
+  text-shadow: 0 0 8px rgba(27,220,136,0.30);
+  transition: transform 0.15s, text-shadow 0.15s;
+}
+.synergy-pair-card:hover .synergy-pair-plus {
+  transform: scale(1.25);
+  text-shadow: 0 0 14px rgba(27,220,136,0.50);
+}
+
+/* Synergy leg text: refined */
+.synergy-pair-leg {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.55);
+  transition: color 0.12s;
+}
+.synergy-pair-card:hover .synergy-pair-leg {
+  color: rgba(255,255,255,0.85);
+}
+.synergy-pair-leg .parlay-leg-name {
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
+}
+.synergy-pair-card:hover .synergy-pair-leg .parlay-leg-name {
+  color: #fff;
+}
+
+/* Synergy reason: accent bar */
+.synergy-pair-reason {
+  font-size: 9.5px;
+  color: rgba(255,255,255,0.30);
+  margin-top: 6px;
+  padding-left: 8px;
+  border-left: 1.5px solid rgba(27,220,136,0.12);
+  line-height: 1.5;
+}
+.synergy-pair-card:hover .synergy-pair-reason {
+  color: rgba(255,255,255,0.50);
+  border-left-color: rgba(27,220,136,0.25);
+}
+
+/* Synergy meta: refined */
+.synergy-pair-meta {
+  margin-top: 6px;
+  gap: 12px;
+}
+.synergy-pair-impact {
+  font-weight: 800;
+  color: #1bdc88;
+  font-size: 9.5px;
+  text-shadow: 0 0 6px rgba(27,220,136,0.15);
+}
+.synergy-pair-card:hover .synergy-pair-impact {
+  text-shadow: 0 0 10px rgba(27,220,136,0.30);
+}
+.synergy-pair-conf {
+  color: rgba(255,255,255,0.30);
+  font-size: 9.5px;
+}
+.synergy-pair-added {
+  font-weight: 800;
+  color: var(--gold);
+  font-size: 9.5px;
+  text-shadow: 0 0 6px rgba(248,198,74,0.20);
+}
+
+/* === Alternating rows in pool === */
+.parlay-pool .parlay-leg-row:nth-child(2n) {
+  background: rgba(255,255,255,0.008);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
