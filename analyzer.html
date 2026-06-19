@@ -11561,6 +11561,444 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   margin-bottom: 1px;
 }
 
+/* ── GLOW-UP 77: Best Picks — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Keyframes === */
+@keyframes bp-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes bp-icon-pulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+@keyframes bp-row-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === Section: deeper glass + refined border === */
+.best-picks-section {
+  background: linear-gradient(170deg, rgba(255,255,255,0.028) 0%, rgba(255,255,255,0.006) 40%, rgba(0,0,0,0.08) 100%),
+              var(--bg2);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 0 -1px 0 rgba(0,0,0,0.12),
+    0 8px 24px rgba(0,0,0,0.30),
+    0 24px 64px rgba(0,0,0,0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.best-picks-section.over { border: 1px solid rgba(0,232,122,0.22); }
+.best-picks-section.under { border: 1px solid rgba(255,58,96,0.22); }
+
+/* Section accent edge: thicker + brighter */
+.best-picks-section.over::before {
+  height: 3px;
+  background: linear-gradient(90deg, rgba(0,232,122,0.75), rgba(0,232,122,0.25) 45%, rgba(0,232,122,0.04) 85%, transparent);
+  border-radius: 14px 14px 0 0;
+}
+.best-picks-section.under::before {
+  height: 3px;
+  background: linear-gradient(90deg, rgba(255,58,96,0.75), rgba(255,58,96,0.25) 45%, rgba(255,58,96,0.04) 85%, transparent);
+  border-radius: 14px 14px 0 0;
+}
+
+/* Section hover: rich outer glow */
+.best-picks-section.over:hover {
+  border-color: rgba(0,232,122,0.30);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 8px 24px rgba(0,0,0,0.30),
+    0 24px 64px rgba(0,0,0,0.35),
+    0 0 30px rgba(0,232,122,0.07),
+    0 0 60px rgba(0,232,122,0.03);
+}
+.best-picks-section.under:hover {
+  border-color: rgba(255,58,96,0.30);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 8px 24px rgba(0,0,0,0.30),
+    0 24px 64px rgba(0,0,0,0.35),
+    0 0 30px rgba(255,58,96,0.07),
+    0 0 60px rgba(255,58,96,0.03);
+}
+
+/* === Header: gradient text + colored count badge === */
+.best-picks-section.over .best-picks-header {
+  background: linear-gradient(90deg, rgba(0,232,122,0.14), rgba(0,232,122,0.04) 50%, rgba(0,232,122,0.01) 80%, transparent);
+  border-bottom: 1px solid rgba(0,232,122,0.18);
+  padding: 13px 18px;
+}
+.best-picks-section.under .best-picks-header {
+  background: linear-gradient(90deg, rgba(255,58,96,0.14), rgba(255,58,96,0.04) 50%, rgba(255,58,96,0.01) 80%, transparent);
+  border-bottom: 1px solid rgba(255,58,96,0.18);
+  padding: 13px 18px;
+}
+
+/* Title: gradient text */
+.best-picks-section.over .best-picks-title {
+  background: linear-gradient(135deg, #00e87a, #6affc0, #00e87a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+  filter: drop-shadow(0 0 8px rgba(0,232,122,0.25));
+}
+.best-picks-section.under .best-picks-title {
+  background: linear-gradient(135deg, #ff3a60, #ff94a8, #ff3a60);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+  filter: drop-shadow(0 0 8px rgba(255,58,96,0.25));
+}
+/* Restore icon visibility in ::before */
+.best-picks-section.over .best-picks-title::before {
+  -webkit-text-fill-color: #00e87a;
+  animation: bp-icon-pulse 2.5s ease-in-out infinite;
+}
+.best-picks-section.under .best-picks-title::before {
+  -webkit-text-fill-color: #ff3a60;
+  animation: bp-icon-pulse 2.5s ease-in-out infinite;
+}
+
+/* Count badge: section-colored */
+.best-picks-count {
+  font-size: 9.5px;
+  padding: 3.5px 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+}
+.best-picks-section.over .best-picks-count {
+  border-color: rgba(0,232,122,0.22);
+  color: rgba(0,232,122,0.75);
+  box-shadow: 0 0 8px rgba(0,232,122,0.06);
+}
+.best-picks-section.under .best-picks-count {
+  border-color: rgba(255,58,96,0.22);
+  color: rgba(255,58,96,0.75);
+  box-shadow: 0 0 8px rgba(255,58,96,0.06);
+}
+
+/* === Rows: entrance animation + refined spacing === */
+.best-pick-row {
+  padding: 11px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
+  animation: bp-row-enter 0.3s ease-out both;
+}
+.best-pick-row:nth-child(2)  { animation-delay: 0.02s; }
+.best-pick-row:nth-child(3)  { animation-delay: 0.05s; }
+.best-pick-row:nth-child(4)  { animation-delay: 0.08s; }
+.best-pick-row:nth-child(5)  { animation-delay: 0.11s; }
+.best-pick-row:nth-child(6)  { animation-delay: 0.14s; }
+.best-pick-row:nth-child(7)  { animation-delay: 0.17s; }
+.best-pick-row:nth-child(8)  { animation-delay: 0.20s; }
+.best-pick-row:nth-child(9)  { animation-delay: 0.23s; }
+.best-pick-row:nth-child(10) { animation-delay: 0.26s; }
+
+/* Row hover: glass lift */
+.best-pick-row:hover {
+  background: rgba(255,255,255,0.03) !important;
+  transform: translateX(5px);
+}
+
+/* === #1 HERO: card-within-card === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) {
+  padding: 16px 18px;
+  margin: 6px 8px;
+  border-radius: 10px;
+  border-bottom: none;
+  background:
+    linear-gradient(135deg, rgba(248,198,74,0.10), rgba(248,198,74,0.03) 40%, transparent 70%),
+    linear-gradient(0deg, rgba(255,255,255,0.01), rgba(255,255,255,0.03));
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  box-shadow:
+    0 4px 16px rgba(0,0,0,0.20),
+    0 0 24px rgba(248,198,74,0.06),
+    inset 0 1px 0 rgba(248,198,74,0.12);
+}
+/* Hero shimmer overlay */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2)::after {
+  border-radius: 10px;
+  background: linear-gradient(90deg, transparent 25%, rgba(248,198,74,0.07) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: bp-shimmer 4s ease-in-out infinite;
+  border-top: none;
+}
+/* Hero name: gradient gold */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-name {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #f8c64a, #ffe4a0, #f8c64a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.30));
+}
+/* Hero line: massive */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-line {
+  font-size: 24px;
+  font-weight: 900;
+  background: rgba(248,198,74,0.08);
+  border-color: rgba(248,198,74,0.20);
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(248,198,74,0.50);
+  padding: 5px 14px;
+}
+/* Hero avatar: larger + deep glow */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar {
+  width: 40px;
+  height: 40px;
+  box-shadow:
+    0 0 0 2.5px rgba(248,198,74,0.55),
+    0 0 16px rgba(248,198,74,0.30),
+    0 0 36px rgba(248,198,74,0.08);
+}
+/* Hero rank: gradient gold text */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank {
+  font-size: 13px;
+  font-weight: 900;
+  background: linear-gradient(180deg, #f8c64a, #d4a84c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.50));
+}
+/* Hero crown: bigger + glow */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank::before {
+  font-size: 14px;
+  margin-bottom: 2px;
+  -webkit-text-fill-color: unset;
+  filter: drop-shadow(0 0 5px rgba(248,198,74,0.50));
+}
+/* Hero hover */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2):hover {
+  border-color: rgba(248,198,74,0.32) !important;
+  box-shadow:
+    0 4px 16px rgba(0,0,0,0.20),
+    0 0 32px rgba(248,198,74,0.12),
+    inset 0 1px 0 rgba(248,198,74,0.15);
+  transform: translateX(3px);
+}
+
+/* === #2 SILVER: metallic rank + left accent === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) {
+  border-left: 2px solid rgba(201,212,232,0.25);
+  padding-left: 16px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3)::after {
+  background: linear-gradient(90deg, rgba(201,212,232,0.06), transparent 40%);
+  border-top: 1px solid rgba(201,212,232,0.08);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .best-pick-rank {
+  font-size: 11px; font-weight: 800;
+  background: linear-gradient(180deg, #e0e8f4, #a8b8d0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .best-pick-name {
+  font-size: 17px; font-weight: 750; color: #d0d8e8;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(201,212,232,0.40), 0 0 12px rgba(201,212,232,0.15);
+}
+
+/* === #3 BRONZE: warm metallic rank + left accent === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) {
+  border-left: 2px solid rgba(217,160,107,0.25);
+  padding-left: 16px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4)::after {
+  background: linear-gradient(90deg, rgba(217,160,107,0.06), transparent 40%);
+  border-top: 1px solid rgba(217,160,107,0.08);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .best-pick-rank {
+  font-size: 11px; font-weight: 800;
+  background: linear-gradient(180deg, #e8c090, #c48860);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .best-pick-name {
+  font-size: 17px; font-weight: 750; color: #ddb882;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(217,160,107,0.40), 0 0 12px rgba(217,160,107,0.15);
+}
+
+/* === Podium divider: clear #3 → #4 separation === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) {
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+  margin-bottom: 3px;
+  padding-bottom: 13px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(5) {
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+/* === Rank numbers (all): refined base style === */
+.best-pick-rank {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: rgba(255,255,255,0.25);
+  min-width: 24px;
+  text-align: center;
+}
+
+/* === Fighter name: refined typography === */
+.best-pick-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+.best-pick-row:hover .best-pick-name {
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px rgba(244,247,255,0.18);
+}
+
+/* === Reason text: accent bar + better color === */
+.best-pick-reason {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.32);
+  line-height: 1.5;
+  margin-top: 2px;
+  padding-left: 8px;
+  border-left: 1.5px solid rgba(255,255,255,0.06);
+  transition: color 0.15s, border-color 0.15s;
+}
+.best-picks-section.over .best-pick-row:hover .best-pick-reason {
+  border-left-color: rgba(0,232,122,0.22);
+  color: rgba(255,255,255,0.50);
+}
+.best-picks-section.under .best-pick-row:hover .best-pick-reason {
+  border-left-color: rgba(255,58,96,0.22);
+  color: rgba(255,255,255,0.50);
+}
+
+/* === Line value pill: glass + backdrop blur === */
+.best-pick-line {
+  min-width: 48px;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-weight: 800;
+  font-size: 18px;
+}
+/* Med tier: subtle section color */
+.best-pick-row.tier-med.over .best-pick-line {
+  background: rgba(0,232,122,0.035);
+  border-color: rgba(0,232,122,0.08);
+  color: #c4f0d8;
+}
+.best-pick-row.tier-med.under .best-pick-line {
+  background: rgba(255,58,96,0.035);
+  border-color: rgba(255,58,96,0.08);
+  color: #f0c4ce;
+}
+/* Low tier: muted color */
+.best-pick-row.tier-low.over .best-pick-line  { color: #b0d4c4; }
+.best-pick-row.tier-low.under .best-pick-line { color: #d4b0b8; }
+
+/* === Tier badges: refined pill with background === */
+.best-pick-tier {
+  font-size: 9px;
+  padding: 2.5px 9px;
+  border-radius: 6px;
+  letter-spacing: 0.12em;
+}
+.best-pick-tier.high {
+  background: rgba(27,220,136,0.14);
+  border: 1px solid rgba(27,220,136,0.28);
+  color: #5dffa8;
+  box-shadow: 0 0 12px rgba(27,220,136,0.18);
+}
+.best-pick-tier.med {
+  background: rgba(248,198,74,0.10);
+  border: 1px solid rgba(248,198,74,0.22);
+  color: #ffd06a;
+  box-shadow: 0 0 8px rgba(248,198,74,0.12);
+}
+.best-pick-tier.low {
+  background: rgba(255,108,136,0.08);
+  border: 1px solid rgba(255,108,136,0.16);
+  color: #ff8fa3;
+  box-shadow: 0 0 6px rgba(255,108,136,0.08);
+}
+
+/* === Type label: colored pill background === */
+.best-pick-type {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.06em;
+}
+.best-pick-type.over {
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.16);
+  color: rgba(0,232,122,0.95);
+  text-shadow: 0 0 6px rgba(0,232,122,0.30);
+}
+.best-pick-type.under {
+  background: rgba(255,58,96,0.08);
+  border: 1px solid rgba(255,58,96,0.16);
+  color: rgba(255,91,120,0.95);
+  text-shadow: 0 0 6px rgba(255,58,96,0.25);
+}
+
+/* === Platform chip: gradient glass === */
+.best-pick-platform {
+  font-size: 9px;
+  padding: 2.5px 8px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--text2);
+  letter-spacing: 0.04em;
+}
+.best-pick-row:hover .best-pick-platform {
+  background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  border-color: rgba(255,255,255,0.18);
+}
+
+/* === Avatar: refined === */
+.bp-avatar {
+  width: 34px; height: 34px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.14), 0 3px 10px rgba(0,0,0,0.50);
+}
+.best-pick-row:hover .bp-avatar {
+  transform: scale(1.10);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.22), 0 0 14px rgba(255,255,255,0.10);
+}
+
+/* === Conflict badge: premium === */
+.best-pick-conflict {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  box-shadow: 0 0 10px rgba(248,198,74,0.20);
+}
+.best-pick-row:hover .best-pick-conflict {
+  box-shadow: 0 0 18px rgba(248,198,74,0.40);
+  transform: scale(1.08);
+}
+
+/* === Alternating stripes (below podium): cleaner === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2n+6) {
+  background: rgba(255,255,255,0.012);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2n+7) {
+  background: rgba(0,0,0,0.015);
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
