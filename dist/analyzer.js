@@ -12636,6 +12636,7 @@ function buildLineTimelinePanel(f) {
             for (const plat of Object.keys(pt.v))
                 activePlats.add(plat);
         }
+        let fillsHtml = '';
         let dotsHtml = '';
         for (const plat of activePlats) {
             const color = platColors[plat] || '#888';
@@ -12648,20 +12649,22 @@ function buildLineTimelinePanel(f) {
                     continue;
                 const x = ((pt.t - tMin) / tRange) * 100;
                 const y = ((val - chartMin) / chartRange) * 100;
-                // Connecting line from previous point
                 if (prevX != null && prevY != null) {
                     const lineWidth = x - prevX;
-                    dotsHtml += `<div class="line-timeline-step" style="left:${prevX}%;bottom:${prevY}%;width:${lineWidth}%;background:${color};opacity:0.4"></div>`;
-                    // Vertical connector if value changed
+                    dotsHtml += `<div class="line-timeline-step" style="left:${prevX}%;bottom:${prevY}%;width:${lineWidth}%;background:${color}"></div>`;
                     if (Math.abs(y - prevY) > 0.5) {
                         const stepBottom = Math.min(y, prevY);
                         const stepHeight = Math.abs(y - prevY);
-                        dotsHtml += `<div class="line-timeline-vstep" style="left:${x}%;bottom:${stepBottom}%;height:${stepHeight}%;background:${color};opacity:0.4"></div>`;
+                        dotsHtml += `<div class="line-timeline-vstep" style="left:${x}%;bottom:${stepBottom}%;height:${stepHeight}%;background:${color}"></div>`;
                     }
+                    fillsHtml += `<div class="line-timeline-fill" style="left:${prevX}%;width:${lineWidth}%;bottom:0;height:${prevY}%;background:linear-gradient(to top,transparent 0%,${color} 100%)"></div>`;
                 }
-                dotsHtml += `<div class="line-timeline-dot" style="left:${x}%;bottom:${y}%;background:${color}" title="${platLabels[plat] || plat}: ${val} @ ${new Date(pt.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}"></div>`;
+                dotsHtml += `<div class="line-timeline-dot" data-plat="${plat}" style="left:${x}%;bottom:${y}%;background:${color}" title="${platLabels[plat] || plat}: ${val} @ ${new Date(pt.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}"></div>`;
                 prevX = x;
                 prevY = y;
+            }
+            if (prevX != null && prevY != null) {
+                fillsHtml += `<div class="line-timeline-fill" style="left:${prevX}%;width:${100 - prevX}%;bottom:0;height:${prevY}%;background:linear-gradient(to top,transparent 0%,${color} 100%)"></div>`;
             }
         }
         // Opening line marker
@@ -12696,28 +12699,29 @@ function buildLineTimelinePanel(f) {
         // Y-axis labels
         const yLabels = `<span class="line-timeline-y-label" style="bottom:0">${chartMin.toFixed(1)}</span><span class="line-timeline-y-label" style="bottom:100%">${chartMax.toFixed(1)}</span>`;
         // Platform legend
-        const legendHtml = [...activePlats].map(p => `<span style="color:${platColors[p] || '#888'}">${platLabels[p] || p}</span>`).join(' · ');
+        const legendHtml = [...activePlats].map(p => `<span class="line-tl-legend-chip" data-plat="${p}"><span class="line-tl-legend-dot" style="background:${platColors[p] || '#888'}"></span>${platLabels[p] || p}</span>`).join('');
         chartsHtml += `
       <div class="line-timeline-stat">
-        <div class="line-timeline-stat-header">${label} <span style="font-weight:400;opacity:0.5;margin-left:6px">${legendHtml}</span></div>
+        <div class="line-timeline-stat-header"><span class="line-tl-stat-label">${label}</span><span class="line-tl-legend">${legendHtml}</span></div>
         <div class="line-timeline-chart">
+          ${fillsHtml}
           ${yLabels}
           ${openMarkerHtml}
           ${dotsHtml}
         </div>
         <div class="line-timeline-summary">
-          <span>${openVal != null ? `Open: ${openVal}` : ''}</span>
-          <span>Now: ${currentVals}</span>
-          <span>Delta: ${deltaDisplay}</span>
-          <span>${changeCount} change${changeCount !== 1 ? 's' : ''}</span>
-          <span style="opacity:0.5">${dateFirst} ${timeFirst}–${timeLast}</span>
+          <span class="line-tl-open">${openVal != null ? `Open: ${openVal}` : ''}</span>
+          <span class="line-tl-now">Now: ${currentVals}</span>
+          <span class="line-tl-delta">Delta: ${deltaDisplay}</span>
+          <span class="line-tl-changes">${changeCount} change${changeCount !== 1 ? 's' : ''}</span>
+          <span class="line-tl-time">${dateFirst} ${timeFirst}–${timeLast}</span>
         </div>
       </div>`;
     }
     if (!hasAny)
         return '';
     return `<div class="detail-panel line-timeline-panel">
-    <div class="detail-panel-title">Line Movement Timeline</div>
+    <div class="detail-panel-title"><span class="line-tl-icon">📈</span> Line Movement Timeline</div>
     ${chartsHtml}
   </div>`;
 }

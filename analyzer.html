@@ -10925,6 +10925,642 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   margin-top: 4px;
 }
 
+/* ── GLOW-UP 74: Line Movement Timeline — plus ultra ── */
+
+/* --- Panel: glass gradient + top highlight --- */
+.line-timeline-panel {
+  border-left: 3px solid rgba(248,198,74,0.6) !important;
+  background: linear-gradient(165deg, rgba(248,198,74,0.04) 0%, rgba(248,198,74,0.01) 20%, transparent 45%),
+              var(--card-bg, rgba(13,14,26,0.85));
+  padding: 12px 14px !important;
+}
+.line-timeline-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(248,198,74,0.5), rgba(248,198,74,0.12) 50%, transparent);
+  pointer-events: none;
+}
+
+/* --- Title: hide emoji, use CSS accent --- */
+.line-tl-icon { display: none; }
+.line-timeline-panel .detail-panel-title {
+  font-family: 'Space Grotesk', 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold) !important;
+  text-shadow: 0 0 12px rgba(248,198,74,0.3);
+  padding-left: 10px;
+  position: relative;
+}
+.line-timeline-panel .detail-panel-title::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold), rgba(248,198,74,0.3));
+  box-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+
+/* --- Stat sections: dividers between FP / SS / TD --- */
+.line-timeline-stat {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(248,198,74,0.06);
+}
+.line-timeline-stat:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* --- Stat header: label + legend --- */
+.line-timeline-stat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 10px;
+}
+.line-tl-stat-label {
+  font-family: 'Space Grotesk', 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.1em;
+  position: relative;
+  padding-left: 10px;
+}
+.line-tl-stat-label::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(248,198,74,0.5);
+}
+
+/* --- Legend chips --- */
+.line-tl-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.line-tl-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--text2);
+  letter-spacing: 0.05em;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background 0.15s, border-color 0.15s;
+}
+.line-tl-legend-chip:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.15);
+}
+.line-tl-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.line-tl-legend-chip[data-plat="p6"] .line-tl-legend-dot { box-shadow: 0 0 5px rgba(0,212,255,0.6); }
+.line-tl-legend-chip[data-plat="ud"] .line-tl-legend-dot { box-shadow: 0 0 5px rgba(0,232,122,0.6); }
+.line-tl-legend-chip[data-plat="pp"] .line-tl-legend-dot { box-shadow: 0 0 5px rgba(168,85,247,0.6); }
+.line-tl-legend-chip[data-plat="betr"] .line-tl-legend-dot { box-shadow: 0 0 5px rgba(248,198,74,0.6); }
+.line-tl-legend-chip[data-plat="dk"] .line-tl-legend-dot { box-shadow: 0 0 5px rgba(74,158,255,0.6); }
+
+/* --- Chart area: taller, gradient glass, grid lines --- */
+.line-timeline-panel .line-timeline-chart {
+  height: 72px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent calc(25% - 1px),
+      rgba(248,198,74,0.04) calc(25% - 1px),
+      rgba(248,198,74,0.04) 25%
+    ),
+    linear-gradient(180deg, rgba(10,12,28,0.80), rgba(4,5,14,0.92));
+  border: 1px solid rgba(248,198,74,0.12);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04),
+              inset 0 -1px 0 rgba(248,198,74,0.04),
+              0 3px 12px rgba(0,0,0,0.35);
+}
+
+/* --- Gradient area fills under each line --- */
+.line-timeline-fill {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.10;
+  pointer-events: none;
+}
+
+/* --- Dots: bigger, per-platform glow with ring --- */
+.line-timeline-panel .line-timeline-dot {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.15s;
+}
+.line-timeline-dot[data-plat="p6"]   { box-shadow: 0 0 6px rgba(0,212,255,0.5), 0 0 2px rgba(0,212,255,0.3); border-color: rgba(0,212,255,0.4); }
+.line-timeline-dot[data-plat="ud"]   { box-shadow: 0 0 6px rgba(0,232,122,0.5), 0 0 2px rgba(0,232,122,0.3); border-color: rgba(0,232,122,0.4); }
+.line-timeline-dot[data-plat="pp"]   { box-shadow: 0 0 6px rgba(168,85,247,0.5), 0 0 2px rgba(168,85,247,0.3); border-color: rgba(168,85,247,0.4); }
+.line-timeline-dot[data-plat="betr"] { box-shadow: 0 0 6px rgba(248,198,74,0.5), 0 0 2px rgba(248,198,74,0.3); border-color: rgba(248,198,74,0.4); }
+.line-timeline-dot[data-plat="dk"]   { box-shadow: 0 0 6px rgba(74,158,255,0.5), 0 0 2px rgba(74,158,255,0.3); border-color: rgba(74,158,255,0.4); }
+
+.line-timeline-panel .line-timeline-dot:hover {
+  transform: translate(-50%, 50%) scale(2.4);
+  filter: brightness(1.4);
+  border-color: rgba(255,255,255,0.6);
+}
+.line-timeline-dot[data-plat="p6"]:hover   { box-shadow: 0 0 16px rgba(0,212,255,0.7), 0 0 4px rgba(0,212,255,0.4); }
+.line-timeline-dot[data-plat="ud"]:hover   { box-shadow: 0 0 16px rgba(0,232,122,0.7), 0 0 4px rgba(0,232,122,0.4); }
+.line-timeline-dot[data-plat="pp"]:hover   { box-shadow: 0 0 16px rgba(168,85,247,0.7), 0 0 4px rgba(168,85,247,0.4); }
+.line-timeline-dot[data-plat="betr"]:hover { box-shadow: 0 0 16px rgba(248,198,74,0.7), 0 0 4px rgba(248,198,74,0.4); }
+.line-timeline-dot[data-plat="dk"]:hover   { box-shadow: 0 0 16px rgba(74,158,255,0.7), 0 0 4px rgba(74,158,255,0.4); }
+
+/* --- Step lines: thicker, colored glow --- */
+.line-timeline-panel .line-timeline-step {
+  height: 3px;
+  border-radius: 1.5px;
+  opacity: 0.6;
+  box-shadow: 0 0 4px currentColor;
+}
+.line-timeline-panel .line-timeline-vstep {
+  width: 3px;
+  border-radius: 1.5px;
+  opacity: 0.6;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* --- Open marker: stronger dashed line + pill label --- */
+.line-timeline-panel .line-timeline-open-marker {
+  border-top: 1.5px dashed rgba(248,198,74,0.5);
+}
+.line-timeline-panel .line-timeline-open-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--gold);
+  opacity: 1;
+  background: rgba(248,198,74,0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(248,198,74,0.2);
+  top: -10px;
+}
+
+/* --- Y-axis labels: pill with better readability --- */
+.line-timeline-panel .line-timeline-y-label {
+  font-size: 7.5px;
+  font-weight: 600;
+  color: var(--text3);
+  background: rgba(0,0,0,0.5);
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.3;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* --- Summary strip: glass bar with dividers --- */
+.line-timeline-panel .line-timeline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 9px;
+  background: linear-gradient(90deg, rgba(248,198,74,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(248,198,74,0.08);
+  border-radius: 6px;
+  padding: 4px 0;
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+.line-timeline-panel .line-timeline-summary > span {
+  padding: 1px 10px;
+  border-right: 1px solid rgba(248,198,74,0.08);
+  line-height: 1.5;
+}
+.line-timeline-panel .line-timeline-summary > span:last-child {
+  border-right: none;
+}
+
+/* --- Summary item accents --- */
+.line-tl-open {
+  color: var(--gold);
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(248,198,74,0.2);
+}
+.line-tl-now {
+  color: var(--text1);
+  font-weight: 700;
+}
+.line-tl-delta {
+  font-weight: 800;
+}
+.line-tl-changes {
+  color: var(--text2);
+  font-weight: 600;
+}
+.line-tl-time {
+  color: var(--text4);
+  font-size: 8px;
+}
+
+/* --- Hover glow: stronger gold radiance --- */
+.line-timeline-panel:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04),
+              0 12px 30px rgba(0,0,0,0.35),
+              0 0 24px rgba(248,198,74,0.10) !important;
+}
+
+/* ── GLOW-UP 75: Best Picks — premium overhaul ── */
+
+/* --- Section containers: glass frame + accent border --- */
+.best-picks-section {
+  background: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.003)), var(--bg2);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 48px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+.best-picks-section.over {
+  border: 1px solid rgba(0,232,122,0.18);
+}
+.best-picks-section.under {
+  border: 1px solid rgba(255,58,96,0.18);
+}
+
+/* --- Headers: gradient bar + accent glow --- */
+.best-picks-section.over .best-picks-header {
+  background: linear-gradient(90deg, rgba(0,232,122,0.10), rgba(0,232,122,0.02) 70%, transparent);
+  border-bottom: 1px solid rgba(0,232,122,0.12);
+  padding: 11px 16px;
+}
+.best-picks-section.under .best-picks-header {
+  background: linear-gradient(90deg, rgba(255,58,96,0.10), rgba(255,58,96,0.02) 70%, transparent);
+  border-bottom: 1px solid rgba(255,58,96,0.12);
+  padding: 11px 16px;
+}
+.best-picks-title {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 10px currentColor;
+}
+.best-picks-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text2);
+}
+
+/* --- Row: enhanced hover + subtle dividers --- */
+.best-pick-row {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.best-pick-row:last-child { border-bottom: none; }
+.best-pick-row:hover {
+  background: rgba(255,255,255,0.025);
+  transform: translateX(4px);
+  box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.04);
+}
+
+/* --- #1 pick: dramatic hero treatment --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) {
+  padding: 14px 16px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2)::after {
+  background: linear-gradient(90deg, rgba(248,198,74,0.08), rgba(248,198,74,0.02) 50%, transparent);
+  border-top: 1px solid rgba(248,198,74,0.22);
+  border-bottom: 1px solid rgba(248,198,74,0.12);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank {
+  font-size: 12px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(248,198,74,0.5);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-name {
+  font-size: 19px;
+  color: var(--gold);
+  text-shadow: 0 0 14px rgba(248,198,74,0.3);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-line {
+  font-size: 22px;
+  text-shadow: 0 0 20px rgba(248,198,74,0.4);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.5), 0 0 14px rgba(248,198,74,0.25);
+}
+
+/* --- Rank numbers: podium colors --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank {
+  font-size: 12px; font-weight: 800;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .best-pick-rank {
+  color: #c9d4e8; font-weight: 700; text-shadow: 0 0 8px rgba(201,212,232,0.35);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .best-pick-rank {
+  color: #d9a06b; font-weight: 700; text-shadow: 0 0 8px rgba(217,160,107,0.35);
+}
+
+/* --- Fighter name: sharper + hover glow --- */
+.best-pick-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, letter-spacing 0.2s, text-shadow 0.15s;
+}
+.best-pick-row:hover .best-pick-name {
+  letter-spacing: 0.07em;
+  text-shadow: 0 0 8px rgba(244,247,255,0.15);
+}
+
+/* --- Reason text: better readability --- */
+.best-pick-reason {
+  font-size: 10px;
+  color: var(--text3);
+  line-height: 1.5;
+  transition: color 0.15s;
+}
+.best-pick-row:hover .best-pick-reason {
+  color: var(--text2);
+}
+
+/* --- Line number: dramatic glow per tier --- */
+.best-pick-line {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  transition: text-shadow 0.15s, transform 0.15s;
+}
+.best-pick-row:hover .best-pick-line {
+  text-shadow: 0 0 20px rgba(244,247,255,0.3);
+  transform: scale(1.05);
+}
+.best-pick-row.tier-high.over .best-pick-line {
+  color: #b8ffd8;
+  text-shadow: 0 0 16px rgba(27,220,136,0.45);
+}
+.best-pick-row.tier-high.under .best-pick-line {
+  color: #ffc8d4;
+  text-shadow: 0 0 16px rgba(255,108,136,0.45);
+}
+
+/* --- Tier badges: bigger, more glow --- */
+.best-pick-tier {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  letter-spacing: 0.1em;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.best-pick-row:hover .best-pick-tier {
+  transform: scale(1.05);
+}
+.best-pick-tier.high {
+  box-shadow: 0 0 10px rgba(27,220,136,0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.best-pick-tier.med {
+  box-shadow: 0 0 8px rgba(248,198,74,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.best-pick-tier.low {
+  box-shadow: 0 0 5px rgba(255,108,136,0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* --- Type label: stronger color --- */
+.best-pick-type {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.best-pick-type.over {
+  color: rgba(0,232,122,0.95);
+  text-shadow: 0 0 8px rgba(0,232,122,0.35);
+}
+.best-pick-type.under {
+  color: rgba(255,91,120,0.95);
+  text-shadow: 0 0 8px rgba(255,58,96,0.30);
+}
+
+/* --- Platform chip: glass pill --- */
+.best-pick-platform {
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: background 0.15s, border-color 0.15s;
+}
+.best-pick-row:hover .best-pick-platform {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* --- Avatar: refined ring + tier glow --- */
+.bp-avatar {
+  width: 32px;
+  height: 32px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.12), 0 2px 8px rgba(0,0,0,0.45);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.best-pick-row:hover .bp-avatar {
+  transform: scale(1.08);
+}
+.best-pick-row.tier-high.over .bp-avatar {
+  box-shadow: 0 0 0 1.5px rgba(27,220,136,0.5), 0 0 10px rgba(27,220,136,0.2);
+}
+.best-pick-row.tier-high.under .bp-avatar {
+  box-shadow: 0 0 0 1.5px rgba(255,108,136,0.5), 0 0 10px rgba(255,108,136,0.2);
+}
+
+/* --- Tier row tints: richer gradients --- */
+.best-pick-row.tier-high.over {
+  box-shadow: inset 3px 0 0 0 #1bdc88;
+  background: linear-gradient(90deg, rgba(0,232,122,0.08), rgba(0,232,122,0.02) 40%, transparent);
+}
+.best-pick-row.tier-high.under {
+  box-shadow: inset 3px 0 0 0 #ff6c88;
+  background: linear-gradient(90deg, rgba(255,58,96,0.08), rgba(255,58,96,0.02) 40%, transparent);
+}
+.best-pick-row.tier-med.over {
+  box-shadow: inset 3px 0 0 0 rgba(27,220,136,0.45);
+  background: linear-gradient(90deg, rgba(0,232,122,0.04), transparent 40%);
+}
+.best-pick-row.tier-med.under {
+  box-shadow: inset 3px 0 0 0 rgba(255,108,136,0.45);
+  background: linear-gradient(90deg, rgba(255,58,96,0.04), transparent 40%);
+}
+
+/* --- Conflict + lineshop badges: sharper --- */
+.best-pick-conflict {
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(248,198,74,0.18);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.best-pick-row:hover .best-pick-conflict {
+  box-shadow: 0 0 14px rgba(248,198,74,0.35);
+  transform: scale(1.05);
+}
+.best-pick-lineshop {
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(99,179,237,0.15);
+}
+
+/* --- Section hover: subtle container glow --- */
+.best-picks-section.over:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05),
+              0 16px 48px rgba(0,0,0,0.4),
+              0 0 20px rgba(0,232,122,0.06);
+}
+.best-picks-section.under:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05),
+              0 16px 48px rgba(0,0,0,0.4),
+              0 0 20px rgba(255,58,96,0.06);
+}
+
+/* ── GLOW-UP 76: Best Picks — next level ── */
+
+/* --- Section top accent edge --- */
+.best-picks-section.over::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(0,232,122,0.5), rgba(0,232,122,0.1) 60%, transparent);
+  z-index: 1;
+}
+.best-picks-section.under::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255,58,96,0.5), rgba(255,58,96,0.1) 60%, transparent);
+  z-index: 1;
+}
+.best-picks-section { position: relative; }
+
+/* --- Header: icon glow + sharper divider --- */
+.best-picks-section.over .best-picks-title::before {
+  content: '▲';
+  font-size: 10px;
+  margin-right: 4px;
+  text-shadow: 0 0 8px rgba(0,232,122,0.5);
+}
+.best-picks-section.under .best-picks-title::before {
+  content: '▼';
+  font-size: 10px;
+  margin-right: 4px;
+  text-shadow: 0 0 8px rgba(255,58,96,0.5);
+}
+.best-picks-count {
+  box-shadow: 0 0 6px rgba(255,255,255,0.04);
+}
+
+/* --- Podium top-3: stronger visual separation --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) {
+  border-bottom: 1px solid rgba(248,198,74,0.10);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(5) {
+  margin-top: 2px;
+}
+
+/* --- #2 silver treatment --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3)::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(201,212,232,0.03), transparent 35%);
+  border-top: 1px solid rgba(201,212,232,0.06);
+}
+/* --- #3 bronze treatment --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4)::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(217,160,107,0.03), transparent 35%);
+  border-top: 1px solid rgba(217,160,107,0.06);
+}
+
+/* --- Line value: subtle pill background --- */
+.best-pick-line {
+  background: rgba(255,255,255,0.03);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.best-pick-row.tier-high.over .best-pick-line {
+  background: rgba(0,232,122,0.06);
+  border-color: rgba(0,232,122,0.10);
+}
+.best-pick-row.tier-high.under .best-pick-line {
+  background: rgba(255,58,96,0.06);
+  border-color: rgba(255,58,96,0.10);
+}
+
+/* --- Row hover: colored accent glow --- */
+.best-picks-section.over .best-pick-row:hover {
+  box-shadow: inset 3px 0 0 0 currentColor,
+              0 0 12px rgba(0,232,122,0.06);
+}
+.best-picks-section.under .best-pick-row:hover {
+  box-shadow: inset 3px 0 0 0 currentColor,
+              0 0 12px rgba(255,58,96,0.06);
+}
+
+/* --- Avatar hover: ring brightens --- */
+.best-pick-row:hover .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.20), 0 0 12px rgba(255,255,255,0.08);
+}
+.best-picks-section.over .best-pick-row.tier-high:hover .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(0,232,122,0.55), 0 0 14px rgba(0,232,122,0.25);
+}
+.best-picks-section.under .best-pick-row.tier-high:hover .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(255,108,136,0.55), 0 0 14px rgba(255,108,136,0.25);
+}
+
+/* --- Alternating subtle stripes (below podium) --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2n+6) {
+  background: rgba(255,255,255,0.008);
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2n+7) {
+  background: transparent;
+}
+
+/* --- Rank: #1 gets mini crown via text --- */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank::before {
+  content: '👑';
+  display: block;
+  font-size: 10px;
+  line-height: 1;
+  margin-bottom: 1px;
+}
+
 /* ── GLOW-UP 46: Best Picks card interiors ── */
 /* Fighter names, reason text, tier badges, platform chips, avatars,
    and a crown treatment for the #1 pick. */
