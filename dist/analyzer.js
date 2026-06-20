@@ -12447,7 +12447,7 @@ function findSimilarOpponentFights(db, currentOppDB, minSimilarity = 0.35, maxRe
     matches.sort((a, b) => b.similarity - a.similarity);
     return matches.slice(0, maxResults);
 }
-function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLine, ctrlLine) {
+function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLine, ctrlLine, ssR1Line = null) {
     if (!db?.loaded || !oppDB?.loaded || !db.history?.length)
         return '';
     const matches = findSimilarOpponentFights(db, oppDB, 0.35, 5);
@@ -12460,14 +12460,18 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
     // Compute average performance vs similar opponents
     const withFP = matches.filter(m => m.betrFP != null);
     const withSS = matches.filter(m => m.fightResult.sigStr != null);
+    const withR1SS = matches.filter(m => m.fightResult.sigStrR1 != null);
     const withTD = matches.filter(m => m.fightResult.td != null);
     const avgFP = withFP.length > 0 ? withFP.reduce((s, m) => s + m.betrFP, 0) / withFP.length : null;
     const avgSS = withSS.length > 0 ? withSS.reduce((s, m) => s + (m.fightResult.sigStr || 0), 0) / withSS.length : null;
+    const avgR1SS = withR1SS.length > 0 ? withR1SS.reduce((s, m) => s + (m.fightResult.sigStrR1 || 0), 0) / withR1SS.length : null;
     const avgTD = withTD.length > 0 ? withTD.reduce((s, m) => s + (m.fightResult.td || 0), 0) / withTD.length : null;
     const winRate = matches.length > 0 ? matches.filter(m => m.fightResult.result === 'win').length / matches.length : null;
     // Career averages for comparison
     const careerFP = db.avgFP_betr ?? db.avgFP ?? null;
     const careerSS = db.avgSigStr ?? null;
+    const r1History = (db.history || []).filter(h => h.sigStrR1 != null);
+    const careerR1SS = r1History.length > 0 ? r1History.reduce((s, h) => s + (h.sigStrR1 || 0), 0) / r1History.length : null;
     const careerTD = db.avgTDperFight ?? null;
     // Delta arrows
     const deltaIcon = (similar, career) => {
@@ -12495,6 +12499,13 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
         const pct = Math.round(overCount / withSS.length * 100);
         const color = pct >= 60 ? '#1bdc88' : pct <= 40 ? '#ff6c88' : 'var(--text2)';
         ssOverHtml = `<div style="font-size:9.5px;color:${color};margin-top:2px">vs similar: ${overCount}/${withSS.length} (${pct}%) went OVER ${ssLine} SS</div>`;
+    }
+    let ssR1OverHtml = '';
+    if (ssR1Line != null && withR1SS.length >= 2) {
+        const overCount = withR1SS.filter(m => (m.fightResult.sigStrR1 || 0) > ssR1Line).length;
+        const pct = Math.round(overCount / withR1SS.length * 100);
+        const color = pct >= 60 ? '#1bdc88' : pct <= 40 ? '#ff6c88' : 'var(--text2)';
+        ssR1OverHtml = `<div style="font-size:9.5px;color:${color};margin-top:2px">vs similar: ${overCount}/${withR1SS.length} (${pct}%) went OVER ${ssR1Line} R1 SS</div>`;
     }
     let tdOverHtml = '';
     if (tdLine != null && withTD.length >= 2) {
@@ -12527,6 +12538,7 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
         const round = m.fightResult.round ? `R${m.fightResult.round}` : '';
         const fp = m.betrFP != null ? m.betrFP.toFixed(1) : '—';
         const ss = m.fightResult.sigStr != null ? String(m.fightResult.sigStr) : '—';
+        const ssR1 = m.fightResult.sigStrR1 != null ? String(m.fightResult.sigStrR1) : '';
         const td = m.fightResult.td != null ? String(m.fightResult.td) : '—';
         const kd = m.fightResult.kd != null && m.fightResult.kd > 0 ? String(m.fightResult.kd) : '';
         const ctrl = m.fightResult.ctrlSecs != null && m.fightResult.ctrlSecs > 0
@@ -12549,6 +12561,7 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
       <div class="sim-opp-stats">
         <span class="sim-opp-stat">FP: <b>${fp}</b>${fpBadge}</span>
         <span class="sim-opp-stat">SS: <b>${ss}</b></span>
+        ${ssR1 ? `<span class="sim-opp-stat">R1: <b>${ssR1}</b></span>` : ''}
         <span class="sim-opp-stat">TD: <b>${td}</b></span>
         ${kd ? `<span class="sim-opp-stat">KD: <b>${kd}</b></span>` : ''}
         ${ctrl ? `<span class="sim-opp-stat">Ctrl: <b>${ctrl}</b></span>` : ''}
@@ -12562,6 +12575,7 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
     <div class="sim-opp-avg-stats">
       ${avgFP != null ? `<span class="sim-opp-stat">FP: <b>${avgFP.toFixed(1)}</b>${deltaIcon(avgFP, careerFP)}</span>` : ''}
       ${avgSS != null ? `<span class="sim-opp-stat">SS: <b>${avgSS.toFixed(1)}</b>${deltaIcon(avgSS, careerSS)}</span>` : ''}
+      ${avgR1SS != null ? `<span class="sim-opp-stat">R1 SS: <b>${avgR1SS.toFixed(1)}</b>${deltaIcon(avgR1SS, careerR1SS)}</span>` : ''}
       ${avgTD != null ? `<span class="sim-opp-stat">TD: <b>${avgTD.toFixed(1)}</b>${deltaIcon(avgTD, careerTD)}</span>` : ''}
     </div>
   </div>`;
@@ -12571,7 +12585,7 @@ function buildSimilarOpponentPanel(fighterName, db, oppDB, fpLine, ssLine, tdLin
       Current opponent profile: <span style="color:var(--text2)">${archLabel} · ${currentOppProfile.style} · ${currentOppProfile.slpm.toFixed(1)} SLpM · ${currentOppProfile.tdAvgPerFight.toFixed(1)} TD/fight · ${currentOppProfile.tdDef}% TD def</span>
     </div>
     ${avgRow}
-    ${fpOverHtml}${ssOverHtml}${tdOverHtml}${ctrlOverHtml}
+    ${fpOverHtml}${ssOverHtml}${ssR1OverHtml}${tdOverHtml}${ctrlOverHtml}
     <div class="sim-opp-fights">${fightRows}</div>
   </div>`;
 }
@@ -14076,7 +14090,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${buildPayoutEVPanel(f, lean, leanEvDetail, perBookEv)}
         </div>
         <div class="panel-pair">
-        ${buildSimilarOpponentPanel(f.name, db, oppEntry?.db || null, activeLine, platformStatLine(f, 'ss'), platformStatLine(f, 'td'), platformStatLine(f, 'ctrl'))}
+        ${buildSimilarOpponentPanel(f.name, db, oppEntry?.db || null, activeLine, platformStatLine(f, 'ss'), platformStatLine(f, 'td'), platformStatLine(f, 'ctrl'), f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null)}
         ${buildOpponentQualityPanel(db, activeLine, platformStatLine(f, 'ss'))}
         </div>
         ${buildLineTimelinePanel(f)}
