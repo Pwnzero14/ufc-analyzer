@@ -12296,6 +12296,122 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 90: Opponent Activity Context — Homo Sapiens Sapiens ── */
+
+/* ── OAC panel — amber/warm identity ── */
+.oac-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(240,192,64,0.06) !important;
+  border-left: 3px solid rgba(240,192,64,0.4) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.oac-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(240,192,64,0.025) 0%, transparent 50%);
+  pointer-events: none;
+}
+.oac-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #f0c040, #f8d878) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  color: transparent !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Fight count line ── */
+.oac-panel > div[style*="font-size:9px"][style*="text4"] {
+  font-size: 10px !important;
+  color: rgba(160,185,220,0.5) !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Section labels (vs active / vs passive) ── */
+.oac-panel .oq-section-label {
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  color: rgba(240,192,64,0.7) !important;
+  margin: 10px 0 6px !important;
+  padding-bottom: 4px !important;
+  border-bottom: 1px solid rgba(240,192,64,0.06);
+}
+.oac-panel .oq-section-label:first-of-type {
+  margin-top: 4px !important;
+}
+
+/* ── Hit rate rows ── */
+.oac-panel .style-hit-row {
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  transition: background 0.15s ease;
+}
+.oac-panel .style-hit-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+.oac-panel .style-hit-label {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  color: rgba(160,185,220,0.5) !important;
+}
+.oac-panel .style-hit-bar-wrap {
+  background: rgba(255,255,255,0.04) !important;
+  height: 6px !important;
+  border-radius: 4px !important;
+}
+.oac-panel .style-hit-bar.over-bar {
+  background: linear-gradient(90deg, rgba(72,199,142,0.4), #48c78e) !important;
+  box-shadow: 0 0 8px rgba(72,199,142,0.3);
+  border-radius: 4px !important;
+}
+.oac-panel .style-hit-bar.under-bar {
+  background: linear-gradient(90deg, rgba(255,100,100,0.4), #ff6464) !important;
+  box-shadow: 0 0 8px rgba(255,100,100,0.3);
+  border-radius: 4px !important;
+}
+.oac-panel .style-hit-pct {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.oac-panel .style-hit-count {
+  font-size: 9px !important;
+  color: rgba(160,185,220,0.4) !important;
+}
+
+/* ── Quality flag (lean-point inside OAC) ── */
+.oac-panel .lean-reason {
+  background: rgba(10,16,35,0.4) !important;
+  border: 1px solid rgba(240,192,64,0.06) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+}
+.oac-panel .lean-point-icon.pos {
+  color: #6ef5b1 !important;
+  text-shadow: 0 0 6px rgba(0,232,122,0.3);
+}
+.oac-panel .lean-point-icon.neg {
+  color: #ff8aa0 !important;
+  text-shadow: 0 0 6px rgba(255,58,96,0.3);
+}
+
+/* ── Entrance animation ── */
+@keyframes glow90-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.oac-panel {
+  animation: glow90-slideUp 0.35s ease both;
+}
+
+
 /* ── GLOW-UP 89: Fair Value Generator & Payout EV — Homo Sapiens Sapiens ── */
 
 /* ── Fair Value panel — gold identity ── */
