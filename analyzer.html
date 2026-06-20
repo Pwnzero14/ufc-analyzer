@@ -12296,6 +12296,214 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 86: Matchup Models & Career — Homo Sapiens Sapiens ── */
+
+/* ── MA Panel containers ── */
+.ma-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.ma-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+}
+
+/* ── SS panel identity — cyan ── */
+.ma-ss {
+  border-left: 3px solid rgba(44,212,208,0.5) !important;
+}
+.ma-ss::after {
+  background: radial-gradient(ellipse at top left, rgba(44,212,208,0.04) 0%, transparent 50%);
+}
+.ma-ss .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #2cd4d0, #50e0ff) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 4px !important;
+}
+
+/* ── CTRL panel identity — purple ── */
+.ma-ctrl {
+  border-left: 3px solid rgba(127,136,255,0.5) !important;
+}
+.ma-ctrl::after {
+  background: radial-gradient(ellipse at top left, rgba(127,136,255,0.04) 0%, transparent 50%);
+}
+.ma-ctrl .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #7f88ff, #a78bfa) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 4px !important;
+}
+
+/* ── Fighter subheadings ── */
+.ma-panel .ma-subhead {
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  margin: 10px 0 5px !important;
+  padding-bottom: 4px !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+}
+.ma-panel .ma-subhead:first-child {
+  margin-top: 2px !important;
+}
+.ma-ss .ma-subhead {
+  color: rgba(44,212,208,0.8) !important;
+  border-bottom-color: rgba(44,212,208,0.08) !important;
+}
+.ma-ctrl .ma-subhead {
+  color: rgba(127,136,255,0.8) !important;
+  border-bottom-color: rgba(127,136,255,0.08) !important;
+}
+
+/* ── Stat badge tags (SS, CTRL, OPP) ── */
+.ma-panel .ma-subhead-tag {
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+}
+.ma-ss .ma-subhead-tag {
+  color: rgba(44,212,208,0.6) !important;
+  background: rgba(44,212,208,0.06) !important;
+  border-color: rgba(44,212,208,0.1) !important;
+}
+.ma-ctrl .ma-subhead-tag {
+  color: rgba(127,136,255,0.6) !important;
+  background: rgba(127,136,255,0.06) !important;
+  border-color: rgba(127,136,255,0.1) !important;
+}
+
+/* ── Data rows — glass style ── */
+.ma-panel .ma-row {
+  padding: 4px 8px !important;
+  margin: 1px 0 !important;
+  border-radius: 6px !important;
+  transition: background 0.15s ease;
+}
+.ma-panel .ma-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+.ma-panel .ma-label {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em;
+  color: rgba(160,185,220,0.45) !important;
+  flex: 0 0 112px !important;
+}
+.ma-panel .ma-value {
+  font-size: 11px !important;
+  color: rgba(200,216,240,0.8) !important;
+  line-height: 1.5;
+}
+.ma-panel .ma-value.ma-verdict {
+  color: #d0e0f8 !important;
+  font-weight: 700 !important;
+}
+
+/* ── Verdict chips — evolved glass ── */
+.ma-panel .ma-verdict-chip {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.3px;
+}
+.ma-panel .ma-verdict-chip.over {
+  color: #6ef5b1 !important;
+  background: rgba(0,232,122,0.08) !important;
+  border: 1px solid rgba(0,232,122,0.25) !important;
+  box-shadow: 0 0 12px rgba(0,232,122,0.15), inset 0 0 8px rgba(0,232,122,0.04);
+  text-shadow: 0 0 10px rgba(0,232,122,0.4) !important;
+}
+.ma-panel .ma-verdict-chip.under {
+  color: #ff8aa0 !important;
+  background: rgba(255,58,96,0.08) !important;
+  border: 1px solid rgba(255,58,96,0.25) !important;
+  box-shadow: 0 0 12px rgba(255,58,96,0.15), inset 0 0 8px rgba(255,58,96,0.04);
+  text-shadow: 0 0 10px rgba(255,58,96,0.35) !important;
+}
+.ma-panel .ma-verdict-chip.none {
+  color: rgba(160,185,220,0.5) !important;
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* ── Confidence bar — evolved ── */
+.ma-panel .ma-conf {
+  max-width: 200px !important;
+}
+.ma-panel .ma-conf-bar {
+  height: 6px !important;
+  border-radius: 4px !important;
+  background: rgba(255,255,255,0.04) !important;
+}
+.ma-panel .ma-conf-fill.high {
+  background: linear-gradient(90deg, rgba(0,232,122,0.3), #20df8f) !important;
+  box-shadow: 0 0 10px rgba(32,223,143,0.4) !important;
+}
+.ma-panel .ma-conf-fill.med {
+  background: linear-gradient(90deg, rgba(248,198,74,0.3), var(--gold)) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.35) !important;
+}
+.ma-panel .ma-conf-fill.low {
+  background: linear-gradient(90deg, rgba(255,108,136,0.3), var(--red)) !important;
+  box-shadow: 0 0 10px rgba(255,91,120,0.35) !important;
+}
+.ma-panel .ma-conf-num {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(208,224,248,0.9) !important;
+}
+
+/* ── Dim values (unavailable) ── */
+.ma-panel .ma-value-dim {
+  color: rgba(160,185,220,0.3) !important;
+  font-style: italic;
+  font-size: 10px !important;
+}
+
+/* ── Final Summary subhead ── */
+.ma-panel .ma-subhead:last-of-type {
+  margin-top: 12px !important;
+  padding-top: 6px !important;
+}
+.ma-ss .ma-subhead:last-of-type {
+  border-top: 1px solid rgba(44,212,208,0.06);
+}
+.ma-ctrl .ma-subhead:last-of-type {
+  border-top: 1px solid rgba(127,136,255,0.06);
+}
+
+/* ── Entrance animation ── */
+@keyframes glow86-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ma-panel {
+  animation: glow86-slideUp 0.35s ease both;
+}
+.ma-panel:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+
 /* ── GLOW-UP 85: Similar Opponent History — Homo Sapiens Sapiens ── */
 
 /* ── Panel container ── */
