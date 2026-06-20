@@ -12296,6 +12296,350 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 92: Best Picks — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Section containers: deep glass with radial overlay === */
+.best-picks-section {
+  background: linear-gradient(180deg, rgba(12,18,35,0.96) 0%, rgba(8,12,28,0.92) 100%) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06),
+              0 20px 60px rgba(0,0,0,0.5),
+              0 0 1px rgba(255,255,255,0.06) !important;
+  overflow: visible !important;
+}
+.best-picks-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: 0;
+}
+.best-picks-section.over {
+  border: 1px solid rgba(0,232,122,0.22) !important;
+}
+.best-picks-section.over::after {
+  background: radial-gradient(ellipse 60% 40% at 10% 0%, rgba(0,232,122,0.06), transparent 70%);
+}
+.best-picks-section.under {
+  border: 1px solid rgba(255,58,96,0.22) !important;
+}
+.best-picks-section.under::after {
+  background: radial-gradient(ellipse 60% 40% at 10% 0%, rgba(255,58,96,0.06), transparent 70%);
+}
+
+/* === Top accent edge: refined === */
+.best-picks-section.over::before {
+  height: 2px !important;
+  background: linear-gradient(90deg, rgba(0,232,122,0.6), rgba(0,232,122,0.15) 50%, transparent) !important;
+  border-radius: 14px 14px 0 0;
+}
+.best-picks-section.under::before {
+  height: 2px !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.6), rgba(255,58,96,0.15) 50%, transparent) !important;
+  border-radius: 14px 14px 0 0;
+}
+
+/* === Headers: gradient text titles === */
+.best-picks-section.over .best-picks-header {
+  background: linear-gradient(90deg, rgba(0,232,122,0.08), rgba(0,232,122,0.015) 60%, transparent) !important;
+  border-bottom: 1px solid rgba(0,232,122,0.14) !important;
+  padding: 12px 18px !important;
+  position: relative;
+  z-index: 1;
+}
+.best-picks-section.under .best-picks-header {
+  background: linear-gradient(90deg, rgba(255,58,96,0.08), rgba(255,58,96,0.015) 60%, transparent) !important;
+  border-bottom: 1px solid rgba(255,58,96,0.14) !important;
+  padding: 12px 18px !important;
+  position: relative;
+  z-index: 1;
+}
+.best-picks-section.over .best-picks-title {
+  background: linear-gradient(135deg, #6dffc2 0%, #20df8f 45%, #0be876 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 13px !important;
+  letter-spacing: 0.16em !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 10px rgba(0,232,122,0.35));
+}
+.best-picks-section.under .best-picks-title {
+  background: linear-gradient(135deg, #ffb3c4 0%, #ff6c88 45%, #ff3a60 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 13px !important;
+  letter-spacing: 0.16em !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 10px rgba(255,58,96,0.35));
+}
+.best-picks-section.over .best-picks-title::before {
+  -webkit-text-fill-color: initial !important;
+  filter: drop-shadow(0 0 10px rgba(0,232,122,0.6));
+}
+.best-picks-section.under .best-picks-title::before {
+  -webkit-text-fill-color: initial !important;
+  filter: drop-shadow(0 0 10px rgba(255,58,96,0.6));
+}
+
+/* === Count badge: glass pill with accent tint === */
+.best-picks-section.over .best-picks-count {
+  background: rgba(0,232,122,0.08) !important;
+  border: 1px solid rgba(0,232,122,0.18) !important;
+  color: rgba(0,232,122,0.85) !important;
+  box-shadow: 0 0 8px rgba(0,232,122,0.08) !important;
+}
+.best-picks-section.under .best-picks-count {
+  background: rgba(255,58,96,0.08) !important;
+  border: 1px solid rgba(255,58,96,0.18) !important;
+  color: rgba(255,58,96,0.85) !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.08) !important;
+}
+
+/* === Rows: deeper glass + refined dividers === */
+.best-pick-row {
+  border-bottom: 1px solid rgba(255,255,255,0.025) !important;
+  position: relative;
+  z-index: 1;
+}
+.best-pick-row:hover {
+  background: rgba(255,255,255,0.03) !important;
+}
+
+/* === #1 Hero pick: premium glass card === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) {
+  padding: 16px 18px !important;
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(248,198,74,0.01) 60%, transparent) !important;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2)::after {
+  background: linear-gradient(90deg, rgba(248,198,74,0.10), rgba(248,198,74,0.025) 45%, transparent) !important;
+  border-top: 1px solid rgba(248,198,74,0.28) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.14) !important;
+  border-radius: 8px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-name {
+  font-size: 20px !important;
+  background: linear-gradient(135deg, #ffe9ad 0%, #f8c64a 50%, #ffb833 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(248,198,74,0.3));
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-line {
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar {
+  width: 38px !important;
+  height: 38px !important;
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.55), 0 0 18px rgba(248,198,74,0.3), 0 4px 12px rgba(0,0,0,0.4) !important;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank::before {
+  font-size: 12px !important;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.7));
+}
+
+/* === #2 Silver: refined wash === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) {
+  padding: 12px 18px;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3)::after {
+  background: linear-gradient(90deg, rgba(201,212,232,0.045), transparent 30%) !important;
+  border-top: 1px solid rgba(201,212,232,0.08) !important;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(3) .best-pick-name {
+  color: #d4dff0;
+  text-shadow: 0 0 8px rgba(201,212,232,0.2);
+}
+
+/* === #3 Bronze: refined wash === */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4)::after {
+  background: linear-gradient(90deg, rgba(217,160,107,0.045), transparent 30%) !important;
+  border-top: 1px solid rgba(217,160,107,0.08) !important;
+}
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(4) .best-pick-name {
+  color: #e8c99c;
+  text-shadow: 0 0 8px rgba(217,160,107,0.2);
+}
+
+/* === Line value pill: deeper glass === */
+.best-pick-line {
+  background: rgba(255,255,255,0.035) !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  font-weight: 900 !important;
+}
+.best-pick-row.tier-high.over .best-pick-line {
+  background: rgba(0,232,122,0.07) !important;
+  border-color: rgba(0,232,122,0.14) !important;
+  color: #a8ffda !important;
+  text-shadow: 0 0 20px rgba(27,220,136,0.5), 0 0 40px rgba(27,220,136,0.15) !important;
+}
+.best-pick-row.tier-high.under .best-pick-line {
+  background: rgba(255,58,96,0.07) !important;
+  border-color: rgba(255,58,96,0.14) !important;
+  color: #ffc0cc !important;
+  text-shadow: 0 0 20px rgba(255,108,136,0.5), 0 0 40px rgba(255,108,136,0.15) !important;
+}
+
+/* === Tier badges: glass refinement === */
+.best-pick-tier.high {
+  background: rgba(27,220,136,0.12) !important;
+  border: 1px solid rgba(27,220,136,0.28) !important;
+  box-shadow: 0 0 12px rgba(27,220,136,0.2), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+  color: #6dffc2 !important;
+}
+.best-pick-tier.med {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.24) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.15), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  color: #ffe9ad !important;
+}
+.best-pick-tier.low {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  color: var(--text3) !important;
+}
+
+/* === Type badge: glass pill === */
+.best-pick-type {
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  font-size: 9px !important;
+  letter-spacing: 0.08em !important;
+}
+.best-pick-type.over {
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.18);
+  color: #6dffc2 !important;
+  text-shadow: 0 0 10px rgba(0,232,122,0.35) !important;
+}
+.best-pick-type.under {
+  background: rgba(255,58,96,0.08);
+  border: 1px solid rgba(255,58,96,0.18);
+  color: #ffb3c4 !important;
+  text-shadow: 0 0 10px rgba(255,58,96,0.30) !important;
+}
+
+/* === Platform chip: refined glass === */
+.best-pick-platform {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  font-size: 8.5px !important;
+  color: var(--text2) !important;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s !important;
+}
+.best-pick-row:hover .best-pick-platform {
+  background: rgba(255,255,255,0.09) !important;
+  border-color: rgba(255,255,255,0.16) !important;
+  box-shadow: 0 0 6px rgba(255,255,255,0.04);
+}
+
+/* === Avatar: refined glass ring === */
+.bp-avatar {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.14), 0 3px 10px rgba(0,0,0,0.5) !important;
+}
+.best-pick-row.tier-high.over .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(27,220,136,0.5), 0 0 14px rgba(27,220,136,0.25), 0 3px 10px rgba(0,0,0,0.4) !important;
+}
+.best-pick-row.tier-high.under .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(255,108,136,0.5), 0 0 14px rgba(255,108,136,0.25), 0 3px 10px rgba(0,0,0,0.4) !important;
+}
+
+/* === Tier row tints: richer evolution === */
+.best-pick-row.tier-high.over {
+  box-shadow: inset 3px 0 0 0 #1bdc88 !important;
+  background: linear-gradient(90deg, rgba(0,232,122,0.09), rgba(0,232,122,0.02) 35%, transparent) !important;
+}
+.best-pick-row.tier-high.under {
+  box-shadow: inset 3px 0 0 0 #ff6c88 !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.09), rgba(255,58,96,0.02) 35%, transparent) !important;
+}
+.best-pick-row.tier-med.over {
+  box-shadow: inset 3px 0 0 0 rgba(27,220,136,0.5) !important;
+  background: linear-gradient(90deg, rgba(0,232,122,0.045), transparent 35%) !important;
+}
+.best-pick-row.tier-med.under {
+  box-shadow: inset 3px 0 0 0 rgba(255,108,136,0.5) !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.045), transparent 35%) !important;
+}
+.best-pick-row.tier-low.over {
+  box-shadow: inset 2px 0 0 0 rgba(27,220,136,0.25) !important;
+}
+.best-pick-row.tier-low.under {
+  box-shadow: inset 2px 0 0 0 rgba(255,108,136,0.25) !important;
+}
+
+/* === Section hover: evolved glow === */
+.best-picks-section.over:hover {
+  border-color: rgba(0,232,122,0.30) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06),
+              0 20px 60px rgba(0,0,0,0.5),
+              0 0 30px rgba(0,232,122,0.08) !important;
+}
+.best-picks-section.under:hover {
+  border-color: rgba(255,58,96,0.30) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06),
+              0 20px 60px rgba(0,0,0,0.5),
+              0 0 30px rgba(255,58,96,0.08) !important;
+}
+
+/* === Row hover: accent-colored glow === */
+.best-picks-section.over .best-pick-row:hover {
+  box-shadow: inset 3px 0 0 0 rgba(0,232,122,0.7),
+              0 0 16px rgba(0,232,122,0.06) !important;
+}
+.best-picks-section.under .best-pick-row:hover {
+  box-shadow: inset 3px 0 0 0 rgba(255,58,96,0.7),
+              0 0 16px rgba(255,58,96,0.06) !important;
+}
+
+/* === Fighter name: sharper typography === */
+.best-pick-name {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+}
+.best-pick-row:hover .best-pick-name {
+  letter-spacing: 0.08em !important;
+}
+
+/* === Reason text: better contrast === */
+.best-pick-reason {
+  color: rgba(160,178,210,0.7) !important;
+  font-size: 10px !important;
+}
+.best-pick-row:hover .best-pick-reason {
+  color: rgba(185,200,228,0.85) !important;
+}
+
+/* === Conflict/lineshop badges: glass upgrade === */
+.best-pick-conflict {
+  background: rgba(248,198,74,0.08) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.15) !important;
+}
+.best-pick-lineshop {
+  background: rgba(99,179,237,0.08) !important;
+  border: 1px solid rgba(99,179,237,0.18) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 8px rgba(99,179,237,0.12) !important;
+}
+
+/* === Grid gap refinement === */
+.best-picks-grid {
+  gap: 16px !important;
+}
+
+
 /* ── GLOW-UP 91: SS/R1 SS/TD/FT Lean & Style Matchup — Homo Sapiens Sapiens ── */
 
 /* ── Standalone lean panels (SS, R1 SS, TD, FT) — cyan identity ── */
