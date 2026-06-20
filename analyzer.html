@@ -12296,6 +12296,240 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 84: Recalibration Engine — Homo Sapiens Sapiens ── */
+
+/* ── Section wrapper identity ── */
+[data-section-id="cal-recal"] {
+  background: linear-gradient(135deg, rgba(15,20,42,0.92) 0%, rgba(12,18,38,0.88) 100%) !important;
+  border: 1px solid rgba(0,212,255,0.08) !important;
+  border-radius: 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+[data-section-id="cal-recal"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #00d4ff, #4db0ff, #a855f7);
+  border-radius: 14px 14px 0 0;
+  z-index: 1;
+}
+[data-section-id="cal-recal"]::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top right, rgba(0,212,255,0.03) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* ── Section title ── */
+[data-section-id="cal-recal"] .best-picks-header .best-picks-title {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  background: linear-gradient(90deg, #00d4ff, #4db0ff) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  letter-spacing: 0.4px;
+}
+
+/* ── Badge pill ── */
+[data-section-id="cal-recal"] .best-picks-header span[style*="text-muted"] {
+  background: rgba(0,212,255,0.08) !important;
+  border: 1px solid rgba(0,212,255,0.12) !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  color: rgba(0,212,255,0.55) !important;
+  font-weight: 700 !important;
+}
+
+/* ── Description text ── */
+[data-section-id="cal-recal"] > div > div[style*="text-muted"][style*="margin-bottom"] {
+  background: rgba(10,16,35,0.4) !important;
+  border: 1px solid rgba(0,212,255,0.04) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  font-size: 10.5px !important;
+  line-height: 1.5;
+  color: rgba(140,165,210,0.5) !important;
+}
+
+/* ── Table wrapper ── */
+.calib-recal-table {
+  border-collapse: separate !important;
+  border-spacing: 0 3px !important;
+  margin-top: 4px;
+}
+
+/* ── Table header ── */
+.calib-recal-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.calib-recal-table th {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 1px !important;
+  color: rgba(130,160,210,0.4) !important;
+  text-transform: uppercase !important;
+  padding: 8px 10px !important;
+  border-bottom: 1px solid rgba(0,212,255,0.06) !important;
+  background: rgba(12,18,35,0.7) !important;
+  backdrop-filter: blur(8px);
+}
+.calib-recal-table th:first-child {
+  border-radius: 8px 0 0 0;
+}
+.calib-recal-table th:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+/* ── Table rows ── */
+.calib-recal-table tbody tr {
+  transition: all 0.15s ease;
+}
+.calib-recal-table tbody tr td {
+  padding: 9px 10px !important;
+  border-bottom: 1px solid rgba(0,212,255,0.03) !important;
+  background: rgba(12,18,38,0.35);
+  font-family: 'JetBrains Mono', monospace !important;
+}
+.calib-recal-table tbody tr td:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.calib-recal-table tbody tr td:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.calib-recal-table tbody tr:hover td {
+  background: rgba(0,212,255,0.04) !important;
+}
+
+/* ── Range column ── */
+.calib-recal-table td:first-child {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #c0d4f0 !important;
+  letter-spacing: 0.3px;
+}
+
+/* ── Predicted column ── */
+.calib-recal-table td:nth-child(2) {
+  font-size: 11px !important;
+  color: rgba(160,180,220,0.5) !important;
+  text-align: center;
+}
+
+/* ── Recalibrated column ── */
+.calib-recal-table td:nth-child(3) {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.calib-recal-arrow {
+  color: rgba(130,155,200,0.3) !important;
+  margin: 0 5px !important;
+  font-size: 10px;
+}
+.calib-recal-adjusted {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 8px currentColor;
+}
+.calib-recal-table tbody tr:hover .calib-recal-adjusted {
+  text-shadow: 0 0 12px currentColor !important;
+}
+
+/* ── Delta column ── */
+.calib-recal-delta {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 6px currentColor;
+}
+.calib-recal-table tbody tr:hover .calib-recal-delta {
+  text-shadow: 0 0 10px currentColor !important;
+}
+
+/* ── Grade column ── */
+.calib-recal-table td:nth-child(5) {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+}
+
+/* ── N column ── */
+.calib-recal-table td:nth-child(6) {
+  font-size: 10px !important;
+  color: rgba(130,155,200,0.3) !important;
+  opacity: 1 !important;
+}
+.calib-recal-table tbody tr:hover td:nth-child(6) {
+  color: rgba(130,155,200,0.55) !important;
+}
+
+/* ── Per-stat recalibration rows ── */
+.calib-recal-table ~ div[style*="margin-top"] {
+  background: rgba(10,16,35,0.4) !important;
+  border: 1px solid rgba(0,212,255,0.04) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  margin-top: 10px !important;
+}
+.calib-recal-table ~ div[style*="margin-top"] span[style*="font-weight:700"] {
+  color: rgba(0,212,255,0.7) !important;
+  font-size: 11px !important;
+}
+.calib-recal-table ~ div[style*="margin-top"] span[style*="surface2"] {
+  background: rgba(15,22,45,0.6) !important;
+  border: 1px solid rgba(0,212,255,0.06) !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  transition: all 0.15s ease;
+}
+.calib-recal-table ~ div[style*="margin-top"] span[style*="surface2"]:hover {
+  background: rgba(0,212,255,0.06) !important;
+  border-color: rgba(0,212,255,0.12) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+/* ── Recalibration Active notice ── */
+.calib-recal-table ~ div[style*="rgba(0,232,122"] {
+  background: rgba(0,232,122,0.04) !important;
+  border: 1px solid rgba(0,232,122,0.12) !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  margin-top: 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+.calib-recal-table ~ div[style*="rgba(0,232,122"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #00e87a, #1bdc88);
+  border-radius: 3px 0 0 3px;
+}
+
+/* ── Row entrance animation ── */
+@keyframes recal-row-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.calib-recal-table tbody tr {
+  animation: recal-row-enter 0.3s ease both;
+}
+.calib-recal-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+.calib-recal-table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+.calib-recal-table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+.calib-recal-table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+.calib-recal-table tbody tr:nth-child(5) { animation-delay: 0.10s; }
+.calib-recal-table tbody tr:nth-child(6) { animation-delay: 0.12s; }
+.calib-recal-table tbody tr:nth-child(7) { animation-delay: 0.14s; }
+.calib-recal-table tbody tr:nth-child(8) { animation-delay: 0.16s; }
+.calib-recal-table tbody tr:nth-child(9) { animation-delay: 0.18s; }
+.calib-recal-table tbody tr:nth-child(10) { animation-delay: 0.20s; }
+
 /* ── GLOW-UP 83: Betr Screenshot Reader — Homo Sapiens Sapiens ── */
 
 /* ── Modal container evolution ── */
