@@ -12296,6 +12296,232 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 82: Line Movement Timeline — SVG redesign (Homo Sapiens Sapiens) ── */
+
+/* ── Panel container ── */
+.line-timeline-panel {
+  background: linear-gradient(135deg, rgba(15,20,40,0.92) 0%, rgba(20,28,58,0.88) 100%) !important;
+  border: 1px solid rgba(74,158,255,0.12) !important;
+  border-radius: 16px !important;
+  padding: 22px 20px 18px !important;
+  position: relative;
+  overflow: hidden;
+}
+.line-timeline-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #4a9eff, #00d4ff, #00e87a, #a855f7, #f8c64a);
+  border-radius: 16px 16px 0 0;
+}
+.line-timeline-panel > .detail-panel-title {
+  font-size: 17px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.3px;
+  background: linear-gradient(90deg, #7db5ff, #50e0ff) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 16px !important;
+  padding-left: 2px;
+  position: relative;
+}
+.line-timeline-panel > .detail-panel-title::before {
+  content: '📈';
+  -webkit-text-fill-color: initial;
+  margin-right: 8px;
+}
+.line-timeline-panel > .detail-panel-title::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(125,181,255,0.15) 50%, transparent 100%);
+  animation: lm-title-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes lm-title-shimmer {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+/* ── Per-stat section ── */
+.line-timeline-stat {
+  background: rgba(20,28,55,0.5) !important;
+  border: 1px solid rgba(74,158,255,0.08) !important;
+  border-radius: 12px !important;
+  padding: 14px 14px 10px !important;
+  margin-bottom: 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+.line-timeline-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #4a9eff, #00d4ff);
+  border-radius: 3px 0 0 3px;
+}
+
+/* ── Stat header + legend ── */
+.line-timeline-stat-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 10px !important;
+}
+.line-tl-stat-label {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px;
+  color: #c8d8f0 !important;
+  text-transform: uppercase;
+}
+.line-tl-legend {
+  display: flex !important;
+  gap: 8px !important;
+}
+.line-tl-legend-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: rgba(180,195,220,0.7) !important;
+  background: rgba(30,40,70,0.5) !important;
+  border: 1px solid rgba(74,158,255,0.08) !important;
+  border-radius: 6px !important;
+  padding: 2px 7px !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+.line-tl-legend-dot {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  display: inline-block !important;
+}
+
+/* ── OLD chart/fill/dot/step elements — HIDE ── */
+.line-timeline-chart {
+  display: none !important;
+}
+.line-timeline-summary {
+  display: none !important;
+}
+
+/* ── Per-platform sparkline rows ── */
+.lm-plat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lm-plat-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 48px 42px 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(12,18,38,0.45);
+  border-radius: 8px;
+  border: 1px solid rgba(74,158,255,0.04);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.lm-plat-row:hover {
+  background: rgba(20,30,60,0.6);
+  border-color: rgba(74,158,255,0.1);
+}
+
+/* Platform label */
+.lm-plat-label {
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--plat-color, #b0c0e0);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--plat-color, #4a9eff) 30%, transparent);
+  letter-spacing: 0.5px;
+}
+
+/* Sparkline container */
+.lm-plat-spark {
+  height: 28px;
+  min-width: 0;
+}
+.lm-plat-spark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Current value */
+.lm-plat-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: #d0e0f8;
+  text-align: right;
+}
+
+/* Delta */
+.lm-plat-delta {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(160,180,210,0.4);
+  text-align: right;
+}
+.lm-plat-delta.lm-row-rise {
+  color: #34d399;
+  text-shadow: 0 0 6px rgba(52,211,153,0.3);
+}
+.lm-plat-delta.lm-row-drop {
+  color: #f87171;
+  text-shadow: 0 0 6px rgba(248,113,113,0.3);
+}
+
+/* Change count */
+.lm-plat-changes {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(140,160,200,0.35);
+  text-align: right;
+}
+
+/* Opening line badge */
+.lm-open-badge {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(248,198,74,0.75);
+  background: rgba(248,198,74,0.08);
+  border: 1px solid rgba(248,198,74,0.15);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+/* Time footer */
+.lm-time-footer {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(130,155,200,0.35);
+  text-align: center;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Entrance animation ── */
+@keyframes lm-stat-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.line-timeline-stat {
+  animation: lm-stat-enter 0.5s ease both;
+}
+.line-timeline-stat:nth-child(2) { animation-delay: 0.08s; }
+.line-timeline-stat:nth-child(3) { animation-delay: 0.16s; }
+.line-timeline-stat:nth-child(4) { animation-delay: 0.24s; }
+
 /* ── GLOW-UP 77: Best Picks — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Keyframes === */

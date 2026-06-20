@@ -12656,119 +12656,94 @@ function buildLineTimelinePanel(f) {
         if (history.length < 2)
             continue;
         hasAny = true;
-        // Collect all values to compute range
-        let allVals = [];
-        for (const pt of history) {
-            for (const v of Object.values(pt.v))
-                allVals.push(v);
-        }
         const openKey = openingLineKey('p6', stat, f.name);
         const openVal = _openingLines.get(openKey);
-        if (openVal != null)
-            allVals.push(openVal);
-        const minVal = Math.min(...allVals);
-        const maxVal = Math.max(...allVals);
-        const range = maxVal - minVal || 1;
-        const padding = range * 0.15;
-        const chartMin = minVal - padding;
-        const chartMax = maxVal + padding;
-        const chartRange = chartMax - chartMin || 1;
-        // Time range
         const tMin = history[0].t;
         const tMax = history[history.length - 1].t;
         const tRange = tMax - tMin || 1;
-        // Build dots and connecting lines per platform
         const activePlats = new Set();
         for (const pt of history) {
             for (const plat of Object.keys(pt.v))
                 activePlats.add(plat);
         }
-        let fillsHtml = '';
-        let dotsHtml = '';
+        // Per-platform sparkline rows
+        let rowsHtml = '';
         for (const plat of activePlats) {
             const color = platColors[plat] || '#888';
-            let prevX = null;
-            let prevY = null;
-            for (let i = 0; i < history.length; i++) {
-                const pt = history[i];
-                const val = pt.v[plat];
-                if (val == null)
-                    continue;
-                const x = ((pt.t - tMin) / tRange) * 100;
-                const y = ((val - chartMin) / chartRange) * 100;
-                if (prevX != null && prevY != null) {
-                    const lineWidth = x - prevX;
-                    dotsHtml += `<div class="line-timeline-step" style="left:${prevX}%;bottom:${prevY}%;width:${lineWidth}%;background:${color}"></div>`;
-                    if (Math.abs(y - prevY) > 0.5) {
-                        const stepBottom = Math.min(y, prevY);
-                        const stepHeight = Math.abs(y - prevY);
-                        dotsHtml += `<div class="line-timeline-vstep" style="left:${x}%;bottom:${stepBottom}%;height:${stepHeight}%;background:${color}"></div>`;
-                    }
-                    fillsHtml += `<div class="line-timeline-fill" style="left:${prevX}%;width:${lineWidth}%;bottom:0;height:${prevY}%;background:linear-gradient(to top,transparent 0%,${color} 100%)"></div>`;
+            const pLabel = platLabels[plat] || plat;
+            const vals = [];
+            for (const pt of history) {
+                if (pt.v[plat] != null)
+                    vals.push({ t: pt.t, v: pt.v[plat] });
+            }
+            if (vals.length === 0)
+                continue;
+            const currentVal = vals[vals.length - 1].v;
+            const firstVal = vals[0].v;
+            const delta = currentVal - firstVal;
+            const deltaStr = delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`;
+            const deltaClass = delta > 0 ? 'lm-row-rise' : delta < 0 ? 'lm-row-drop' : '';
+            // Sparkline SVG — per-platform, isolated
+            const sparkW = 180;
+            const sparkH = 32;
+            const sPad = 4;
+            const platVals = vals.map(v => v.v);
+            const pMin = Math.min(...platVals);
+            const pMax = Math.max(...platVals);
+            const pRange = pMax - pMin || 1;
+            const pPad = pRange * 0.2;
+            let sparkPath = '';
+            if (vals.length === 1 || pMax === pMin) {
+                // Flat line
+                const sy = sparkH / 2;
+                sparkPath = `<line x1="${sPad}" y1="${sy}" x2="${sparkW - sPad}" y2="${sy}" stroke="${color}" stroke-width="2" opacity="0.6" stroke-dasharray="4,3"/>`;
+            }
+            else {
+                // Step sparkline
+                const pts = vals.map(v => ({
+                    x: sPad + ((v.t - tMin) / tRange) * (sparkW - sPad * 2),
+                    y: sPad + (sparkH - sPad * 2) - ((v.v - (pMin - pPad)) / (pRange + pPad * 2)) * (sparkH - sPad * 2)
+                }));
+                let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+                for (let i = 1; i < pts.length; i++) {
+                    d += ` L${pts[i].x.toFixed(1)},${pts[i - 1].y.toFixed(1)} L${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`;
                 }
-                dotsHtml += `<div class="line-timeline-dot" data-plat="${plat}" style="left:${x}%;bottom:${y}%;background:${color}" title="${platLabels[plat] || plat}: ${val} @ ${new Date(pt.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}"></div>`;
-                prevX = x;
-                prevY = y;
+                d += ` L${(sparkW - sPad).toFixed(1)},${pts[pts.length - 1].y.toFixed(1)}`;
+                sparkPath = `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`;
+                // Start + end dots
+                sparkPath += `<circle cx="${pts[0].x.toFixed(1)}" cy="${pts[0].y.toFixed(1)}" r="3" fill="${color}" opacity="0.4"/>`;
+                sparkPath += `<circle cx="${pts[pts.length - 1].x.toFixed(1)}" cy="${pts[pts.length - 1].y.toFixed(1)}" r="3.5" fill="${color}" stroke="rgba(10,14,24,0.6)" stroke-width="1"/>`;
             }
-            if (prevX != null && prevY != null) {
-                fillsHtml += `<div class="line-timeline-fill" style="left:${prevX}%;width:${100 - prevX}%;bottom:0;height:${prevY}%;background:linear-gradient(to top,transparent 0%,${color} 100%)"></div>`;
-            }
+            const changeCount = vals.reduce((c, v, i) => i > 0 && v.v !== vals[i - 1].v ? c + 1 : c, 0);
+            rowsHtml += `
+        <div class="lm-plat-row" style="--plat-color:${color}">
+          <span class="lm-plat-label">${pLabel}</span>
+          <div class="lm-plat-spark">
+            <svg viewBox="0 0 ${sparkW} ${sparkH}" preserveAspectRatio="none">${sparkPath}</svg>
+          </div>
+          <span class="lm-plat-val">${currentVal}</span>
+          <span class="lm-plat-delta ${deltaClass}">${deltaStr}</span>
+          <span class="lm-plat-changes">${changeCount}×</span>
+        </div>`;
         }
-        // Opening line marker
-        let openMarkerHtml = '';
-        if (openVal != null) {
-            const openY = ((openVal - chartMin) / chartRange) * 100;
-            openMarkerHtml = `<div class="line-timeline-open-marker" style="bottom:${openY}%"><span class="line-timeline-open-label">${openVal}</span></div>`;
-        }
-        // Current values and delta
-        const lastPt = history[history.length - 1];
-        const currentVals = Object.entries(lastPt.v).map(([p, v]) => `${platLabels[p] || p}: ${v}`).join(' · ');
-        const firstPt = history[0];
-        // Compute max delta across platforms that exist in both first and last
-        let maxDelta = 0;
-        let deltaDisplay = '—';
-        for (const plat of Object.keys(lastPt.v)) {
-            const firstVal = firstPt.v[plat];
-            const lastVal = lastPt.v[plat];
-            if (firstVal != null && lastVal != null) {
-                const d = lastVal - firstVal;
-                if (Math.abs(d) > Math.abs(maxDelta))
-                    maxDelta = d;
-            }
-        }
-        if (maxDelta !== 0) {
-            deltaDisplay = `<span class="${maxDelta > 0 ? 'delta-rise' : 'delta-drop'}">${maxDelta > 0 ? '+' : ''}${maxDelta.toFixed(1)}</span>`;
-        }
-        const changeCount = history.length - 1;
-        const timeFirst = new Date(tMin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const timeLast = new Date(tMax).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Time range footer
+        const timeFirst = new Date(tMin).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        const timeLast = new Date(tMax).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         const dateFirst = new Date(tMin).toLocaleDateString([], { month: 'short', day: 'numeric' });
-        // Y-axis labels
-        const yLabels = `<span class="line-timeline-y-label" style="bottom:0">${chartMin.toFixed(1)}</span><span class="line-timeline-y-label" style="bottom:100%">${chartMax.toFixed(1)}</span>`;
-        // Platform legend
-        const legendHtml = [...activePlats].map(p => `<span class="line-tl-legend-chip" data-plat="${p}"><span class="line-tl-legend-dot" style="background:${platColors[p] || '#888'}"></span>${platLabels[p] || p}</span>`).join('');
         chartsHtml += `
       <div class="line-timeline-stat">
-        <div class="line-timeline-stat-header"><span class="line-tl-stat-label">${label}</span><span class="line-tl-legend">${legendHtml}</span></div>
-        <div class="line-timeline-chart">
-          ${fillsHtml}
-          ${yLabels}
-          ${openMarkerHtml}
-          ${dotsHtml}
+        <div class="line-timeline-stat-header">
+          <span class="line-tl-stat-label">${label}</span>
+          ${openVal != null ? `<span class="lm-open-badge">Open: ${openVal}</span>` : ''}
         </div>
-        <div class="line-timeline-summary">
-          <span class="line-tl-open">${openVal != null ? `Open: ${openVal}` : ''}</span>
-          <span class="line-tl-now">Now: ${currentVals}</span>
-          <span class="line-tl-delta">Delta: ${deltaDisplay}</span>
-          <span class="line-tl-changes">${changeCount} change${changeCount !== 1 ? 's' : ''}</span>
-          <span class="line-tl-time">${dateFirst} ${timeFirst}–${timeLast}</span>
-        </div>
+        <div class="lm-plat-rows">${rowsHtml}</div>
+        <div class="lm-time-footer">${dateFirst} · ${timeFirst} – ${timeLast}</div>
       </div>`;
     }
     if (!hasAny)
         return '';
     return `<div class="detail-panel line-timeline-panel">
-    <div class="detail-panel-title"><span class="line-tl-icon">📈</span> Line Movement Timeline</div>
+    <div class="detail-panel-title">Line Movement Timeline</div>
     ${chartsHtml}
   </div>`;
 }
