@@ -11561,6 +11561,563 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
   margin-bottom: 1px;
 }
 
+/* ── GLOW-UP 80: Calibration — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Keyframes === */
+@keyframes calib-ring-breathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(32,223,143,0.40)) drop-shadow(0 0 50px rgba(32,223,143,0.15));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 32px rgba(32,223,143,0.65)) drop-shadow(0 0 70px rgba(32,223,143,0.25));
+    transform: scale(1.03);
+  }
+}
+@keyframes calib-shimmer-sweep {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes calib-hero-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes calib-bar-rise {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+@keyframes calib-diag-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes calib-ring-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes calib-score-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* === Confidence Calibration Hero === */
+.calib-hero {
+  animation: calib-hero-enter 0.5s ease-out both;
+  background: linear-gradient(135deg, rgba(10,14,24,0.65) 0%, rgba(32,223,143,0.04) 40%, rgba(10,14,24,0.65) 100%) !important;
+  border: 1px solid rgba(32,223,143,0.15) !important;
+  border-radius: 16px !important;
+  padding: 24px 28px !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -1px 0 rgba(32,223,143,0.04),
+    0 12px 40px rgba(0,0,0,0.4),
+    0 0 60px rgba(32,223,143,0.04) !important;
+  position: relative;
+  overflow: hidden;
+  gap: 24px !important;
+}
+.calib-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(32,223,143,0.8), rgba(44,212,208,0.5), rgba(32,223,143,0.15), transparent);
+  border-radius: 16px 16px 0 0;
+}
+.calib-hero::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse 50% 120% at 0% 50%, rgba(32,223,143,0.07), transparent 60%),
+    radial-gradient(ellipse 30% 50% at 100% 0%, rgba(44,212,208,0.03), transparent 50%);
+  pointer-events: none;
+}
+
+/* --- Score Ring: dramatic outer glow ring + breathing --- */
+.calib-score-ring {
+  animation: calib-ring-breathe 4s ease-in-out infinite !important;
+  width: 120px !important;
+  height: 120px !important;
+  box-shadow:
+    0 0 0 4px rgba(32,223,143,0.12),
+    0 0 0 8px rgba(32,223,143,0.04),
+    0 12px 32px rgba(0,0,0,0.4),
+    0 0 40px rgba(32,223,143,0.10) !important;
+  transition: transform 0.3s ease !important;
+}
+.calib-score-ring:hover {
+  transform: scale(1.10) !important;
+  box-shadow:
+    0 0 0 4px rgba(32,223,143,0.20),
+    0 0 0 8px rgba(32,223,143,0.08),
+    0 16px 40px rgba(0,0,0,0.5),
+    0 0 60px rgba(32,223,143,0.18) !important;
+}
+.calib-score-ring::after {
+  background: radial-gradient(circle, rgba(16,20,36,0.95) 60%, rgba(32,223,143,0.03) 100%) !important;
+  box-shadow: inset 0 0 30px rgba(32,223,143,0.08) !important;
+}
+
+/* --- Score Number: giant gradient + pop animation --- */
+.calib-score-num {
+  font-size: 36px !important;
+  font-weight: 900 !important;
+  background: linear-gradient(180deg, #e0fff0 0%, #60ffb0 25%, #20df8f 50%, #0ae07a 100%) !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 14px rgba(32,223,143,0.40)) drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  animation: calib-score-pop 0.6s ease-out 0.2s both;
+}
+
+/* --- Score Label: gradient + glow --- */
+.calib-score-label {
+  font-size: 8px !important;
+  letter-spacing: 0.20em !important;
+  font-weight: 800 !important;
+  background: linear-gradient(90deg, rgba(32,223,143,0.9), rgba(44,212,208,0.8));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 4px rgba(32,223,143,0.2));
+}
+
+/* --- Summary Card: premium glass card-within-card --- */
+.calib-summary {
+  background: linear-gradient(135deg, rgba(10,14,24,0.60), rgba(32,223,143,0.02), rgba(10,14,24,0.60)) !important;
+  border: 1px solid rgba(32,223,143,0.10) !important;
+  border-radius: 14px !important;
+  padding: 18px 22px !important;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 24px rgba(0,0,0,0.25) !important;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease !important;
+}
+.calib-summary::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+  background: linear-gradient(180deg, rgba(32,223,143,0.8), rgba(44,212,208,0.4), rgba(32,223,143,0.1));
+  border-radius: 4px 0 0 4px;
+}
+.calib-summary::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 40%; height: 100%;
+  background: radial-gradient(ellipse at 100% 50%, rgba(32,223,143,0.03), transparent 70%);
+  pointer-events: none;
+}
+.calib-summary:hover {
+  border-color: rgba(32,223,143,0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 32px rgba(0,0,0,0.3), 0 0 20px rgba(32,223,143,0.05) !important;
+  transform: translateY(-1px);
+}
+
+/* --- Summary Title: big gradient text with shimmer --- */
+.calib-summary-title {
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #e0fff5 0%, #48c78e 35%, #2cd4d0 65%, #48c78e 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: calib-shimmer-sweep 6s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(44,212,208,0.20));
+  margin-bottom: 8px !important;
+}
+
+/* --- Summary Text: enhanced readability --- */
+.calib-summary-text {
+  font-size: 12px !important;
+  line-height: 1.75 !important;
+  color: rgba(200,215,240,0.72) !important;
+}
+.calib-summary:hover .calib-summary-text {
+  color: rgba(225,235,250,0.90) !important;
+}
+
+/* === Calibration Curve Section === */
+.best-picks-section[data-section-id="calibration-curve"],
+.best-picks-section[data-section-id="calibration"] {
+  background: linear-gradient(180deg, rgba(10,14,24,0.60), rgba(44,212,208,0.02), rgba(10,14,24,0.60)) !important;
+  border: 1px solid rgba(44,212,208,0.10) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(44,212,208,0.03) !important;
+  overflow: hidden;
+  position: relative;
+}
+.best-picks-section[data-section-id="calibration-curve"]::before,
+.best-picks-section[data-section-id="calibration"]::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 4px !important;
+  background: linear-gradient(90deg, rgba(44,212,208,0.7), rgba(32,223,143,0.4), rgba(44,212,208,0.15), transparent) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+/* --- Section header title: gradient teal + shimmer --- */
+.best-picks-section[data-section-id="calibration-curve"] .best-picks-title,
+.best-picks-section[data-section-id="calibration"] .best-picks-title {
+  font-size: 13px !important;
+  background: linear-gradient(135deg, #e0fffa 0%, #2cd4d0 40%, #48c78e 80%, #2cd4d0 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: calib-shimmer-sweep 8s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(44,212,208,0.20));
+}
+
+/* --- Count badge: teal glass pill --- */
+.best-picks-section[data-section-id="calibration-curve"] .best-picks-count,
+.best-picks-section[data-section-id="calibration"] .best-picks-count {
+  border-color: rgba(44,212,208,0.30) !important;
+  color: rgba(44,212,208,0.85) !important;
+  background: rgba(44,212,208,0.06) !important;
+  box-shadow: 0 0 8px rgba(44,212,208,0.06);
+}
+
+/* --- Bar chart area: glass floor --- */
+.best-picks-section[data-section-id="calibration"] div[style*="display:flex"][style*="align-items:flex-end"][style*="padding:6px"],
+.best-picks-section[data-section-id="calibration-curve"] div[style*="display:flex"][style*="align-items:flex-end"][style*="padding:6px"] {
+  background: rgba(10,14,24,0.30);
+  border: 1px solid rgba(44,212,208,0.04);
+  border-radius: 12px;
+  padding: 12px 8px 8px 8px !important;
+  margin-top: 4px;
+}
+
+/* --- Bar columns: entrance animation --- */
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div[style*="flex-direction:column"],
+.best-picks-section[data-section-id="calibration-curve"] div[style*="align-items:flex-end"] > div[style*="flex-direction:column"] {
+  animation: calib-hero-enter 0.35s ease-out both;
+  padding: 4px 2px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div[style*="flex-direction:column"]:hover,
+.best-picks-section[data-section-id="calibration-curve"] div[style*="align-items:flex-end"] > div[style*="flex-direction:column"]:hover {
+  background: rgba(255,255,255,0.02);
+}
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(2) { animation-delay: 0.04s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(3) { animation-delay: 0.08s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(4) { animation-delay: 0.12s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(5) { animation-delay: 0.16s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(6) { animation-delay: 0.20s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(7) { animation-delay: 0.24s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(8) { animation-delay: 0.28s; }
+.best-picks-section[data-section-id="calibration"] div[style*="align-items:flex-end"] > div:nth-child(9) { animation-delay: 0.32s; }
+
+/* --- Actual bars: stronger glow + glass border --- */
+.best-picks-section[data-section-id="calibration"] div[style*="border-radius:4px 4px 2px 2px"],
+.best-picks-section[data-section-id="calibration-curve"] div[style*="border-radius:4px 4px 2px 2px"] {
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-bottom: none !important;
+  border-radius: 6px 6px 2px 2px !important;
+  transform-origin: bottom center;
+  transition: transform 0.2s ease, box-shadow 0.3s ease, filter 0.3s ease;
+}
+.best-picks-section[data-section-id="calibration"] div[style*="border-radius:4px 4px 2px 2px"]:hover,
+.best-picks-section[data-section-id="calibration-curve"] div[style*="border-radius:4px 4px 2px 2px"]:hover {
+  transform: scaleY(1.06) scaleX(1.1) !important;
+  filter: brightness(1.2);
+}
+
+/* --- Predicted bars (dashed): refined glass --- */
+.best-picks-section[data-section-id="calibration"] div[style*="border:1px dashed"],
+.best-picks-section[data-section-id="calibration-curve"] div[style*="border:1px dashed"] {
+  background: rgba(125,145,190,0.05) !important;
+  border-color: rgba(125,145,190,0.22) !important;
+  border-radius: 5px !important;
+}
+
+/* --- Per-Stat Calibration: premium glass panel --- */
+div[style*="Per-Stat Calibration"] {
+  background: linear-gradient(135deg, rgba(10,14,24,0.45), rgba(44,212,208,0.02)) !important;
+  border: 1px solid rgba(44,212,208,0.08) !important;
+  border-radius: 12px !important;
+  padding: 14px 18px !important;
+  margin-top: 16px !important;
+  border-top: 1px solid rgba(44,212,208,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* --- Per-stat header: gradient label --- */
+div[style*="Per-Stat Calibration"] > div[style*="text-transform"] {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+  background: linear-gradient(90deg, rgba(44,212,208,0.85), rgba(32,223,143,0.7));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px !important;
+}
+
+/* --- Stat rows: glass hover + dividers --- */
+div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:3px"] {
+  border-radius: 8px;
+  padding: 6px 10px !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  border-bottom: 1px solid rgba(125,145,190,0.04);
+}
+div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:3px"]:last-child {
+  border-bottom: none;
+}
+div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:3px"]:hover {
+  background: rgba(44,212,208,0.03);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* --- Calibration dots: bigger + colored glow halos --- */
+div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"] {
+  width: 10px !important;
+  height: 10px !important;
+  box-shadow: 0 0 6px rgba(0,0,0,0.2), 0 0 3px currentColor;
+  transition: transform 0.15s ease, box-shadow 0.25s ease;
+}
+div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
+  transform: scale(1.5);
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor;
+}
+
+/* === Overconfidence Diagnosis === */
+.calib-diag-card {
+  background: linear-gradient(135deg, rgba(10,14,24,0.65), rgba(10,14,24,0.50)) !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-left-width: 4px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 6px 20px rgba(0,0,0,0.30) !important;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+.calib-diag-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--diag-color, rgba(125,145,190,0.3)), transparent 70%);
+  opacity: 0.7;
+}
+.calib-diag-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse 60% 80% at 0% 0%, var(--diag-color, transparent), transparent 50%);
+  opacity: 0.04;
+  pointer-events: none;
+}
+.calib-diag-card:hover {
+  transform: translateY(-4px) scale(1.01) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 16px 40px rgba(0,0,0,0.40),
+    0 0 24px -4px var(--diag-color, rgba(255,255,255,0.05)) !important;
+}
+
+/* --- Diagnosis entrance: dramatic --- */
+.calib-diag-grid .calib-diag-card {
+  animation: calib-diag-enter 0.35s ease-out both !important;
+}
+.calib-diag-grid .calib-diag-card:nth-child(2) { animation-delay: 0.08s !important; }
+.calib-diag-grid .calib-diag-card:nth-child(3) { animation-delay: 0.16s !important; }
+.calib-diag-grid .calib-diag-card:nth-child(4) { animation-delay: 0.24s !important; }
+.calib-diag-grid .calib-diag-card:nth-child(5) { animation-delay: 0.32s !important; }
+
+/* --- Red severity: strong red tint --- */
+.calib-diag-card[style*="--diag-color: var(--red)"],
+.calib-diag-card[style*="--diag-color:var(--red)"] {
+  background: linear-gradient(135deg, rgba(255,58,96,0.10) 0%, rgba(255,58,96,0.03) 40%, rgba(10,14,24,0.60) 100%) !important;
+  border-left-color: var(--red) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,58,96,0.06),
+    0 6px 20px rgba(0,0,0,0.30),
+    0 0 20px rgba(255,58,96,0.04) !important;
+}
+.calib-diag-card[style*="--diag-color: var(--red)"]:hover,
+.calib-diag-card[style*="--diag-color:var(--red)"]:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,58,96,0.08),
+    0 16px 40px rgba(0,0,0,0.40),
+    0 0 30px rgba(255,58,96,0.10) !important;
+}
+
+/* --- Amber severity: warm tint --- */
+.calib-diag-card[style*="--diag-color: var(--amber)"],
+.calib-diag-card[style*="--diag-color:var(--amber)"] {
+  background: linear-gradient(135deg, rgba(240,192,64,0.08) 0%, rgba(240,192,64,0.02) 40%, rgba(10,14,24,0.60) 100%) !important;
+  border-left-color: var(--amber) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(240,192,64,0.06),
+    0 6px 20px rgba(0,0,0,0.30),
+    0 0 20px rgba(240,192,64,0.04) !important;
+}
+
+/* --- Green severity: positive tint --- */
+.calib-diag-card[style*="--diag-color: var(--green)"],
+.calib-diag-card[style*="--diag-color:var(--green)"] {
+  background: linear-gradient(135deg, rgba(32,223,143,0.08) 0%, rgba(32,223,143,0.02) 40%, rgba(10,14,24,0.60) 100%) !important;
+  border-left-color: var(--green) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(32,223,143,0.06),
+    0 6px 20px rgba(0,0,0,0.30),
+    0 0 20px rgba(32,223,143,0.04) !important;
+}
+
+/* --- Diagnosis title: bigger + bolder --- */
+.calib-diag-title {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em;
+}
+.calib-diag-card:hover .calib-diag-title {
+  color: #fff !important;
+  text-shadow: 0 0 8px rgba(255,255,255,0.1);
+}
+
+/* --- Diagnosis badge: glass with severity colored border + glow --- */
+.calib-diag-badge {
+  background: rgba(10,14,24,0.70) !important;
+  border: 1.5px solid var(--diag-color, rgba(125,145,190,0.2)) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  padding: 4px 12px !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25), 0 0 12px -4px var(--diag-color, transparent) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+.calib-diag-card:hover .calib-diag-badge {
+  transform: scale(1.12) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 0 16px var(--diag-color, transparent) !important;
+}
+
+/* --- Diagnosis body: refined --- */
+.calib-diag-body {
+  font-size: 10.5px !important;
+  line-height: 1.6 !important;
+  color: rgba(200,210,230,0.62) !important;
+}
+.calib-diag-card:hover .calib-diag-body {
+  color: rgba(225,235,250,0.85) !important;
+}
+
+/* --- Diagnosis action: accent bar + severity color --- */
+.calib-diag-action {
+  font-size: 10.5px !important;
+  padding: 6px 0 0 10px !important;
+  border-left: 2px solid var(--diag-color, rgba(44,212,208,0.25)) !important;
+  margin-top: 10px !important;
+  color: var(--cyan) !important;
+}
+.calib-diag-card:hover .calib-diag-action {
+  border-left-width: 3px !important;
+  color: #fff !important;
+}
+
+/* --- Overconfidence section: premium container --- */
+.best-picks-section:has(.calib-diag-grid) {
+  background: linear-gradient(180deg, rgba(10,14,24,0.55), rgba(255,58,96,0.02), rgba(10,14,24,0.55)) !important;
+  border: 1px solid rgba(255,58,96,0.10) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 40px rgba(255,58,96,0.02);
+}
+.best-picks-section:has(.calib-diag-grid)::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 4px !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.7), rgba(240,192,64,0.4), rgba(255,58,96,0.15), transparent) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.best-picks-section:has(.calib-diag-grid) .best-picks-title {
+  font-size: 13px !important;
+  background: linear-gradient(135deg, #ffe0e8 0%, #ff3a60 40%, #f0c040 80%, #ff3a60 100%) !important;
+  background-size: 200% 100% !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: calib-shimmer-sweep 6s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(255,58,96,0.20)) !important;
+}
+.best-picks-section:has(.calib-diag-grid) .best-picks-count {
+  border-color: rgba(255,58,96,0.30) !important;
+  color: rgba(255,58,96,0.85) !important;
+  background: rgba(255,58,96,0.06) !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.05);
+}
+
+/* --- Calibration Trend section: amber glass --- */
+.best-picks-section:has(.calib-trend-chart) {
+  background: linear-gradient(180deg, rgba(10,14,24,0.55), rgba(240,192,64,0.02), rgba(10,14,24,0.55)) !important;
+  border: 1px solid rgba(240,192,64,0.08) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  position: relative;
+}
+.best-picks-section:has(.calib-trend-chart)::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 4px !important;
+  background: linear-gradient(90deg, rgba(240,192,64,0.6), rgba(248,198,74,0.3), transparent) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.best-picks-section:has(.calib-trend-chart) .best-picks-title {
+  font-size: 13px !important;
+  background: linear-gradient(135deg, #fff5d0 0%, #f0c040 50%, #f8c64a 100%) !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 6px rgba(240,192,64,0.15)) !important;
+}
+.best-picks-section:has(.calib-trend-chart) .best-picks-count {
+  border-color: rgba(240,192,64,0.25) !important;
+  color: rgba(240,192,64,0.8) !important;
+  background: rgba(240,192,64,0.05) !important;
+}
+
+/* --- Trend chart: enhanced glass --- */
+.calib-trend-chart {
+  background: rgba(10,14,24,0.40) !important;
+  border: 1px solid rgba(240,192,64,0.06) !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+/* --- Trend event chips: glass + colored identity --- */
+.calib-event-chip {
+  background: rgba(10,14,24,0.50) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 12px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+.calib-event-chip:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(44,212,208,0.20) !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 12px rgba(44,212,208,0.06) !important;
+}
+
 /* ── GLOW-UP 77: Best Picks — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Keyframes === */
