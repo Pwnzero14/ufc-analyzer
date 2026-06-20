@@ -12296,6 +12296,186 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 85: Similar Opponent History — Homo Sapiens Sapiens ── */
+
+/* ── Panel container ── */
+.soh-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(44,212,208,0.08) !important;
+  border-left: 3px solid rgba(44,212,208,0.45) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+.soh-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(44,212,208,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* ── Title ── */
+.soh-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, #2cd4d0, #50e0ff) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 6px !important;
+  position: relative;
+}
+.soh-panel .detail-panel-title::before {
+  content: '';
+  -webkit-text-fill-color: initial;
+  margin-right: 6px;
+}
+.soh-panel .detail-panel-title::after {
+  display: none !important;
+}
+
+/* ── Opponent profile description ── */
+.soh-panel > div[style*="font-size:9.5px"][style*="text3"] {
+  background: rgba(10,16,35,0.4) !important;
+  border: 1px solid rgba(44,212,208,0.04) !important;
+  border-radius: 6px !important;
+  padding: 5px 10px !important;
+  font-size: 9.5px !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Averages card ── */
+.sim-opp-averages {
+  background: rgba(44,212,208,0.04) !important;
+  border: 1px solid rgba(44,212,208,0.08) !important;
+  border-radius: 8px !important;
+  padding: 7px 10px !important;
+  margin-bottom: 6px !important;
+  position: relative;
+}
+.sim-opp-averages::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #2cd4d0, #50e0ff);
+  border-radius: 3px 0 0 3px;
+}
+.sim-opp-avg-title {
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.8px !important;
+  color: rgba(44,212,208,0.7) !important;
+  margin-bottom: 3px !important;
+}
+.sim-opp-avg-stats {
+  gap: 14px !important;
+}
+.sim-opp-stat {
+  font-size: 10px !important;
+  color: rgba(160,185,220,0.6) !important;
+}
+.sim-opp-stat b {
+  color: #d0e0f8 !important;
+  font-weight: 700 !important;
+  font-size: 11px;
+}
+
+/* ── Over-rate lines (vs similar) ── */
+.soh-panel > div[style*="font-size:9.5px"][style*="margin-top:2px"] {
+  font-size: 9.5px !important;
+  padding: 0 !important;
+  margin-top: 1px !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Fight rows ── */
+.sim-opp-fights {
+  gap: 3px !important;
+  margin-top: 5px !important;
+}
+.sim-opp-fight-row {
+  background: rgba(12,18,38,0.45) !important;
+  border: 1px solid rgba(44,212,208,0.04) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.sim-opp-fight-row:hover {
+  background: rgba(44,212,208,0.04) !important;
+  border-color: rgba(44,212,208,0.1) !important;
+}
+
+/* ── Fight header ── */
+.sim-opp-fight-header {
+  gap: 8px !important;
+  margin-bottom: 2px !important;
+}
+.sim-opp-score {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  min-width: 32px !important;
+  text-shadow: 0 0 8px currentColor;
+}
+.sim-opp-name {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #c8d8f0 !important;
+}
+.sim-opp-method {
+  font-size: 9px !important;
+  color: rgba(140,160,200,0.45) !important;
+  background: rgba(20,30,55,0.5);
+  border: 1px solid rgba(74,158,255,0.06);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+/* ── Fight stats ── */
+.sim-opp-fight-row .sim-opp-stats {
+  gap: 10px !important;
+  margin-bottom: 2px !important;
+}
+.sim-opp-fight-row .sim-opp-stat {
+  font-size: 10px !important;
+}
+.sim-opp-fight-row .sim-opp-stat b {
+  font-size: 10.5px !important;
+}
+
+/* ── Reason tags ── */
+.sim-opp-reason-tag {
+  font-size: 8px !important;
+  color: rgba(44,212,208,0.5) !important;
+  background: rgba(44,212,208,0.04) !important;
+  border: 1px solid rgba(44,212,208,0.08) !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  transition: all 0.15s ease;
+}
+.sim-opp-reason-tag:hover {
+  background: rgba(44,212,208,0.08) !important;
+  border-color: rgba(44,212,208,0.15) !important;
+  color: rgba(44,212,208,0.75) !important;
+}
+
+/* ── Fight row entrance animation ── */
+@keyframes soh-fight-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sim-opp-fight-row {
+  animation: soh-fight-enter 0.3s ease both;
+}
+.sim-opp-fight-row:nth-child(1) { animation-delay: 0.03s; }
+.sim-opp-fight-row:nth-child(2) { animation-delay: 0.06s; }
+.sim-opp-fight-row:nth-child(3) { animation-delay: 0.09s; }
+.sim-opp-fight-row:nth-child(4) { animation-delay: 0.12s; }
+.sim-opp-fight-row:nth-child(5) { animation-delay: 0.15s; }
+
 /* ── GLOW-UP 84: Recalibration Engine — Homo Sapiens Sapiens ── */
 
 /* ── Section wrapper identity ── */
