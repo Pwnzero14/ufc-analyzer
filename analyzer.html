@@ -12296,6 +12296,165 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 91: SS/R1 SS/TD/FT Lean & Style Matchup — Homo Sapiens Sapiens ── */
+
+/* ── Standalone lean panels (SS, R1 SS, TD, FT) — cyan identity ── */
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel):not(.fv-panel):not(.ev-panel):not(.arch-panel):not(.oac-panel):not(.style-matchup-panel) {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(44,212,208,0.06) !important;
+  border-left: 3px solid rgba(44,212,208,0.4) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel):not(.fv-panel):not(.ev-panel):not(.arch-panel):not(.oac-panel):not(.style-matchup-panel)::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(44,212,208,0.025) 0%, transparent 50%);
+  pointer-events: none;
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel):not(.fv-panel):not(.ev-panel):not(.arch-panel):not(.oac-panel):not(.style-matchup-panel) .detail-panel-title {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, #2cd4d0, #50e0ff) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Lean points inside standalone panels ── */
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) .lean-point {
+  font-size: 11px !important;
+  line-height: 1.55 !important;
+  padding: 3px 6px !important;
+  border-radius: 5px !important;
+  margin-bottom: 3px !important;
+  transition: background 0.15s ease;
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) .lean-point:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+/* ── Lean verdict bars inside standalone panels ── */
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) > .lean-verdict {
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  margin-top: 10px !important;
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) > .lean-verdict.over {
+  background: rgba(0,232,122,0.05) !important;
+  border: none !important;
+  border-left: 3px solid rgba(0,232,122,0.5) !important;
+  box-shadow: 0 0 12px rgba(0,232,122,0.08);
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) > .lean-verdict.under {
+  background: rgba(255,58,96,0.05) !important;
+  border: none !important;
+  border-left: 3px solid rgba(255,58,96,0.5) !important;
+  box-shadow: 0 0 12px rgba(255,58,96,0.08);
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict):not(.ma-panel):not(.mr-panel) > .lean-verdict.push {
+  background: rgba(240,192,64,0.04) !important;
+  border: none !important;
+  border-left: 3px solid rgba(240,192,64,0.4) !important;
+}
+
+/* ── Style Matchup panel — orange identity ── */
+.style-matchup-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(255,138,61,0.06) !important;
+  border-left: 3px solid rgba(255,138,61,0.45) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.style-matchup-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(255,138,61,0.025) 0%, transparent 50%);
+  pointer-events: none;
+}
+.style-matchup-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #ff8a3d, #ffb347) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  color: transparent !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Style chip inside title (restore fill color) ── */
+.style-matchup-panel .detail-panel-title .style-matchup-chip {
+  -webkit-text-fill-color: initial !important;
+}
+
+/* ── Style hit section label ── */
+.style-matchup-panel .style-hit-section-label {
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  color: rgba(255,138,61,0.6) !important;
+  margin: 10px 0 6px !important;
+  padding-bottom: 4px !important;
+  border-bottom: 1px solid rgba(255,138,61,0.06);
+}
+
+/* ── Style hit bars inside Style Matchup ── */
+.style-matchup-panel .style-hit-row {
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  transition: background 0.15s ease;
+}
+.style-matchup-panel .style-hit-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+.style-matchup-panel .style-hit-bar-wrap {
+  background: rgba(255,255,255,0.04) !important;
+  height: 6px !important;
+  border-radius: 4px !important;
+}
+.style-matchup-panel .style-hit-bar.over-bar {
+  background: linear-gradient(90deg, rgba(72,199,142,0.4), #48c78e) !important;
+  box-shadow: 0 0 8px rgba(72,199,142,0.3);
+}
+.style-matchup-panel .style-hit-bar.under-bar {
+  background: linear-gradient(90deg, rgba(255,100,100,0.4), #ff6464) !important;
+  box-shadow: 0 0 8px rgba(255,100,100,0.3);
+}
+
+/* ── Style Matchup lean points ── */
+.style-matchup-panel .lean-point {
+  font-size: 11px !important;
+  padding: 3px 6px !important;
+  border-radius: 5px !important;
+  margin-bottom: 3px !important;
+  transition: background 0.15s ease;
+}
+.style-matchup-panel .lean-point:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+/* ── Entrance animations ── */
+@keyframes glow91-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fighter-row .detail-panel:has(> .lean-reason + .lean-verdict),
+.style-matchup-panel {
+  animation: glow91-slideUp 0.35s ease both;
+}
+
+
 /* ── GLOW-UP 90: Opponent Activity Context — Homo Sapiens Sapiens ── */
 
 /* ── OAC panel — amber/warm identity ── */
