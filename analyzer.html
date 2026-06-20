@@ -12296,6 +12296,121 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 89: Fair Value Generator & Payout EV — Homo Sapiens Sapiens ── */
+
+/* ── Fair Value panel — gold identity ── */
+.fv-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+  border-left: 3px solid rgba(248,198,74,0.45) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.fv-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(248,198,74,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+.fv-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #f0c040, #f8d878) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Fair value hero number ── */
+.fv-panel > div:nth-child(2) > div:first-child span:first-child {
+  background: linear-gradient(90deg, #f0c040, #f8d878) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-size: 22px !important;
+}
+
+/* ── Edge badge pill ── */
+.fv-panel > div:nth-child(2) > div:nth-child(2) {
+  border-radius: 8px !important;
+}
+
+/* ── Model projections grid ── */
+.fv-panel > div:nth-child(2) ~ div[style*="display:flex"][style*="space-around"] {
+  background: rgba(248,198,74,0.03) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+  border-radius: 10px !important;
+}
+
+/* ── Per-book edge rows ── */
+.fv-panel > div:last-child > div {
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+}
+.fv-panel > div:last-child > div:hover {
+  transform: translateX(2px);
+}
+
+/* ── Payout EV panel — green identity ── */
+.ev-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(32,223,143,0.06) !important;
+  border-left: 3px solid rgba(32,223,143,0.4) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.ev-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(32,223,143,0.025) 0%, transparent 50%);
+  pointer-events: none;
+}
+.ev-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #20df8f, #6ef5b1) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── EV percentage badge ── */
+.ev-panel > div:nth-child(2) > div:first-child {
+  border-radius: 8px !important;
+}
+
+/* ── Per-book EV rows ── */
+.ev-panel > div:last-child > div {
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+}
+.ev-panel > div:last-child > div:hover {
+  transform: translateX(2px);
+}
+
+/* ── Entrance animations ── */
+@keyframes glow89-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fv-panel {
+  animation: glow89-slideUp 0.35s ease both;
+}
+.ev-panel {
+  animation: glow89-slideUp 0.35s ease both;
+  animation-delay: 0.08s;
+}
+
+
 /* ── GLOW-UP 88: Lean Analysis (FP) & Model Rivalry — Homo Sapiens Sapiens ── */
 
 /* ── Lean Analysis panel — green/red identity ── */
