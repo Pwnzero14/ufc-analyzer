@@ -12296,6 +12296,229 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 88: Lean Analysis (FP) & Model Rivalry — Homo Sapiens Sapiens ── */
+
+/* ── Lean Analysis panel — green/red identity ── */
+.panel-pair:has(.mr-panel) > .detail-panel:not(.mr-panel) {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-left: 3px solid rgba(0,232,122,0.4) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.panel-pair:has(.mr-panel) > .detail-panel:not(.mr-panel)::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(0,232,122,0.025) 0%, transparent 50%);
+  pointer-events: none;
+}
+.panel-pair:has(.mr-panel) > .detail-panel:not(.mr-panel) .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #6ef5b1, #48c78e) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Top drivers card ── */
+.top-drivers {
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  position: relative;
+  overflow: hidden;
+}
+.top-drivers.over {
+  background: rgba(0,232,122,0.04) !important;
+  border: 1px solid rgba(0,232,122,0.12) !important;
+}
+.top-drivers.under {
+  background: rgba(255,58,96,0.04) !important;
+  border: 1px solid rgba(255,58,96,0.12) !important;
+}
+.top-drivers-head {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 8px !important;
+}
+.top-drivers.over .top-drivers-head {
+  color: rgba(110,245,177,0.9) !important;
+}
+.top-drivers.under .top-drivers-head {
+  color: rgba(255,138,160,0.9) !important;
+}
+
+/* ── Driver rank badges ── */
+.top-driver {
+  font-size: 11px !important;
+  line-height: 1.55 !important;
+  margin-bottom: 6px !important;
+}
+.top-driver-rank {
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+.top-drivers.over .top-driver-rank {
+  background: rgba(0,232,122,0.15) !important;
+  color: #6ef5b1 !important;
+  box-shadow: 0 0 8px rgba(0,232,122,0.2);
+}
+.top-drivers.under .top-driver-rank {
+  background: rgba(255,58,96,0.15) !important;
+  color: #ff8aa0 !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.2);
+}
+.top-driver-text {
+  color: rgba(200,216,240,0.75) !important;
+}
+
+/* ── Pro / Risk columns ── */
+.lean-reason-groups {
+  gap: 8px !important;
+}
+.lean-reason-col {
+  background: rgba(12,18,38,0.5) !important;
+  border-radius: 10px !important;
+  padding: 10px 10px !important;
+}
+.lean-reason-col.pro {
+  border: 1px solid rgba(0,232,122,0.08) !important;
+}
+.lean-reason-col.risk {
+  border: 1px solid rgba(255,58,96,0.08) !important;
+}
+.lean-reason-col.neutral {
+  border: 1px solid rgba(255,255,255,0.04) !important;
+}
+.lean-reason-head {
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  margin-bottom: 6px !important;
+}
+.lean-reason-col.pro .lean-reason-head {
+  color: rgba(110,245,177,0.85) !important;
+}
+.lean-reason-col.risk .lean-reason-head {
+  color: rgba(255,138,160,0.85) !important;
+}
+.lean-reason-col.neutral .lean-reason-head {
+  color: rgba(160,185,220,0.6) !important;
+}
+
+/* ── Lean points inside pro/risk ── */
+.lean-reason-col .lean-point {
+  font-size: 10.5px !important;
+  line-height: 1.5 !important;
+  margin-bottom: 4px !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  transition: background 0.15s ease;
+}
+.lean-reason-col .lean-point:hover {
+  background: rgba(255,255,255,0.02);
+}
+.lean-reason-col .lean-point-icon.pos {
+  color: #6ef5b1 !important;
+  text-shadow: 0 0 6px rgba(0,232,122,0.3);
+}
+.lean-reason-col .lean-point-icon.neg {
+  color: #ff8aa0 !important;
+  text-shadow: 0 0 6px rgba(255,58,96,0.3);
+}
+
+/* ── Lean verdict bar ── */
+.panel-pair:has(.mr-panel) .lean-verdict {
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  margin-top: 10px !important;
+}
+.panel-pair:has(.mr-panel) .lean-verdict.over {
+  background: rgba(0,232,122,0.05) !important;
+  border-left: 3px solid rgba(0,232,122,0.5) !important;
+  border-top: none; border-right: none; border-bottom: none;
+  box-shadow: 0 0 12px rgba(0,232,122,0.08);
+}
+.panel-pair:has(.mr-panel) .lean-verdict.under {
+  background: rgba(255,58,96,0.05) !important;
+  border-left: 3px solid rgba(255,58,96,0.5) !important;
+  border-top: none; border-right: none; border-bottom: none;
+  box-shadow: 0 0 12px rgba(255,58,96,0.08);
+}
+.panel-pair:has(.mr-panel) .lean-verdict.push {
+  background: rgba(240,192,64,0.04) !important;
+  border-left: 3px solid rgba(240,192,64,0.4) !important;
+  border-top: none; border-right: none; border-bottom: none;
+}
+
+/* ── Model Rivalry panel — purple identity ── */
+.mr-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(127,136,255,0.06) !important;
+  border-left: 3px solid rgba(127,136,255,0.45) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.mr-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(127,136,255,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+.mr-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #7f88ff, #a78bfa) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Model cards (inline-styled divs in mr-panel) ── */
+.mr-panel > div:last-child > div {
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+}
+.mr-panel > div:last-child > div:hover {
+  transform: translateX(2px);
+}
+
+/* ── Consensus chip ── */
+.mr-panel .style-matchup-chip {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.4px;
+  padding: 3px 8px !important;
+  border-radius: 5px !important;
+}
+
+/* ── Entrance animations ── */
+@keyframes glow88-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel-pair:has(.mr-panel) > .detail-panel {
+  animation: glow88-slideUp 0.35s ease both;
+}
+.panel-pair:has(.mr-panel) > .detail-panel:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+
 /* ── GLOW-UP 87: UFCStats Career Data & Archetype Learner — Homo Sapiens Sapiens ── */
 
 /* ── Career Data panel — blue identity ── */
