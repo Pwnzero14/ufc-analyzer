@@ -12296,6 +12296,219 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 87: UFCStats Career Data & Archetype Learner — Homo Sapiens Sapiens ── */
+
+/* ── Career Data panel — blue identity ── */
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(74,158,255,0.06) !important;
+  border-left: 3px solid rgba(74,158,255,0.45) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel)::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(74,158,255,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #4a9eff, #63b3ed) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Record number ── */
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) > .stat-val {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 6px !important;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) > .stat-val.mid {
+  background: linear-gradient(90deg, #f0c040, #f8d878) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ── Stat rows — glass ── */
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-row {
+  padding: 5px 8px !important;
+  margin: 1px 0 !important;
+  border-radius: 6px !important;
+  border-bottom: none !important;
+  transition: background 0.15s ease;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-label {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  color: rgba(160,185,220,0.45) !important;
+  letter-spacing: 0.06em;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-val {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-val.good {
+  color: #6ef5b1 !important;
+  text-shadow: 0 0 10px rgba(0,232,122,0.25);
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-val.mid {
+  color: #f0c040 !important;
+  text-shadow: 0 0 10px rgba(240,192,64,0.2);
+}
+.panel-pair:has(.arch-panel) > .detail-panel:not(.arch-panel) .stat-val.low {
+  color: #ff8aa0 !important;
+  text-shadow: 0 0 10px rgba(255,58,96,0.2);
+}
+
+/* ── Finish rate section ── */
+.panel-pair:has(.arch-panel) .finish-split-wrap {
+  display: flex !important;
+  gap: 12px !important;
+  margin-top: 6px !important;
+}
+.panel-pair:has(.arch-panel) .finish-split-section {
+  background: rgba(10,16,35,0.4) !important;
+  border: 1px solid rgba(74,158,255,0.04) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+}
+.panel-pair:has(.arch-panel) .finish-split-header {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  color: rgba(160,185,220,0.5) !important;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px !important;
+}
+.panel-pair:has(.arch-panel) .finish-bar-wrap {
+  background: rgba(255,255,255,0.04) !important;
+  height: 5px !important;
+  border-radius: 4px !important;
+}
+.panel-pair:has(.arch-panel) .finish-bar.ko-bar {
+  background: linear-gradient(90deg, rgba(255,100,100,0.5), #ff6464) !important;
+  box-shadow: 0 0 8px rgba(255,100,100,0.3);
+}
+.panel-pair:has(.arch-panel) .finish-bar.ko-bar-loss {
+  background: linear-gradient(90deg, rgba(255,58,96,0.5), #ff3a60) !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+.panel-pair:has(.arch-panel) .finish-bar.sub-bar {
+  background: linear-gradient(90deg, rgba(159,122,234,0.5), #9f7aea) !important;
+  box-shadow: 0 0 8px rgba(159,122,234,0.3);
+}
+.panel-pair:has(.arch-panel) .finish-bar.dec-bar {
+  background: linear-gradient(90deg, rgba(99,179,237,0.5), #63b3ed) !important;
+  box-shadow: 0 0 8px rgba(99,179,237,0.3);
+}
+.panel-pair:has(.arch-panel) .finish-bar-label {
+  color: rgba(160,185,220,0.5) !important;
+}
+.panel-pair:has(.arch-panel) .finish-bar-pct {
+  color: rgba(200,216,240,0.6) !important;
+}
+
+/* ── UFCStats link ── */
+.panel-pair:has(.arch-panel) .panel-link {
+  color: rgba(74,158,255,0.7) !important;
+  font-size: 10px !important;
+  transition: color 0.15s ease;
+}
+.panel-pair:has(.arch-panel) .panel-link:hover {
+  color: rgba(74,158,255,1) !important;
+}
+
+/* ── Archetype Learner panel — orange identity ── */
+.arch-panel {
+  background: linear-gradient(140deg, rgba(15,22,42,0.94) 0%, rgba(12,18,38,0.90) 100%) !important;
+  border: 1px solid rgba(255,138,61,0.06) !important;
+  border-left: 3px solid rgba(255,138,61,0.45) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  position: relative;
+  overflow: hidden;
+}
+.arch-panel::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at top left, rgba(255,138,61,0.03) 0%, transparent 50%) !important;
+  pointer-events: none;
+}
+.arch-panel .detail-panel-title {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px;
+  background: linear-gradient(90deg, #ff8a3d, #ffb347) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── Archetype chip + confidence ── */
+.arch-panel .style-matchup-chip {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.4px;
+  padding: 3px 8px !important;
+  border-radius: 5px !important;
+}
+.arch-panel .style-matchup-chip.style-chip-default {
+  background: rgba(255,138,61,0.08) !important;
+  border: 1px solid rgba(255,138,61,0.2) !important;
+  color: #ffb347 !important;
+}
+
+/* ── Archetype lean points ── */
+.arch-panel .lean-reason {
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  color: rgba(200,216,240,0.7) !important;
+}
+.arch-panel .lean-point {
+  padding: 3px 6px !important;
+  border-radius: 5px !important;
+  margin-bottom: 3px !important;
+  transition: background 0.15s ease;
+}
+.arch-panel .lean-point:hover {
+  background: rgba(255,255,255,0.02);
+}
+.arch-panel .lean-point-icon.pos {
+  color: #6ef5b1 !important;
+  text-shadow: 0 0 8px rgba(0,232,122,0.3);
+}
+.arch-panel .lean-point-icon.neg {
+  color: #ff8aa0 !important;
+  text-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+
+/* ── Entrance animations ── */
+@keyframes glow87-slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel-pair:has(.arch-panel) > .detail-panel {
+  animation: glow87-slideUp 0.35s ease both;
+}
+.panel-pair:has(.arch-panel) > .detail-panel:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+
 /* ── GLOW-UP 86: Matchup Models & Career — Homo Sapiens Sapiens ── */
 
 /* ── MA Panel containers ── */
