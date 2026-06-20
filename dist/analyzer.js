@@ -10454,56 +10454,103 @@ async function renderCalibrationPanel(container) {
             const y = svgH - 6 - (calScore / 100) * (svgH - 16);
             trendPoints.push({ x, y, label: e.event.replace(/UFC\s*(Fight Night|on ESPN):?\s*/i, '').trim(), rate: hitRate, n: e.total, brierScore: calScore });
         }
-        // SVG path
-        const pathD = trendPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-        const areaD = `${pathD} L${trendPoints[trendPoints.length - 1].x.toFixed(1)},${svgH} L${trendPoints[0].x.toFixed(1)},${svgH} Z`;
+        // Smooth bezier path through points
+        const smoothPath = (pts) => {
+            if (pts.length < 2)
+                return '';
+            let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i - 1];
+                const curr = pts[i];
+                const cpx = (prev.x + curr.x) / 2;
+                d += ` C${cpx.toFixed(1)},${prev.y.toFixed(1)} ${cpx.toFixed(1)},${curr.y.toFixed(1)} ${curr.x.toFixed(1)},${curr.y.toFixed(1)}`;
+            }
+            return d;
+        };
+        const pathD = smoothPath(trendPoints);
+        const lastPt = trendPoints[trendPoints.length - 1];
+        const firstPt = trendPoints[0];
+        const areaD = `${pathD} L${lastPt.x.toFixed(1)},${svgH} L${firstPt.x.toFixed(1)},${svgH} Z`;
         // Trend direction
         const first3 = trendPoints.slice(0, Math.min(3, trendPoints.length));
         const last3 = trendPoints.slice(-Math.min(3, trendPoints.length));
         const avgFirst = first3.reduce((s, p) => s + p.brierScore, 0) / first3.length;
         const avgLast = last3.reduce((s, p) => s + p.brierScore, 0) / last3.length;
         const trendDelta = Math.round(avgLast - avgFirst);
-        const trendIcon = trendDelta > 3 ? '📈' : trendDelta < -3 ? '📉' : '➡️';
+        const trendArrow = trendDelta > 3 ? '↑' : trendDelta < -3 ? '↓' : '→';
         const trendLabel = trendDelta > 3 ? 'Improving' : trendDelta < -3 ? 'Degrading' : 'Stable';
         const trendColor = trendDelta > 3 ? 'var(--green)' : trendDelta < -3 ? 'var(--red)' : 'var(--text-muted)';
-        // Dots
-        const dotsHtml = trendPoints.map(p => {
-            const col = p.brierScore >= 85 ? 'var(--green)' : p.brierScore >= 70 ? 'var(--amber)' : 'var(--red)';
-            return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${col}" stroke="var(--surface)" stroke-width="1.5">
-        <title>${p.label} — Score: ${p.brierScore} · Hit: ${p.rate}% · n=${p.n}</title>
-      </circle>`;
+        const trendColorHex = trendDelta > 3 ? '#20df8f' : trendDelta < -3 ? '#ff3a60' : '#7d91be';
+        // Reference lines at 25, 50, 75
+        const refLines = [25, 50, 75].map(val => {
+            const ry = svgH - 8 - (val / 100) * (svgH - 20);
+            return `<line x1="${padL}" y1="${ry.toFixed(1)}" x2="${svgW - padR}" y2="${ry.toFixed(1)}" stroke="rgba(125,145,190,0.10)" stroke-dasharray="3,4"/>
+        <text x="${padL + 2}" y="${ry - 3}" fill="rgba(125,145,190,0.25)" font-size="7" font-family="'JetBrains Mono',monospace">${val}</text>`;
         }).join('');
-        // 50% line
-        const halfY = svgH - 6 - (50 / 100) * (svgH - 16);
+        // Dots with score labels
+        const dotsHtml = trendPoints.map((p, i) => {
+            const col = p.brierScore >= 85 ? '#20df8f' : p.brierScore >= 70 ? '#f0c040' : '#ff3a60';
+            const labelY = p.y < 30 ? p.y + 16 : p.y - 10;
+            return `<g class="calib-trend-dot-group">
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="8" fill="${col}" opacity="0.12" class="calib-trend-dot-halo"/>
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${col}" stroke="rgba(10,14,24,0.8)" stroke-width="2" class="calib-trend-dot">
+          <title>${p.label} — Score: ${p.brierScore} · Hit: ${p.rate}% · n=${p.n}</title>
+        </circle>
+        <text x="${p.x.toFixed(1)}" y="${labelY.toFixed(1)}" fill="${col}" font-size="8" font-weight="700" text-anchor="middle" font-family="'JetBrains Mono',monospace" class="calib-trend-score-label">${p.brierScore}</text>
+      </g>`;
+        }).join('');
+        // Current score callout (last point)
+        const currentScore = lastPt.brierScore;
+        const currentColor = currentScore >= 85 ? 'var(--green)' : currentScore >= 70 ? 'var(--amber)' : 'var(--red)';
         trendHtml = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:14px">${trendIcon}</span>
-        <span style="font-size:12px;font-weight:700;color:${trendColor}">${trendLabel}</span>
-        <span style="font-size:10px;color:var(--text-muted)">${trendDelta > 0 ? '+' : ''}${trendDelta} pts over ${eventCalibArr.length} events</span>
+      <div class="calib-trend-header">
+        <div class="calib-trend-current">
+          <div class="calib-trend-current-score" style="color:${currentColor}">${currentScore}</div>
+          <div class="calib-trend-current-label">Current</div>
+        </div>
+        <div class="calib-trend-direction" data-trend="${trendDelta > 3 ? 'up' : trendDelta < -3 ? 'down' : 'stable'}">
+          <span class="calib-trend-arrow" style="color:${trendColor}">${trendArrow}</span>
+          <div>
+            <div class="calib-trend-label" style="color:${trendColor}">${trendLabel}</div>
+            <div class="calib-trend-delta">${trendDelta > 0 ? '+' : ''}${trendDelta} pts across ${eventCalibArr.length} events</div>
+          </div>
+        </div>
       </div>
-      <div class="calib-trend-chart">
-        <svg class="calib-trend-svg" viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="none">
+      <div class="calib-trend-chart" style="height:130px">
+        <svg class="calib-trend-svg" viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="calibTrendGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="${trendColor}" stop-opacity="0.25"/>
-              <stop offset="100%" stop-color="${trendColor}" stop-opacity="0.02"/>
+              <stop offset="0%" stop-color="${trendColorHex}" stop-opacity="0.30"/>
+              <stop offset="50%" stop-color="${trendColorHex}" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="${trendColorHex}" stop-opacity="0.01"/>
             </linearGradient>
+            <linearGradient id="calibTrendStroke" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="${trendColorHex}" stop-opacity="0.5"/>
+              <stop offset="50%" stop-color="${trendColorHex}" stop-opacity="1"/>
+              <stop offset="100%" stop-color="${trendColorHex}" stop-opacity="0.8"/>
+            </linearGradient>
+            <filter id="calibLineGlow">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
           </defs>
-          <line x1="${padL}" y1="${halfY.toFixed(1)}" x2="${svgW - padR}" y2="${halfY.toFixed(1)}" stroke="rgba(125,145,190,0.2)" stroke-dasharray="4,3"/>
-          <text x="${svgW - padR - 2}" y="${halfY - 3}" fill="rgba(125,145,190,0.35)" font-size="7" text-anchor="end">50</text>
+          ${refLines}
           <path d="${areaD}" fill="url(#calibTrendGrad)"/>
-          <path d="${pathD}" fill="none" stroke="${trendColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="${pathD}" fill="none" stroke="url(#calibTrendStroke)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#calibLineGlow)"/>
           ${dotsHtml}
         </svg>
       </div>
-      <div class="calib-event-grid">
-        ${eventCalibArr.slice(-8).map(e => {
+      <div class="calib-event-timeline">
+        ${eventCalibArr.slice(-8).map((e, i) => {
             const rate = Math.round((e.hits / e.total) * 100);
             const col = rate >= 55 ? 'var(--green)' : rate >= 45 ? 'var(--amber)' : 'var(--red)';
+            const colHex = rate >= 55 ? '#20df8f' : rate >= 45 ? '#f0c040' : '#ff3a60';
             const shortName = e.event.replace(/UFC\s*(Fight Night|on ESPN):?\s*/i, '').replace(/\s+/g, ' ').trim();
-            return `<div class="calib-event-chip">
-            <div class="calib-event-name" title="${e.event}">${shortName}</div>
-            <div class="calib-event-stat"><span style="color:${col};font-weight:700">${rate}%</span> hit · ${e.hits}/${e.total}</div>
+            return `<div class="calib-event-card" style="--event-color:${col};--event-color-hex:${colHex};animation-delay:${i * 0.04}s">
+            <div class="calib-event-card-name" title="${e.event}">${shortName}</div>
+            <div class="calib-event-card-rate"><span style="color:${col}">${rate}%</span> <span class="calib-event-card-ratio">hit</span></div>
+            <div class="calib-event-card-bar"><div class="calib-event-card-fill" style="width:${rate}%;background:${col}"></div></div>
+            <div class="calib-event-card-count">${e.hits}/${e.total}</div>
           </div>`;
         }).join('')}
       </div>`;
