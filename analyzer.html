@@ -12296,6 +12296,347 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Lab header: deep glass + radial atmosphere === */
+.parlay-lab-header {
+  background: linear-gradient(180deg, rgba(12,18,35,0.96) 0%, rgba(8,12,28,0.92) 100%) !important;
+  border: 1px solid rgba(255,165,0,0.18) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 16px 48px rgba(0,0,0,0.4),
+    0 0 1px rgba(255,255,255,0.06) !important;
+  padding: 16px 20px !important;
+  position: relative;
+  overflow: hidden;
+}
+.parlay-lab-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(ellipse 50% 80% at 5% 50%, rgba(255,165,0,0.06), transparent 60%);
+  pointer-events: none;
+}
+.parlay-lab-header::after {
+  height: 2px !important;
+  background: linear-gradient(90deg, rgba(255,165,0,0.7), rgba(248,198,74,0.3) 40%, transparent) !important;
+  opacity: 1 !important;
+}
+.parlay-lab-title {
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.12em !important;
+  background: linear-gradient(135deg, #ffb833 0%, #ffd280 45%, #ffa500 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 16px rgba(255,165,0,0.35)) !important;
+}
+.parlay-lab-header:hover {
+  border-color: rgba(255,165,0,0.30) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 16px 48px rgba(0,0,0,0.4),
+    0 0 30px rgba(255,165,0,0.08) !important;
+}
+
+/* === Pool & Builder: deep glass containers === */
+.parlay-pool,
+.parlay-builder {
+  background: linear-gradient(180deg, rgba(12,18,35,0.95) 0%, rgba(8,12,28,0.90) 100%) !important;
+  border: 1px solid rgba(125,145,190,0.14) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 16px 48px rgba(0,0,0,0.4) !important;
+}
+.parlay-pool::before {
+  background: linear-gradient(90deg, rgba(255,165,0,0.6), rgba(255,165,0,0.15) 50%, transparent) !important;
+  opacity: 0.7 !important;
+  border-radius: 14px 14px 0 0 !important;
+}
+.parlay-builder::before {
+  background: linear-gradient(90deg, rgba(248,198,74,0.6), rgba(248,198,74,0.15) 50%, transparent) !important;
+  opacity: 0.7 !important;
+  border-radius: 14px 14px 0 0 !important;
+}
+.parlay-pool:hover,
+.parlay-builder:hover {
+  border-color: rgba(125,145,190,0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 16px 48px rgba(0,0,0,0.4),
+    0 0 24px rgba(125,145,190,0.05) !important;
+}
+
+/* === Pool/Builder titles: refined gradient text === */
+.parlay-pool-title {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.16em !important;
+  background: linear-gradient(135deg, #ffb833, #ffd280, #ffa500) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 8px rgba(255,165,0,0.20));
+}
+.parlay-builder-title {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.16em !important;
+  background: linear-gradient(135deg, #f8c64a, #ffe9ad, #f8c64a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.20));
+}
+
+/* === Leg rows: refined glass + hover === */
+.parlay-leg-row {
+  border-radius: 10px !important;
+  padding: 9px 14px !important;
+  margin: 3px 0 !important;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s !important;
+}
+.parlay-leg-row:hover {
+  background: rgba(255,255,255,0.035) !important;
+  transform: translateX(4px) !important;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.2), inset 0 0 0 0.5px rgba(255,255,255,0.04) !important;
+}
+
+/* === Selected legs: premium gold glass === */
+.parlay-leg-row.selected {
+  background: linear-gradient(90deg, rgba(248,198,74,0.12), rgba(248,198,74,0.03) 45%, transparent) !important;
+  border: 1px solid rgba(248,198,74,0.30) !important;
+  box-shadow:
+    inset 3px 0 0 0 rgba(248,198,74,0.7),
+    0 0 18px rgba(248,198,74,0.08) !important;
+}
+.parlay-leg-row.selected .parlay-leg-name {
+  background: linear-gradient(135deg, #ffe9ad, #f8c64a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.20));
+}
+.parlay-leg-row.selected .parlay-leg-line {
+  color: #ffe9ad !important;
+  background: rgba(248,198,74,0.08) !important;
+  border-color: rgba(248,198,74,0.16) !important;
+  text-shadow: 0 0 10px rgba(248,198,74,0.3);
+}
+.parlay-leg-row.selected:hover {
+  background: linear-gradient(90deg, rgba(248,198,74,0.16), rgba(248,198,74,0.04) 45%, transparent) !important;
+  border-color: rgba(248,198,74,0.40) !important;
+}
+
+/* === Direction badges: stronger glass === */
+.parlay-leg-dir.over {
+  background: rgba(27,220,136,0.10) !important;
+  border: 1px solid rgba(27,220,136,0.24) !important;
+  color: #6dffc2 !important;
+  box-shadow: 0 0 10px rgba(27,220,136,0.12) !important;
+}
+.parlay-leg-dir.under {
+  background: rgba(255,108,136,0.08) !important;
+  border: 1px solid rgba(255,108,136,0.22) !important;
+  color: #ffb3c4 !important;
+  box-shadow: 0 0 10px rgba(255,108,136,0.10) !important;
+}
+
+/* === Line value: refined glass pill === */
+.parlay-leg-line {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  background: rgba(255,255,255,0.03) !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+/* === Health panel: deep glass + stronger glow === */
+.parlay-health {
+  background: linear-gradient(170deg, rgba(12,18,35,0.95), rgba(8,12,28,0.90)) !important;
+  border: 1px solid rgba(125,145,190,0.14) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 10px 30px rgba(0,0,0,0.3) !important;
+}
+.parlay-health-score {
+  font-size: 40px !important;
+  font-weight: 900 !important;
+}
+.parlay-health-score.excellent {
+  filter: drop-shadow(0 0 20px rgba(27,220,136,0.45)) !important;
+}
+.parlay-health:has(.parlay-health-score.excellent) {
+  border-color: rgba(27,220,136,0.22) !important;
+}
+.parlay-health:has(.parlay-health-score.excellent)::before {
+  background: linear-gradient(90deg, rgba(27,220,136,0.7), rgba(27,220,136,0.15) 50%, transparent) !important;
+}
+.parlay-health:has(.parlay-health-score.excellent)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(ellipse 60% 60% at 15% 40%, rgba(27,220,136,0.04), transparent 60%);
+  pointer-events: none;
+}
+.parlay-health-title {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.18em !important;
+  background: linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,255,255,0.35)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* === Slip legs: premium gold glass cards === */
+.parlay-slip-leg {
+  border-radius: 10px !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.07), rgba(248,198,74,0.015) 45%, transparent) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  padding: 10px 16px !important;
+  margin-bottom: 5px !important;
+}
+.parlay-slip-leg:hover {
+  background: linear-gradient(90deg, rgba(248,198,74,0.10), rgba(248,198,74,0.025) 45%, transparent) !important;
+  border-color: rgba(248,198,74,0.24) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 0 12px rgba(248,198,74,0.05) !important;
+}
+.parlay-slip-leg .parlay-leg-name {
+  background: linear-gradient(135deg, rgba(248,198,74,0.9), #ffe9ad) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.parlay-slip-remove:hover {
+  background: rgba(255,108,136,0.12) !important;
+  box-shadow: 0 0 14px rgba(255,108,136,0.22) !important;
+}
+
+/* === Suggested Parlays: deeper glass cards === */
+.parlay-suggest-title {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.16em !important;
+  background: linear-gradient(135deg, #f8c64a, #ffe9ad, #f8c64a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.25)) !important;
+}
+.parlay-suggest-card {
+  background: linear-gradient(170deg, rgba(12,18,35,0.94), rgba(8,12,28,0.88)) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  margin-bottom: 10px !important;
+}
+.parlay-suggest-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(ellipse 50% 60% at 5% 30%, rgba(248,198,74,0.03), transparent 60%);
+  pointer-events: none;
+}
+.parlay-suggest-card:hover {
+  border-color: rgba(248,198,74,0.25) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 20px rgba(248,198,74,0.06) !important;
+}
+.parlay-suggest-label {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  background: linear-gradient(135deg, #ffe9ad, #f8c64a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.3));
+}
+/* #1 suggested: hero gold wash */
+.parlay-suggest-title + .parlay-suggest-card {
+  border-color: rgba(248,198,74,0.28) !important;
+  background: linear-gradient(135deg, rgba(248,198,74,0.08), rgba(248,198,74,0.02) 35%, transparent),
+              linear-gradient(170deg, rgba(12,18,35,0.94), rgba(8,12,28,0.88)) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25), 0 0 22px rgba(248,198,74,0.06) !important;
+}
+
+/* === Synergy Pairs: deeper glass + green radial === */
+.synergy-pairs-title {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.16em !important;
+  background: linear-gradient(135deg, #6dffc2, #1bdc88, #6dffc2) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(27,220,136,0.25)) !important;
+}
+.synergy-pair-card {
+  background: linear-gradient(170deg, rgba(12,18,35,0.94), rgba(8,12,28,0.88)) !important;
+  border: 1px solid rgba(27,220,136,0.14) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  margin-bottom: 10px !important;
+}
+.synergy-pair-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(ellipse 50% 60% at 5% 30%, rgba(27,220,136,0.03), transparent 60%);
+  pointer-events: none;
+}
+.synergy-pair-card:hover {
+  border-color: rgba(27,220,136,0.28) !important;
+  background: linear-gradient(170deg, rgba(27,220,136,0.04), rgba(8,12,28,0.88)) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 20px rgba(27,220,136,0.06) !important;
+}
+.synergy-pair-card.synergy-active {
+  border-color: rgba(27,220,136,0.35) !important;
+  background: linear-gradient(135deg, rgba(27,220,136,0.10), rgba(27,220,136,0.02) 45%, transparent) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25), 0 0 24px rgba(27,220,136,0.10) !important;
+}
+.synergy-pair-plus {
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  color: #6dffc2 !important;
+  text-shadow: 0 0 10px rgba(27,220,136,0.35) !important;
+}
+.synergy-pair-impact {
+  font-weight: 900 !important;
+  color: #6dffc2 !important;
+  text-shadow: 0 0 8px rgba(27,220,136,0.18) !important;
+}
+.synergy-pair-added {
+  font-weight: 900 !important;
+  color: #ffe9ad !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.22) !important;
+}
+
+/* === Correlation alerts: refined === */
+.parlay-corr-alert.synergy {
+  border-left: 2.5px solid rgba(27,220,136,0.40) !important;
+  background: rgba(27,220,136,0.02);
+}
+.parlay-corr-alert.conflict {
+  border-left: 2.5px solid rgba(255,108,136,0.40) !important;
+  background: rgba(255,108,136,0.02);
+}
+
+/* === Grid gap === */
+.parlay-lab-cols {
+  gap: 16px !important;
+}
+
+
 /* ── GLOW-UP 92: Best Picks — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Section containers: deep glass with radial overlay === */
