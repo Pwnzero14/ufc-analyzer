@@ -12296,6 +12296,575 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 94: Prop Line Predictions & Learning Summary — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Section containers: deep glass + dual radial overlays === */
+.best-picks-section[data-section-id="predictions"] {
+  background: linear-gradient(180deg, rgba(10,16,32,0.97) 0%, rgba(6,10,24,0.95) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 1px rgba(248,198,74,0.2), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+.best-picks-section[data-section-id="predictions"]::before {
+  content: '';
+  position: absolute; top: -50%; right: -25%; width: 70%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(248,198,74,0.07) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+.best-picks-section[data-section-id="predictions"]::after {
+  content: '';
+  position: absolute; bottom: -30%; left: -15%; width: 50%; height: 60%;
+  background: radial-gradient(ellipse at center, rgba(240,160,48,0.04) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+
+.best-picks-section[data-section-id="learning"] {
+  background: linear-gradient(180deg, rgba(10,16,32,0.97) 0%, rgba(6,10,24,0.95) 100%) !important;
+  border: 1px solid rgba(32,223,143,0.18) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 1px rgba(32,223,143,0.2), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+.best-picks-section[data-section-id="learning"]::before {
+  content: '';
+  position: absolute; top: -50%; right: -25%; width: 70%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(32,223,143,0.06) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+.best-picks-section[data-section-id="learning"]::after {
+  content: '';
+  position: absolute; bottom: -30%; left: -15%; width: 50%; height: 60%;
+  background: radial-gradient(ellipse at center, rgba(24,184,112,0.03) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+
+/* === Per-Event Results + AI Accuracy + CLV sections: deep glass treatment === */
+.best-picks-section[data-section-id="events"] {
+  background: linear-gradient(180deg, rgba(10,16,32,0.97) 0%, rgba(6,10,24,0.95) 100%) !important;
+  border: 1px solid rgba(94,106,210,0.15) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  position: relative; overflow: hidden;
+}
+.best-picks-section[data-section-id="events"]::before {
+  content: '';
+  position: absolute; top: -50%; right: -25%; width: 70%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(94,106,210,0.05) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+.best-picks-section[data-section-id="events"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(18,24,48,0.98) 0%, rgba(12,18,40,0.95) 100%) !important;
+  border-bottom: 1px solid rgba(94,106,210,0.1) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.best-picks-section[data-section-id="events"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #8b9cf7 0%, #b4bfff 40%, #5e6ad2 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 700 !important;
+  filter: drop-shadow(0 0 8px rgba(94,106,210,0.3));
+}
+
+.best-picks-section[data-section-id="ai-accuracy"] {
+  background: linear-gradient(180deg, rgba(10,16,32,0.97) 0%, rgba(6,10,24,0.95) 100%) !important;
+  border: 1px solid rgba(56,176,0,0.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(18,24,48,0.98) 0%, rgba(12,18,40,0.95) 100%) !important;
+  border-bottom: 1px solid rgba(56,176,0,0.1) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+.best-picks-section[data-section-id="entry-clv"] {
+  background: linear-gradient(180deg, rgba(10,16,32,0.97) 0%, rgba(6,10,24,0.95) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+.best-picks-section[data-section-id="entry-clv"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(18,24,48,0.98) 0%, rgba(12,18,40,0.95) 100%) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.08) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+/* === Section headers: gradient text titles === */
+.best-picks-section[data-section-id="predictions"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(18,24,48,0.98) 0%, rgba(12,18,40,0.95) 100%) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.best-picks-section[data-section-id="predictions"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35));
+}
+
+.best-picks-section[data-section-id="learning"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(18,24,48,0.98) 0%, rgba(12,18,40,0.95) 100%) !important;
+  border-bottom: 1px solid rgba(32,223,143,0.12) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.best-picks-section[data-section-id="learning"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #20df8f 0%, #60ffb8 35%, #18b870 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  filter: drop-shadow(0 0 10px rgba(32,223,143,0.35));
+}
+
+/* === Column header strip: glass bar === */
+.best-picks-section[data-section-id="predictions"] .section-body > div:nth-child(2) {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 8px !important;
+  padding: 6px 12px !important;
+  margin-bottom: 6px !important;
+}
+
+/* === Pred rows: cinematic glass cards === */
+.pred-row {
+  background: linear-gradient(135deg, rgba(18,26,52,0.7) 0%, rgba(12,18,40,0.5) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 12px !important;
+  margin-bottom: 5px !important;
+  padding: 11px 14px !important;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.4,0,0.2,1) !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+.pred-row::before {
+  content: '' !important;
+  position: absolute !important; left: 0 !important; top: 0 !important; bottom: 0 !important;
+  width: 3px !important; border-radius: 12px 0 0 12px !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.4) 0%, rgba(248,198,74,0.08) 100%) !important;
+  box-shadow: 0 0 6px rgba(248,198,74,0.15) !important;
+  transition: all 0.22s ease !important;
+}
+.pred-row::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 5%, rgba(255,255,255,0.07) 30%, rgba(255,255,255,0.07) 70%, transparent 95%);
+  border-radius: 12px 12px 0 0;
+  pointer-events: none;
+}
+.pred-row:hover {
+  background: linear-gradient(135deg, rgba(248,198,74,0.06) 0%, rgba(18,26,52,0.8) 100%) !important;
+  border-color: rgba(248,198,74,0.2) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 20px rgba(248,198,74,0.1), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  transform: translateY(-2px) scale(1.003);
+}
+.pred-row:hover::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.5) 100%) !important;
+  box-shadow: 0 0 16px rgba(248,198,74,0.5) !important;
+  width: 3.5px !important;
+}
+.pred-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* === Pred fighter: avatar glow ring + name luminance === */
+.pred-row .bp-avatar {
+  box-shadow: 0 0 10px rgba(248,198,74,0.2), 0 0 3px rgba(248,198,74,0.1);
+  border: 1.5px solid rgba(248,198,74,0.25) !important;
+  border-radius: 50%;
+  transition: all 0.22s ease;
+}
+.pred-row:hover .bp-avatar {
+  box-shadow: 0 0 18px rgba(248,198,74,0.45), 0 0 6px rgba(248,198,74,0.2);
+  border-color: rgba(248,198,74,0.5) !important;
+}
+.pred-row .pred-fighter div > div:first-child {
+  transition: all 0.22s ease;
+}
+.pred-row:hover .pred-fighter div > div:first-child {
+  color: #fff !important;
+  text-shadow: 0 0 12px rgba(248,198,74,0.3);
+}
+
+/* === SS/TD/FP stat columns: glass pill containers === */
+.pred-row > div[style*="min-width:55px"], .pred-row > div[style*="min-width:45px"] {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: 0 1px;
+  transition: all 0.18s ease;
+}
+.pred-row:hover > div[style*="min-width:55px"], .pred-row:hover > div[style*="min-width:45px"] {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* === Confidence bar: thicker glass track with halo glow === */
+.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 5px !important;
+  height: 12px !important;
+}
+.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] > div {
+  border-radius: 5px !important;
+  box-shadow: 0 0 8px currentColor, 0 0 3px currentColor;
+}
+
+/* === Reason tags: luminous glass pills === */
+.pred-row span[style*="display:inline-block;font-size:9px"] {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  backdrop-filter: blur(4px);
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.pred-row:hover span[style*="display:inline-block;font-size:9px"] {
+  background: rgba(248,198,74,0.07) !important;
+  border-color: rgba(248,198,74,0.15) !important;
+  color: rgba(255,255,255,0.75) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 6px rgba(248,198,74,0.06);
+}
+
+/* === Generate button: premium amber glass === */
+#predictorGenerateBtn {
+  background: linear-gradient(135deg, rgba(248,198,74,0.92) 0%, rgba(240,160,48,0.95) 100%) !important;
+  border: 1px solid rgba(255,220,112,0.5) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 18px rgba(248,198,74,0.35), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.2);
+  transition: all 0.22s cubic-bezier(0.4,0,0.2,1) !important;
+  animation: genBtnPulse94 3s ease-in-out infinite;
+}
+@keyframes genBtnPulse94 {
+  0%, 100% { box-shadow: 0 4px 18px rgba(248,198,74,0.3), inset 0 1px 0 rgba(255,255,255,0.25); }
+  50%      { box-shadow: 0 4px 28px rgba(248,198,74,0.5), 0 0 24px rgba(248,198,74,0.2), inset 0 1px 0 rgba(255,255,255,0.25); }
+}
+#predictorGenerateBtn:hover {
+  transform: translateY(-2px) scale(1.04) !important;
+  box-shadow: 0 10px 32px rgba(248,198,74,0.45), 0 0 20px rgba(248,198,74,0.25), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #predictorGenerateBtn { animation: none !important; }
+}
+
+/* === Learn button: premium emerald glass === */
+#predictorLearnBtn {
+  background: linear-gradient(135deg, rgba(32,223,143,0.92) 0%, rgba(24,184,112,0.95) 100%) !important;
+  border: 1px solid rgba(96,255,184,0.4) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 18px rgba(32,223,143,0.35), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  transition: all 0.22s cubic-bezier(0.4,0,0.2,1) !important;
+  animation: learnBtnPulse94 3s ease-in-out infinite;
+}
+@keyframes learnBtnPulse94 {
+  0%, 100% { box-shadow: 0 4px 18px rgba(32,223,143,0.3), inset 0 1px 0 rgba(255,255,255,0.25); }
+  50%      { box-shadow: 0 4px 28px rgba(32,223,143,0.5), 0 0 24px rgba(32,223,143,0.2), inset 0 1px 0 rgba(255,255,255,0.25); }
+}
+#predictorLearnBtn:hover {
+  transform: translateY(-2px) scale(1.04) !important;
+  box-shadow: 0 10px 32px rgba(32,223,143,0.45), 0 0 20px rgba(32,223,143,0.25), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #predictorLearnBtn { animation: none !important; }
+}
+
+/* === Delete button: glass with crimson hover === */
+#predictorDeleteBtn {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  transition: all 0.18s ease !important;
+}
+#predictorDeleteBtn:hover {
+  background: rgba(255,80,80,0.08) !important;
+  border-color: rgba(255,80,80,0.4) !important;
+  color: var(--red) !important;
+  box-shadow: 0 0 16px rgba(255,80,80,0.18), 0 4px 12px rgba(0,0,0,0.2) !important;
+}
+
+/* === Pending learn banner: glass with green accent radial === */
+.best-picks-section[data-section-id="learning"] div[style*="background:rgba(56,176,0,0.08)"] {
+  background: linear-gradient(135deg, rgba(32,223,143,0.07) 0%, rgba(32,223,143,0.02) 100%) !important;
+  border: 1px solid rgba(32,223,143,0.22) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), 0 0 14px rgba(32,223,143,0.1);
+}
+
+/* === Learn hero: cinematic glass with layered radials === */
+.learn-hero {
+  background: linear-gradient(135deg, rgba(14,22,46,0.96) 0%, rgba(8,14,32,0.92) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 48px rgba(0,0,0,0.4) !important;
+  position: relative;
+  overflow: hidden;
+  padding: 20px 22px !important;
+}
+.learn-hero::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07) 20%, rgba(255,255,255,0.07) 80%, transparent) !important;
+}
+.learn-hero::after {
+  content: '';
+  position: absolute; top: -40%; left: -25%; width: 60%; height: 80%;
+  background: radial-gradient(ellipse at center, rgba(32,223,143,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* === Grade ring: deeper glass + cinematic glow === */
+.learn-grade-ring {
+  width: 62px !important; height: 62px !important;
+  background: linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(8,14,32,0.65) 100%) !important;
+  border-width: 3px !important;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--grade-color) 40%, transparent),
+              0 0 6px color-mix(in srgb, var(--grade-color) 20%, transparent),
+              inset 0 0 12px color-mix(in srgb, var(--grade-color) 15%, transparent) !important;
+}
+.learn-grade-letter {
+  font-size: 28px !important;
+  text-shadow: 0 0 22px var(--grade-color), 0 0 6px var(--grade-color) !important;
+}
+
+/* === Learn hero title: gradient text === */
+.learn-hero-title {
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-size: 16px !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* === Best/Worst badges: glass pill with glow accent === */
+.learn-badge-best {
+  background: linear-gradient(135deg, rgba(32,223,143,0.1) 0%, rgba(32,223,143,0.04) 100%) !important;
+  border: 1px solid rgba(32,223,143,0.25) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18), 0 0 6px rgba(32,223,143,0.1);
+  padding: 4px 10px !important;
+}
+.learn-badge-worst {
+  background: linear-gradient(135deg, rgba(255,80,80,0.08) 0%, rgba(255,80,80,0.03) 100%) !important;
+  border: 1px solid rgba(255,80,80,0.25) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18), 0 0 6px rgba(255,80,80,0.1);
+  padding: 4px 10px !important;
+}
+.learn-badge-best:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 20px rgba(32,223,143,0.3) !important;
+  transform: scale(1.1) translateY(-2px) !important;
+}
+.learn-badge-worst:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 20px rgba(255,80,80,0.3) !important;
+  transform: scale(1.1) translateY(-2px) !important;
+}
+
+/* === Stat chips: cinematic glass panels === */
+.learn-stat-chip {
+  background: linear-gradient(135deg, rgba(14,22,46,0.92) 0%, rgba(8,14,32,0.88) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  padding: 16px 18px !important;
+}
+.learn-stat-chip::before {
+  width: 3.5px !important;
+  border-radius: 14px 0 0 14px !important;
+}
+.learn-stat-chip::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent) !important;
+}
+.learn-stat-chip:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+.learn-stat-chip[data-grade="good"]:hover {
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 22px rgba(32,223,143,0.22) !important;
+  border-color: rgba(32,223,143,0.2) !important;
+}
+.learn-stat-chip[data-grade="mid"]:hover {
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 22px rgba(245,166,35,0.22) !important;
+  border-color: rgba(245,166,35,0.2) !important;
+}
+.learn-stat-chip[data-grade="bad"]:hover {
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 22px rgba(255,80,80,0.22) !important;
+  border-color: rgba(255,80,80,0.2) !important;
+}
+
+/* === Chip value: larger with grade-tinted glow === */
+.learn-chip-bar-track {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 5px !important;
+  height: 6px !important;
+}
+.learn-chip-bar-fill {
+  box-shadow: 0 0 8px currentColor, 0 0 3px currentColor;
+  border-radius: 5px !important;
+}
+.learn-chip-value {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 12px currentColor;
+}
+
+/* === Weights details: glass accordion === */
+.weights-details {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 10px !important;
+}
+.weights-details summary {
+  padding: 7px 12px !important;
+  border-radius: 10px !important;
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+.weights-details summary:hover {
+  background: rgba(248,198,74,0.06) !important;
+  color: var(--text);
+}
+.weights-details[open] {
+  background: linear-gradient(135deg, rgba(14,22,46,0.7) 0%, rgba(8,14,32,0.6) 100%) !important;
+  border-color: rgba(248,198,74,0.12) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* === Delta table header: glass strip === */
+.learn-delta-header {
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 10px 10px 0 0 !important;
+  padding: 7px 10px !important;
+}
+
+/* === Delta rows: cinematic glass cards === */
+.learn-delta-row {
+  background: linear-gradient(135deg, rgba(18,26,52,0.5) 0%, rgba(12,18,40,0.35) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 10px !important;
+  margin-bottom: 4px !important;
+  padding: 8px 10px !important;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1) !important;
+}
+.learn-delta-row:nth-child(odd) {
+  background: linear-gradient(135deg, rgba(22,30,56,0.5) 0%, rgba(14,20,44,0.35) 100%) !important;
+}
+.learn-delta-row::before {
+  width: 3px !important;
+  border-radius: 10px 0 0 10px !important;
+}
+.learn-delta-row:hover {
+  background: rgba(255,255,255,0.045) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25) !important;
+  transform: translateX(3px);
+}
+.learn-delta-row[data-grade="good"]:hover {
+  border-color: rgba(32,223,143,0.18) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 14px rgba(32,223,143,0.12) !important;
+}
+.learn-delta-row[data-grade="bad"]:hover {
+  border-color: rgba(255,80,80,0.18) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 14px rgba(255,80,80,0.12) !important;
+}
+
+/* === Top 3 delta rows: podium treatment with medal accents === */
+.learn-delta-row:nth-child(-n+3) {
+  background: linear-gradient(135deg, rgba(32,223,143,0.04) 0%, rgba(18,26,52,0.5) 100%) !important;
+  border-color: rgba(32,223,143,0.1) !important;
+}
+.learn-delta-row:nth-child(1) {
+  border-color: rgba(248,198,74,0.15) !important;
+  background: linear-gradient(135deg, rgba(248,198,74,0.05) 0%, rgba(18,26,52,0.5) 100%) !important;
+}
+.learn-delta-row:nth-child(1) .learn-delta-rank {
+  background: linear-gradient(135deg, rgba(248,198,74,0.2), rgba(248,198,74,0.08)) !important;
+  border: 1.5px solid rgba(248,198,74,0.35) !important;
+  color: #f8c64a !important;
+  box-shadow: 0 0 12px rgba(248,198,74,0.25), 0 2px 6px rgba(0,0,0,0.2);
+  text-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+.learn-delta-row:nth-child(2) .learn-delta-rank {
+  background: rgba(192,192,210,0.1) !important;
+  border: 1.5px solid rgba(192,192,210,0.2) !important;
+  color: #c0c0d2 !important;
+  box-shadow: 0 0 8px rgba(192,192,210,0.15);
+}
+.learn-delta-row:nth-child(3) .learn-delta-rank {
+  background: rgba(205,127,50,0.1) !important;
+  border: 1.5px solid rgba(205,127,50,0.2) !important;
+  color: #cd7f32 !important;
+  box-shadow: 0 0 8px rgba(205,127,50,0.15);
+}
+
+/* === Delta bar: glass track with glow fill === */
+.learn-delta-bar {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 5px !important;
+  height: 6px !important;
+}
+.learn-delta-bar-fill, .learn-delta-bar > div {
+  border-radius: 5px !important;
+  box-shadow: 0 0 8px currentColor, 0 0 3px currentColor;
+}
+
+/* === Delta total: glow text === */
+.learn-delta-total {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* === Trend tag: glass pill with amber tint === */
+.learn-trend-tag {
+  background: rgba(248,198,74,0.08) !important;
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  border-radius: 8px !important;
+  padding: 3px 10px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 4px rgba(248,198,74,0.08);
+}
+
+/* === Per-Event result rows: glass card treatment === */
+.event-row {
+  background: linear-gradient(135deg, rgba(18,26,52,0.5) 0%, rgba(12,18,40,0.35) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 10px !important;
+  margin-bottom: 4px !important;
+  padding: 10px 14px !important;
+  transition: all 0.2s ease !important;
+}
+.event-row::before {
+  border-radius: 10px 0 0 10px !important;
+}
+.event-row:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(94,106,210,0.15) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 10px rgba(94,106,210,0.08) !important;
+  transform: translateX(2px);
+}
+.event-pct {
+  text-shadow: 0 0 10px currentColor;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
