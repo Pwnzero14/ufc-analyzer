@@ -1273,6 +1273,29 @@ async function archivePlatformPropLines(
     archiveEventName = fallback;
   }
 
+  // Ghost-event guard. inferEventFromSlate picks the highest-count pair in the slate,
+  // which can be a far-future marquee bout (e.g. next month's "Conor McGregor vs Max
+  // Holloway") when stray high-coverage ghost lines outvote the real card. Using that
+  // name mislabels this card's rows AND makes the rewrite below flip correct rows to the
+  // ghost name — regenerating unsettleable records on every fetch (the bug that stamped
+  // the whole Kape/Horiguchi card under "Conor McGregor vs Max Holloway"). The fetched
+  // UFCStats card is authoritative: if the chosen event names fighters who are NOT on it,
+  // discard it and use card.event. Fully-foreign batches are already dropped by the
+  // early-bail above, so anything reaching here has at least one on-card fighter.
+  if (archiveEventName !== card.event) {
+    const evSurnames = (() => {
+      const m = archiveEventName.match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
+      if (!m) return new Set<string>();
+      return new Set([m[1], m[2]].map(s => surnameOf(s)).filter(s => s.length >= 3));
+    })();
+    const onCardEvent = evSurnames.size >= 2 && [...evSurnames].every(s => cardSurnames.has(s));
+    if (!onCardEvent) {
+      console.warn(`[UFC Archive] Off-card event "${archiveEventName}" (not on card "${card.event}") — using card.event instead`);
+      archiveEventName = card.event;
+      archiveEventOverride = null;
+    }
+  }
+
   if (archiveEventName !== card.event) {
     // The card pointer has moved on (e.g. to next week's event) but these lines are for a
     // different, inferred event. If that inferred event already has SETTLED rows, it's over —
