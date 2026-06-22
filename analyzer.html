@@ -5771,6 +5771,213 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 97: Best Picks Visual Polish ── */
+
+/* ─ Pick row card: gradient bg, confidence left border, hover lift ─ */
+.best-pick-row {
+  border-bottom: none;
+  margin: 0 8px 5px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border2);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(13,18,33,0.6), rgba(20,27,45,0.4));
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+}
+.best-pick-row:last-child { border-bottom: none; margin-bottom: 2px; }
+.best-pick-row:hover {
+  background: linear-gradient(135deg, rgba(20,27,45,0.9), rgba(27,36,57,0.7));
+  transform: translateX(4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.32);
+}
+
+/* ─ Confidence-tiered left borders (overrides tier-high/med/low inset shadow) ─ */
+.best-pick-row.tier-high.over {
+  border-left: 3px solid #1bdc88;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  background: linear-gradient(135deg, rgba(0,232,122,0.08), rgba(13,18,33,0.6) 50%);
+}
+.best-pick-row.tier-med.over {
+  border-left: 3px solid rgba(248,198,74,0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  background: linear-gradient(135deg, rgba(248,198,74,0.05), rgba(13,18,33,0.6) 50%);
+}
+.best-pick-row.tier-low.over {
+  border-left: 3px solid rgba(255,108,136,0.45);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.best-pick-row.tier-high.under {
+  border-left: 3px solid #ff6c88;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  background: linear-gradient(135deg, rgba(255,58,96,0.08), rgba(13,18,33,0.6) 50%);
+}
+.best-pick-row.tier-med.under {
+  border-left: 3px solid rgba(248,198,74,0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  background: linear-gradient(135deg, rgba(248,198,74,0.05), rgba(13,18,33,0.6) 50%);
+}
+.best-pick-row.tier-low.under {
+  border-left: 3px solid rgba(255,108,136,0.45);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+/* Hover elevates shadow for all tiers */
+.best-pick-row.tier-high.over:hover  { box-shadow: 0 6px 20px rgba(0,0,0,0.32), 0 0 12px rgba(27,220,136,0.08); }
+.best-pick-row.tier-high.under:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.32), 0 0 12px rgba(255,108,136,0.08); }
+.best-pick-row.tier-med:hover  { box-shadow: 0 6px 20px rgba(0,0,0,0.32), 0 0 10px rgba(248,198,74,0.06); }
+.best-pick-row.tier-low:hover  { box-shadow: 0 6px 20px rgba(0,0,0,0.32); }
+
+/* ─ #1 pick spotlight — gold crown glow + premium border ─ */
+.best-picks-section.over > .section-body > .best-pick-row:first-child,
+.best-picks-section.over > .best-pick-row:nth-child(2),
+.best-picks-section.under > .section-body > .best-pick-row:first-child,
+.best-picks-section.under > .best-pick-row:nth-child(2) {
+  position: relative;
+  border: 1px solid rgba(248,198,74,0.35);
+  border-left: 3px solid var(--gold);
+  background: linear-gradient(135deg, rgba(248,198,74,0.07), rgba(13,18,33,0.7) 55%);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28), 0 0 20px rgba(248,198,74,0.07), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.best-picks-section.over > .section-body > .best-pick-row:first-child::before,
+.best-picks-section.over > .best-pick-row:nth-child(2)::before,
+.best-picks-section.under > .section-body > .best-pick-row:first-child::before,
+.best-picks-section.under > .best-pick-row:nth-child(2)::before {
+  content: '';
+  position: absolute; inset: -1px; z-index: 0; pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 70% 120% at 15% 50%, rgba(248,198,74,0.06), transparent 60%);
+}
+.best-picks-section.over > .section-body > .best-pick-row:first-child:hover,
+.best-picks-section.over > .best-pick-row:nth-child(2):hover,
+.best-picks-section.under > .section-body > .best-pick-row:first-child:hover,
+.best-picks-section.under > .best-pick-row:nth-child(2):hover {
+  border-color: rgba(248,198,74,0.5);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35), 0 0 28px rgba(248,198,74,0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ─ Score line glow by tier ─ */
+.best-pick-row.tier-high.over .best-pick-line {
+  color: #c8ffe2;
+  text-shadow: 0 0 18px rgba(27,220,136,0.5), 0 0 6px rgba(27,220,136,0.25);
+}
+.best-pick-row.tier-high.under .best-pick-line {
+  color: #ffd6de;
+  text-shadow: 0 0 18px rgba(255,108,136,0.5), 0 0 6px rgba(255,108,136,0.25);
+}
+.best-pick-row.tier-med .best-pick-line {
+  text-shadow: 0 0 14px rgba(248,198,74,0.3);
+}
+
+/* ─ Tier badge ring glow ─ */
+.best-pick-tier.high {
+  box-shadow: 0 0 8px rgba(27,220,136,0.25), inset 0 0 6px rgba(27,220,136,0.1);
+}
+.best-pick-tier.med {
+  box-shadow: 0 0 8px rgba(248,198,74,0.2), inset 0 0 6px rgba(248,198,74,0.08);
+}
+.best-pick-tier.low {
+  box-shadow: 0 0 6px rgba(255,108,136,0.15), inset 0 0 4px rgba(255,108,136,0.06);
+}
+
+/* ─ Section headers: direction-tinted accent bars ─ */
+.best-picks-section.over > .best-picks-header {
+  position: relative;
+  background: linear-gradient(135deg, rgba(0,232,122,0.08), rgba(13,18,33,0.8));
+  border-bottom: 1px solid rgba(0,232,122,0.15);
+}
+.best-picks-section.over > .best-picks-header::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(32,223,143,0.6) 25%, rgba(27,220,136,0.35) 75%, transparent 100%);
+}
+.best-picks-section.under > .best-picks-header {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255,58,96,0.08), rgba(13,18,33,0.8));
+  border-bottom: 1px solid rgba(255,58,96,0.15);
+}
+.best-picks-section.under > .best-picks-header::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,91,120,0.55) 25%, rgba(255,58,96,0.3) 75%, transparent 100%);
+}
+
+/* ─ Section container elevation ─ */
+.best-picks-section.over {
+  border-color: rgba(0,232,122,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 44px rgba(0,0,0,0.38), 0 0 24px rgba(0,232,122,0.04);
+}
+.best-picks-section.under {
+  border-color: rgba(255,58,96,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 44px rgba(0,0,0,0.38), 0 0 24px rgba(255,58,96,0.04);
+}
+
+/* ─ Staggered entrance animation ─ */
+@keyframes bestPickSlideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.best-pick-row { animation: bestPickSlideIn 0.25s ease both; }
+.best-pick-row:nth-child(2) { animation-delay: 0s; }
+.best-pick-row:nth-child(3) { animation-delay: 0.04s; }
+.best-pick-row:nth-child(4) { animation-delay: 0.08s; }
+.best-pick-row:nth-child(5) { animation-delay: 0.12s; }
+.best-pick-row:nth-child(6) { animation-delay: 0.16s; }
+.best-pick-row:nth-child(7) { animation-delay: 0.20s; }
+.best-pick-row:nth-child(8) { animation-delay: 0.24s; }
+.best-pick-row:nth-child(n+9) { animation-delay: 0.28s; }
+@media (prefers-reduced-motion: reduce) {
+  .best-pick-row { animation: none; }
+}
+
+/* ─ Stat badge hover effects ─ */
+.best-pick-tier {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.best-pick-tier:hover {
+  transform: translateY(-1px);
+}
+.best-pick-tier.high:hover { box-shadow: 0 4px 14px rgba(27,220,136,0.3), inset 0 0 6px rgba(27,220,136,0.12); }
+.best-pick-tier.med:hover  { box-shadow: 0 4px 14px rgba(248,198,74,0.25), inset 0 0 6px rgba(248,198,74,0.1); }
+.best-pick-tier.low:hover  { box-shadow: 0 4px 12px rgba(255,108,136,0.2), inset 0 0 4px rgba(255,108,136,0.08); }
+
+.best-pick-platform {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.best-pick-platform:hover {
+  background: var(--bg4);
+  border-color: var(--border3);
+}
+
+.best-pick-conflict, .best-pick-lineshop {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.best-pick-conflict:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(248,198,74,0.2);
+}
+.best-pick-lineshop:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(99,179,237,0.2);
+}
+
+/* ─ Avatar ring glow for top picks ─ */
+.best-picks-section.over > .section-body > .best-pick-row:first-child .bp-avatar,
+.best-picks-section.over > .best-pick-row:nth-child(2) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.5), 0 0 10px rgba(248,198,74,0.25), 0 2px 6px rgba(0,0,0,0.4);
+}
+.best-picks-section.under > .section-body > .best-pick-row:first-child .bp-avatar,
+.best-picks-section.under > .best-pick-row:nth-child(2) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.5), 0 0 10px rgba(248,198,74,0.25), 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* ─ Name text glow on hover ─ */
+.best-pick-row:hover .best-pick-name {
+  text-shadow: 0 0 12px rgba(244,247,255,0.12);
+}
+.best-pick-row.tier-high.over:hover .best-pick-name  { text-shadow: 0 0 14px rgba(27,220,136,0.2); }
+.best-pick-row.tier-high.under:hover .best-pick-name { text-shadow: 0 0 14px rgba(255,108,136,0.2); }
+
+
 /* ── GLOW-UP 8: Level 6 — navigation & discoverability ── */
 
 /* Drilldown section headers */
@@ -17621,160 +17828,4 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
     <span class="event-date" id="eventDate"></span>
     <span class="venue-badge" id="venueBadge" style="display:none"></span>
   </div>
-  <span class="event-countdown" id="eventCountdown"></span>
-</div>
-
-<!-- FILTER ROW 1: Platform selector + search + BETR entry -->
-<div class="filter-bar filter-bar-top">
-  <div class="platform-pills-row">
-    <div class="platform-pill p6" id="pillP6" data-platform="pick6" title="Click to prioritize Pick6 lines">
-      <div class="pill-dot"></div>
-      <span>Pick6</span>
-      <span class="pill-count" id="countP6">—</span>
-      <span class="pill-age" id="ageP6"></span>
-      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
-    </div>
-    <div class="platform-pill ud" id="pillUD" data-platform="underdog" title="Click to prioritize Underdog lines">
-      <div class="pill-dot"></div>
-      <span>Underdog</span>
-      <span class="pill-count" id="countUD">—</span>
-      <span class="pill-age" id="ageUD"></span>
-      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
-    </div>
-    <div class="platform-pill betr" id="pillBetr" data-platform="betr" title="Click to prioritize Betr lines">
-      <div class="pill-dot"></div>
-      <span>Betr</span>
-      <span class="pill-count" id="countBetr">—</span>
-      <span class="pill-age" id="ageBetr"></span>
-      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
-    </div>
-    <div class="platform-pill dk" id="pillDK" data-platform="draftkings_sportsbook" title="Click to prioritize DraftKings Sportsbook lines">
-      <div class="pill-dot"></div>
-      <span>DK Sportsbook</span>
-      <span class="pill-count" id="countDK">—</span>
-      <span class="pill-age" id="ageDK"></span>
-      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
-    </div>
-    <div class="platform-pill pp" id="pillPP" data-platform="prizepicks" title="Click to prioritize PrizePicks lines">
-      <div class="pill-dot"></div>
-      <span>PrizePicks</span>
-      <span class="pill-count" id="countPP">—</span>
-      <span class="pill-age" id="agePP"></span>
-      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
-    </div>
-    <div class="source-toggle-row" id="sourceToggleRow">
-      <button type="button" class="source-toggle-label" id="sourceToggleTrigger" aria-haspopup="true" aria-expanded="false" title="Show or hide each sportsbook source">
-        <span id="sourceTriggerText">Sources 5/5</span>
-        <span class="source-trigger-caret" id="sourceTriggerCaret" aria-hidden="true">▾</span>
-      </button>
-      <div class="source-toggle-buttons" id="sourceToggleButtons" style="display:none">
-        <button class="source-toggle p6 active" data-source="p6">P6</button>
-        <button class="source-toggle ud active" data-source="ud">UD</button>
-        <button class="source-toggle" style="color:#f59e0b;border-color:rgba(245,158,11,0.3)" data-source="dk">DK</button>
-        <button class="source-toggle pp active" data-source="pp">PP</button>
-        <button class="source-toggle betr active" data-source="betr">BT</button>
-      </div>
-    </div>
-  </div>
-  <div class="filter-bar-center">
-    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="🔍 Search fighters... or conf:70+ lean:over td:under split:yes" autocomplete="off">
-  </div>
-  <div class="filter-bar-actions">
-    <button id="manualEntryBtn" class="manual-entry-btn">✏️ BETR LINES</button>
-  </div>
-</div>
-<!-- FILTER ROW 2: Sort buttons + view tabs -->
-<div class="filter-bar filter-bar-bottom">
-  <div class="sort-trend-control">
-    <button id="sortTrendTrigger" class="sort-trend-trigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Configure sort order and trend window">
-      <span class="sort-label">Sort &amp; Trend</span>
-      <span class="sort-trend-summary"><span id="sortTrendActiveSort">Card Order</span> · <span id="sortTrendActiveTrend">L3</span></span>
-      <span class="sort-trend-caret" aria-hidden="true">▾</span>
-    </button>
-    <div id="sortTrendPopover" class="sort-trend-popover" role="menu" hidden>
-      <div class="sort-trend-section">
-        <span class="sort-trend-section-label">Sort by</span>
-        <div class="sort-group" id="sortGroup">
-          <button class="sort-btn active" data-sort="default">Card Order</button>
-          <button class="sort-btn" data-sort="line">Line ↓</button>
-          <button class="sort-btn" data-sort="ssline" title="Sort by active SS line">SS Line</button>
-          <button class="sort-btn" data-sort="ftline" title="Sort by active fight-time line">FT Line</button>
-          <button class="sort-btn" data-sort="avgss" title="Sort by average significant strikes">Avg SS</button>
-          <button class="sort-btn" data-sort="delta" title="Sort by SS delta (Avg SS - Line)">SS Delta</button>
-          <button class="sort-btn" data-sort="conf">Confidence</button>
-          <button class="sort-btn" data-sort="avgfp">Avg FP</button>
-          <button class="sort-btn" data-sort="floor">Floor</button>
-          <button class="sort-btn" data-sort="ceil">Ceiling</button>
-          <button class="sort-btn" data-sort="consistency">Consistency</button>
-        </div>
-      </div>
-      <div class="sort-trend-section">
-        <span class="sort-trend-section-label" title="Compare recent N fights vs career average">Trend window</span>
-        <div class="trend-window-group">
-          <button class="trend-btn active" data-window="3">L3</button>
-          <button class="trend-btn" data-window="5">L5</button>
-          <button class="trend-btn" data-window="0">Career</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="view-tabs">
-    <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
-    <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
-    <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
-    <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
-    <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
-    <div class="data-tabs-wrap">
-      <button class="tab-btn data-tabs-trigger" id="dataTabsTrigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Calibration and Archive views">
-        <span id="dataTabsLabel">Data</span>
-        <span class="data-tabs-caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="data-tabs-popover" id="dataTabsPopover" role="menu" hidden>
-        <button class="tab-btn" data-view="calibration">📈 Calibration</button>
-        <button class="tab-btn" data-view="archive">Archive</button>
-      </div>
-    </div>
-  </div>
-  <div class="density-control">
-    <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
-      <span aria-hidden="true">⚙</span>
-      <span id="densityTriggerDot" class="density-trigger-dot" aria-hidden="true" hidden></span>
-    </button>
-    <div id="densityPopover" class="density-popover" role="menu" hidden>
-      <span class="density-popover-label">Display density</span>
-      <button id="densityToggleBtn" class="density-btn density-popover-item" title="Toggle between compact and detailed fighter cards">Compact View</button>
-      <button id="historyDensityToggleBtn" class="density-btn density-popover-item" title="Toggle history panel readability">History: Compact</button>
-    </div>
-  </div>
-</div>
-
-<!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
-<div id="visitBriefing" class="visit-briefing is-hidden"></div>
-<div id="slateStatusBanner" class="slate-banner">
-<!-- PRE-LOCK QA PANEL -->
-<div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
-
-<div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
-  <div class="mh-stat">
-    <span class="mh-label">Calibrated Hit Rate</span>
-    <span class="mh-value" id="mhHitRate">--%</span>
-    <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
-  </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
-    <span class="mh-label">Top Edge</span>
-    <span class="mh-value" id="mhTopEdge">--</span>
-    <span class="mh-trend" id="mhTopEdgeTrend">No actionable edges</span>
-  </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
-    <span class="mh-label">Actionable Leans</span>
-    <span class="mh-value" id="mhCoverage">0</span>
-    <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
-  </div>
-</div>
-</div><!-- /slateStatusBanner -->
-
-<div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
-  <div class="ld-drilldown-banner">
-    <
+  <span class="event-countdown"
