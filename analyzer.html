@@ -12737,93 +12737,119 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
-/* ── GLOW-UP 95: Stat Head-to-Head — Homo Sapiens Sapiens (final evolution) ── */
+/* ── GLOW-UP 95: Stat Head-to-Head — Homo Sapiens Sapiens v3 (ascension) ── */
 
-/* === Section head: cinematic glass banner with gradient gold text === */
+/* --- Shimmer keyframe for section header --- */
+@keyframes h2h-gold-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* === Section head: cinematic glass banner with animated gold shimmer text === */
 .detail-section-head {
-  background: linear-gradient(135deg, rgba(8,12,28,0.97) 0%, rgba(4,8,20,0.95) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.22) !important;
+  background: linear-gradient(135deg, rgba(6,10,24,0.98) 0%, rgba(3,6,16,0.96) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.25) !important;
   border-radius: 14px !important;
-  padding: 11px 18px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+  padding: 12px 20px !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 20px rgba(248,198,74,0.04) !important;
   position: relative;
   overflow: hidden;
 }
 .detail-section-head::before {
   content: '' !important;
-  width: 3.5px !important; height: 16px !important;
-  background: linear-gradient(180deg, #ffd66b, #f8c64a, rgba(240,160,48,0.4)) !important;
-  box-shadow: 0 0 14px rgba(248,198,74,0.55), 0 0 4px rgba(248,198,74,0.3) !important;
+  width: 4px !important; height: 18px !important;
+  background: linear-gradient(180deg, #ffe08a, #f8c64a, #d4920a) !important;
+  box-shadow: 0 0 16px rgba(248,198,74,0.6), 0 0 6px rgba(248,198,74,0.4) !important;
   border-radius: 2px !important;
 }
 .detail-section-head::after {
-  background: linear-gradient(90deg, rgba(248,198,74,0.25), rgba(71,90,128,0.08), transparent) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.3), rgba(71,90,128,0.1), transparent) !important;
 }
 .detail-section-head span {
-  background: linear-gradient(135deg, #ffd66b 0%, #f8c64a 40%, #e8a832 100%) !important;
+  background: linear-gradient(90deg, #ffe08a 0%, #f8c64a 25%, #d4920a 50%, #f8c64a 75%, #ffe08a 100%) !important;
+  background-size: 200% 100% !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: drop-shadow(0 0 6px rgba(248,198,74,0.2));
+  animation: h2h-gold-shimmer 5s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.25));
 }
 
-/* === Stat-pair: cinematic fused glass card with layered atmosphere === */
+/* === Stat-pair: cinematic fused glass with top accent bar === */
 .stat-pair {
-  background: linear-gradient(180deg, rgba(8,14,30,0.97) 0%, rgba(4,8,22,0.95) 100%) !important;
+  background: linear-gradient(180deg, rgba(6,12,28,0.98) 0%, rgba(3,7,18,0.96) 100%) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
+  border-top: none !important;
   border-radius: 16px !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  box-shadow: 0 12px 44px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06) !important;
   position: relative;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4,0,0.2,1) !important;
 }
+.stat-pair::before { z-index: 2; }
+.stat-pair::after { z-index: 2; }
+.stat-pair > *:first-child::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(86,195,255,0.6) 0%, rgba(86,195,255,0.15) 45%, rgba(255,138,61,0.15) 55%, rgba(255,138,61,0.6) 100%);
+  border-radius: 16px 16px 0 0;
+  z-index: 3;
+  pointer-events: none;
+}
 .stat-pair:hover {
-  border-color: rgba(255,255,255,0.12) !important;
-  box-shadow: 0 14px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.13) !important;
+  box-shadow: 0 16px 52px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.09), 0 0 30px rgba(86,195,255,0.03), 0 0 30px rgba(255,138,61,0.03) !important;
+  transform: translateY(-2px);
 }
 
 /* === Self-side panel: deep cyan accent + layered radials === */
 .stat-pair > .detail-panel:first-child {
-  border-left: 3.5px solid rgba(86,195,255,0.55) !important;
-  background: linear-gradient(135deg, rgba(86,195,255,0.05) 0%, rgba(86,195,255,0.015) 40%, transparent 70%) !important;
+  border-left: 3.5px solid rgba(86,195,255,0.6) !important;
+  background: linear-gradient(135deg, rgba(86,195,255,0.06) 0%, rgba(86,195,255,0.02) 35%, transparent 65%) !important;
   border-radius: 16px 0 0 16px !important;
 }
 .stat-pair > .detail-panel:first-child::after {
   content: '';
-  position: absolute; top: -25%; left: -10%; width: 55%; height: 65%;
-  background: radial-gradient(ellipse at 30% 40%, rgba(86,195,255,0.07) 0%, rgba(86,195,255,0.02) 40%, transparent 70%);
+  position: absolute; top: -20%; left: -8%; width: 50%; height: 60%;
+  background: radial-gradient(ellipse at 25% 35%, rgba(86,195,255,0.08) 0%, rgba(86,195,255,0.025) 40%, transparent 70%);
   pointer-events: none;
 }
 
 /* === Opp-side panel: deep orange accent + layered radials === */
 .stat-pair > .detail-panel + .detail-panel {
-  border-right: 3.5px solid rgba(255,138,61,0.55) !important;
+  border-right: 3.5px solid rgba(255,138,61,0.6) !important;
   border-left: none !important;
-  background: linear-gradient(225deg, rgba(255,138,61,0.05) 0%, rgba(255,138,61,0.015) 40%, transparent 70%) !important;
+  background: linear-gradient(225deg, rgba(255,138,61,0.06) 0%, rgba(255,138,61,0.02) 35%, transparent 65%) !important;
   border-radius: 0 16px 16px 0 !important;
 }
 .stat-pair > .detail-panel + .detail-panel::after {
   content: '';
-  position: absolute; top: -25%; right: -10%; width: 55%; height: 65%;
-  background: radial-gradient(ellipse at 70% 40%, rgba(255,138,61,0.07) 0%, rgba(255,138,61,0.02) 40%, transparent 70%);
+  position: absolute; top: -20%; right: -8%; width: 50%; height: 60%;
+  background: radial-gradient(ellipse at 75% 35%, rgba(255,138,61,0.08) 0%, rgba(255,138,61,0.025) 40%, transparent 70%);
   pointer-events: none;
 }
 
-/* === Center divider: luminous gradient line + glass pip with gold ring === */
+/* === Center divider: luminous gradient line + glowing gold pip === */
 .stat-pair:has(> .detail-panel + .detail-panel)::before {
-  background: linear-gradient(180deg, transparent 3%, rgba(255,255,255,0.06) 15%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.06) 85%, transparent 97%) !important;
+  background: linear-gradient(180deg, transparent 2%, rgba(255,255,255,0.05) 10%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.05) 90%, transparent 98%) !important;
   width: 1px !important;
 }
 .stat-pair:has(> .detail-panel + .detail-panel)::after {
-  background: linear-gradient(135deg, rgba(12,20,44,0.97), rgba(8,14,32,0.95)) !important;
-  border: 1.5px solid rgba(248,198,74,0.25) !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 10px rgba(248,198,74,0.15), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-  width: 24px !important; height: 24px !important;
-  font-size: 10px !important;
-  color: rgba(248,198,74,0.85) !important;
-  text-shadow: 0 0 6px rgba(248,198,74,0.3);
+  background: linear-gradient(135deg, rgba(10,18,40,0.98), rgba(6,12,28,0.96)) !important;
+  border: 1.5px solid rgba(248,198,74,0.35) !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.5), 0 0 14px rgba(248,198,74,0.2), 0 0 4px rgba(248,198,74,0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+  width: 26px !important; height: 26px !important;
+  font-size: 11px !important;
+  color: rgba(248,198,74,0.9) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.4);
+  transition: all 0.25s ease !important;
+}
+.stat-pair:hover::after {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.5), 0 0 18px rgba(248,198,74,0.3), 0 0 6px rgba(248,198,74,0.5), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+  border-color: rgba(248,198,74,0.5) !important;
 }
 
 /* === Detail panels inside pairs: transparent base === */
@@ -12837,161 +12863,185 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 
 /* === Standalone detail panels (career data, models): deep glass === */
 .panel-pair > .detail-panel, .detail-grid > .detail-panel {
-  background: linear-gradient(145deg, rgba(10,18,42,0.95) 0%, rgba(6,12,28,0.92) 100%) !important;
+  background: linear-gradient(145deg, rgba(8,16,40,0.96) 0%, rgba(4,10,24,0.94) 100%) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
   border-radius: 16px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06) !important;
   overflow: hidden;
   position: relative;
 }
 .panel-pair > .detail-panel:hover, .detail-grid > .detail-panel:hover {
-  border-color: rgba(255,255,255,0.12) !important;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+  border-color: rgba(255,255,255,0.13) !important;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
 /* === Panel titles: gradient text — cyan for self, orange for opp === */
 .detail-panel-title {
-  font-weight: 700 !important;
-  letter-spacing: 0.05em !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  font-size: inherit !important;
 }
 .stat-pair > .detail-panel:first-child .detail-panel-title {
-  background: linear-gradient(135deg, #7ad4ff 0%, #56c3ff 50%, #a8e0ff 100%) !important;
+  background: linear-gradient(135deg, #8adcff 0%, #56c3ff 45%, #b4e8ff 100%) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: drop-shadow(0 0 6px rgba(86,195,255,0.2));
+  filter: drop-shadow(0 0 8px rgba(86,195,255,0.25));
 }
 .stat-pair > .detail-panel + .detail-panel .detail-panel-title {
-  background: linear-gradient(135deg, #ffb06b 0%, #ff8a3d 50%, #ffc896 100%) !important;
+  background: linear-gradient(135deg, #ffc080 0%, #ff8a3d 45%, #ffd4a8 100%) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: drop-shadow(0 0 6px rgba(255,138,61,0.2));
+  filter: drop-shadow(0 0 8px rgba(255,138,61,0.25));
 }
 .detail-panel-title::after {
-  height: 1px !important;
+  height: 2px !important;
+  border-radius: 1px !important;
 }
 .stat-pair > .detail-panel:first-child .detail-panel-title::after {
-  background: linear-gradient(90deg, rgba(86,195,255,0.3), rgba(86,195,255,0.08), transparent) !important;
+  background: linear-gradient(90deg, rgba(86,195,255,0.4), rgba(86,195,255,0.12), transparent) !important;
+  box-shadow: 0 0 6px rgba(86,195,255,0.15);
 }
 .stat-pair > .detail-panel + .detail-panel .detail-panel-title::after {
-  background: linear-gradient(90deg, rgba(255,138,61,0.3), rgba(255,138,61,0.08), transparent) !important;
+  background: linear-gradient(90deg, rgba(255,138,61,0.4), rgba(255,138,61,0.12), transparent) !important;
+  box-shadow: 0 0 6px rgba(255,138,61,0.15);
 }
 
 /* === Standalone panel titles: gold gradient === */
 .panel-pair > .detail-panel .detail-panel-title,
 .detail-grid > .detail-panel .detail-panel-title {
-  background: linear-gradient(135deg, #ffd66b 0%, #f8c64a 50%, #e8a832 100%) !important;
+  background: linear-gradient(135deg, #ffe08a 0%, #f8c64a 45%, #d4920a 100%) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: drop-shadow(0 0 6px rgba(248,198,74,0.15));
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.2));
 }
 .panel-pair > .detail-panel .detail-panel-title::after,
 .detail-grid > .detail-panel .detail-panel-title::after {
-  background: linear-gradient(90deg, rgba(248,198,74,0.25), rgba(71,90,128,0.08), transparent) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.35), rgba(71,90,128,0.1), transparent) !important;
+  box-shadow: 0 0 6px rgba(248,198,74,0.12);
 }
 
 /* === History bars: deep glass tracks + double-glow fills === */
 .history-bar-wrap {
-  background: rgba(4,8,18,0.8) !important;
-  border: 1px solid rgba(255,255,255,0.04) !important;
+  background: rgba(3,6,14,0.85) !important;
+  border: 1px solid rgba(255,255,255,0.035) !important;
   border-radius: 5px !important;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.35);
 }
 .history-bar-fill {
   border-radius: 4px !important;
+  min-height: 8px;
 }
 .history-bar-fill.over-line {
-  background: linear-gradient(90deg, rgba(0,232,122,0.6) 0%, rgba(0,232,122,0.35) 70%, rgba(0,232,122,0.2) 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 0 10px rgba(0,232,122,0.25), 0 0 3px rgba(0,232,122,0.4) !important;
+  background: linear-gradient(90deg, rgba(0,232,122,0.65) 0%, rgba(0,232,122,0.4) 60%, rgba(0,232,122,0.18) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgba(0,232,122,0.3), 0 0 4px rgba(0,232,122,0.45) !important;
 }
 .history-bar-fill.under-line {
-  background: linear-gradient(90deg, rgba(255,58,96,0.5) 0%, rgba(255,58,96,0.25) 70%, rgba(255,58,96,0.12) 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 0 10px rgba(255,58,96,0.2), 0 0 3px rgba(255,58,96,0.35) !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.55) 0%, rgba(255,58,96,0.3) 60%, rgba(255,58,96,0.1) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 12px rgba(255,58,96,0.25), 0 0 4px rgba(255,58,96,0.4) !important;
 }
 
-/* === History bar row: glass strip hover with edge reveal === */
+/* === History bar row: alternating + glass hover === */
 .history-bar-row {
   border-radius: 6px !important;
   transition: all 0.2s cubic-bezier(0.4,0,0.2,1) !important;
-  padding: 2px 5px !important;
+  padding: 3px 6px !important;
   border: 1px solid transparent !important;
 }
+.history-bar-row:nth-child(even) {
+  background: rgba(255,255,255,0.012) !important;
+}
+.history-bar-row:first-child {
+  background: rgba(248,198,74,0.025) !important;
+  border-color: rgba(248,198,74,0.06) !important;
+}
 .history-bar-row:hover {
-  background: rgba(255,255,255,0.035) !important;
-  border-color: rgba(255,255,255,0.05) !important;
+  background: rgba(255,255,255,0.045) !important;
+  border-color: rgba(255,255,255,0.06) !important;
 }
 
-/* === Bar values: double-glow text === */
+/* === Bar values: bolder double-glow text === */
 .history-bar-row:has(.over-line) .history-bar-val {
-  color: rgba(0,240,130,0.95) !important;
-  text-shadow: 0 0 10px rgba(0,232,122,0.35), 0 0 3px rgba(0,232,122,0.2);
-  font-weight: 600 !important;
+  color: rgba(0,245,135,0.97) !important;
+  text-shadow: 0 0 12px rgba(0,232,122,0.4), 0 0 4px rgba(0,232,122,0.25);
+  font-weight: 700 !important;
 }
 .history-bar-row:has(.under-line) .history-bar-val {
-  color: rgba(255,95,120,0.9) !important;
-  text-shadow: 0 0 10px rgba(255,58,96,0.3), 0 0 3px rgba(255,58,96,0.15);
-  font-weight: 600 !important;
+  color: rgba(255,100,125,0.95) !important;
+  text-shadow: 0 0 12px rgba(255,58,96,0.35), 0 0 4px rgba(255,58,96,0.2);
+  font-weight: 700 !important;
 }
 
-/* === Opponent names: subtle glow on hover === */
+/* === Opponent names: refined transitions === */
 .history-opp {
   transition: all 0.2s ease !important;
 }
 .history-bar-row:hover .history-opp {
-  color: var(--text) !important;
-  text-shadow: 0 0 8px rgba(255,255,255,0.12);
+  color: #fff !important;
+  text-shadow: 0 0 10px rgba(255,255,255,0.15);
 }
 
-/* === Line marker: triple-glow gold beacon === */
+/* === Line marker: quad-glow gold beacon === */
 .line-marker {
   border-left-color: rgba(248,198,74,0.95) !important;
-  box-shadow: 0 0 12px rgba(248,198,74,0.5), 0 0 4px rgba(248,198,74,0.7), 0 0 20px rgba(248,198,74,0.15) !important;
+  border-left-width: 2px !important;
+  box-shadow: 0 0 14px rgba(248,198,74,0.55), 0 0 5px rgba(248,198,74,0.75), 0 0 24px rgba(248,198,74,0.2), 0 0 2px rgba(248,198,74,0.9) !important;
 }
 
-/* === Panel meta: deeper glass strip with accent line === */
+/* === Panel meta: deeper glass strip with glow accent === */
 .panel-meta {
-  background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.01) 100%) !important;
-  border: 1px solid rgba(255,255,255,0.05) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.012) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.055) !important;
   border-radius: 10px !important;
-  padding: 6px 10px !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  padding: 7px 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 2px 8px rgba(0,0,0,0.15);
 }
 .panel-meta-line {
-  background: linear-gradient(90deg, rgba(248,198,74,0.8), rgba(248,198,74,0.4)) !important;
-  box-shadow: 0 0 8px rgba(248,198,74,0.4), 0 0 3px rgba(248,198,74,0.2) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.85), rgba(248,198,74,0.5)) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.45), 0 0 4px rgba(248,198,74,0.25) !important;
   border-radius: 2px !important;
+  width: 4px !important;
 }
 
 /* === Panel badges/confidence: glass pills with glow === */
 .panel-confidence {
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.025) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
   border-radius: 8px !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* === PER badge: red glass pill === */
+.detail-panel-title .per-badge,
+.detail-panel-title span[style*="background"][style*="PER"],
+.detail-panel-title span[style*="red"] {
+  border-radius: 6px !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.2);
 }
 
 /* === Fight Time Breakdown: deeper glass treatment === */
 .finish-bar-wrap {
-  background: rgba(4,8,18,0.75) !important;
+  background: rgba(3,6,14,0.8) !important;
   border: 1px solid rgba(255,255,255,0.05) !important;
   border-radius: 5px !important;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.3);
 }
 .finish-bar {
   border-radius: 4px !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 6px rgba(255,255,255,0.05);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 0 8px rgba(255,255,255,0.06);
 }
 
 /* === Early-finish risk banner: cinematic glass with amber glow ring === */
 .detail-panel div[style*="COMBINED EARLY-FINISH RISK"],
 .detail-panel div[style*="background:rgba(248,198,74"] {
   border-radius: 12px !important;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.3), 0 0 12px rgba(248,198,74,0.08) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35), 0 0 16px rgba(248,198,74,0.1) !important;
+  border: 1px solid rgba(248,198,74,0.15) !important;
 }
 
 /* === Stat rows in career panel: glass strip hover === */
@@ -13002,26 +13052,35 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   border: 1px solid transparent;
 }
 .stat-row:hover {
-  background: rgba(255,255,255,0.025) !important;
-  border-color: rgba(255,255,255,0.04) !important;
+  background: rgba(255,255,255,0.03) !important;
+  border-color: rgba(255,255,255,0.045) !important;
 }
 
 /* === Stat values: double-glow by tier === */
-.stat-val.good { text-shadow: 0 0 10px rgba(0,232,122,0.3), 0 0 3px rgba(0,232,122,0.15); }
-.stat-val.low  { text-shadow: 0 0 10px rgba(255,58,96,0.25), 0 0 3px rgba(255,58,96,0.12); }
+.stat-val.good { text-shadow: 0 0 12px rgba(0,232,122,0.35), 0 0 4px rgba(0,232,122,0.18); }
+.stat-val.low  { text-shadow: 0 0 12px rgba(255,58,96,0.3), 0 0 4px rgba(255,58,96,0.15); }
 
-/* === Matchup Models section head: indigo accent === */
+/* === Matchup Models section head: indigo accent with shimmer === */
 .detail-grid > .detail-section-head:nth-of-type(2) {
-  border-color: rgba(94,106,210,0.18) !important;
+  border-color: rgba(94,106,210,0.2) !important;
 }
 .detail-grid > .detail-section-head:nth-of-type(2)::before {
-  background: linear-gradient(180deg, #8b96f0, rgba(94,106,210,0.5)) !important;
-  box-shadow: 0 0 14px rgba(94,106,210,0.45) !important;
+  background: linear-gradient(180deg, #a0abff, #8b96f0, rgba(94,106,210,0.4)) !important;
+  box-shadow: 0 0 16px rgba(94,106,210,0.5), 0 0 4px rgba(94,106,210,0.3) !important;
+}
+.detail-grid > .detail-section-head:nth-of-type(2) span {
+  background: linear-gradient(90deg, #c4caff 0%, #8b96f0 40%, #a0abff 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  animation: none !important;
+  filter: drop-shadow(0 0 6px rgba(94,106,210,0.2));
 }
 
 /* === SS/CTRL Matchup Analyzer panels === */
 .panel-pair {
-  gap: 12px !important;
+  gap: 14px !important;
 }
 
 /* ── GLOW-UP 94: Prop Line Predictions & Learning Summary — Homo Sapiens Sapiens (final evolution) ── */
@@ -17828,4 +17887,350 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
     <span class="event-date" id="eventDate"></span>
     <span class="venue-badge" id="venueBadge" style="display:none"></span>
   </div>
-  <span class="event-countdown"
+  <span class="event-countdown" id="eventCountdown"></span>
+</div>
+
+<!-- FILTER ROW 1: Platform selector + search + BETR entry -->
+<div class="filter-bar filter-bar-top">
+  <div class="platform-pills-row">
+    <div class="platform-pill p6" id="pillP6" data-platform="pick6" title="Click to prioritize Pick6 lines">
+      <div class="pill-dot"></div>
+      <span>Pick6</span>
+      <span class="pill-count" id="countP6">—</span>
+      <span class="pill-age" id="ageP6"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
+    </div>
+    <div class="platform-pill ud" id="pillUD" data-platform="underdog" title="Click to prioritize Underdog lines">
+      <div class="pill-dot"></div>
+      <span>Underdog</span>
+      <span class="pill-count" id="countUD">—</span>
+      <span class="pill-age" id="ageUD"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
+    </div>
+    <div class="platform-pill betr" id="pillBetr" data-platform="betr" title="Click to prioritize Betr lines">
+      <div class="pill-dot"></div>
+      <span>Betr</span>
+      <span class="pill-count" id="countBetr">—</span>
+      <span class="pill-age" id="ageBetr"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
+    </div>
+    <div class="platform-pill dk" id="pillDK" data-platform="draftkings_sportsbook" title="Click to prioritize DraftKings Sportsbook lines">
+      <div class="pill-dot"></div>
+      <span>DK Sportsbook</span>
+      <span class="pill-count" id="countDK">—</span>
+      <span class="pill-age" id="ageDK"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
+    </div>
+    <div class="platform-pill pp" id="pillPP" data-platform="prizepicks" title="Click to prioritize PrizePicks lines">
+      <div class="pill-dot"></div>
+      <span>PrizePicks</span>
+      <span class="pill-count" id="countPP">—</span>
+      <span class="pill-age" id="agePP"></span>
+      <span class="pill-active-badge" aria-hidden="true">ACTIVE</span>
+    </div>
+    <div class="source-toggle-row" id="sourceToggleRow">
+      <button type="button" class="source-toggle-label" id="sourceToggleTrigger" aria-haspopup="true" aria-expanded="false" title="Show or hide each sportsbook source">
+        <span id="sourceTriggerText">Sources 5/5</span>
+        <span class="source-trigger-caret" id="sourceTriggerCaret" aria-hidden="true">▾</span>
+      </button>
+      <div class="source-toggle-buttons" id="sourceToggleButtons" style="display:none">
+        <button class="source-toggle p6 active" data-source="p6">P6</button>
+        <button class="source-toggle ud active" data-source="ud">UD</button>
+        <button class="source-toggle" style="color:#f59e0b;border-color:rgba(245,158,11,0.3)" data-source="dk">DK</button>
+        <button class="source-toggle pp active" data-source="pp">PP</button>
+        <button class="source-toggle betr active" data-source="betr">BT</button>
+      </div>
+    </div>
+  </div>
+  <div class="filter-bar-center">
+    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="🔍 Search fighters... or conf:70+ lean:over td:under split:yes" autocomplete="off">
+  </div>
+  <div class="filter-bar-actions">
+    <button id="manualEntryBtn" class="manual-entry-btn">✏️ BETR LINES</button>
+  </div>
+</div>
+<!-- FILTER ROW 2: Sort buttons + view tabs -->
+<div class="filter-bar filter-bar-bottom">
+  <div class="sort-trend-control">
+    <button id="sortTrendTrigger" class="sort-trend-trigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Configure sort order and trend window">
+      <span class="sort-label">Sort &amp; Trend</span>
+      <span class="sort-trend-summary"><span id="sortTrendActiveSort">Card Order</span> · <span id="sortTrendActiveTrend">L3</span></span>
+      <span class="sort-trend-caret" aria-hidden="true">▾</span>
+    </button>
+    <div id="sortTrendPopover" class="sort-trend-popover" role="menu" hidden>
+      <div class="sort-trend-section">
+        <span class="sort-trend-section-label">Sort by</span>
+        <div class="sort-group" id="sortGroup">
+          <button class="sort-btn active" data-sort="default">Card Order</button>
+          <button class="sort-btn" data-sort="line">Line ↓</button>
+          <button class="sort-btn" data-sort="ssline" title="Sort by active SS line">SS Line</button>
+          <button class="sort-btn" data-sort="ftline" title="Sort by active fight-time line">FT Line</button>
+          <button class="sort-btn" data-sort="avgss" title="Sort by average significant strikes">Avg SS</button>
+          <button class="sort-btn" data-sort="delta" title="Sort by SS delta (Avg SS - Line)">SS Delta</button>
+          <button class="sort-btn" data-sort="conf">Confidence</button>
+          <button class="sort-btn" data-sort="avgfp">Avg FP</button>
+          <button class="sort-btn" data-sort="floor">Floor</button>
+          <button class="sort-btn" data-sort="ceil">Ceiling</button>
+          <button class="sort-btn" data-sort="consistency">Consistency</button>
+        </div>
+      </div>
+      <div class="sort-trend-section">
+        <span class="sort-trend-section-label" title="Compare recent N fights vs career average">Trend window</span>
+        <div class="trend-window-group">
+          <button class="trend-btn active" data-window="3">L3</button>
+          <button class="trend-btn" data-window="5">L5</button>
+          <button class="trend-btn" data-window="0">Career</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="view-tabs">
+    <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
+    <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
+    <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
+    <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
+    <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
+    <div class="data-tabs-wrap">
+      <button class="tab-btn data-tabs-trigger" id="dataTabsTrigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Calibration and Archive views">
+        <span id="dataTabsLabel">Data</span>
+        <span class="data-tabs-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="data-tabs-popover" id="dataTabsPopover" role="menu" hidden>
+        <button class="tab-btn" data-view="calibration">📈 Calibration</button>
+        <button class="tab-btn" data-view="archive">Archive</button>
+      </div>
+    </div>
+  </div>
+  <div class="density-control">
+    <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
+      <span aria-hidden="true">⚙</span>
+      <span id="densityTriggerDot" class="density-trigger-dot" aria-hidden="true" hidden></span>
+    </button>
+    <div id="densityPopover" class="density-popover" role="menu" hidden>
+      <span class="density-popover-label">Display density</span>
+      <button id="densityToggleBtn" class="density-btn density-popover-item" title="Toggle between compact and detailed fighter cards">Compact View</button>
+      <button id="historyDensityToggleBtn" class="density-btn density-popover-item" title="Toggle history panel readability">History: Compact</button>
+    </div>
+  </div>
+</div>
+
+<!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
+<div id="visitBriefing" class="visit-briefing is-hidden"></div>
+<div id="slateStatusBanner" class="slate-banner">
+<!-- PRE-LOCK QA PANEL -->
+<div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
+
+<div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
+  <div class="mh-stat">
+    <span class="mh-label">Calibrated Hit Rate</span>
+    <span class="mh-value" id="mhHitRate">--%</span>
+    <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
+  </div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Top Edge</span>
+    <span class="mh-value" id="mhTopEdge">--</span>
+    <span class="mh-trend" id="mhTopEdgeTrend">No actionable edges</span>
+  </div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Actionable Leans</span>
+    <span class="mh-value" id="mhCoverage">0</span>
+    <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
+  </div>
+</div>
+</div><!-- /slateStatusBanner -->
+
+<div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
+  <div class="ld-drilldown-banner">
+    <span class="ld-drilldown-icon" aria-hidden="true">⚡</span>
+    <div class="ld-drilldown-content">
+      <span class="ld-label">Learning Drilldown</span>
+      <span class="ld-value ld-drilldown-title" id="ldDrilldownTitle">No drilldown yet</span>
+      <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
+      <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
+    </div>
+  </div>
+  <div class="ld-footer">
+    <span class="ld-footer-summary" id="ldFooterSummary">Loading diagnostics…</span>
+    <button class="ld-details-toggle" id="ldDetailsToggle" type="button" aria-expanded="false" aria-controls="ldDetails" title="Show learning memory, market accuracy, and pattern tracker details">
+      <span>Details</span>
+      <span class="ld-details-caret" aria-hidden="true">▾</span>
+    </button>
+  </div>
+  <div class="ld-details" id="ldDetails" hidden>
+    <div class="ld-stat">
+      <span class="ld-label">Learning Memory</span>
+      <span class="ld-value" id="ldResolved">0 resolved</span>
+      <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Market Accuracy</span>
+      <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
+      <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Pattern Tracker</span>
+      <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
+      <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
+    </div>
+  </div>
+</div>
+<!-- LINE MOVEMENT SUMMARY -->
+<div id="lineMovementSummary" class="movement-summary-grid" style="display:none">
+  <div class="movement-summary-header" id="movementSummaryHeader">
+    <span class="movement-summary-title">LINE MOVERS</span>
+    <span class="movement-summary-time" id="movementSummaryTime"></span>
+    <span class="movement-summary-toggle" id="movementSummaryToggle">▼</span>
+  </div>
+  <div class="movement-summary-body" id="movementSummaryBody"></div>
+</div>
+
+<!-- STICKY FIGHTER HEADER (shown when cardContainer is visible) -->
+<div class="fighter-header-row is-hidden" id="fighterHeaderRow">
+  <div class="fhr-label">Fighter</div>
+  <div class="fhr-label">Lines</div>
+  <div class="fhr-label fhr-center">Avg FP · SS · TDs · Consist</div>
+  <div class="fhr-label fhr-right">Lean</div>
+  <div></div>
+</div>
+
+<!-- BETR MODAL -->
+<div id="manualModal" class="modal-overlay is-hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">📸 BETR SCREENSHOT READER</div>
+        <div class="modal-sub">Drop screenshots from the Betr app — AI reads the lines automatically</div>
+      </div>
+      <button id="manualModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+
+    <div id="betrExtracted">
+      <div class="betr-review-title">Upcoming UFC Lines — Review & Edit Before Saving</div>
+      <div class="betr-grid-head">
+        <div class="betr-grid-col">FIGHTER</div>
+        <div class="betr-grid-col fp center">FP</div>
+        <div class="betr-grid-col ss center">SS</div>
+        <div></div>
+      </div>
+      <div id="betrExtractedRows" class="betr-extracted-rows"></div>
+      <div class="betr-actions">
+        <button id="betrSaveBtn" class="betr-save-btn">✓ SAVE TO BETR</button>
+        <button id="betrAddRow" class="betr-add-row-btn">+ Add Row</button>
+        <span id="betrSaveStatus" class="betr-save-status"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HEAD-TO-HEAD MODAL -->
+<div id="h2hModal" class="modal-overlay is-hidden">
+  <div class="modal-box h2h-modal-box">
+    <div class="modal-head">
+      <div class="modal-title">⚔ HEAD-TO-HEAD</div>
+      <button id="h2hModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="h2hContent"></div>
+  </div>
+</div>
+
+<div id="reportModal" class="modal-overlay is-hidden">
+  <div class="modal-box report-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">📊 PRE-EVENT REPORT CARD</div>
+        <div class="modal-sub" id="reportModalSub"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" id="reportCopyBtn" style="font-size:11px;padding:5px 10px">📋 Copy</button>
+        <button class="btn btn-ghost" id="reportDownloadBtn" style="font-size:11px;padding:5px 10px">⬇ Download</button>
+        <button id="reportModalClose" class="modal-close-btn">✕ CLOSE</button>
+      </div>
+    </div>
+    <div id="reportContent" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- LINE SHOP MODAL -->
+<div id="lineShopModal" class="modal-overlay is-hidden">
+  <div class="modal-box lineshop-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">🛒 LINE SHOPPING DIFF</div>
+        <div class="modal-sub" id="lineShopSub">All platforms · sorted by biggest discrepancy</div>
+      </div>
+      <button id="lineShopClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="lineShopContent" style="margin-top:16px;overflow-x:auto"></div>
+  </div>
+</div>
+
+<!-- NEWS MODAL -->
+<div id="newsModal" class="modal-overlay is-hidden">
+  <div class="modal-box news-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="newsModalTitle">⚠ FIGHTER NEWS</div>
+        <div class="modal-sub" id="newsModalSub">Recent headlines · Google News</div>
+      </div>
+      <button id="newsModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="newsModalContent" style="margin-top:16px"></div>
+  </div>
+</div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">⚡</div>
+    <div class="empty-title">Ready to Auto-Fetch Lines</div>
+    <div class="empty-steps">
+      <strong class="empty-opt1">Option 1 (Recommended):</strong> Click <strong>⚡ AUTO-FETCH LINES</strong> above — automatically opens Pick6 + Underdog, scrapes lines, and loads everything.<br><br>
+      <strong class="empty-opt2">Option 2 (Manual):</strong> Open pick6.draftkings.com → UFC picks, then underdogfantasy.com → UFC picks, then click <strong>Refresh</strong>.<br><br>
+      <em class="empty-note">Make sure you're logged in to both platforms before auto-fetching.</em>
+    </div>
+    <button id="emptyStateAutoFetchBtn" class="empty-autofetch-btn">⚡ AUTO-FETCH LINES NOW</button>
+  </div>
+  <div id="cardContainer" class="card-container-hidden"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- DEBUG PANEL -->
+<div id="debugPanelWrap" class="debug-panel-wrap debug-panel-hidden">
+  <div class="debug-panel-head">
+    <span class="debug-label">⚡ UFC STATS DEBUG</span>
+    <button id="dbgTestBtn" class="debug-btn warn">TEST FETCH</button>
+    <button id="dbgDumpBtn" class="debug-btn info">DUMP RAW ROW</button>
+    <button id="dbgBgDumpBtn" class="debug-btn violet">FETCH VIA BG</button>
+    <button id="dbgClearBtn" class="debug-btn danger">CLEAR CACHE</button>
+    <button id="dbgCopyBtn" class="debug-btn success">COPY LOG</button>
+    <button id="dbgHideBtn" class="debug-btn neutral">HIDE</button>
+  </div>
+  <pre id="debugPanel" class="debug-panel-log">Waiting for fetch activity...</pre>
+</div>
+
+<button id="backToTop" class="back-to-top" title="Back to top">↑</button>
+
+<div id="kbdHelp" class="kbd-help is-hidden">
+  <div class="kbd-help-box">
+    <div class="kbd-help-title">⌨ Keyboard Shortcuts</div>
+    <div class="kbd-help-row"><span class="kbd-key">/</span> Focus search</div>
+    <div class="kbd-help-row"><span class="kbd-key">1</span>–<span class="kbd-key">5</span> All · Over · Under · Best Picks · Parlay</div>
+    <div class="kbd-help-row"><span class="kbd-key">K</span> Quick-jump to any fighter</div>
+    <div class="kbd-help-row"><span class="kbd-key">?</span> Toggle this help</div>
+    <div class="kbd-help-row"><span class="kbd-key">Esc</span> Close</div>
+  </div>
+</div>
+
+<div id="cmdPalette" class="cmd-palette is-hidden">
+  <div class="cmd-palette-box">
+    <input id="cmdPaletteInput" class="cmd-palette-input" type="text" placeholder="Jump to fighter…" autocomplete="off">
+    <div id="cmdPaletteResults" class="cmd-palette-results"></div>
+  </div>
+</div>
+
+<script type="module" src="dist/analyzer.js"></script>
+</body>
+</html>
