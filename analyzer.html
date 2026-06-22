@@ -5771,6 +5771,310 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 98: Matchup Models & Career — cinematic glass evolution ── */
+
+/* === Matchup Models section head: indigo glass with gradient text === */
+.detail-grid > .detail-section-head:has(span) + .panel-pair,
+.detail-section-head + .panel-pair {
+  margin-top: 2px !important;
+}
+
+/* === Panel-pair: refined gap + glass container feel === */
+.detail-grid > .panel-pair {
+  gap: 14px !important;
+  position: relative;
+}
+
+/* === Matchup analyzer panels (SS/CTRL): cinematic glass cards === */
+.detail-grid > .panel-pair > .detail-panel {
+  background: linear-gradient(145deg, rgba(8,16,40,0.96) 0%, rgba(4,10,24,0.94) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1) !important;
+}
+.detail-grid > .panel-pair > .detail-panel:hover {
+  border-color: rgba(255,255,255,0.13) !important;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  transform: translateY(-1px);
+}
+
+/* === Panel top accent bars === */
+.detail-grid > .panel-pair > .detail-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(94,106,210,0.5) 0%, rgba(94,106,210,0.15) 50%, transparent 100%);
+  border-radius: 16px 16px 0 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* === Stat labels: refined monospace === */
+.detail-grid .stat-label {
+  color: rgba(180,195,225,0.55) !important;
+  letter-spacing: 0.07em !important;
+  font-size: 9px !important;
+}
+
+/* === Stat values: enhanced glow by tier === */
+.detail-grid .stat-val {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+}
+.detail-grid .stat-val.good {
+  text-shadow: 0 0 14px rgba(0,232,122,0.4), 0 0 4px rgba(0,232,122,0.2) !important;
+}
+.detail-grid .stat-val.mid {
+  text-shadow: 0 0 10px rgba(240,192,64,0.25), 0 0 3px rgba(240,192,64,0.12) !important;
+}
+.detail-grid .stat-val.low {
+  text-shadow: 0 0 14px rgba(255,58,96,0.35), 0 0 4px rgba(255,58,96,0.18) !important;
+}
+
+/* === Stat row: glass strip with alternating + hover === */
+.detail-grid .stat-row {
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1) !important;
+  border: 1px solid transparent !important;
+}
+.detail-grid .stat-row:nth-child(even) {
+  background: rgba(255,255,255,0.012) !important;
+}
+.detail-grid .stat-row:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.05) !important;
+}
+
+/* === Fighter record: premium display === */
+.detail-grid .detail-panel > .stat-val.mid {
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  background: linear-gradient(135deg, #ffe08a 0%, #f8c64a 50%, #e8a832 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.2));
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* === Matchup analyzer: fighter name + badge === */
+.detail-grid .detail-panel > span[style*="font-weight:700"],
+.detail-grid .detail-panel > span[style*="font-weight: 700"] {
+  letter-spacing: 0.02em;
+}
+
+/* === Matchup analyzer: verdict box === */
+.detail-grid .detail-panel pre,
+.detail-grid .detail-panel code {
+  background: rgba(4,8,18,0.7) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* === Finish split section: glass treatment === */
+.detail-grid .finish-split-wrap {
+  gap: 18px !important;
+}
+.detail-grid .finish-split-section {
+  background: rgba(255,255,255,0.015) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 10px !important;
+  padding: 8px 10px !important;
+}
+.detail-grid .finish-split-header {
+  background: linear-gradient(90deg, rgba(180,195,225,0.7), rgba(180,195,225,0.4)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  margin-bottom: 6px !important;
+}
+.detail-grid .finish-bar-row {
+  padding: 2px 0 !important;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+.detail-grid .finish-bar-row:hover {
+  background: rgba(255,255,255,0.025);
+}
+.detail-grid .finish-bar-wrap {
+  background: rgba(3,6,14,0.8) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 5px !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+.detail-grid .finish-bar.ko-bar {
+  background: linear-gradient(90deg, rgba(255,58,96,0.6), rgba(255,58,96,0.3)) !important;
+  box-shadow: 0 0 8px rgba(255,58,96,0.2);
+  border-radius: 4px !important;
+}
+.detail-grid .finish-bar.sub-bar {
+  background: linear-gradient(90deg, rgba(86,195,255,0.55), rgba(86,195,255,0.25)) !important;
+  box-shadow: 0 0 8px rgba(86,195,255,0.2);
+  border-radius: 4px !important;
+}
+.detail-grid .finish-bar.dec-bar {
+  background: linear-gradient(90deg, rgba(180,195,225,0.4), rgba(180,195,225,0.15)) !important;
+  box-shadow: 0 0 6px rgba(180,195,225,0.1);
+  border-radius: 4px !important;
+}
+.detail-grid .finish-bar.ko-bar-loss {
+  background: linear-gradient(90deg, rgba(255,138,61,0.55), rgba(255,138,61,0.25)) !important;
+  box-shadow: 0 0 8px rgba(255,138,61,0.2);
+  border-radius: 4px !important;
+}
+.detail-grid .finish-bar-label {
+  color: rgba(180,195,225,0.6) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.06em !important;
+}
+.detail-grid .finish-bar-pct {
+  color: rgba(225,235,250,0.75) !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  text-shadow: 0 0 6px rgba(255,255,255,0.08);
+}
+
+/* === Panel link: glass pill === */
+.detail-grid .panel-link-wrap {
+  margin-top: 10px !important;
+}
+.detail-grid .panel-link {
+  background: linear-gradient(135deg, rgba(94,106,210,0.1) 0%, rgba(94,106,210,0.04) 100%) !important;
+  border: 1px solid rgba(94,106,210,0.2) !important;
+  border-radius: 8px !important;
+  padding: 5px 12px !important;
+  color: rgba(160,171,255,0.9) !important;
+  text-decoration: none !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  transition: all 0.2s ease !important;
+  display: inline-block !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.detail-grid .panel-link:hover {
+  background: linear-gradient(135deg, rgba(94,106,210,0.18) 0%, rgba(94,106,210,0.08) 100%) !important;
+  border-color: rgba(94,106,210,0.35) !important;
+  color: #c4caff !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 10px rgba(94,106,210,0.1) !important;
+  transform: translateY(-1px);
+}
+
+/* === Lean Analysis: glass pro/risk columns === */
+.detail-grid .lean-reason-groups {
+  gap: 0 !important;
+}
+.detail-grid .lean-reason-col {
+  background: rgba(255,255,255,0.015) !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+}
+.detail-grid .lean-reason-col.pro {
+  border-color: rgba(0,232,122,0.08) !important;
+  background: linear-gradient(180deg, rgba(0,232,122,0.03) 0%, transparent 60%) !important;
+}
+.detail-grid .lean-reason-col.risk {
+  border-color: rgba(255,58,96,0.08) !important;
+  background: linear-gradient(180deg, rgba(255,58,96,0.03) 0%, transparent 60%) !important;
+}
+.detail-grid .lean-reason-head {
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  font-size: 10px !important;
+}
+.detail-grid .lean-reason-col.pro .lean-reason-head {
+  text-shadow: 0 0 8px rgba(0,232,122,0.2);
+}
+.detail-grid .lean-reason-col.risk .lean-reason-head {
+  text-shadow: 0 0 8px rgba(255,58,96,0.2);
+}
+
+/* === Lean points: refined icons + text === */
+.detail-grid .lean-point {
+  padding: 3px 4px !important;
+  border-radius: 5px !important;
+  transition: background 0.15s ease !important;
+}
+.detail-grid .lean-point:hover {
+  background: rgba(255,255,255,0.025) !important;
+}
+.detail-grid .lean-point-icon.pos {
+  text-shadow: 0 0 8px rgba(0,232,122,0.35);
+}
+.detail-grid .lean-point-icon.neg {
+  text-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+
+/* === Lean verdict: enhanced glass pill === */
+.detail-grid .lean-verdict {
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 16px rgba(0,0,0,0.2) !important;
+}
+.detail-grid .lean-verdict.over {
+  border-color: rgba(0,232,122,0.2) !important;
+  background: rgba(0,232,122,0.04) !important;
+  text-shadow: 0 0 10px rgba(0,232,122,0.15);
+}
+.detail-grid .lean-verdict.under {
+  border-color: rgba(255,58,96,0.2) !important;
+  background: rgba(255,58,96,0.04) !important;
+  text-shadow: 0 0 10px rgba(255,58,96,0.12);
+}
+.detail-grid .lean-verdict.push {
+  border-color: rgba(240,192,64,0.2) !important;
+  background: rgba(240,192,64,0.04) !important;
+  text-shadow: 0 0 10px rgba(240,192,64,0.12);
+}
+
+/* === Similar Opponent History: enhanced glass === */
+.detail-grid .detail-panel div[style*="border-left:3px solid var(--cyan)"],
+.detail-grid .detail-panel div[style*="border-left: 3px solid var(--cyan)"] {
+  background: linear-gradient(135deg, rgba(86,195,255,0.05) 0%, rgba(86,195,255,0.015) 100%) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+/* === Opponent fight result rows: glass strips === */
+.detail-grid .detail-panel div[style*="margin:6px 0"] {
+  border-radius: 8px;
+  padding: 6px 10px !important;
+  transition: background 0.15s ease;
+}
+.detail-grid .detail-panel div[style*="margin:6px 0"]:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+/* === Archetype badge: glass pill with glow === */
+.detail-grid .detail-panel span[style*="border-radius"][style*="padding"][style*="background:var(--cyan)"],
+.detail-grid .detail-panel span[style*="background: var(--cyan)"] {
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(44,212,208,0.2), 0 0 12px rgba(44,212,208,0.08) !important;
+}
+
+/* === Archetype traits: glass bullets === */
+.detail-grid .detail-panel div[style*="margin:4px 0"] {
+  padding: 3px 0;
+  transition: color 0.15s ease;
+}
+
 /* ── GLOW-UP 97: Best Picks Visual Polish ── */
 
 /* ─ Pick row card: gradient bg, confidence left border, hover lift ─ */
