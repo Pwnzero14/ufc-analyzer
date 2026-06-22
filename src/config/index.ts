@@ -215,4 +215,10 @@ export const NAME_ALIASES: Record<string, string> = {
   'Vinicius De Oliveira': 'Vinicius Oliveira',
   // Platforms use her given name "Beatriz"; UFCStats fighter page is "Bia Mesquita".
   'Beatriz Mesquita':    'Bia Mesquita',
+  // UFCStats lists these two Magomedovs by short first names (Shara / Abus); the
+  // platforms + card use the full legal first names. Canonicalize so card-match,
+  // the UFCStats history fetch, and settle all agree — and so the two Magomedovs on
+  // the same card (Fiziev/Torres) stay distinct fighters.
+  'Sharabutdin Magomedov': 'Shara Magomedov',
+  'Abusupiyan Magomedov':  'Abus Magomedov',
 };

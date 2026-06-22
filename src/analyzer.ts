@@ -1057,6 +1057,10 @@ const UFCSTATS_NAME_ALIASES: Record<string, string> = {
   // matching) but UFCStats lists him as the single-word "Sumudaerji". Bridge
   // here so the alpha-index lookup uses the single-word form.
   'su mudaerji': 'Sumudaerji',
+  // UFCStats uses short first names; the full legal names won't resolve via the
+  // first+last candidate search, and "Magomedov" alone is ambiguous (two on the card).
+  'sharabutdin magomedov': 'Shara Magomedov',
+  'abusupiyan magomedov': 'Abus Magomedov',
 };
 
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
