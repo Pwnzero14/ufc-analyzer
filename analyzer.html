@@ -12296,6 +12296,236 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   opacity: 1;
 }
 
+/* ── GLOW-UP 95: Stat Head-to-Head — Homo Sapiens Sapiens (final evolution) ── */
+
+/* === Section head: cinematic glass banner with gradient text === */
+.detail-section-head {
+  background: linear-gradient(135deg, rgba(10,16,32,0.95) 0%, rgba(6,10,24,0.9) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+.detail-section-head::before {
+  content: '' !important;
+  width: 3.5px !important; height: 14px !important;
+  background: linear-gradient(180deg, #f8c64a, rgba(240,160,48,0.5)) !important;
+  box-shadow: 0 0 12px rgba(248,198,74,0.45) !important;
+  border-radius: 2px !important;
+}
+.detail-section-head::after {
+  background: linear-gradient(90deg, rgba(248,198,74,0.2), rgba(71,90,128,0.08), transparent) !important;
+}
+
+/* === Stat-pair: cinematic fused glass card === */
+.stat-pair {
+  background: linear-gradient(180deg, rgba(10,16,32,0.96) 0%, rgba(6,10,24,0.93) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
+}
+.stat-pair:hover {
+  border-color: rgba(255,255,255,0.1) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* === Self-side panel: cyan radial atmosphere === */
+.stat-pair > .detail-panel:first-child {
+  border-left: 2.5px solid rgba(86,195,255,0.5) !important;
+  background: linear-gradient(135deg, rgba(86,195,255,0.04) 0%, transparent 60%) !important;
+  border-radius: 14px 0 0 14px !important;
+}
+.stat-pair > .detail-panel:first-child::after {
+  content: '';
+  position: absolute; top: -30%; left: -15%; width: 50%; height: 70%;
+  background: radial-gradient(ellipse at center, rgba(86,195,255,0.05) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* === Opp-side panel: orange radial atmosphere === */
+.stat-pair > .detail-panel + .detail-panel {
+  border-right: 2.5px solid rgba(255,138,61,0.5) !important;
+  border-left: none !important;
+  background: linear-gradient(225deg, rgba(255,138,61,0.04) 0%, transparent 60%) !important;
+  border-radius: 0 14px 14px 0 !important;
+}
+.stat-pair > .detail-panel + .detail-panel::after {
+  content: '';
+  position: absolute; top: -30%; right: -15%; width: 50%; height: 70%;
+  background: radial-gradient(ellipse at center, rgba(255,138,61,0.05) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* === Center divider: refined gradient line + glass pip === */
+.stat-pair:has(> .detail-panel + .detail-panel)::before {
+  background: linear-gradient(180deg, transparent 5%, rgba(255,255,255,0.08) 20%, rgba(255,255,255,0.08) 80%, transparent 95%) !important;
+  width: 1px !important;
+}
+.stat-pair:has(> .detail-panel + .detail-panel)::after {
+  background: linear-gradient(135deg, rgba(16,24,48,0.95), rgba(10,16,36,0.9)) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 6px rgba(248,198,74,0.1) !important;
+  width: 22px !important; height: 22px !important;
+  font-size: 10px !important;
+  color: rgba(248,198,74,0.7) !important;
+}
+
+/* === Detail panels inside pairs: deeper glass === */
+.stat-pair > .detail-panel {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  position: relative;
+}
+
+/* === Standalone detail panels (career data, models): deep glass === */
+.panel-pair > .detail-panel, .detail-grid > .detail-panel {
+  background: linear-gradient(145deg, rgba(14,22,46,0.92) 0%, rgba(8,14,32,0.88) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+  overflow: hidden;
+  position: relative;
+}
+.panel-pair > .detail-panel:hover, .detail-grid > .detail-panel:hover {
+  border-color: rgba(255,255,255,0.1) !important;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* === Panel titles: gradient text with accent underline === */
+.detail-panel-title {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-shadow: 0 0 10px rgba(248,198,74,0.15) !important;
+}
+.detail-panel-title::after {
+  background: linear-gradient(90deg, rgba(248,198,74,0.22), rgba(71,90,128,0.1), transparent) !important;
+  height: 1px !important;
+}
+
+/* === History bars: refined glass track + glowing fills === */
+.history-bar-wrap {
+  background: rgba(8,12,24,0.7) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 4px !important;
+}
+.history-bar-fill {
+  border-radius: 3px !important;
+}
+.history-bar-fill.over-line {
+  background: linear-gradient(90deg, rgba(0,232,122,0.55), rgba(0,232,122,0.30)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 8px rgba(0,232,122,0.2) !important;
+}
+.history-bar-fill.under-line {
+  background: linear-gradient(90deg, rgba(255,58,96,0.45), rgba(255,58,96,0.22)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 8px rgba(255,58,96,0.15) !important;
+}
+
+/* === History bar row: glass hover === */
+.history-bar-row {
+  border-radius: 4px !important;
+  transition: background 0.15s ease !important;
+  padding: 2px 4px !important;
+}
+.history-bar-row:hover {
+  background: rgba(255,255,255,0.03) !important;
+}
+
+/* === Bar values: glow text === */
+.history-bar-row:has(.over-line) .history-bar-val {
+  color: rgba(0,232,122,0.9) !important;
+  text-shadow: 0 0 8px rgba(0,232,122,0.25);
+}
+.history-bar-row:has(.under-line) .history-bar-val {
+  color: rgba(255,90,115,0.85) !important;
+  text-shadow: 0 0 8px rgba(255,58,96,0.2);
+}
+
+/* === Opponent names: refined hover glow === */
+.history-opp {
+  transition: all 0.15s ease !important;
+}
+.history-bar-row:hover .history-opp {
+  color: var(--text) !important;
+  text-shadow: 0 0 6px rgba(255,255,255,0.1);
+}
+
+/* === Line marker: cinematic gold dash === */
+.line-marker {
+  border-left-color: rgba(248,198,74,0.95) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.4), 0 0 3px rgba(248,198,74,0.6) !important;
+}
+
+/* === Panel meta: glass strip === */
+.panel-meta {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  border-radius: 8px !important;
+  padding: 5px 8px !important;
+}
+.panel-meta-line {
+  background: linear-gradient(90deg, rgba(248,198,74,0.7), rgba(248,198,74,0.4)) !important;
+  box-shadow: 0 0 6px rgba(248,198,74,0.35) !important;
+  border-radius: 2px !important;
+}
+
+/* === Panel badges/confidence: glass pills === */
+.panel-confidence {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+/* === Fight Time Breakdown: glass treatment === */
+.finish-bar-wrap {
+  background: rgba(8,12,24,0.6) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  border-radius: 4px !important;
+}
+.finish-bar {
+  border-radius: 3px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+/* === Early-finish risk banner: glass with amber accent === */
+.detail-panel div[style*="COMBINED EARLY-FINISH RISK"],
+.detail-panel div[style*="background:rgba(248,198,74"] {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+
+/* === Stat rows in career panel: glass hover === */
+.stat-row {
+  border-radius: 4px !important;
+  transition: background 0.12s ease !important;
+  padding: 3px 4px !important;
+}
+.stat-row:hover {
+  background: rgba(255,255,255,0.02) !important;
+}
+
+/* === Stat values: glow by tier === */
+.stat-val.good { text-shadow: 0 0 8px rgba(0,232,122,0.25); }
+.stat-val.low  { text-shadow: 0 0 8px rgba(255,58,96,0.2); }
+
+/* === Matchup Models section head === */
+.detail-grid > .detail-section-head:nth-of-type(2) {
+  border-color: rgba(94,106,210,0.15) !important;
+}
+
+/* === SS/CTRL Matchup Analyzer panels === */
+.panel-pair {
+  gap: 10px !important;
+}
+
 /* ── GLOW-UP 94: Prop Line Predictions & Learning Summary — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Section containers: deep glass + dual radial overlays === */
