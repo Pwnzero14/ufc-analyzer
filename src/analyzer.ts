@@ -8004,7 +8004,8 @@ function renderParlayLab(container: HTMLElement): void {
   const poolRows = availableLegs.map(a => {
     const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
     const sel = parlaySelectedLegs.has(key);
-    return `<div class="parlay-leg-row${sel ? ' selected' : ''}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
+    const confClass = a.leg.confidence >= 72 ? 'conf-high' : a.leg.confidence >= 58 ? 'conf-med' : 'conf-low';
+    return `<div class="parlay-leg-row${sel ? ' selected' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
@@ -8056,7 +8057,7 @@ function renderParlayLab(container: HTMLElement): void {
       const cTag = conflictCount > 0 ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : '';
       const tags = [tag, cTag].filter(Boolean).join(', ');
       const legsDataAttr = s.legs.map(l => parlayLegKey(l.fighter, l.stat, l.direction)).join(',');
-      return `<div class="parlay-suggest-card" data-suggest-legs="${legsDataAttr}">
+      return `<div class="parlay-suggest-card grade-${s.health.grade}" data-suggest-legs="${legsDataAttr}">
         <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade})</div>
         <div class="parlay-suggest-legs">${legsText}</div>
         <div class="parlay-suggest-score">Avg confidence: ${Math.round(s.health.avgConfidence)}%${tags ? ` · ${tags}` : ''}</div>
@@ -18914,8 +18915,4 @@ function savePreferences(): void {
 
 window.addEventListener('beforeunload', savePreferences);
 
-// Load saved preferences
-const savedPrefs = readAnalyzerPreferences();
-if (savedPrefs?.theme) {
-  document.documentElement.className = savedPrefs.theme;
-}
+// Load save
