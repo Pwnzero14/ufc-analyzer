@@ -5771,6 +5771,294 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 102: Learning Summary — intelligence readout evolution ── */
+/* Hero card cinematic depth, grade ring pulse glow, stat chip radial bloom,
+   delta row color halos, podium medal glow, weights accordion depth,
+   trend tags, best/worst badge evolution. */
+
+/* --- Learn hero: cinematic atmosphere with dual radials --- */
+.learn-hero {
+  background: linear-gradient(135deg, rgba(14,22,46,0.97) 0%, rgba(8,14,32,0.94) 100%) !important;
+  border-color: rgba(32,223,143,0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 20px 56px rgba(0,0,0,0.5), 0 0 30px rgba(32,223,143,0.04) !important;
+}
+.learn-hero::before {
+  background: linear-gradient(90deg, transparent, rgba(32,223,143,0.1) 20%, rgba(255,255,255,0.07) 50%, rgba(32,223,143,0.08) 80%, transparent) !important;
+}
+.learn-hero::after {
+  width: 65% !important; height: 90% !important;
+  background: radial-gradient(ellipse at center, rgba(32,223,143,0.1) 0%, transparent 60%) !important;
+}
+
+/* --- Grade ring: stronger pulse + deeper glass --- */
+.learn-grade-ring {
+  width: 66px !important; height: 66px !important;
+  background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(8,14,32,0.7) 100%) !important;
+  border-width: 3px !important;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--grade-color) 48%, transparent),
+              0 0 10px color-mix(in srgb, var(--grade-color) 28%, transparent),
+              inset 0 0 18px color-mix(in srgb, var(--grade-color) 20%, transparent) !important;
+}
+@keyframes g102-grade-pulse {
+  0%, 100% { box-shadow: 0 0 26px color-mix(in srgb, var(--grade-color) 40%, transparent),
+                          0 0 8px color-mix(in srgb, var(--grade-color) 22%, transparent),
+                          inset 0 0 14px color-mix(in srgb, var(--grade-color) 16%, transparent); }
+  50%      { box-shadow: 0 0 38px color-mix(in srgb, var(--grade-color) 55%, transparent),
+                          0 0 14px color-mix(in srgb, var(--grade-color) 32%, transparent),
+                          inset 0 0 20px color-mix(in srgb, var(--grade-color) 24%, transparent); }
+}
+.learn-grade-ring {
+  animation: g102-grade-pulse 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .learn-grade-ring { animation: none; }
+}
+
+/* --- Grade letter: stronger glow + size bump --- */
+.learn-grade-letter {
+  font-size: 30px !important;
+  text-shadow: 0 0 28px var(--grade-color), 0 0 10px var(--grade-color), 0 0 3px var(--grade-color) !important;
+}
+
+/* --- Hero title: gradient text with green tint --- */
+.learn-hero-title {
+  background: linear-gradient(135deg, #ffffff 0%, #d0ffe8 50%, rgba(255,255,255,0.7) 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-size: 17px !important;
+  filter: drop-shadow(0 0 8px rgba(32,223,143,0.15));
+}
+
+/* --- Hero subtitle: subtle green tint --- */
+.learn-hero-subtitle {
+  color: rgba(32,223,143,0.55) !important;
+}
+.learn-hero:hover .learn-hero-subtitle {
+  color: rgba(32,223,143,0.75) !important;
+}
+
+/* --- Best badge: deeper glass + animated glow --- */
+.learn-badge-best {
+  background: linear-gradient(135deg, rgba(32,223,143,0.12) 0%, rgba(32,223,143,0.05) 100%) !important;
+  border-color: rgba(32,223,143,0.3) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 8px rgba(32,223,143,0.12) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.learn-badge-best:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 0 24px rgba(32,223,143,0.35) !important;
+  transform: scale(1.12) translateY(-3px) !important;
+  border-color: rgba(32,223,143,0.5) !important;
+}
+
+/* --- Worst badge: deeper glass + animated glow --- */
+.learn-badge-worst {
+  background: linear-gradient(135deg, rgba(255,80,80,0.1) 0%, rgba(255,80,80,0.04) 100%) !important;
+  border-color: rgba(255,80,80,0.3) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 8px rgba(255,80,80,0.12) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.learn-badge-worst:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 0 24px rgba(255,80,80,0.35) !important;
+  transform: scale(1.12) translateY(-3px) !important;
+  border-color: rgba(255,80,80,0.5) !important;
+}
+
+/* --- Stat chips: radial bloom on hover + deeper glass --- */
+.learn-stat-chip {
+  background: linear-gradient(135deg, rgba(14,22,46,0.94) 0%, rgba(8,14,32,0.90) 100%) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  position: relative;
+}
+.learn-stat-chip::before {
+  width: 4px !important;
+}
+.learn-stat-chip::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent) !important;
+}
+.learn-stat-chip:hover {
+  transform: translateY(-5px) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+}
+.learn-stat-chip[data-grade="good"]:hover {
+  box-shadow: 0 14px 36px rgba(0,0,0,0.45), 0 0 28px rgba(32,223,143,0.25) !important;
+  border-color: rgba(32,223,143,0.25) !important;
+}
+.learn-stat-chip[data-grade="mid"]:hover {
+  box-shadow: 0 14px 36px rgba(0,0,0,0.45), 0 0 28px rgba(245,166,35,0.25) !important;
+  border-color: rgba(245,166,35,0.25) !important;
+}
+.learn-stat-chip[data-grade="bad"]:hover {
+  box-shadow: 0 14px 36px rgba(0,0,0,0.45), 0 0 28px rgba(255,80,80,0.25) !important;
+  border-color: rgba(255,80,80,0.25) !important;
+}
+
+/* --- Stat chip left accent: wider glow beam --- */
+.learn-stat-chip[data-grade="good"]::before { box-shadow: 0 0 10px rgba(32,223,143,0.5) !important; }
+.learn-stat-chip[data-grade="mid"]::before  { box-shadow: 0 0 10px rgba(245,166,35,0.5) !important; }
+.learn-stat-chip[data-grade="bad"]::before  { box-shadow: 0 0 10px rgba(255,80,80,0.5) !important; }
+
+/* --- Chip value: stronger glow --- */
+.learn-chip-value {
+  font-size: 22px !important;
+  text-shadow: 0 0 16px currentColor, 0 0 4px currentColor !important;
+}
+
+/* --- Chip bar: deeper track + stronger fill glow --- */
+.learn-chip-bar-track {
+  background: rgba(255,255,255,0.035) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+  height: 7px !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+.learn-chip-bar-fill {
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor !important;
+}
+
+/* --- Chip label + dot: subtle glow --- */
+.learn-chip-dot {
+  box-shadow: 0 0 6px currentColor;
+}
+.learn-chip-label {
+  text-shadow: 0 0 4px rgba(255,255,255,0.06);
+}
+
+/* --- Delta header: glass command strip with gradient text --- */
+.learn-delta-header {
+  background: linear-gradient(135deg, rgba(18,26,52,0.6), rgba(12,18,40,0.4)) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+  border-radius: 10px 10px 0 0 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+.learn-delta-header > * {
+  text-shadow: 0 0 4px rgba(255,255,255,0.06);
+}
+
+/* --- Delta rows: deeper glass + stagger animation --- */
+@keyframes g102-delta-slide {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.learn-delta-row {
+  animation: g102-delta-slide 0.2s ease both;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.learn-delta-row:nth-child(2)  { animation-delay: 0.03s; }
+.learn-delta-row:nth-child(3)  { animation-delay: 0.06s; }
+.learn-delta-row:nth-child(4)  { animation-delay: 0.09s; }
+.learn-delta-row:nth-child(5)  { animation-delay: 0.12s; }
+.learn-delta-row:nth-child(6)  { animation-delay: 0.15s; }
+.learn-delta-row:nth-child(7)  { animation-delay: 0.18s; }
+.learn-delta-row:nth-child(8)  { animation-delay: 0.21s; }
+.learn-delta-row:nth-child(9)  { animation-delay: 0.24s; }
+.learn-delta-row:nth-child(10) { animation-delay: 0.27s; }
+@media (prefers-reduced-motion: reduce) {
+  .learn-delta-row { animation: none; }
+}
+
+/* --- Delta row left accent: wider glow on hover --- */
+.learn-delta-row:hover::before {
+  width: 3.5px !important;
+}
+
+/* --- Delta row hover: stronger elevation --- */
+.learn-delta-row:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3) !important;
+  transform: translateX(4px) !important;
+}
+.learn-delta-row[data-grade="good"]:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3), 0 0 18px rgba(32,223,143,0.15) !important;
+}
+.learn-delta-row[data-grade="bad"]:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3), 0 0 18px rgba(255,80,80,0.15) !important;
+}
+
+/* --- Delta bar: stronger glow halo --- */
+.learn-delta-bar {
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+.learn-delta-bar-fill, .learn-delta-bar > div {
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor !important;
+}
+.learn-delta-row:hover .learn-delta-bar-fill,
+.learn-delta-row:hover .learn-delta-bar > div {
+  box-shadow: 0 0 14px currentColor, 0 0 6px currentColor !important;
+}
+
+/* --- Delta total: stronger glow text --- */
+.learn-delta-total {
+  text-shadow: 0 0 10px currentColor !important;
+}
+.learn-delta-row:hover .learn-delta-total {
+  text-shadow: 0 0 14px currentColor, 0 0 4px currentColor !important;
+}
+
+/* --- Gold medal row (#1): richer atmosphere --- */
+.learn-delta-row:nth-child(1) {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(248,198,74,0.14) !important;
+}
+.learn-delta-row:nth-child(1) .learn-delta-rank {
+  box-shadow: 0 0 18px rgba(248,198,74,0.4), 0 2px 8px rgba(0,0,0,0.25) !important;
+  text-shadow: 0 0 12px rgba(248,198,74,0.55) !important;
+}
+.learn-delta-row:nth-child(1) .learn-delta-name {
+  text-shadow: 0 0 8px rgba(32,223,143,0.25);
+}
+
+/* --- Silver row (#2): subtle gleam --- */
+.learn-delta-row:nth-child(2) .learn-delta-rank {
+  box-shadow: 0 0 10px rgba(192,192,210,0.2) !important;
+}
+
+/* --- Bronze row (#3): warm gleam --- */
+.learn-delta-row:nth-child(3) .learn-delta-rank {
+  box-shadow: 0 0 10px rgba(205,127,50,0.2) !important;
+}
+
+/* --- Weights details: deeper accordion glass --- */
+.weights-details {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.weights-details[open] {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 12px rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.15) !important;
+}
+.weights-details summary:hover {
+  text-shadow: 0 0 8px rgba(248,198,74,0.2) !important;
+}
+
+/* --- Trend tag: glass pill evolution --- */
+.learn-trend-tag {
+  background: rgba(248,198,74,0.1) !important;
+  border-color: rgba(248,198,74,0.22) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 6px rgba(248,198,74,0.08);
+  transition: all 0.18s ease;
+}
+.learn-trend-tag:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 12px rgba(248,198,74,0.2) !important;
+  transform: translateY(-1px);
+}
+
+/* --- Pending learn banner: stronger green accent --- */
+.best-picks-section[data-section-id="learning"] div[style*="background:rgba(56,176,0,0.08)"] {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3), 0 0 18px rgba(32,223,143,0.12) !important;
+}
+
+/* --- Weights body: glass when expanded --- */
+.weights-body {
+  background: rgba(255,255,255,0.02) !important;
+  border-top-color: rgba(248,198,74,0.08) !important;
+}
+
+
 /* ── GLOW-UP 101: Prop Line Predictor — intelligence console evolution ── */
 /* Section container border pulse, title shimmer, column header glass,
    per-stat colored glow, confidence bar halo, reason tag evolution,
