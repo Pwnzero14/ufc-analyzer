@@ -5771,6 +5771,419 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 105: Command Center V3 — animated spine sweep, logo shimmer, status LED pulse, focus ring, tab underline beam ── */
+/* Traveling light across accent spine, logo text shimmer animation, live/pill dot
+   pulse, search bar focus glow ring, active tab gold underline beam, header atmospheric
+   radials, auto-fetch hover boost, BETR LINES hover gradient sweep, inactive pill
+   platform-color hover reveal. */
+
+/* ─── Accent spine: traveling light sweep ─── */
+@keyframes g105-spine-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.header::before {
+  background-size: 200% 100% !important;
+  animation: g105-spine-sweep 6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .header::before { animation: none; }
+}
+
+/* ─── Logo text: traveling shimmer highlight ─── */
+@keyframes g105-logo-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.logo-text {
+  animation: g105-logo-shimmer 4s ease-in-out infinite !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-text { animation: none !important; }
+}
+
+/* ─── Header: atmospheric radial overlays ─── */
+.header::after {
+  background:
+    radial-gradient(ellipse 600px 120px at 20% 60%, rgba(248,198,74,0.03), transparent),
+    radial-gradient(ellipse 500px 100px at 80% 40%, rgba(86,195,255,0.025), transparent),
+    linear-gradient(180deg, transparent, rgba(0,0,0,0.3)) !important;
+}
+
+/* ─── Live status dot: breathing pulse ─── */
+@keyframes g105-live-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(32,223,143,0.5), 0 0 2px rgba(32,223,143,0.3); opacity: 1; }
+  50%      { box-shadow: 0 0 10px rgba(32,223,143,0.7), 0 0 4px rgba(32,223,143,0.5); opacity: 0.85; }
+}
+.ext-status .live-dot {
+  animation: g105-live-pulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ext-status .live-dot { animation: none; }
+}
+
+/* ─── Platform pill dots: synced LED breathe ─── */
+@keyframes g105-pill-dot-breathe {
+  0%, 100% { box-shadow: 0 0 10px color-mix(in srgb, currentColor 80%, transparent), 0 0 4px currentColor, 0 0 2px currentColor; transform: scale(1); }
+  50%      { box-shadow: 0 0 14px color-mix(in srgb, currentColor 90%, transparent), 0 0 6px currentColor, 0 0 3px currentColor; transform: scale(1.15); }
+}
+.platform-pill.active .pill-dot {
+  animation: g105-pill-dot-breathe 2.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-pill.active .pill-dot { animation: none; }
+}
+
+/* ─── Inactive pills: reveal platform color on hover ─── */
+.platform-pill.p6:not(.active):hover {
+  border-color: rgba(86,195,255,0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(86,195,255,0.08) !important;
+}
+.platform-pill.ud:not(.active):hover {
+  border-color: rgba(168,120,255,0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(168,120,255,0.08) !important;
+}
+.platform-pill.betr:not(.active):hover {
+  border-color: rgba(255,138,61,0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(255,138,61,0.08) !important;
+}
+.platform-pill.pp:not(.active):hover {
+  border-color: rgba(44,212,208,0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(44,212,208,0.08) !important;
+}
+.platform-pill.dk:not(.active):hover {
+  border-color: rgba(245,158,11,0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(245,158,11,0.08) !important;
+}
+
+/* ─── Search bar: gold focus ring ─── */
+.search-input:focus {
+  border-color: rgba(248,198,74,0.3) !important;
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.08), 0 0 16px rgba(248,198,74,0.1), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  outline: none !important;
+}
+
+/* ─── Auto-fetch: hover intensity boost ─── */
+.auto-fetch-btn:hover {
+  box-shadow: 0 0 30px rgba(32,223,143,0.55), 0 0 12px rgba(32,223,143,0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  transform: translateY(-1px);
+}
+
+/* ─── Active tab: gold underline beam ─── */
+.view-tabs .tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 15%; right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.8), rgba(255,220,120,1), rgba(248,198,74,0.8), transparent);
+  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(248,198,74,0.5), 0 0 3px rgba(248,198,74,0.3);
+}
+
+/* ─── Inactive tab hover: subtle gold top edge ─── */
+.view-tabs .tab-btn:not(.active):hover::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.3), transparent);
+}
+
+/* ─── BETR LINES: hover gradient sweep ─── */
+@keyframes g105-betr-sweep {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.betr-lines-btn:hover {
+  background-size: 200% 100%;
+  animation: g105-betr-sweep 1.5s ease-in-out;
+  box-shadow: 0 0 28px rgba(248,198,74,0.45), 0 0 10px rgba(248,198,74,0.25), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .betr-lines-btn:hover { animation: none; }
+}
+
+/* ─── Sort chip: hover text glow ─── */
+.sort-chip:hover {
+  color: rgba(248,198,74,0.9) !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.15);
+}
+
+/* ─── Settings gear: golden spin on hover ─── */
+.settings-btn:hover {
+  transform: rotate(30deg);
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+
+/* ── GLOW-UP 104: Command Center V2 — cinematic header, pill holographics, tab arena ── */
+/* Header bar deeper atmosphere with animated accent spine, logo icon pulse,
+   platform pills holographic glass with per-platform colored aura, ACTIVE badge beacon,
+   age badges status glow, view tabs premium arena with lit active state,
+   search bar glass, BETR LINES button amber glow, SOURCES badge, sort chip. */
+
+/* ─── Header: cinematic depth with double accent spine ─── */
+.header {
+  background: linear-gradient(180deg, rgba(12,16,28,0.98), rgba(6,9,18,0.99)) !important;
+  box-shadow:
+    0 6px 40px rgba(0,0,0,0.85),
+    inset 0 -1px 0 rgba(255,255,255,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.02) !important;
+  border-bottom: none !important;
+}
+.header::before {
+  height: 2px !important;
+  background: linear-gradient(90deg,
+    transparent 2%,
+    rgba(248,198,74,0.7) 15%,
+    rgba(255,138,61,0.5) 35%,
+    rgba(86,195,255,0.4) 55%,
+    rgba(168,120,255,0.35) 75%,
+    rgba(248,198,74,0.6) 90%,
+    transparent 98%) !important;
+  box-shadow: 0 0 16px rgba(248,198,74,0.3), 0 0 6px rgba(86,195,255,0.15) !important;
+}
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 40px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.3));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Logo icon: pulsing gold ring ─── */
+@keyframes g104-logo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(240,192,64,0.6)) drop-shadow(0 0 5px rgba(255,138,61,0.3)); }
+  50%      { filter: drop-shadow(0 0 24px rgba(240,192,64,0.8)) drop-shadow(0 0 8px rgba(255,138,61,0.45)); }
+}
+.logo-icon {
+  filter: drop-shadow(0 0 18px rgba(240,192,64,0.6)) drop-shadow(0 0 5px rgba(255,138,61,0.3)) !important;
+  animation: g104-logo-pulse 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-icon { animation: none; }
+}
+
+/* ─── Logo text: richer gold + stronger shimmer ─── */
+.logo-text {
+  background: linear-gradient(90deg, #ffd54f 0%, #ffe8a0 20%, var(--gold) 40%, #ffb347 60%, #ffe8a0 80%, #ffd54f 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-size: 200% 100% !important;
+  text-shadow: 0 0 20px rgba(248,198,74,0.25), 0 0 8px rgba(255,138,61,0.15) !important;
+}
+
+/* ─── Status badges: richer glass + status-aware glow ─── */
+.ext-status {
+  background: rgba(255,255,255,0.035) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 2px 8px rgba(0,0,0,0.35) !important;
+}
+.status-chunk {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  transition: all 0.2s ease !important;
+}
+.status-chunk:hover {
+  background: rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(248,198,74,0.1) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* ─── Auto-fetch button: deeper neon with animated glow ─── */
+@keyframes g104-fetch-glow {
+  0%, 100% { box-shadow: 0 0 18px rgba(32,223,143,0.35), 0 0 6px rgba(32,223,143,0.15), inset 0 1px 0 rgba(255,255,255,0.15); }
+  50%      { box-shadow: 0 0 26px rgba(32,223,143,0.5), 0 0 10px rgba(32,223,143,0.25), inset 0 1px 0 rgba(255,255,255,0.2); }
+}
+.auto-fetch-btn {
+  box-shadow: 0 0 20px rgba(32,223,143,0.4), 0 0 8px rgba(32,223,143,0.2), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  animation: g104-fetch-glow 2.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auto-fetch-btn { animation: none; }
+}
+
+/* ─── Refresh / More buttons: glass depth + hover ─── */
+.btn-ghost {
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.16) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 12px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Platform pills: holographic glass with stronger per-platform aura ─── */
+.platform-pill {
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  transition: all 0.2s ease !important;
+}
+.platform-pill:hover {
+  background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 4px 16px rgba(0,0,0,0.3) !important;
+  transform: translateY(-1px);
+}
+.platform-pill.active::before {
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, currentColor 12%, transparent), transparent 65%) !important;
+}
+
+/* Per-platform: stronger colored borders + glow halos */
+.platform-pill.p6.active {
+  border-color: rgba(86,195,255,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 0 18px rgba(86,195,255,0.2), 0 0 6px rgba(86,195,255,0.12) !important;
+}
+.platform-pill.ud.active {
+  border-color: rgba(168,120,255,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 0 18px rgba(168,120,255,0.2), 0 0 6px rgba(168,120,255,0.12) !important;
+}
+.platform-pill.betr.active {
+  border-color: rgba(255,138,61,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 0 18px rgba(255,138,61,0.2), 0 0 6px rgba(255,138,61,0.12) !important;
+}
+.platform-pill.pp.active {
+  border-color: rgba(44,212,208,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 0 18px rgba(44,212,208,0.2), 0 0 6px rgba(44,212,208,0.12) !important;
+}
+.platform-pill.dk.active {
+  border-color: rgba(245,158,11,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 0 18px rgba(245,158,11,0.2), 0 0 6px rgba(245,158,11,0.12) !important;
+}
+
+/* ─── Pill dot: stronger LED with outer ring ─── */
+.platform-pill .pill-dot {
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 80%, transparent), 0 0 4px currentColor, 0 0 2px currentColor !important;
+}
+
+/* ─── ACTIVE badge: gold beacon with pulse ─── */
+@keyframes g104-active-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(248,198,74,0.45), inset 0 1px 0 rgba(255,255,255,0.15); }
+  50%      { box-shadow: 0 0 16px rgba(248,198,74,0.65), inset 0 1px 0 rgba(255,255,255,0.2); }
+}
+.platform-pill .pill-active-badge {
+  box-shadow: 0 0 12px rgba(248,198,74,0.5), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5) !important;
+  animation: g104-active-pulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-pill .pill-active-badge { animation: none; }
+}
+
+/* ─── Age badges: status-aware glow tint ─── */
+.platform-pill .pill-age {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* ─── SOURCES badge: glass command chip ─── */
+.source-toggle-label {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 6px rgba(0,0,0,0.2) !important;
+  transition: all 0.15s ease !important;
+}
+.source-toggle-label:hover {
+  background: rgba(255,255,255,0.07) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+}
+
+/* ─── Search bar: glass input ─── */
+.header-search, .search-input {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ─── BETR LINES button: amber neon ─── */
+.betr-lines-btn {
+  box-shadow: 0 0 14px rgba(248,198,74,0.25), 0 0 5px rgba(248,198,74,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+}
+.betr-lines-btn:hover {
+  box-shadow: 0 0 22px rgba(248,198,74,0.4), 0 0 8px rgba(248,198,74,0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+}
+
+/* ─── View tabs: premium arena with lit active + stronger hover ─── */
+.view-tabs {
+  background: linear-gradient(180deg, rgba(12,16,26,0.88), rgba(8,11,20,0.94)) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(0,0,0,0.35) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Active tab: deeper gold with cinematic shadow */
+.view-tabs .tab-btn.active {
+  background: linear-gradient(180deg, #ffe270 0%, var(--gold) 40%, #d49a0c 100%) !important;
+  box-shadow:
+    0 0 20px rgba(248,198,74,0.4),
+    0 4px 12px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.4) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25) !important;
+}
+
+/* Inactive tabs: deeper glass + gold accent on hover */
+.view-tabs .tab-btn:not(.active) {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border: 1px solid transparent !important;
+  transition: all 0.18s ease !important;
+}
+.view-tabs .tab-btn:not(.active):hover {
+  background: rgba(248,198,74,0.08) !important;
+  border-color: rgba(248,198,74,0.12) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.06) !important;
+}
+
+/* Tab count badges: deeper inset glass */
+.view-tabs .tab-count {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.view-tabs .tab-btn.active .tab-count {
+  background: rgba(0,0,0,0.25) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25) !important;
+}
+
+/* ─── Sort & Trend chip: glass command pill ─── */
+.sort-chip {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: all 0.15s ease;
+}
+.sort-chip:hover {
+  background: rgba(255,255,255,0.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(248,198,74,0.06);
+}
+
+/* ─── Settings gear: subtle glow on hover ─── */
+.settings-btn:hover {
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.3));
+}
+
+
 /* ── GLOW-UP 103: AI Best Picks — arena showcase evolution ── */
 /* Section atmospheric glass, header accent bars, #1 pick spotlight glow,
    card glass elevation, avatar ring pulse, tier badge luminance,
