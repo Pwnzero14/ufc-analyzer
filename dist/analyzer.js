@@ -6978,7 +6978,7 @@ function renderBestPicks(container, renderSeq = 0) {
                 const conflictTag = corrPenalty > 0
                     ? ` <span class="best-pick-conflict" title="Opponent picked same direction — demoted ${corrPenalty}pts (correlated slate risk)">⬇ corr</span>`
                     : conflictFighters.has(f.name)
-                        ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">⚡ corr</span>`
+                        ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">↔ corr</span>`
                         : '';
                 // Lineshop badge: only meaningful for FP picks now — SS/TD/FT/CTRL
                 // displayed line is already the best-side across all books.
@@ -18374,5 +18374,9 @@ function savePreferences() {
     }, 1000);
 }
 window.addEventListener('beforeunload', savePreferences);
-// Load save
+// Load saved preferences
+const savedPrefs = readAnalyzerPreferences();
+if (savedPrefs?.theme) {
+    document.documentElement.className = savedPrefs.theme;
+}
 //# sourceMappingURL=analyzer.js.map
