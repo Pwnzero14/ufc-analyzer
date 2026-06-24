@@ -8641,6 +8641,227 @@ html { scroll-behavior: smooth; }
 .best-pick-row.tier-high.under:hover .best-pick-name { text-shadow: 0 0 14px rgba(255,108,136,0.2); }
 
 
+/* ── GLOW-UP 98: Fighters Section Visual Polish ── */
+
+/* ─ Fighter row card: refined gradient + confidence-tiered left border ─ */
+.fighter-row {
+  background: linear-gradient(135deg, rgba(15,22,39,0.95), rgba(10,14,24,0.85)), var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 14px rgba(0,0,0,0.25);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fighter-row:hover {
+  background: linear-gradient(135deg, rgba(20,27,45,0.95), rgba(15,22,39,0.9)), var(--card);
+  border-color: var(--border3);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 36px rgba(0,0,0,0.45), 0 0 20px rgba(86,195,255,0.05);
+}
+.fighter-row.expanded {
+  transform: none;
+  border-color: var(--border3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 36px rgba(248,198,74,0.06);
+}
+
+/* ─ Confidence-tiered left border coloring ─ */
+.fighter-row.lean-over-row.conf-tier-high  { border-left-color: #1bdc88; }
+.fighter-row.lean-over-row.conf-tier-med   { border-left-color: rgba(0,232,122,0.5); }
+.fighter-row.lean-over-row.conf-tier-low   { border-left-color: rgba(0,232,122,0.25); }
+.fighter-row.lean-under-row.conf-tier-high { border-left-color: #ff6c88; }
+.fighter-row.lean-under-row.conf-tier-med  { border-left-color: rgba(255,58,96,0.5); }
+.fighter-row.lean-under-row.conf-tier-low  { border-left-color: rgba(255,58,96,0.25); }
+
+/* High-confidence rows: subtle directional tint */
+.fighter-row.lean-over-row.conf-tier-high {
+  background: linear-gradient(135deg, rgba(0,232,122,0.06), rgba(15,22,39,0.95) 40%), var(--card);
+}
+.fighter-row.lean-under-row.conf-tier-high {
+  background: linear-gradient(135deg, rgba(255,58,96,0.06), rgba(15,22,39,0.95) 40%), var(--card);
+}
+
+/* ─ Expanded state: lean-colored glow ─ */
+.fighter-row.lean-over-row.expanded {
+  border-left-color: var(--green);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(0,232,122,0.06);
+}
+.fighter-row.lean-under-row.expanded {
+  border-left-color: var(--red);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(255,58,96,0.06);
+}
+
+/* ─ Avatar: lean-colored ring on hover ─ */
+.fighter-row.lean-over-row:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(0,232,122,0.4), 0 0 0 3px rgba(0,232,122,0.12), 0 4px 12px rgba(0,0,0,0.5);
+}
+.fighter-row.lean-under-row:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,58,96,0.4), 0 0 0 3px rgba(255,58,96,0.12), 0 4px 12px rgba(0,0,0,0.5);
+}
+/* High-confidence avatar ring at rest */
+.fighter-row.lean-over-row.conf-tier-high .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(0,232,122,0.35), 0 0 0 2.5px rgba(0,232,122,0.1), 0 3px 8px rgba(0,0,0,0.4);
+}
+.fighter-row.lean-under-row.conf-tier-high .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,58,96,0.35), 0 0 0 2.5px rgba(255,58,96,0.1), 0 3px 8px rgba(0,0,0,0.4);
+}
+/* Expanded avatar glow */
+.fighter-row.lean-over-row.expanded .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(0,232,122,0.5), 0 0 0 3px rgba(0,232,122,0.18), 0 0 12px rgba(0,232,122,0.15), 0 4px 12px rgba(0,0,0,0.5);
+}
+.fighter-row.lean-under-row.expanded .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,58,96,0.5), 0 0 0 3px rgba(255,58,96,0.18), 0 0 12px rgba(255,58,96,0.15), 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* ─ Stat card elevation + hover ─ */
+.stat-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.fighter-row:hover .stat-card {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+}
+.stat-card-fp {
+  box-shadow: inset 0 1px 0 rgba(44,212,208,0.06), 0 2px 6px rgba(0,0,0,0.15);
+}
+.fighter-row:hover .stat-card-fp {
+  border-color: rgba(44,212,208,0.45);
+  box-shadow: inset 0 1px 0 rgba(44,212,208,0.08), 0 4px 14px rgba(0,0,0,0.3), 0 0 8px rgba(44,212,208,0.05);
+}
+.stat-card-ss {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 2px 6px rgba(0,0,0,0.15);
+}
+.fighter-row:hover .stat-card-ss {
+  border-color: var(--border3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 14px rgba(0,0,0,0.3);
+}
+
+/* ─ Stat card number glow on hover ─ */
+.fighter-row:hover .stat-card-num {
+  text-shadow: 0 0 12px rgba(244,247,255,0.15);
+}
+.fighter-row.lean-over-row:hover .stat-delta-block.delta-plus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(0,232,122,0.3);
+}
+.fighter-row.lean-under-row:hover .stat-delta-block.delta-minus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(255,58,96,0.3);
+}
+
+/* ─ Line cell hover refinement ─ */
+.line-cell {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.line-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+.line-cell.fp:hover { border-color: rgba(86,195,255,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(86,195,255,0.08); }
+.line-cell.ss:hover { border-color: rgba(44,212,208,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(44,212,208,0.08); }
+.line-cell.td:hover { border-color: rgba(248,198,74,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(248,198,74,0.08); }
+.line-cell.ft:hover { border-color: rgba(146,125,255,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(146,125,255,0.08); }
+
+/* ─ Fighter name glow on hover ─ */
+.fighter-row:hover .fighter-name {
+  text-shadow: 0 0 14px rgba(244,247,255,0.12);
+}
+.fighter-row.lean-over-row.conf-tier-high:hover .fighter-name {
+  text-shadow: 0 0 16px rgba(0,232,122,0.18);
+}
+.fighter-row.lean-under-row.conf-tier-high:hover .fighter-name {
+  text-shadow: 0 0 16px rgba(255,58,96,0.18);
+}
+
+/* ─ Lean badge glow intensification on hover ─ */
+.fighter-row:hover .lean-over {
+  box-shadow: 0 0 22px rgba(0,232,122,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+  text-shadow: 0 0 12px rgba(0,232,122,0.5);
+}
+.fighter-row:hover .lean-under {
+  box-shadow: 0 0 22px rgba(255,58,96,0.32), inset 0 1px 0 rgba(255,255,255,0.1);
+  text-shadow: 0 0 12px rgba(255,58,96,0.45);
+}
+.fighter-row:hover .lean-push {
+  box-shadow: 0 0 20px rgba(248,198,74,0.3), inset 0 1px 0 rgba(255,255,255,0.09);
+  text-shadow: 0 0 12px rgba(248,198,74,0.45);
+}
+
+/* ─ Confidence meter glow ─ */
+.confidence-meter {
+  background: rgba(255,255,255,0.06);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+.fighter-row:hover .confidence-fill {
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* ─ Staggered entrance for fight pairs ─ */
+@keyframes fightPairSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fight-pair { animation: fightPairSlideIn 0.3s ease both; }
+.fight-pair:nth-of-type(2) { animation-delay: 0.05s; }
+.fight-pair:nth-of-type(3) { animation-delay: 0.10s; }
+.fight-pair:nth-of-type(4) { animation-delay: 0.15s; }
+.fight-pair:nth-of-type(5) { animation-delay: 0.20s; }
+.fight-pair:nth-of-type(6) { animation-delay: 0.25s; }
+.fight-pair:nth-of-type(n+7) { animation-delay: 0.30s; }
+@media (prefers-reduced-motion: reduce) {
+  .fight-pair { animation: none; }
+}
+
+/* ─ Fight group header accent bars ─ */
+.fight-group-header {
+  position: relative;
+}
+.fgh-main .fight-group-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(248,198,74,0.55) 40%, rgba(255,138,61,0.4) 70%, transparent 100%);
+  box-shadow: 0 0 8px rgba(248,198,74,0.2);
+}
+.fgh-co .fight-group-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(77,176,255,0.5) 40%, rgba(86,195,255,0.35) 70%, transparent 100%);
+  box-shadow: 0 0 8px rgba(77,176,255,0.18);
+}
+.fgh-card .fight-group-line {
+  background: linear-gradient(90deg, transparent 0%, var(--border2) 30%, var(--border2) 70%, transparent 100%);
+}
+
+/* Fight badge hover glow */
+.fight-badge { transition: box-shadow 0.15s ease; }
+.fight-badge.main:hover { box-shadow: 0 0 22px rgba(240,192,64,0.35), 0 4px 12px rgba(0,0,0,0.3); }
+.fight-badge.co:hover   { box-shadow: 0 0 22px rgba(77,176,255,0.3), 0 4px 12px rgba(0,0,0,0.3); }
+
+/* ─ Detail panel reveal animation ─ */
+.fighter-row.expanded .fighter-detail {
+  animation: detailReveal 0.3s ease both;
+}
+@keyframes detailReveal {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fighter-row.expanded .fighter-detail { animation: none; }
+}
+
+/* ─ Form dots glow boost on hover ─ */
+.fighter-row:hover .form-dot.win  { box-shadow: 0 0 8px rgba(0,232,122,0.6); }
+.fighter-row:hover .form-dot.loss { box-shadow: 0 0 8px rgba(255,58,96,0.5); }
+
+/* ─ Expand arrow rotation refinement ─ */
+.expand-arrow { transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), color 0.15s ease; }
+.fighter-row:hover .expand-arrow { color: var(--text2); }
+.fighter-row.expanded .expand-arrow { color: var(--gold); }
+
+/* ─ Main event spotlight: premium glow for first fight pair ─ */
+.fgh-main + .fight-pair .fighter-row {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(15,22,39,0.95) 45%), var(--card);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.45), 0 0 28px rgba(248,198,74,0.06);
+}
+.fgh-main + .fight-pair .fighter-row:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 44px rgba(0,0,0,0.5), 0 0 36px rgba(248,198,74,0.1);
+}
+
+
 /* ── GLOW-UP 8: Level 6 — navigation & discoverability ── */
 
 /* Drilldown section headers */

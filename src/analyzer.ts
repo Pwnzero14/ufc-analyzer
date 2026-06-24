@@ -14487,7 +14487,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
 
   const row = document.createElement('div') as HTMLDivElement;
   const rowLeanClass = lean.lean === 'over' ? ' lean-over-row' : lean.lean === 'under' ? ' lean-under-row' : '';
-  row.className = 'fighter-row' + rowLeanClass;
+  const rowConfTier = displayConf >= 72 ? ' conf-tier-high' : displayConf >= 58 ? ' conf-tier-med' : displayConf > 0 ? ' conf-tier-low' : '';
+  row.className = 'fighter-row' + rowLeanClass + rowConfTier;
   row.dataset['name'] = f.name;
   row.innerHTML = `
     <div class="fighter-main">
