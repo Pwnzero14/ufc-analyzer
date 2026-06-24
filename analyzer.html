@@ -8850,6 +8850,156 @@ html { scroll-behavior: smooth; }
 }
 
 
+/* ── GLOW-UP 106: Lines Section Overhaul ── */
+/* Flash animations on line changes, platform color identity,
+   worst-line styling, staggered entrance, enhanced movement arrows. */
+
+/* ─ Line change flash animations ─ */
+@keyframes lineFlashGreen {
+  0%   { background-color: rgba(0,232,122,0.28); box-shadow: inset 0 0 12px rgba(0,232,122,0.3); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+@keyframes lineFlashRed {
+  0%   { background-color: rgba(255,91,120,0.28); box-shadow: inset 0 0 12px rgba(255,91,120,0.3); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+.line-cell.line-flash-up {
+  animation: lineFlashGreen 1.8s ease-out both;
+}
+.line-cell.line-flash-down {
+  animation: lineFlashRed 1.8s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-cell.line-flash-up,
+  .line-cell.line-flash-down { animation: none; }
+}
+
+/* ─ Enhanced movement arrows ─ */
+.line-movement {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.line-movement.mv-up {
+  background: rgba(0,232,122,0.12);
+  color: #20df8f;
+  text-shadow: 0 0 8px rgba(0,232,122,0.6);
+}
+.line-movement.mv-down {
+  background: rgba(255,91,120,0.12);
+  color: #ff5b78;
+  text-shadow: 0 0 8px rgba(255,91,120,0.55);
+}
+/* Arrow symbol: slightly larger for visibility */
+.line-movement .mv-arrow {
+  font-size: 7px;
+  line-height: 1;
+}
+
+/* ─ Platform color identity: background tints per source ─ */
+.line-cell.src-p6 {
+  background: linear-gradient(165deg, rgba(86,195,255,0.09), rgba(86,195,255,0.02) 55%, transparent);
+}
+.line-cell.src-ud {
+  background: linear-gradient(165deg, rgba(127,136,255,0.09), rgba(127,136,255,0.02) 55%, transparent);
+}
+.line-cell.src-pp {
+  background: linear-gradient(165deg, rgba(44,212,208,0.09), rgba(44,212,208,0.02) 55%, transparent);
+}
+.line-cell.src-betr {
+  background: linear-gradient(165deg, rgba(255,138,61,0.09), rgba(255,138,61,0.02) 55%, transparent);
+}
+.line-cell.src-dk {
+  background: linear-gradient(165deg, rgba(245,158,11,0.09), rgba(245,158,11,0.02) 55%, transparent);
+  border-color: rgba(245,158,11,0.30);
+}
+/* DK text color + glow (wasn't defined before) */
+.line-value.dk { color: #f59e0b; text-shadow: 0 0 10px rgba(245,158,11,0.25); }
+.line-cell:hover .line-value.dk { text-shadow: 0 0 14px rgba(245,158,11,0.45); }
+/* DK source tag */
+.line-source-tag.src-dk { color: #f59e0b; }
+/* DK hover */
+.line-cell.src-dk:hover {
+  border-color: rgba(245,158,11,0.55);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(245,158,11,0.12);
+}
+
+/* ─ Platform source header pill tint on line cells ─ */
+.line-cell .line-source-tag {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.line-cell:hover .line-source-tag.src-p6 { background: rgba(86,195,255,0.12); box-shadow: 0 0 6px rgba(86,195,255,0.15); }
+.line-cell:hover .line-source-tag.src-ud { background: rgba(127,136,255,0.12); box-shadow: 0 0 6px rgba(127,136,255,0.15); }
+.line-cell:hover .line-source-tag.src-pp { background: rgba(44,212,208,0.12); box-shadow: 0 0 6px rgba(44,212,208,0.15); }
+.line-cell:hover .line-source-tag.src-betr { background: rgba(255,138,61,0.12); box-shadow: 0 0 6px rgba(255,138,61,0.15); }
+.line-cell:hover .line-source-tag.src-dk { background: rgba(245,158,11,0.12); box-shadow: 0 0 6px rgba(245,158,11,0.15); }
+
+/* ─ Worst-line styling: faded border, warning tint ─ */
+.line-cell.worst-line {
+  border-color: rgba(255,91,120,0.25);
+  background: linear-gradient(165deg, rgba(255,91,120,0.05), transparent 55%);
+  opacity: 0.85;
+}
+.line-cell.worst-line::after {
+  content: '▾';
+  position: absolute;
+  top: 2px; right: 3px;
+  font-size: 7px;
+  color: var(--red);
+  opacity: 0.45;
+  filter: drop-shadow(0 0 2px rgba(255,91,120,0.4));
+}
+.line-cell.worst-line:hover {
+  opacity: 1;
+  border-color: rgba(255,91,120,0.45);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 14px rgba(255,91,120,0.10);
+}
+.line-cell.worst-line:hover::after { opacity: 0.8; }
+
+/* ─ Staggered entrance for line cells ─ */
+@keyframes lineCellFadeIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.platform-lines .line-cell {
+  animation: lineCellFadeIn 0.25s ease both;
+}
+.platform-lines .line-cell:nth-child(2)  { animation-delay: 0.03s; }
+.platform-lines .line-cell:nth-child(3)  { animation-delay: 0.06s; }
+.platform-lines .line-cell:nth-child(4)  { animation-delay: 0.09s; }
+.platform-lines .line-cell:nth-child(5)  { animation-delay: 0.12s; }
+.platform-lines .line-cell:nth-child(6)  { animation-delay: 0.15s; }
+.platform-lines .line-cell:nth-child(7)  { animation-delay: 0.18s; }
+.platform-lines .line-cell:nth-child(8)  { animation-delay: 0.21s; }
+.platform-lines .line-cell:nth-child(9)  { animation-delay: 0.24s; }
+.platform-lines .line-cell:nth-child(10) { animation-delay: 0.27s; }
+.platform-lines .line-cell:nth-child(n+11) { animation-delay: 0.30s; }
+@media (prefers-reduced-motion: reduce) {
+  .platform-lines .line-cell { animation: none; }
+}
+
+/* ─ Line value hover: scale pop ─ */
+.line-cell:hover .line-value {
+  transform: scale(1.06);
+  transition: transform 0.15s ease;
+}
+
+/* ─ Movement arrow: enhanced badge-style on hover ─ */
+.line-cell:hover .line-movement.mv-up {
+  background: rgba(0,232,122,0.22);
+  box-shadow: 0 0 10px rgba(0,232,122,0.3);
+}
+.line-cell:hover .line-movement.mv-down {
+  background: rgba(255,91,120,0.22);
+  box-shadow: 0 0 10px rgba(255,91,120,0.25);
+}
+
+
 /* ── GLOW-UP 8: Level 6 — navigation & discoverability ── */
 
 /* Drilldown section headers */
@@ -20970,131 +21120,4 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 </div>
 
 <!-- BETR MODAL -->
-<div id="manualModal" class="modal-overlay is-hidden">
-  <div class="modal-box">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">📸 BETR SCREENSHOT READER</div>
-        <div class="modal-sub">Drop screenshots from the Betr app — AI reads the lines automatically</div>
-      </div>
-      <button id="manualModalClose" class="modal-close-btn">✕ CLOSE</button>
-    </div>
-
-    <div id="betrExtracted">
-      <div class="betr-review-title">Upcoming UFC Lines — Review & Edit Before Saving</div>
-      <div class="betr-grid-head">
-        <div class="betr-grid-col">FIGHTER</div>
-        <div class="betr-grid-col fp center">FP</div>
-        <div class="betr-grid-col ss center">SS</div>
-        <div></div>
-      </div>
-      <div id="betrExtractedRows" class="betr-extracted-rows"></div>
-      <div class="betr-actions">
-        <button id="betrSaveBtn" class="betr-save-btn">✓ SAVE TO BETR</button>
-        <button id="betrAddRow" class="betr-add-row-btn">+ Add Row</button>
-        <span id="betrSaveStatus" class="betr-save-status"></span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- HEAD-TO-HEAD MODAL -->
-<div id="h2hModal" class="modal-overlay is-hidden">
-  <div class="modal-box h2h-modal-box">
-    <div class="modal-head">
-      <div class="modal-title">⚔ HEAD-TO-HEAD</div>
-      <button id="h2hModalClose" class="modal-close-btn">✕ CLOSE</button>
-    </div>
-    <div id="h2hContent"></div>
-  </div>
-</div>
-
-<div id="reportModal" class="modal-overlay is-hidden">
-  <div class="modal-box report-modal-box">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">📊 PRE-EVENT REPORT CARD</div>
-        <div class="modal-sub" id="reportModalSub"></div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-ghost" id="reportCopyBtn" style="font-size:11px;padding:5px 10px">📋 Copy</button>
-        <button class="btn btn-ghost" id="reportDownloadBtn" style="font-size:11px;padding:5px 10px">⬇ Download</button>
-        <button id="reportModalClose" class="modal-close-btn">✕ CLOSE</button>
-      </div>
-    </div>
-    <div id="reportContent" style="margin-top:16px"></div>
-  </div>
-</div>
-
-<!-- LINE SHOP MODAL -->
-<div id="lineShopModal" class="modal-overlay is-hidden">
-  <div class="modal-box lineshop-modal-box">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">🛒 LINE SHOPPING DIFF</div>
-        <div class="modal-sub" id="lineShopSub">All platforms · sorted by biggest discrepancy</div>
-      </div>
-      <button id="lineShopClose" class="modal-close-btn">✕ CLOSE</button>
-    </div>
-    <div id="lineShopContent" style="margin-top:16px;overflow-x:auto"></div>
-  </div>
-</div>
-
-<!-- NEWS MODAL -->
-<div id="newsModal" class="modal-overlay is-hidden">
-  <div class="modal-box news-modal-box">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title" id="newsModalTitle">⚠ FIGHTER NEWS</div>
-        <div class="modal-sub" id="newsModalSub">Recent headlines · Google News</div>
-      </div>
-      <button id="newsModalClose" class="modal-close-btn">✕ CLOSE</button>
-    </div>
-    <div id="newsModalContent" style="margin-top:16px"></div>
-  </div>
-</div>
-
-  <div class="empty-state" id="emptyState">
-    <div class="empty-icon">⚡</div>
-    <div class="empty-title">Ready to Auto-Fetch Lines</div>
-    <div class="empty-steps">
-      <strong class="empty-opt1">Option 1 (Recommended):</strong> Click <strong>⚡ AUTO-FETCH LINES</strong> above — automatically opens Pick6 + Underdog, scrapes lines, and loads everything.<br><br>
-      <strong class="empty-opt2">Option 2 (Manual):</strong> Open pick6.draftkings.com → UFC picks, then underdogfantasy.com → UFC picks, then click <strong>Refresh</strong>.<br><br>
-      <em class="empty-note">Make sure you're logged in to both platforms before auto-fetching.</em>
-    </div>
-    <button id="emptyStateAutoFetchBtn" class="empty-autofetch-btn">⚡ AUTO-FETCH LINES NOW</button>
-  </div>
-  <div id="cardContainer" class="card-container-hidden"></div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<!-- DEBUG PANEL -->
-<div id="debugPanelWrap" class="debug-panel-wrap debug-panel-hidden">
-  <div class="debug-panel-head">
-    <span class="debug-label">⚡ UFC STATS DEBUG</span>
-    <button id="dbgTestBtn" class="debug-btn warn">TEST FETCH</button>
-    <button id="dbgDumpBtn" class="debug-btn info">DUMP RAW ROW</button>
-    <button id="dbgBgDumpBtn" class="debug-btn violet">FETCH VIA BG</button>
-    <button id="dbgClearBtn" class="debug-btn danger">CLEAR CACHE</button>
-    <button id="dbgCopyBtn" class="debug-btn success">COPY LOG</button>
-    <button id="dbgHideBtn" class="debug-btn neutral">HIDE</button>
-  </div>
-  <pre id="debugPanel" class="debug-panel-log">Waiting for fetch activity...</pre>
-</div>
-
-<button id="backToTop" class="back-to-top" title="Back to top">↑</button>
-
-<div id="kbdHelp" class="kbd-help is-hidden">
-  <div class="kbd-help-box">
-    <div class="kbd-help-title">⌨ Keyboard Shortcuts</div>
-    <div class="kbd-help-row"><span class="kbd-key">/</span> Focus search</div>
-    <div class="kbd-help-row"><span class="kbd-key">1</span>–<span class="kbd-key">5</span> All · Over · Under · Best Picks · Parlay</div>
-    <div class="kbd-help-row"><span class="kbd-key">K</span> Quick-jump to any fighter</div>
-    <div class="kbd-help-row"><span class="kbd-key">?</span> Toggle this help</div>
-    <div class="kbd-help-row"><span class="kbd-key">Esc</span> Close</div>
-  </div>
-</div>
-
-<div id="cmdPalette" class="cmd-palette is-hidden">
-  <div c
+<div id="manualModal" c
