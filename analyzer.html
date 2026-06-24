@@ -8850,156 +8850,6 @@ html { scroll-behavior: smooth; }
 }
 
 
-/* ── GLOW-UP 106: Lines Section Overhaul ── */
-/* Flash animations on line changes, platform color identity,
-   worst-line styling, staggered entrance, enhanced movement arrows. */
-
-/* ─ Line change flash animations ─ */
-@keyframes lineFlashGreen {
-  0%   { background-color: rgba(0,232,122,0.28); box-shadow: inset 0 0 12px rgba(0,232,122,0.3); }
-  100% { background-color: transparent; box-shadow: none; }
-}
-@keyframes lineFlashRed {
-  0%   { background-color: rgba(255,91,120,0.28); box-shadow: inset 0 0 12px rgba(255,91,120,0.3); }
-  100% { background-color: transparent; box-shadow: none; }
-}
-.line-cell.line-flash-up {
-  animation: lineFlashGreen 1.8s ease-out both;
-}
-.line-cell.line-flash-down {
-  animation: lineFlashRed 1.8s ease-out both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .line-cell.line-flash-up,
-  .line-cell.line-flash-down { animation: none; }
-}
-
-/* ─ Enhanced movement arrows ─ */
-.line-movement {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  padding: 1px 3px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.line-movement.mv-up {
-  background: rgba(0,232,122,0.12);
-  color: #20df8f;
-  text-shadow: 0 0 8px rgba(0,232,122,0.6);
-}
-.line-movement.mv-down {
-  background: rgba(255,91,120,0.12);
-  color: #ff5b78;
-  text-shadow: 0 0 8px rgba(255,91,120,0.55);
-}
-/* Arrow symbol: slightly larger for visibility */
-.line-movement .mv-arrow {
-  font-size: 7px;
-  line-height: 1;
-}
-
-/* ─ Platform color identity: background tints per source ─ */
-.line-cell.src-p6 {
-  background: linear-gradient(165deg, rgba(86,195,255,0.09), rgba(86,195,255,0.02) 55%, transparent);
-}
-.line-cell.src-ud {
-  background: linear-gradient(165deg, rgba(127,136,255,0.09), rgba(127,136,255,0.02) 55%, transparent);
-}
-.line-cell.src-pp {
-  background: linear-gradient(165deg, rgba(44,212,208,0.09), rgba(44,212,208,0.02) 55%, transparent);
-}
-.line-cell.src-betr {
-  background: linear-gradient(165deg, rgba(255,138,61,0.09), rgba(255,138,61,0.02) 55%, transparent);
-}
-.line-cell.src-dk {
-  background: linear-gradient(165deg, rgba(245,158,11,0.09), rgba(245,158,11,0.02) 55%, transparent);
-  border-color: rgba(245,158,11,0.30);
-}
-/* DK text color + glow (wasn't defined before) */
-.line-value.dk { color: #f59e0b; text-shadow: 0 0 10px rgba(245,158,11,0.25); }
-.line-cell:hover .line-value.dk { text-shadow: 0 0 14px rgba(245,158,11,0.45); }
-/* DK source tag */
-.line-source-tag.src-dk { color: #f59e0b; }
-/* DK hover */
-.line-cell.src-dk:hover {
-  border-color: rgba(245,158,11,0.55);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(245,158,11,0.12);
-}
-
-/* ─ Platform source header pill tint on line cells ─ */
-.line-cell .line-source-tag {
-  transition: background 0.15s ease, box-shadow 0.15s ease;
-}
-.line-cell:hover .line-source-tag.src-p6 { background: rgba(86,195,255,0.12); box-shadow: 0 0 6px rgba(86,195,255,0.15); }
-.line-cell:hover .line-source-tag.src-ud { background: rgba(127,136,255,0.12); box-shadow: 0 0 6px rgba(127,136,255,0.15); }
-.line-cell:hover .line-source-tag.src-pp { background: rgba(44,212,208,0.12); box-shadow: 0 0 6px rgba(44,212,208,0.15); }
-.line-cell:hover .line-source-tag.src-betr { background: rgba(255,138,61,0.12); box-shadow: 0 0 6px rgba(255,138,61,0.15); }
-.line-cell:hover .line-source-tag.src-dk { background: rgba(245,158,11,0.12); box-shadow: 0 0 6px rgba(245,158,11,0.15); }
-
-/* ─ Worst-line styling: faded border, warning tint ─ */
-.line-cell.worst-line {
-  border-color: rgba(255,91,120,0.25);
-  background: linear-gradient(165deg, rgba(255,91,120,0.05), transparent 55%);
-  opacity: 0.85;
-}
-.line-cell.worst-line::after {
-  content: '▾';
-  position: absolute;
-  top: 2px; right: 3px;
-  font-size: 7px;
-  color: var(--red);
-  opacity: 0.45;
-  filter: drop-shadow(0 0 2px rgba(255,91,120,0.4));
-}
-.line-cell.worst-line:hover {
-  opacity: 1;
-  border-color: rgba(255,91,120,0.45);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 14px rgba(255,91,120,0.10);
-}
-.line-cell.worst-line:hover::after { opacity: 0.8; }
-
-/* ─ Staggered entrance for line cells ─ */
-@keyframes lineCellFadeIn {
-  from { opacity: 0; transform: translateY(6px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.platform-lines .line-cell {
-  animation: lineCellFadeIn 0.25s ease both;
-}
-.platform-lines .line-cell:nth-child(2)  { animation-delay: 0.03s; }
-.platform-lines .line-cell:nth-child(3)  { animation-delay: 0.06s; }
-.platform-lines .line-cell:nth-child(4)  { animation-delay: 0.09s; }
-.platform-lines .line-cell:nth-child(5)  { animation-delay: 0.12s; }
-.platform-lines .line-cell:nth-child(6)  { animation-delay: 0.15s; }
-.platform-lines .line-cell:nth-child(7)  { animation-delay: 0.18s; }
-.platform-lines .line-cell:nth-child(8)  { animation-delay: 0.21s; }
-.platform-lines .line-cell:nth-child(9)  { animation-delay: 0.24s; }
-.platform-lines .line-cell:nth-child(10) { animation-delay: 0.27s; }
-.platform-lines .line-cell:nth-child(n+11) { animation-delay: 0.30s; }
-@media (prefers-reduced-motion: reduce) {
-  .platform-lines .line-cell { animation: none; }
-}
-
-/* ─ Line value hover: scale pop ─ */
-.line-cell:hover .line-value {
-  transform: scale(1.06);
-  transition: transform 0.15s ease;
-}
-
-/* ─ Movement arrow: enhanced badge-style on hover ─ */
-.line-cell:hover .line-movement.mv-up {
-  background: rgba(0,232,122,0.22);
-  box-shadow: 0 0 10px rgba(0,232,122,0.3);
-}
-.line-cell:hover .line-movement.mv-down {
-  background: rgba(255,91,120,0.22);
-  box-shadow: 0 0 10px rgba(255,91,120,0.25);
-}
-
-
 /* ── GLOW-UP 8: Level 6 — navigation & discoverability ── */
 
 /* Drilldown section headers */
@@ -20825,6 +20675,263 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   box-shadow: 0 0 4px rgba(248,198,74,0.30);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   GLOW-UP 106 v2: Lines Section Overhaul — MAXIMUM IMPACT
+   Placed at END of CSS to win all cascade conflicts.
+   Uses .platform-lines > .line-cell for higher specificity.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── PLATFORM COLOR IDENTITY: bold background tints ─── */
+.platform-lines > .line-cell.src-p6 {
+  background: linear-gradient(145deg, rgba(86,195,255,0.18) 0%, rgba(86,195,255,0.06) 60%, rgba(10,14,24,0.9)) !important;
+  border-color: rgba(86,195,255,0.40) !important;
+  box-shadow: inset 0 0 0 1px rgba(86,195,255,0.10), 0 2px 8px rgba(0,0,0,0.2);
+}
+.platform-lines > .line-cell.src-ud {
+  background: linear-gradient(145deg, rgba(127,136,255,0.18) 0%, rgba(127,136,255,0.06) 60%, rgba(10,14,24,0.9)) !important;
+  border-color: rgba(127,136,255,0.40) !important;
+  box-shadow: inset 0 0 0 1px rgba(127,136,255,0.10), 0 2px 8px rgba(0,0,0,0.2);
+}
+.platform-lines > .line-cell.src-pp {
+  background: linear-gradient(145deg, rgba(44,212,208,0.18) 0%, rgba(44,212,208,0.06) 60%, rgba(10,14,24,0.9)) !important;
+  border-color: rgba(44,212,208,0.40) !important;
+  box-shadow: inset 0 0 0 1px rgba(44,212,208,0.10), 0 2px 8px rgba(0,0,0,0.2);
+}
+.platform-lines > .line-cell.src-betr {
+  background: linear-gradient(145deg, rgba(255,138,61,0.18) 0%, rgba(255,138,61,0.06) 60%, rgba(10,14,24,0.9)) !important;
+  border-color: rgba(255,138,61,0.40) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,138,61,0.10), 0 2px 8px rgba(0,0,0,0.2);
+}
+.platform-lines > .line-cell.src-dk {
+  background: linear-gradient(145deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.06) 60%, rgba(10,14,24,0.9)) !important;
+  border-color: rgba(245,158,11,0.40) !important;
+  box-shadow: inset 0 0 0 1px rgba(245,158,11,0.10), 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* ─── Platform hover: amplified glow ─── */
+.platform-lines > .line-cell.src-p6:hover {
+  border-color: rgba(86,195,255,0.65) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(86,195,255,0.20), inset 0 0 0 1px rgba(86,195,255,0.15) !important;
+}
+.platform-lines > .line-cell.src-ud:hover {
+  border-color: rgba(127,136,255,0.65) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(127,136,255,0.20), inset 0 0 0 1px rgba(127,136,255,0.15) !important;
+}
+.platform-lines > .line-cell.src-pp:hover {
+  border-color: rgba(44,212,208,0.65) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(44,212,208,0.20), inset 0 0 0 1px rgba(44,212,208,0.15) !important;
+}
+.platform-lines > .line-cell.src-betr:hover {
+  border-color: rgba(255,138,61,0.65) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(255,138,61,0.20), inset 0 0 0 1px rgba(255,138,61,0.15) !important;
+}
+.platform-lines > .line-cell.src-dk:hover {
+  border-color: rgba(245,158,11,0.65) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(245,158,11,0.20), inset 0 0 0 1px rgba(245,158,11,0.15) !important;
+}
+
+/* ─── DK text color + glow (wasn't defined elsewhere) ─── */
+.line-value.dk { color: #f59e0b !important; text-shadow: 0 0 12px rgba(245,158,11,0.35); }
+.line-cell:hover .line-value.dk { text-shadow: 0 0 18px rgba(245,158,11,0.55); }
+.line-source-tag.src-dk { color: #f59e0b; }
+
+/* ─── SOURCE TAG: bold colored pills always visible ─── */
+.platform-lines .line-source-tag {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.platform-lines .line-source-tag.src-p6 {
+  background: rgba(86,195,255,0.15);
+  color: #56c3ff;
+  text-shadow: 0 0 6px rgba(86,195,255,0.4);
+}
+.platform-lines .line-source-tag.src-ud {
+  background: rgba(127,136,255,0.15);
+  color: #7f88ff;
+  text-shadow: 0 0 6px rgba(127,136,255,0.4);
+}
+.platform-lines .line-source-tag.src-pp {
+  background: rgba(44,212,208,0.15);
+  color: #2cd4d0;
+  text-shadow: 0 0 6px rgba(44,212,208,0.4);
+}
+.platform-lines .line-source-tag.src-betr {
+  background: rgba(255,138,61,0.15);
+  color: #ff8a3d;
+  text-shadow: 0 0 6px rgba(255,138,61,0.4);
+}
+.platform-lines .line-source-tag.src-dk {
+  background: rgba(245,158,11,0.15);
+  color: #f59e0b;
+  text-shadow: 0 0 6px rgba(245,158,11,0.4);
+}
+/* Hover: brighter pill */
+.line-cell:hover .line-source-tag.src-p6 { background: rgba(86,195,255,0.28); box-shadow: 0 0 10px rgba(86,195,255,0.25); }
+.line-cell:hover .line-source-tag.src-ud { background: rgba(127,136,255,0.28); box-shadow: 0 0 10px rgba(127,136,255,0.25); }
+.line-cell:hover .line-source-tag.src-pp { background: rgba(44,212,208,0.28); box-shadow: 0 0 10px rgba(44,212,208,0.25); }
+.line-cell:hover .line-source-tag.src-betr { background: rgba(255,138,61,0.28); box-shadow: 0 0 10px rgba(255,138,61,0.25); }
+.line-cell:hover .line-source-tag.src-dk { background: rgba(245,158,11,0.28); box-shadow: 0 0 10px rgba(245,158,11,0.25); }
+
+/* ─── MOVEMENT ARROWS: big, bold, impossible to miss ─── */
+.line-movement {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 11px !important;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin-left: 4px;
+}
+.line-movement.mv-up {
+  background: rgba(0,232,122,0.20) !important;
+  color: #1bdc88 !important;
+  text-shadow: 0 0 10px rgba(0,232,122,0.7) !important;
+  box-shadow: 0 0 8px rgba(0,232,122,0.25);
+  animation: mvPulse106 2s ease-in-out infinite;
+}
+.line-movement.mv-down {
+  background: rgba(255,91,120,0.20) !important;
+  color: #ff5b78 !important;
+  text-shadow: 0 0 10px rgba(255,91,120,0.65) !important;
+  box-shadow: 0 0 8px rgba(255,91,120,0.22);
+  animation: mvPulse106 2s ease-in-out infinite;
+}
+@keyframes mvPulse106 {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.75; transform: scale(1.08); }
+}
+.line-movement .mv-arrow {
+  font-size: 9px;
+  line-height: 1;
+}
+/* Hover: amplify */
+.line-cell:hover .line-movement.mv-up {
+  background: rgba(0,232,122,0.35) !important;
+  box-shadow: 0 0 16px rgba(0,232,122,0.45) !important;
+  transform: scale(1.1);
+}
+.line-cell:hover .line-movement.mv-down {
+  background: rgba(255,91,120,0.35) !important;
+  box-shadow: 0 0 16px rgba(255,91,120,0.4) !important;
+  transform: scale(1.1);
+}
+
+/* ─── LINE CHANGE FLASH ANIMATIONS ─── */
+@keyframes lineFlashGreen {
+  0%   { background-color: rgba(0,232,122,0.35); box-shadow: inset 0 0 18px rgba(0,232,122,0.4), 0 0 12px rgba(0,232,122,0.2); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+@keyframes lineFlashRed {
+  0%   { background-color: rgba(255,91,120,0.35); box-shadow: inset 0 0 18px rgba(255,91,120,0.4), 0 0 12px rgba(255,91,120,0.2); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+.platform-lines > .line-cell.line-flash-up {
+  animation: lineFlashGreen 2.2s ease-out both !important;
+}
+.platform-lines > .line-cell.line-flash-down {
+  animation: lineFlashRed 2.2s ease-out both !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-lines > .line-cell.line-flash-up,
+  .platform-lines > .line-cell.line-flash-down { animation: none !important; }
+}
+
+/* ─── BEST LINE: bold green glow treatment ─── */
+.platform-lines > .line-cell.best-line {
+  border-color: rgba(0,232,122,0.50) !important;
+  background: linear-gradient(145deg, rgba(0,232,122,0.16), rgba(0,232,122,0.04) 55%, rgba(10,14,24,0.9)) !important;
+  box-shadow: 0 0 16px rgba(0,232,122,0.15), inset 0 0 0 1px rgba(0,232,122,0.12) !important;
+}
+.platform-lines > .line-cell.best-line::after {
+  content: '★' !important;
+  position: absolute;
+  top: 2px; right: 3px;
+  font-size: 9px !important;
+  color: #20df8f;
+  opacity: 0.85 !important;
+  filter: drop-shadow(0 0 4px rgba(0,232,122,0.6));
+}
+.platform-lines > .line-cell.best-line:hover {
+  border-color: rgba(0,232,122,0.75) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 28px rgba(0,232,122,0.25), inset 0 0 0 1px rgba(0,232,122,0.18) !important;
+}
+.platform-lines > .line-cell.best-line:hover::after { opacity: 1 !important; }
+/* Best-shop badge: bold */
+.best-shop-badge {
+  color: #1bdc88 !important;
+  font-size: 8px !important;
+  font-weight: 800;
+  text-shadow: 0 0 6px rgba(0,232,122,0.5);
+}
+
+/* ─── WORST LINE: bold red warning treatment ─── */
+.platform-lines > .line-cell.worst-line {
+  border-color: rgba(255,91,120,0.40) !important;
+  background: linear-gradient(145deg, rgba(255,91,120,0.12), rgba(255,91,120,0.03) 55%, rgba(10,14,24,0.9)) !important;
+  box-shadow: 0 0 10px rgba(255,91,120,0.08), inset 0 0 0 1px rgba(255,91,120,0.08) !important;
+  opacity: 0.88;
+}
+.platform-lines > .line-cell.worst-line::after {
+  content: '✕';
+  position: absolute;
+  top: 2px; right: 3px;
+  font-size: 8px;
+  color: #ff5b78;
+  opacity: 0.7;
+  filter: drop-shadow(0 0 3px rgba(255,91,120,0.5));
+}
+.platform-lines > .line-cell.worst-line:hover {
+  opacity: 1;
+  border-color: rgba(255,91,120,0.60) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(255,91,120,0.18) !important;
+}
+.platform-lines > .line-cell.worst-line:hover::after { opacity: 1; }
+
+/* ─── STAGGERED ENTRANCE ─── */
+@keyframes lineCellFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.platform-lines > .line-cell {
+  animation: lineCellFadeIn 0.3s ease both;
+}
+.platform-lines > .line-cell:nth-child(2)  { animation-delay: 0.04s; }
+.platform-lines > .line-cell:nth-child(3)  { animation-delay: 0.08s; }
+.platform-lines > .line-cell:nth-child(4)  { animation-delay: 0.12s; }
+.platform-lines > .line-cell:nth-child(5)  { animation-delay: 0.16s; }
+.platform-lines > .line-cell:nth-child(6)  { animation-delay: 0.20s; }
+.platform-lines > .line-cell:nth-child(7)  { animation-delay: 0.24s; }
+.platform-lines > .line-cell:nth-child(8)  { animation-delay: 0.28s; }
+.platform-lines > .line-cell:nth-child(9)  { animation-delay: 0.32s; }
+.platform-lines > .line-cell:nth-child(10) { animation-delay: 0.36s; }
+.platform-lines > .line-cell:nth-child(n+11) { animation-delay: 0.40s; }
+@media (prefers-reduced-motion: reduce) {
+  .platform-lines > .line-cell { animation: none !important; }
+}
+
+/* ─── LINE VALUE: hover scale pop ─── */
+.platform-lines > .line-cell:hover .line-value {
+  transform: scale(1.08);
+  transition: transform 0.15s ease;
+}
+
+/* ─── PLATFORM VALUE TEXT: intensified glow ─── */
+.platform-lines .line-value.p6   { text-shadow: 0 0 14px rgba(86,195,255,0.40) !important; }
+.platform-lines .line-value.ud   { text-shadow: 0 0 14px rgba(127,136,255,0.40) !important; }
+.platform-lines .line-value.pp   { text-shadow: 0 0 14px rgba(44,212,208,0.40) !important; }
+.platform-lines .line-value.betr { text-shadow: 0 0 14px rgba(255,138,61,0.40) !important; }
+.platform-lines .line-value.dk   { text-shadow: 0 0 14px rgba(245,158,11,0.40) !important; }
+/* Hover: even stronger glow */
+.platform-lines > .line-cell:hover .line-value.p6   { text-shadow: 0 0 22px rgba(86,195,255,0.65) !important; }
+.platform-lines > .line-cell:hover .line-value.ud   { text-shadow: 0 0 22px rgba(127,136,255,0.65) !important; }
+.platform-lines > .line-cell:hover .line-value.pp   { text-shadow: 0 0 22px rgba(44,212,208,0.65) !important; }
+.platform-lines > .line-cell:hover .line-value.betr { text-shadow: 0 0 22px rgba(255,138,61,0.65) !important; }
+.platform-lines > .line-cell:hover .line-value.dk   { text-shadow: 0 0 22px rgba(245,158,11,0.65) !important; }
+
 </style>
 </head>
 <body>
@@ -20998,126 +21105,4 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
       </div>
       <div class="sort-trend-section">
         <span class="sort-trend-section-label" title="Compare recent N fights vs career average">Trend window</span>
-        <div class="trend-window-group">
-          <button class="trend-btn active" data-window="3">L3</button>
-          <button class="trend-btn" data-window="5">L5</button>
-          <button class="trend-btn" data-window="0">Career</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="view-tabs">
-    <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
-    <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
-    <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
-    <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
-    <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
-    <div class="data-tabs-wrap">
-      <button class="tab-btn data-tabs-trigger" id="dataTabsTrigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Calibration and Archive views">
-        <span id="dataTabsLabel">Data</span>
-        <span class="data-tabs-caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="data-tabs-popover" id="dataTabsPopover" role="menu" hidden>
-        <button class="tab-btn" data-view="calibration">📈 Calibration</button>
-        <button class="tab-btn" data-view="archive">Archive</button>
-      </div>
-    </div>
-  </div>
-  <div class="density-control">
-    <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
-      <span aria-hidden="true">⚙</span>
-      <span id="densityTriggerDot" class="density-trigger-dot" aria-hidden="true" hidden></span>
-    </button>
-    <div id="densityPopover" class="density-popover" role="menu" hidden>
-      <span class="density-popover-label">Display density</span>
-      <button id="densityToggleBtn" class="density-btn density-popover-item" title="Toggle between compact and detailed fighter cards">Compact View</button>
-      <button id="historyDensityToggleBtn" class="density-btn density-popover-item" title="Toggle history panel readability">History: Compact</button>
-    </div>
-  </div>
-</div>
-
-<!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
-<div id="visitBriefing" class="visit-briefing is-hidden"></div>
-<div id="slateStatusBanner" class="slate-banner">
-<!-- PRE-LOCK QA PANEL -->
-<div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
-
-<div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
-  <div class="mh-stat">
-    <span class="mh-label">Calibrated Hit Rate</span>
-    <span class="mh-value" id="mhHitRate">--%</span>
-    <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
-  </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
-    <span class="mh-label">Top Edge</span>
-    <span class="mh-value" id="mhTopEdge">--</span>
-    <span class="mh-trend" id="mhTopEdgeTrend">No actionable edges</span>
-  </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
-    <span class="mh-label">Actionable Leans</span>
-    <span class="mh-value" id="mhCoverage">0</span>
-    <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
-  </div>
-</div>
-</div><!-- /slateStatusBanner -->
-
-<div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
-  <div class="ld-drilldown-banner">
-    <span class="ld-drilldown-icon" aria-hidden="true">⚡</span>
-    <div class="ld-drilldown-content">
-      <span class="ld-label">Learning Drilldown</span>
-      <span class="ld-value ld-drilldown-title" id="ldDrilldownTitle">No drilldown yet</span>
-      <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
-      <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
-    </div>
-  </div>
-  <div class="ld-footer">
-    <span class="ld-footer-summary" id="ldFooterSummary">Loading diagnostics…</span>
-    <button class="ld-details-toggle" id="ldDetailsToggle" type="button" aria-expanded="false" aria-controls="ldDetails" title="Show learning memory, market accuracy, and pattern tracker details">
-      <span>Details</span>
-      <span class="ld-details-caret" aria-hidden="true">▾</span>
-    </button>
-  </div>
-  <div class="ld-details" id="ldDetails" hidden>
-    <div class="ld-stat">
-      <span class="ld-label">Learning Memory</span>
-      <span class="ld-value" id="ldResolved">0 resolved</span>
-      <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
-    </div>
-    <div class="ld-divider" aria-hidden="true"></div>
-    <div class="ld-stat">
-      <span class="ld-label">Market Accuracy</span>
-      <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
-      <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
-    </div>
-    <div class="ld-divider" aria-hidden="true"></div>
-    <div class="ld-stat">
-      <span class="ld-label">Pattern Tracker</span>
-      <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
-      <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
-    </div>
-  </div>
-</div>
-<!-- LINE MOVEMENT SUMMARY -->
-<div id="lineMovementSummary" class="movement-summary-grid" style="display:none">
-  <div class="movement-summary-header" id="movementSummaryHeader">
-    <span class="movement-summary-title">LINE MOVERS</span>
-    <span class="movement-summary-time" id="movementSummaryTime"></span>
-    <span class="movement-summary-toggle" id="movementSummaryToggle">▼</span>
-  </div>
-  <div class="movement-summary-body" id="movementSummaryBody"></div>
-</div>
-
-<!-- STICKY FIGHTER HEADER (shown when cardContainer is visible) -->
-<div class="fighter-header-row is-hidden" id="fighterHeaderRow">
-  <div class="fhr-label">Fighter</div>
-  <div class="fhr-label">Lines</div>
-  <div class="fhr-label fhr-center">Avg FP · SS · TDs · Consist</div>
-  <div class="fhr-label fhr-right">Lean</div>
-  <div></div>
-</div>
-
-<!-- BETR MODAL -->
-<div id="manualModal" c
+        <div class="trend-window
