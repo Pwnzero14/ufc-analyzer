@@ -8642,25 +8642,22 @@ html { scroll-behavior: smooth; }
 
 
 /* ── GLOW-UP 98: Fighters Section Visual Polish ── */
+/* NOTE: All .fighter-row overrides are additive — they must NOT re-declare
+   border, overflow, or border-radius to avoid breaking the detail panel
+   layout that lives inside .fighter-row. Hover effects that use transform
+   are scoped to :not(.expanded) so the expanded detail grid isn't shifted. */
 
-/* ─ Fighter row card: refined gradient + confidence-tiered left border ─ */
+/* ─ Fighter row card: refined gradient (additive, no border/overflow reset) ─ */
 .fighter-row {
-  background: linear-gradient(135deg, rgba(15,22,39,0.95), rgba(10,14,24,0.85)), var(--card);
-  border: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-sm);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 14px rgba(0,0,0,0.25);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
-.fighter-row:hover {
-  background: linear-gradient(135deg, rgba(20,27,45,0.95), rgba(15,22,39,0.9)), var(--card);
-  border-color: var(--border3);
+.fighter-row:not(.expanded):hover {
   transform: translateY(-2px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 36px rgba(0,0,0,0.45), 0 0 20px rgba(86,195,255,0.05);
 }
 .fighter-row.expanded {
   transform: none;
-  border-color: var(--border3);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 36px rgba(248,198,74,0.06);
 }
 
@@ -8672,14 +8669,6 @@ html { scroll-behavior: smooth; }
 .fighter-row.lean-under-row.conf-tier-med  { border-left-color: rgba(255,58,96,0.5); }
 .fighter-row.lean-under-row.conf-tier-low  { border-left-color: rgba(255,58,96,0.25); }
 
-/* High-confidence rows: subtle directional tint */
-.fighter-row.lean-over-row.conf-tier-high {
-  background: linear-gradient(135deg, rgba(0,232,122,0.06), rgba(15,22,39,0.95) 40%), var(--card);
-}
-.fighter-row.lean-under-row.conf-tier-high {
-  background: linear-gradient(135deg, rgba(255,58,96,0.06), rgba(15,22,39,0.95) 40%), var(--card);
-}
-
 /* ─ Expanded state: lean-colored glow ─ */
 .fighter-row.lean-over-row.expanded {
   border-left-color: var(--green);
@@ -8690,105 +8679,105 @@ html { scroll-behavior: smooth; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(255,58,96,0.06);
 }
 
-/* ─ Avatar: lean-colored ring on hover ─ */
-.fighter-row.lean-over-row:hover .fighter-avatar {
+/* ─ Avatar: lean-colored ring on hover (scoped to .fighter-main) ─ */
+.fighter-row.lean-over-row:hover > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(0,232,122,0.4), 0 0 0 3px rgba(0,232,122,0.12), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fighter-row.lean-under-row:hover .fighter-avatar {
+.fighter-row.lean-under-row:hover > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(255,58,96,0.4), 0 0 0 3px rgba(255,58,96,0.12), 0 4px 12px rgba(0,0,0,0.5);
 }
 /* High-confidence avatar ring at rest */
-.fighter-row.lean-over-row.conf-tier-high .fighter-avatar {
+.fighter-row.lean-over-row.conf-tier-high > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(0,232,122,0.35), 0 0 0 2.5px rgba(0,232,122,0.1), 0 3px 8px rgba(0,0,0,0.4);
 }
-.fighter-row.lean-under-row.conf-tier-high .fighter-avatar {
+.fighter-row.lean-under-row.conf-tier-high > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(255,58,96,0.35), 0 0 0 2.5px rgba(255,58,96,0.1), 0 3px 8px rgba(0,0,0,0.4);
 }
 /* Expanded avatar glow */
-.fighter-row.lean-over-row.expanded .fighter-avatar {
+.fighter-row.lean-over-row.expanded > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(0,232,122,0.5), 0 0 0 3px rgba(0,232,122,0.18), 0 0 12px rgba(0,232,122,0.15), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fighter-row.lean-under-row.expanded .fighter-avatar {
+.fighter-row.lean-under-row.expanded > .fighter-main .fighter-avatar {
   box-shadow: 0 0 0 1px rgba(255,58,96,0.5), 0 0 0 3px rgba(255,58,96,0.18), 0 0 12px rgba(255,58,96,0.15), 0 4px 12px rgba(0,0,0,0.5);
 }
 
-/* ─ Stat card elevation + hover ─ */
-.stat-card {
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+/* ─ Stat card elevation + hover (scoped to .fighter-main) ─ */
+.fighter-row > .fighter-main .stat-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.fighter-row:hover .stat-card {
+.fighter-row:hover > .fighter-main .stat-card {
   box-shadow: 0 3px 10px rgba(0,0,0,0.25);
 }
-.stat-card-fp {
+.fighter-row > .fighter-main .stat-card-fp {
   box-shadow: inset 0 1px 0 rgba(44,212,208,0.06), 0 2px 6px rgba(0,0,0,0.15);
 }
-.fighter-row:hover .stat-card-fp {
+.fighter-row:hover > .fighter-main .stat-card-fp {
   border-color: rgba(44,212,208,0.45);
   box-shadow: inset 0 1px 0 rgba(44,212,208,0.08), 0 4px 14px rgba(0,0,0,0.3), 0 0 8px rgba(44,212,208,0.05);
 }
-.stat-card-ss {
+.fighter-row > .fighter-main .stat-card-ss {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 2px 6px rgba(0,0,0,0.15);
 }
-.fighter-row:hover .stat-card-ss {
+.fighter-row:hover > .fighter-main .stat-card-ss {
   border-color: var(--border3);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 14px rgba(0,0,0,0.3);
 }
 
-/* ─ Stat card number glow on hover ─ */
-.fighter-row:hover .stat-card-num {
+/* ─ Stat card number glow on hover (scoped to .fighter-main) ─ */
+.fighter-row:hover > .fighter-main .stat-card-num {
   text-shadow: 0 0 12px rgba(244,247,255,0.15);
 }
-.fighter-row.lean-over-row:hover .stat-delta-block.delta-plus .stat-delta-val {
+.fighter-row.lean-over-row:hover > .fighter-main .stat-delta-block.delta-plus .stat-delta-val {
   text-shadow: 0 0 10px rgba(0,232,122,0.3);
 }
-.fighter-row.lean-under-row:hover .stat-delta-block.delta-minus .stat-delta-val {
+.fighter-row.lean-under-row:hover > .fighter-main .stat-delta-block.delta-minus .stat-delta-val {
   text-shadow: 0 0 10px rgba(255,58,96,0.3);
 }
 
-/* ─ Line cell hover refinement ─ */
-.line-cell {
+/* ─ Line cell hover refinement (scoped to .fighter-main) ─ */
+.fighter-row > .fighter-main .line-cell {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
-.line-cell:hover {
+.fighter-row > .fighter-main .line-cell:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.4);
 }
-.line-cell.fp:hover { border-color: rgba(86,195,255,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(86,195,255,0.08); }
-.line-cell.ss:hover { border-color: rgba(44,212,208,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(44,212,208,0.08); }
-.line-cell.td:hover { border-color: rgba(248,198,74,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(248,198,74,0.08); }
-.line-cell.ft:hover { border-color: rgba(146,125,255,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(146,125,255,0.08); }
+.fighter-row > .fighter-main .line-cell.fp:hover { border-color: rgba(86,195,255,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(86,195,255,0.08); }
+.fighter-row > .fighter-main .line-cell.ss:hover { border-color: rgba(44,212,208,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(44,212,208,0.08); }
+.fighter-row > .fighter-main .line-cell.td:hover { border-color: rgba(248,198,74,0.55); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(248,198,74,0.08); }
+.fighter-row > .fighter-main .line-cell.ft:hover { border-color: rgba(146,125,255,0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 8px rgba(146,125,255,0.08); }
 
-/* ─ Fighter name glow on hover ─ */
-.fighter-row:hover .fighter-name {
+/* ─ Fighter name glow on hover (scoped to .fighter-main) ─ */
+.fighter-row:hover > .fighter-main .fighter-name {
   text-shadow: 0 0 14px rgba(244,247,255,0.12);
 }
-.fighter-row.lean-over-row.conf-tier-high:hover .fighter-name {
+.fighter-row.lean-over-row.conf-tier-high:hover > .fighter-main .fighter-name {
   text-shadow: 0 0 16px rgba(0,232,122,0.18);
 }
-.fighter-row.lean-under-row.conf-tier-high:hover .fighter-name {
+.fighter-row.lean-under-row.conf-tier-high:hover > .fighter-main .fighter-name {
   text-shadow: 0 0 16px rgba(255,58,96,0.18);
 }
 
-/* ─ Lean badge glow intensification on hover ─ */
-.fighter-row:hover .lean-over {
+/* ─ Lean badge glow intensification on hover (scoped to .fighter-main) ─ */
+.fighter-row:hover > .fighter-main .lean-over {
   box-shadow: 0 0 22px rgba(0,232,122,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
   text-shadow: 0 0 12px rgba(0,232,122,0.5);
 }
-.fighter-row:hover .lean-under {
+.fighter-row:hover > .fighter-main .lean-under {
   box-shadow: 0 0 22px rgba(255,58,96,0.32), inset 0 1px 0 rgba(255,255,255,0.1);
   text-shadow: 0 0 12px rgba(255,58,96,0.45);
 }
-.fighter-row:hover .lean-push {
+.fighter-row:hover > .fighter-main .lean-push {
   box-shadow: 0 0 20px rgba(248,198,74,0.3), inset 0 1px 0 rgba(255,255,255,0.09);
   text-shadow: 0 0 12px rgba(248,198,74,0.45);
 }
 
-/* ─ Confidence meter glow ─ */
-.confidence-meter {
+/* ─ Confidence meter glow (scoped to .fighter-main) ─ */
+.fighter-row > .fighter-main .confidence-meter {
   background: rgba(255,255,255,0.06);
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
 }
-.fighter-row:hover .confidence-fill {
+.fighter-row:hover > .fighter-main .confidence-fill {
   box-shadow: 0 0 10px currentColor;
 }
 
@@ -8831,21 +8820,21 @@ html { scroll-behavior: smooth; }
 .fight-badge.main:hover { box-shadow: 0 0 22px rgba(240,192,64,0.35), 0 4px 12px rgba(0,0,0,0.3); }
 .fight-badge.co:hover   { box-shadow: 0 0 22px rgba(77,176,255,0.3), 0 4px 12px rgba(0,0,0,0.3); }
 
-/* ─ Detail panel reveal animation ─ */
+/* ─ Detail panel reveal animation (opacity only, no transform) ─ */
 .fighter-row.expanded .fighter-detail {
   animation: detailReveal 0.3s ease both;
 }
 @keyframes detailReveal {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fighter-row.expanded .fighter-detail { animation: none; }
 }
 
-/* ─ Form dots glow boost on hover ─ */
-.fighter-row:hover .form-dot.win  { box-shadow: 0 0 8px rgba(0,232,122,0.6); }
-.fighter-row:hover .form-dot.loss { box-shadow: 0 0 8px rgba(255,58,96,0.5); }
+/* ─ Form dots glow boost on hover (scoped to .fighter-main) ─ */
+.fighter-row:hover > .fighter-main .form-dot.win  { box-shadow: 0 0 8px rgba(0,232,122,0.6); }
+.fighter-row:hover > .fighter-main .form-dot.loss { box-shadow: 0 0 8px rgba(255,58,96,0.5); }
 
 /* ─ Expand arrow rotation refinement ─ */
 .expand-arrow { transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), color 0.15s ease; }
@@ -8854,10 +8843,9 @@ html { scroll-behavior: smooth; }
 
 /* ─ Main event spotlight: premium glow for first fight pair ─ */
 .fgh-main + .fight-pair .fighter-row {
-  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(15,22,39,0.95) 45%), var(--card);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.45), 0 0 28px rgba(248,198,74,0.06);
 }
-.fgh-main + .fight-pair .fighter-row:hover {
+.fgh-main + .fight-pair .fighter-row:not(.expanded):hover {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 44px rgba(0,0,0,0.5), 0 0 36px rgba(248,198,74,0.1);
 }
 
@@ -21109,12 +21097,4 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 </div>
 
 <div id="cmdPalette" class="cmd-palette is-hidden">
-  <div class="cmd-palette-box">
-    <input id="cmdPaletteInput" class="cmd-palette-input" type="text" placeholder="Jump to fighter…" autocomplete="off">
-    <div id="cmdPaletteResults" class="cmd-palette-results"></div>
-  </div>
-</div>
-
-<script type="module" src="dist/analyzer.js"></script>
-</body>
-</html>
+  <div c
