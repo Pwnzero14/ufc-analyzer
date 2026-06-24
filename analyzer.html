@@ -20942,11 +20942,6 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 .platform-lines > .line-cell:hover .line-value.betr { text-shadow: 0 0 22px rgba(255,138,61,0.65) !important; }
 .platform-lines > .line-cell:hover .line-value.dk   { text-shadow: 0 0 22px rgba(245,158,11,0.65) !important; }
 
-/* ─── GLOW-UP 106 DIAGNOSTIC: remove after confirming CSS loads ─── */
-.platform-lines > .line-cell {
-  border-top: 2px solid #ff003c !important;
-}
-
 </style>
 </head>
 <body>
@@ -21109,4 +21104,273 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
           <button class="sort-btn" data-sort="line">Line ↓</button>
           <button class="sort-btn" data-sort="ssline" title="Sort by active SS line">SS Line</button>
           <button class="sort-btn" data-sort="ftline" title="Sort by active fight-time line">FT Line</button>
-          <button class="sort-btn" data-sort="avgss" title="Sort by average significant strik
+          <button class="sort-btn" data-sort="avgss" title="Sort by average significant strikes">Avg SS</button>
+          <button class="sort-btn" data-sort="delta" title="Sort by SS delta (Avg SS - Line)">SS Delta</button>
+          <button class="sort-btn" data-sort="conf">Confidence</button>
+          <button class="sort-btn" data-sort="avgfp">Avg FP</button>
+          <button class="sort-btn" data-sort="floor">Floor</button>
+          <button class="sort-btn" data-sort="ceil">Ceiling</button>
+          <button class="sort-btn" data-sort="consistency">Consistency</button>
+        </div>
+      </div>
+      <div class="sort-trend-section">
+        <span class="sort-trend-section-label" title="Compare recent N fights vs career average">Trend window</span>
+        <div class="trend-window-group">
+          <button class="trend-btn active" data-window="3">L3</button>
+          <button class="trend-btn" data-window="5">L5</button>
+          <button class="trend-btn" data-window="0">Career</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="view-tabs">
+    <button class="tab-btn active" data-view="all">All Fighters <span class="tab-count" id="tabCountAll">—</span></button>
+    <button class="tab-btn" data-view="over">▲ Lean Over <span class="tab-count" id="tabCountOver">—</span></button>
+    <button class="tab-btn" data-view="under">▼ Lean Under <span class="tab-count" id="tabCountUnder">—</span></button>
+    <button class="tab-btn tab-btn-primary" data-view="bestpicks">⚡ AI Best Picks <span class="tab-count" id="tabCountBestPicks">—</span></button>
+    <button class="tab-btn" data-view="parlaylab">🔗 Parlay Lab</button>
+    <div class="data-tabs-wrap">
+      <button class="tab-btn data-tabs-trigger" id="dataTabsTrigger" type="button" aria-haspopup="menu" aria-expanded="false" title="Calibration and Archive views">
+        <span id="dataTabsLabel">Data</span>
+        <span class="data-tabs-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="data-tabs-popover" id="dataTabsPopover" role="menu" hidden>
+        <button class="tab-btn" data-view="calibration">📈 Calibration</button>
+        <button class="tab-btn" data-view="archive">Archive</button>
+      </div>
+    </div>
+  </div>
+  <div class="density-control">
+    <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
+      <span aria-hidden="true">⚙</span>
+      <span id="densityTriggerDot" class="density-trigger-dot" aria-hidden="true" hidden></span>
+    </button>
+    <div id="densityPopover" class="density-popover" role="menu" hidden>
+      <span class="density-popover-label">Display density</span>
+      <button id="densityToggleBtn" class="density-btn density-popover-item" title="Toggle between compact and detailed fighter cards">Compact View</button>
+      <button id="historyDensityToggleBtn" class="density-btn density-popover-item" title="Toggle history panel readability">History: Compact</button>
+    </div>
+  </div>
+</div>
+
+<!-- UNIFIED SLATE STATUS BANNER (Slate Check + KPI strip merged) -->
+<div id="visitBriefing" class="visit-briefing is-hidden"></div>
+<div id="slateStatusBanner" class="slate-banner">
+<!-- PRE-LOCK QA PANEL -->
+<div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
+
+<div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
+  <div class="mh-stat">
+    <span class="mh-label">Calibrated Hit Rate</span>
+    <span class="mh-value" id="mhHitRate">--%</span>
+    <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
+  </div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Top Edge</span>
+    <span class="mh-value" id="mhTopEdge">--</span>
+    <span class="mh-trend" id="mhTopEdgeTrend">No actionable edges</span>
+  </div>
+  <div class="mh-divider" aria-hidden="true"></div>
+  <div class="mh-stat">
+    <span class="mh-label">Actionable Leans</span>
+    <span class="mh-value" id="mhCoverage">0</span>
+    <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
+  </div>
+</div>
+</div><!-- /slateStatusBanner -->
+
+<div id="learningDiagnosticsWidget" class="learning-diagnostics-strip" aria-live="polite">
+  <div class="ld-drilldown-banner">
+    <span class="ld-drilldown-icon" aria-hidden="true">⚡</span>
+    <div class="ld-drilldown-content">
+      <span class="ld-label">Learning Drilldown</span>
+      <span class="ld-value ld-drilldown-title" id="ldDrilldownTitle">No drilldown yet</span>
+      <span class="ld-meta" id="ldDrilldownMeta">Need resolved outcomes</span>
+      <span class="ld-meta-extra" id="ldDrilldownBody">No settled picks yet.</span>
+    </div>
+  </div>
+  <div class="ld-footer">
+    <span class="ld-footer-summary" id="ldFooterSummary">Loading diagnostics…</span>
+    <button class="ld-details-toggle" id="ldDetailsToggle" type="button" aria-expanded="false" aria-controls="ldDetails" title="Show learning memory, market accuracy, and pattern tracker details">
+      <span>Details</span>
+      <span class="ld-details-caret" aria-hidden="true">▾</span>
+    </button>
+  </div>
+  <div class="ld-details" id="ldDetails" hidden>
+    <div class="ld-stat">
+      <span class="ld-label">Learning Memory</span>
+      <span class="ld-value" id="ldResolved">0 resolved</span>
+      <span class="ld-meta" id="ldCoverage">No settled outcomes yet</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Market Accuracy</span>
+      <span class="ld-value" id="ldMarketAcc">SS --% · FP --%</span>
+      <span class="ld-meta" id="ldMarketAccMeta">Waiting for resolved results</span>
+    </div>
+    <div class="ld-divider" aria-hidden="true"></div>
+    <div class="ld-stat">
+      <span class="ld-label">Pattern Tracker</span>
+      <span class="ld-value" id="ldPatternWin">Top hit tag: --</span>
+      <span class="ld-meta" id="ldPatternMiss">Top miss tag: --</span>
+    </div>
+  </div>
+</div>
+<!-- LINE MOVEMENT SUMMARY -->
+<div id="lineMovementSummary" class="movement-summary-grid" style="display:none">
+  <div class="movement-summary-header" id="movementSummaryHeader">
+    <span class="movement-summary-title">LINE MOVERS</span>
+    <span class="movement-summary-time" id="movementSummaryTime"></span>
+    <span class="movement-summary-toggle" id="movementSummaryToggle">▼</span>
+  </div>
+  <div class="movement-summary-body" id="movementSummaryBody"></div>
+</div>
+
+<!-- STICKY FIGHTER HEADER (shown when cardContainer is visible) -->
+<div class="fighter-header-row is-hidden" id="fighterHeaderRow">
+  <div class="fhr-label">Fighter</div>
+  <div class="fhr-label">Lines</div>
+  <div class="fhr-label fhr-center">Avg FP · SS · TDs · Consist</div>
+  <div class="fhr-label fhr-right">Lean</div>
+  <div></div>
+</div>
+
+<!-- BETR MODAL -->
+<div id="manualModal" class="modal-overlay is-hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">📸 BETR SCREENSHOT READER</div>
+        <div class="modal-sub">Drop screenshots from the Betr app — AI reads the lines automatically</div>
+      </div>
+      <button id="manualModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+
+    <div id="betrExtracted">
+      <div class="betr-review-title">Upcoming UFC Lines — Review & Edit Before Saving</div>
+      <div class="betr-grid-head">
+        <div class="betr-grid-col">FIGHTER</div>
+        <div class="betr-grid-col fp center">FP</div>
+        <div class="betr-grid-col ss center">SS</div>
+        <div></div>
+      </div>
+      <div id="betrExtractedRows" class="betr-extracted-rows"></div>
+      <div class="betr-actions">
+        <button id="betrSaveBtn" class="betr-save-btn">✓ SAVE TO BETR</button>
+        <button id="betrAddRow" class="betr-add-row-btn">+ Add Row</button>
+        <span id="betrSaveStatus" class="betr-save-status"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HEAD-TO-HEAD MODAL -->
+<div id="h2hModal" class="modal-overlay is-hidden">
+  <div class="modal-box h2h-modal-box">
+    <div class="modal-head">
+      <div class="modal-title">⚔ HEAD-TO-HEAD</div>
+      <button id="h2hModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="h2hContent"></div>
+  </div>
+</div>
+
+<div id="reportModal" class="modal-overlay is-hidden">
+  <div class="modal-box report-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">📊 PRE-EVENT REPORT CARD</div>
+        <div class="modal-sub" id="reportModalSub"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" id="reportCopyBtn" style="font-size:11px;padding:5px 10px">📋 Copy</button>
+        <button class="btn btn-ghost" id="reportDownloadBtn" style="font-size:11px;padding:5px 10px">⬇ Download</button>
+        <button id="reportModalClose" class="modal-close-btn">✕ CLOSE</button>
+      </div>
+    </div>
+    <div id="reportContent" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- LINE SHOP MODAL -->
+<div id="lineShopModal" class="modal-overlay is-hidden">
+  <div class="modal-box lineshop-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">🛒 LINE SHOPPING DIFF</div>
+        <div class="modal-sub" id="lineShopSub">All platforms · sorted by biggest discrepancy</div>
+      </div>
+      <button id="lineShopClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="lineShopContent" style="margin-top:16px;overflow-x:auto"></div>
+  </div>
+</div>
+
+<!-- NEWS MODAL -->
+<div id="newsModal" class="modal-overlay is-hidden">
+  <div class="modal-box news-modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="newsModalTitle">⚠ FIGHTER NEWS</div>
+        <div class="modal-sub" id="newsModalSub">Recent headlines · Google News</div>
+      </div>
+      <button id="newsModalClose" class="modal-close-btn">✕ CLOSE</button>
+    </div>
+    <div id="newsModalContent" style="margin-top:16px"></div>
+  </div>
+</div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">⚡</div>
+    <div class="empty-title">Ready to Auto-Fetch Lines</div>
+    <div class="empty-steps">
+      <strong class="empty-opt1">Option 1 (Recommended):</strong> Click <strong>⚡ AUTO-FETCH LINES</strong> above — automatically opens Pick6 + Underdog, scrapes lines, and loads everything.<br><br>
+      <strong class="empty-opt2">Option 2 (Manual):</strong> Open pick6.draftkings.com → UFC picks, then underdogfantasy.com → UFC picks, then click <strong>Refresh</strong>.<br><br>
+      <em class="empty-note">Make sure you're logged in to both platforms before auto-fetching.</em>
+    </div>
+    <button id="emptyStateAutoFetchBtn" class="empty-autofetch-btn">⚡ AUTO-FETCH LINES NOW</button>
+  </div>
+  <div id="cardContainer" class="card-container-hidden"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- DEBUG PANEL -->
+<div id="debugPanelWrap" class="debug-panel-wrap debug-panel-hidden">
+  <div class="debug-panel-head">
+    <span class="debug-label">⚡ UFC STATS DEBUG</span>
+    <button id="dbgTestBtn" class="debug-btn warn">TEST FETCH</button>
+    <button id="dbgDumpBtn" class="debug-btn info">DUMP RAW ROW</button>
+    <button id="dbgBgDumpBtn" class="debug-btn violet">FETCH VIA BG</button>
+    <button id="dbgClearBtn" class="debug-btn danger">CLEAR CACHE</button>
+    <button id="dbgCopyBtn" class="debug-btn success">COPY LOG</button>
+    <button id="dbgHideBtn" class="debug-btn neutral">HIDE</button>
+  </div>
+  <pre id="debugPanel" class="debug-panel-log">Waiting for fetch activity...</pre>
+</div>
+
+<button id="backToTop" class="back-to-top" title="Back to top">↑</button>
+
+<div id="kbdHelp" class="kbd-help is-hidden">
+  <div class="kbd-help-box">
+    <div class="kbd-help-title">⌨ Keyboard Shortcuts</div>
+    <div class="kbd-help-row"><span class="kbd-key">/</span> Focus search</div>
+    <div class="kbd-help-row"><span class="kbd-key">1</span>–<span class="kbd-key">5</span> All · Over · Under · Best Picks · Parlay</div>
+    <div class="kbd-help-row"><span class="kbd-key">K</span> Quick-jump to any fighter</div>
+    <div class="kbd-help-row"><span class="kbd-key">?</span> Toggle this help</div>
+    <div class="kbd-help-row"><span class="kbd-key">Esc</span> Close</div>
+  </div>
+</div>
+
+<div id="cmdPalette" class="cmd-palette is-hidden">
+  <div class="cmd-palette-box">
+    <input id="cmdPaletteInput" class="cmd-palette-input" type="text" placeholder="Jump to fighter…" autocomplete="off">
+    <div id="cmdPaletteResults" class="cmd-palette-results"></div>
+  </div>
+</div>
+
+<script type="module" src="dist/analyzer.js"></script>
+</body>
+</html>
+                                                                                                                                                                       
