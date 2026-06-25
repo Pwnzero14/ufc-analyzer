@@ -16770,11 +16770,11 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
    Key trick: override --text/--text-muted/--text3 CSS vars within
    calibration containers so ALL inline-styled text goes gold-tinted. */
 
-/* === CSS variable overrides: gold-tint all text in calibration === */
+/* === CSS variable overrides: warm neutral text in calibration === */
 .calib-hero {
-  --text: rgba(248,198,74,0.90) !important;
-  --text-muted: rgba(248,198,74,0.50) !important;
-  --text3: rgba(248,198,74,0.60) !important;
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(210,200,180,0.55) !important;
+  --text3: rgba(225,215,195,0.65) !important;
   background: linear-gradient(135deg, rgba(248,198,74,0.06) 0%, rgba(248,198,74,0.10) 40%, rgba(248,198,74,0.04) 100%) !important;
   border: 1px solid rgba(248,198,74,0.18) !important;
   box-shadow:
@@ -16830,8 +16830,8 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 }
 
 .calib-summary {
-  --text-muted: rgba(248,198,74,0.50) !important;
-  --text3: rgba(248,198,74,0.60) !important;
+  --text-muted: rgba(210,200,180,0.55) !important;
+  --text3: rgba(225,215,195,0.65) !important;
   background: linear-gradient(135deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
   border: 1px solid rgba(248,198,74,0.15) !important;
   backdrop-filter: blur(8px) !important;
@@ -16865,9 +16865,9 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 .best-picks-section[data-section-id="cal-recal"],
 .best-picks-section[data-section-id="cal-bias"],
 .best-picks-section[data-section-id="calibration"] {
-  --text: rgba(248,198,74,0.85) !important;
-  --text-muted: rgba(248,198,74,0.45) !important;
-  --text3: rgba(248,198,74,0.55) !important;
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(210,200,180,0.55) !important;
+  --text3: rgba(225,215,195,0.65) !important;
   background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
   border: 1px solid rgba(248,198,74,0.14) !important;
   box-shadow:
@@ -16929,25 +16929,25 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   box-shadow: inset 0 1px 0 rgba(248,198,74,0.08), 0 8px 24px rgba(0,0,0,0.35), 0 0 16px rgba(248,198,74,0.05) !important;
 }
 .calib-diag-title {
-  color: rgba(248,198,74,0.90) !important;
+  color: rgba(255,250,235,0.90) !important;
 }
 .calib-diag-card:hover .calib-diag-title {
-  color: rgba(248,198,74,1.0) !important;
-  text-shadow: 0 0 12px rgba(248,198,74,0.25) !important;
+  color: rgba(255,252,240,1.0) !important;
+  text-shadow: 0 0 12px rgba(248,198,74,0.15) !important;
 }
 .calib-diag-body {
-  color: rgba(225,235,250,0.60) !important;
+  color: rgba(210,200,180,0.65) !important;
 }
 .calib-diag-card:hover .calib-diag-body {
-  color: rgba(225,235,250,0.80) !important;
+  color: rgba(235,225,205,0.85) !important;
 }
 .calib-diag-action {
-  color: rgba(248,198,74,0.70) !important;
+  color: rgba(225,215,195,0.70) !important;
   border-left-color: rgba(248,198,74,0.30) !important;
 }
 .calib-diag-card:hover .calib-diag-action {
-  color: rgba(248,198,74,0.90) !important;
-  text-shadow: 0 0 8px rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.90) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.12) !important;
   border-left-color: rgba(248,198,74,0.50) !important;
 }
 /* Overconfidence section container: gold glass override (was red-tinted) */
@@ -20240,11 +20240,15 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* ── GLOW-UP 114b: Recalibration Engine — gold-accent override ── */
 /* Placed AFTER the recal table styles so cascade wins. */
 
+/* Recal description text: warm cream */
+.best-picks-section[data-section-id="cal-recal"] .section-body > div[style*="text-muted"] {
+  color: rgba(255,248,230,0.55) !important;
+}
 .calib-recal-table th {
-  color: rgba(248,198,74,0.65) !important;
+  color: rgba(255,248,230,0.60) !important;
   border-bottom: 1px solid rgba(248,198,74,0.15) !important;
   background: rgba(248,198,74,0.04) !important;
-  text-shadow: 0 0 8px rgba(248,198,74,0.10) !important;
+  text-shadow: none !important;
 }
 .calib-recal-table tbody tr td {
   border-bottom-color: rgba(248,198,74,0.04) !important;
@@ -20253,22 +20257,22 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(248,198,74,0.05) !important;
 }
 .calib-recal-table td:first-child {
-  color: rgba(248,198,74,0.80) !important;
+  color: rgba(255,250,235,0.85) !important;
 }
 .calib-recal-table td:nth-child(2) {
-  color: rgba(248,198,74,0.40) !important;
+  color: rgba(210,200,180,0.45) !important;
 }
 .calib-recal-arrow {
-  color: rgba(248,198,74,0.30) !important;
+  color: rgba(210,200,180,0.30) !important;
 }
 .calib-recal-table tbody tr:hover .calib-recal-arrow {
-  color: rgba(248,198,74,0.70) !important;
+  color: rgba(255,250,235,0.60) !important;
 }
 .calib-recal-table td:nth-child(6) {
-  color: rgba(248,198,74,0.30) !important;
+  color: rgba(210,200,180,0.30) !important;
 }
 .calib-recal-table tbody tr:hover td:nth-child(6) {
-  color: rgba(248,198,74,0.55) !important;
+  color: rgba(210,200,180,0.55) !important;
 }
 /* Per-stat recal chips: gold */
 .calib-recal-table ~ div[style*="margin-top"] {
@@ -20276,7 +20280,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(248,198,74,0.08) !important;
 }
 .calib-recal-table ~ div[style*="margin-top"] span[style*="font-weight:700"] {
-  color: rgba(248,198,74,0.80) !important;
+  color: rgba(255,250,235,0.80) !important;
 }
 .calib-recal-table ~ div[style*="margin-top"] span[style*="surface2"] {
   background: rgba(248,198,74,0.04) !important;
