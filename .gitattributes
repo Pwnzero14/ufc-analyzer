@@ -1,0 +1,6 @@
+# Normalize all text files to LF in the repository and check them out with LF,
+# regardless of core.autocrlf. This kills the phantom whole-file "modified" diffs
+# git was reporting on IDE-saved files (src/analyzer.ts, analyzer.html) that were
+# byte-identical to HEAD. Binary assets are excluded so git never normalizes them.
+* text=auto eol=lf
+*.png binary
