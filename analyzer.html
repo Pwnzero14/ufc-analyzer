@@ -18331,6 +18331,95 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: 0 0 10px currentColor;
 }
 
+/* ── GLOW-UP 117: Per-Event Results — gold-accent glass cohesion ── */
+/* Converts indigo-tinted events section to gold accent family.
+   Placed AFTER GLOW-UP 94 event-row styles so cascade wins.
+   Semantic data colors (rate %, AI picks, CLV) preserved. */
+
+/* Container: gold glass */
+.best-picks-section[data-section-id="events"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="events"]::before {
+  background: radial-gradient(ellipse at center, rgba(248,198,74,0.05) 0%, transparent 65%) !important;
+}
+/* Header: gold glass + gold title gradient */
+.best-picks-section[data-section-id="events"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="events"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+/* Header spine: gold accent */
+.best-picks-section[data-section-id="events"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+/* Chevron: gold */
+.best-picks-section[data-section-id="events"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="events"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+/* Count badge: gold */
+.best-picks-section[data-section-id="events"] .best-picks-count {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.75) !important;
+}
+/* Event rows: gold-tinted glass */
+.event-row {
+  background: linear-gradient(135deg, rgba(248,198,74,0.03), rgba(248,198,74,0.01)) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+  border-radius: 10px !important;
+  margin-bottom: 4px !important;
+}
+.event-row::before {
+  background: linear-gradient(180deg, rgba(248,198,74,0.35) 0%, rgba(248,198,74,0.08) 100%) !important;
+  box-shadow: 0 0 6px rgba(248,198,74,0.15) !important;
+}
+.event-row:hover {
+  background: rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.18) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 12px rgba(248,198,74,0.08) !important;
+}
+.event-row:hover::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.4) 100%) !important;
+  box-shadow: 0 0 12px rgba(248,198,74,0.4) !important;
+}
+/* Event name: warm cream */
+.event-row .best-pick-name {
+  color: rgba(255,250,235,0.88) !important;
+}
+/* Event details: warm cream muted */
+.event-row .best-pick-reason {
+  color: rgba(255,248,230,0.50) !important;
+}
+/* Delete button: warm cream muted */
+.event-row .archive-delete-event-btn {
+  color: rgba(255,248,230,0.30) !important;
+}
+.event-row .archive-delete-event-btn:hover {
+  color: var(--red) !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
