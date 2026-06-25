@@ -18420,6 +18420,188 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   color: var(--red) !important;
 }
 
+/* ── GLOW-UP 118: AI Accuracy + CLV + Hit Rate sections — gold-accent glass ── */
+/* Covers: ai-accuracy, entry-clv, fp-hitrate, ss-hitrate, td-hitrate.
+   Placed AFTER GLOW-UP 94/117 so cascade wins. Semantic data colors preserved. */
+
+/* === AI Pick Accuracy container: gold glass === */
+.best-picks-section[data-section-id="ai-accuracy"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+
+/* === CLV container: gold glass === */
+.best-picks-section[data-section-id="entry-clv"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="entry-clv"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="entry-clv"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="entry-clv"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="entry-clv"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="entry-clv"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+
+/* === Stat badges (inside ai-accuracy & entry-clv): gold glass === */
+.best-picks-section[data-section-id="ai-accuracy"] .archive-stat-badge,
+.best-picks-section[data-section-id="entry-clv"] .archive-stat-badge {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+  border-left: 3px solid var(--asb-color, rgba(248,198,74,0.4)) !important;
+}
+.best-picks-section[data-section-id="ai-accuracy"] .archive-stat-badge:hover,
+.best-picks-section[data-section-id="entry-clv"] .archive-stat-badge:hover {
+  background: rgba(248,198,74,0.07) !important;
+  border-color: rgba(248,198,74,0.15) !important;
+  border-left-color: var(--asb-color, rgba(248,198,74,0.5)) !important;
+}
+/* CLV inline chips: gold glass */
+.best-picks-section[data-section-id="entry-clv"] div[style*="border-left:2px solid"] {
+  background: rgba(248,198,74,0.04) !important;
+  border-radius: 8px !important;
+}
+.best-picks-section[data-section-id="entry-clv"] div[style*="border-left:2px solid"]:hover {
+  background: rgba(248,198,74,0.07) !important;
+}
+
+/* === Hit Rate sections: fp-hitrate, ss-hitrate, td-hitrate — gold glass === */
+.best-picks-section[data-section-id="fp-hitrate"],
+.best-picks-section[data-section-id="ss-hitrate"],
+.best-picks-section[data-section-id="td-hitrate"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] > .best-picks-header,
+.best-picks-section[data-section-id="ss-hitrate"] > .best-picks-header,
+.best-picks-section[data-section-id="td-hitrate"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] > .best-picks-header .best-picks-title,
+.best-picks-section[data-section-id="ss-hitrate"] > .best-picks-header .best-picks-title,
+.best-picks-section[data-section-id="td-hitrate"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] > .best-picks-header::before,
+.best-picks-section[data-section-id="ss-hitrate"] > .best-picks-header::before,
+.best-picks-section[data-section-id="td-hitrate"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] .section-chevron,
+.best-picks-section[data-section-id="ss-hitrate"] .section-chevron,
+.best-picks-section[data-section-id="td-hitrate"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"]:hover .section-chevron,
+.best-picks-section[data-section-id="ss-hitrate"]:hover .section-chevron,
+.best-picks-section[data-section-id="td-hitrate"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] .best-picks-count,
+.best-picks-section[data-section-id="ss-hitrate"] .best-picks-count,
+.best-picks-section[data-section-id="td-hitrate"] .best-picks-count {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.75) !important;
+}
+/* Rate hero inside hit rate sections: gold glass */
+.best-picks-section[data-section-id="fp-hitrate"] .rate-hero,
+.best-picks-section[data-section-id="ss-hitrate"] .rate-hero,
+.best-picks-section[data-section-id="td-hitrate"] .rate-hero {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+.best-picks-section[data-section-id="fp-hitrate"] .rate-hero:hover,
+.best-picks-section[data-section-id="ss-hitrate"] .rate-hero:hover,
+.best-picks-section[data-section-id="td-hitrate"] .rate-hero:hover {
+  border-color: rgba(248,198,74,0.18) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 12px rgba(248,198,74,0.06) !important;
+}
+/* Rate hero bar track: gold glass */
+.best-picks-section[data-section-id="fp-hitrate"] .rate-hero-bar,
+.best-picks-section[data-section-id="ss-hitrate"] .rate-hero-bar,
+.best-picks-section[data-section-id="td-hitrate"] .rate-hero-bar {
+  background: rgba(248,198,74,0.06) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* Rate hero sub text: warm cream */
+.best-picks-section[data-section-id="fp-hitrate"] .rate-hero-sub,
+.best-picks-section[data-section-id="ss-hitrate"] .rate-hero-sub,
+.best-picks-section[data-section-id="td-hitrate"] .rate-hero-sub {
+  color: rgba(255,248,230,0.50) !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
