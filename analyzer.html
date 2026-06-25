@@ -18153,6 +18153,162 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(248,198,74,0.08) !important;
 }
 
+/* ── GLOW-UP 116: Learning Summary — gold-accent glass cohesion ── */
+/* Converts green-tinted learning section to gold accent family.
+   Placed AFTER GLOW-UP 94/115 so cascade wins. Semantic data colors
+   (grade ring, best/worst badges, error bars) are preserved. */
+
+/* Container: gold glass */
+.best-picks-section[data-section-id="learning"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="learning"]::before {
+  background: radial-gradient(ellipse at center, rgba(248,198,74,0.05) 0%, transparent 65%) !important;
+}
+.best-picks-section[data-section-id="learning"]::after {
+  background: radial-gradient(ellipse at center, rgba(248,198,74,0.03) 0%, transparent 65%) !important;
+}
+/* Header: gold glass + gold title gradient */
+.best-picks-section[data-section-id="learning"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="learning"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+/* Header spine: gold accent */
+.best-picks-section[data-section-id="learning"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+/* Chevron: gold */
+.best-picks-section[data-section-id="learning"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="learning"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+/* Count badge: gold */
+.best-picks-section[data-section-id="learning"] .best-picks-count {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.75) !important;
+}
+/* Learn hero: gold radial instead of green */
+.learn-hero {
+  background: linear-gradient(135deg, rgba(248,198,74,0.05) 0%, rgba(14,22,46,0.92) 50%, rgba(248,198,74,0.03) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  box-shadow: inset 0 1px 0 rgba(248,198,74,0.05), 0 16px 48px rgba(0,0,0,0.4) !important;
+}
+.learn-hero::after {
+  background: radial-gradient(ellipse at center, rgba(248,198,74,0.06) 0%, transparent 65%) !important;
+}
+/* Hero title: warm cream */
+.learn-hero-title {
+  background: linear-gradient(135deg, rgba(255,250,235,0.95) 0%, rgba(255,248,230,0.70) 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+/* Hero subtitle: warm cream */
+.learn-hero-subtitle {
+  color: rgba(255,248,230,0.55) !important;
+}
+/* Stat chips: gold glass borders */
+.learn-stat-chip {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04) 0%, rgba(14,22,46,0.88) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(248,198,74,0.04) !important;
+}
+.learn-chip-header, .learn-chip-label {
+  color: rgba(255,248,230,0.55) !important;
+}
+.learn-chip-bar-track {
+  background: rgba(248,198,74,0.05) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* Weights details: gold glass */
+.weights-details {
+  background: rgba(248,198,74,0.03) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+.weights-details summary {
+  color: rgba(255,248,230,0.50) !important;
+}
+.weights-details[open] {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04) 0%, rgba(14,22,46,0.6) 100%) !important;
+  border-color: rgba(248,198,74,0.14) !important;
+}
+.weights-body {
+  color: rgba(255,248,230,0.55) !important;
+}
+/* Trend label: warm cream text */
+.learn-trend-label {
+  color: rgba(255,248,230,0.50) !important;
+}
+/* Delta header: gold glass strip */
+.learn-delta-header {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+.learn-dh-rank, .learn-dh-name, .learn-dh-stat, .learn-dh-bar, .learn-dh-total {
+  color: rgba(255,248,230,0.55) !important;
+}
+/* Delta rows: gold-tinted glass */
+.learn-delta-row {
+  background: linear-gradient(135deg, rgba(248,198,74,0.03), rgba(248,198,74,0.01)) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+}
+.learn-delta-row:nth-child(odd) {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(248,198,74,0.02)) !important;
+}
+.learn-delta-row:hover {
+  background: rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.15) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 12px rgba(248,198,74,0.06) !important;
+}
+/* Delta row name: warm cream */
+.learn-delta-name {
+  color: rgba(255,250,235,0.85) !important;
+}
+/* Delta row stats: warm cream muted */
+.learn-delta-stat {
+  color: rgba(255,248,230,0.50) !important;
+}
+/* Delta bar track: gold glass */
+.learn-delta-bar {
+  background: rgba(248,198,74,0.05) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* Pending learn banner: gold accent */
+.best-picks-section[data-section-id="learning"] div[style*="background:rgba(56,176,0,0.08)"] {
+  background: linear-gradient(135deg, rgba(248,198,74,0.06) 0%, rgba(248,198,74,0.02) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), 0 0 14px rgba(248,198,74,0.08) !important;
+}
+.best-picks-section[data-section-id="learning"] div[style*="background:rgba(56,176,0,0.08)"] span {
+  color: rgba(255,250,235,0.85) !important;
+}
+/* Section body (Learning Drilldown) gold treatment */
+.best-picks-section[data-section-id="learning"] .section-body {
+  background: transparent !important;
+}
+
 /* === Per-Event result rows: glass card treatment === */
 .event-row {
   background: linear-gradient(135deg, rgba(18,26,52,0.5) 0%, rgba(12,18,40,0.35) 100%) !important;
