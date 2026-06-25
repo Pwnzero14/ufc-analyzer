@@ -18698,6 +18698,179 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(248,198,74,0.06) !important;
 }
 
+/* ── GLOW-UP 120: Backtesting Dashboard + Prop Archive Grading — gold-accent glass ── */
+/* Both remaining Archive sections. Semantic data colors preserved. */
+
+/* === Backtesting container: gold glass === */
+.best-picks-section[data-section-id="backtest"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="backtest"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="backtest"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="backtest"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="backtest"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="backtest"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+.best-picks-section[data-section-id="backtest"] .best-picks-count {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.75) !important;
+}
+/* Stat cards: gold glass */
+.best-picks-section[data-section-id="backtest"] .bt-stat-card {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-stat-card:hover {
+  background: rgba(248,198,74,0.07) !important;
+  border-color: rgba(248,198,74,0.18) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 12px rgba(248,198,74,0.06) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-stat-card::before {
+  opacity: 0.9 !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-stat-label {
+  color: rgba(255,248,230,0.55) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-stat-sub {
+  color: rgba(225,215,195,0.50) !important;
+}
+/* Grade badge: gold glass */
+.best-picks-section[data-section-id="backtest"] .bt-grade-badge {
+  border: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-grade-desc {
+  color: rgba(255,248,230,0.55) !important;
+}
+/* Sparkline panel: gold glass */
+.best-picks-section[data-section-id="backtest"] .bt-spark-panel {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-spark-panel:hover {
+  border-color: rgba(248,198,74,0.15) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-spark-title {
+  color: rgba(255,248,230,0.50) !important;
+}
+/* Bankroll panel: gold glass */
+.best-picks-section[data-section-id="backtest"] .bt-bankroll-panel {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+.best-picks-section[data-section-id="backtest"] .bt-bankroll-panel:hover {
+  border-color: rgba(248,198,74,0.15) !important;
+}
+
+/* === Prop Archive Grading container: gold glass === */
+.best-picks-section[data-section-id="grading"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.best-picks-section[data-section-id="grading"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="grading"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="grading"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="grading"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="grading"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+.best-picks-section[data-section-id="grading"] .best-picks-count {
+  background: rgba(248,198,74,0.10) !important;
+  border: 1px solid rgba(248,198,74,0.20) !important;
+  color: rgba(255,248,230,0.75) !important;
+}
+/* Grade rows: gold glass */
+.best-picks-section[data-section-id="grading"] .grade-row {
+  background: rgba(248,198,74,0.03) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.06) !important;
+}
+.best-picks-section[data-section-id="grading"] .grade-row:hover {
+  background: rgba(248,198,74,0.06) !important;
+}
+/* Grade bar track: gold glass */
+.best-picks-section[data-section-id="grading"] .grade-bar-bg {
+  background: rgba(248,198,74,0.06) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+}
+/* Platform x Stat Hit Rates container: gold glass */
+.best-picks-section[data-section-id="grading"] div[style*="background:var(--bg3)"] {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* Combo cards: gold glass instead of green/red tint */
+.best-picks-section[data-section-id="grading"] .combo-card-best {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="grading"] .combo-card-best:hover {
+  background: rgba(248,198,74,0.07) !important;
+  border-color: rgba(248,198,74,0.20) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25), 0 0 10px rgba(248,198,74,0.06) !important;
+}
+.best-picks-section[data-section-id="grading"] .combo-card-worst {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="grading"] .combo-card-worst:hover {
+  background: rgba(248,198,74,0.07) !important;
+  border-color: rgba(248,198,74,0.20) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25), 0 0 10px rgba(248,198,74,0.06) !important;
+}
+/* Combo row hover: gold tint */
+.best-picks-section[data-section-id="grading"] .combo-row:hover {
+  background: rgba(248,198,74,0.04) !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
