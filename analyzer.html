@@ -6091,12 +6091,12 @@ html { scroll-behavior: smooth; }
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-/* Per-stat radial wash — gold left, green center, cyan right */
+/* Per-stat radial wash — uniform gold across all three */
 .model-health-strip::before {
   background:
     radial-gradient(ellipse 450px 140px at 16% 0%, rgba(248,198,74,0.12), transparent 55%),
-    radial-gradient(ellipse 350px 120px at 50% 0%, rgba(72,187,120,0.08), transparent 50%),
-    radial-gradient(ellipse 450px 140px at 84% 0%, rgba(86,195,255,0.1), transparent 55%) !important;
+    radial-gradient(ellipse 350px 120px at 50% 0%, rgba(248,198,74,0.08), transparent 50%),
+    radial-gradient(ellipse 450px 140px at 84% 0%, rgba(248,198,74,0.10), transparent 55%) !important;
 }
 /* Gold accent spine on top — same as slate banner */
 .model-health-strip::after {
@@ -6136,75 +6136,55 @@ html { scroll-behavior: smooth; }
   transform: translateY(-2px) !important;
 }
 
-/* Per-identity border accent on cards (subtle at rest, bold on hover) */
-.mh-stat:first-child {
-  border-bottom: 2px solid rgba(248,198,74,0.3) !important;
+/* All stat cards: uniform gold border accent */
+.mh-stat {
+  border-bottom: 2px solid rgba(248,198,74,0.25) !important;
 }
-.mh-stat:first-child:hover {
+.mh-stat:hover {
   border-color: rgba(248,198,74,0.35) !important;
-  border-bottom: 2px solid rgba(248,198,74,0.6) !important;
+  border-bottom: 2px solid rgba(248,198,74,0.55) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.08),
     0 8px 28px rgba(0,0,0,0.35),
-    0 0 20px rgba(248,198,74,0.1) !important;
-}
-.model-health-strip .mh-stat:nth-child(3) {
-  border-bottom: 2px solid rgba(72,187,120,0.25) !important;
-}
-.model-health-strip .mh-stat:nth-child(3):hover {
-  border-color: rgba(72,187,120,0.3) !important;
-  border-bottom: 2px solid rgba(72,187,120,0.55) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 8px 28px rgba(0,0,0,0.35),
-    0 0 20px rgba(72,187,120,0.08) !important;
-}
-.model-health-strip .mh-stat:nth-child(5) {
-  border-bottom: 2px solid rgba(86,195,255,0.25) !important;
-}
-.model-health-strip .mh-stat:nth-child(5):hover {
-  border-color: rgba(86,195,255,0.3) !important;
-  border-bottom: 2px solid rgba(86,195,255,0.55) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 8px 28px rgba(0,0,0,0.35),
-    0 0 20px rgba(86,195,255,0.08) !important;
+    0 0 20px rgba(248,198,74,0.08) !important;
 }
 
-/* ─── Values: per-identity neon (bold always-on, cranked hover) ─── */
-.mh-stat:first-child .mh-value {
-  text-shadow: 0 0 24px rgba(248,198,74,0.5), 0 0 8px rgba(248,198,74,0.2) !important;
+/* ─── ALL values: gold color + gold neon (override older green/blue gradients) ─── */
+.mh-value {
+  background-image: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  -webkit-text-fill-color: rgba(248,198,74,0.95) !important;
+  filter: none !important;
+  color: rgba(248,198,74,0.95) !important;
+  text-shadow: 0 0 24px rgba(248,198,74,0.5), 0 0 8px rgba(248,198,74,0.25) !important;
 }
-.mh-stat:first-child:hover .mh-value {
+.mh-stat:hover .mh-value {
+  -webkit-text-fill-color: rgba(248,198,74,1) !important;
+  color: rgba(248,198,74,1) !important;
   text-shadow: 0 0 36px rgba(248,198,74,0.7), 0 0 14px rgba(248,198,74,0.35) !important;
 }
-.model-health-strip .mh-stat:nth-child(3) .mh-value {
-  text-shadow: 0 0 24px rgba(72,187,120,0.45), 0 0 8px rgba(72,187,120,0.18) !important;
-}
-.model-health-strip .mh-stat:nth-child(3):hover .mh-value {
-  text-shadow: 0 0 36px rgba(72,187,120,0.65), 0 0 14px rgba(72,187,120,0.3) !important;
-}
-.model-health-strip .mh-stat:nth-child(5) .mh-value {
-  text-shadow: 0 0 24px rgba(86,195,255,0.45), 0 0 8px rgba(86,195,255,0.18) !important;
-}
-.model-health-strip .mh-stat:nth-child(5):hover .mh-value {
-  text-shadow: 0 0 36px rgba(86,195,255,0.65), 0 0 14px rgba(86,195,255,0.3) !important;
-}
 
-/* ─── Labels: gold tracking (matching header label style) ─── */
+/* ─── Labels: gold color + tracking (matching title labels) ─── */
 .mh-label {
+  color: rgba(248,198,74,0.7) !important;
   letter-spacing: 0.14em !important;
-  text-shadow: 0 0 8px rgba(255,255,255,0.05) !important;
+  text-shadow: 0 0 10px rgba(248,198,74,0.12) !important;
 }
 .mh-stat:hover .mh-label {
-  color: var(--text) !important;
-  text-shadow: 0 0 10px rgba(248,198,74,0.15) !important;
+  color: rgba(248,198,74,0.85) !important;
+  text-shadow: 0 0 14px rgba(248,198,74,0.25) !important;
 }
 
-/* ─── Trend text: brighten on hover ─── */
-.mh-stat:hover .mh-trend {
-  color: var(--text) !important;
-  text-shadow: 0 0 8px rgba(255,255,255,0.06) !important;
+/* ─── Trend/desc text: neutral with gold hover ─── */
+.mh-stat .mh-trend,
+.mh-stat .mh-desc {
+  color: var(--text-dim, rgba(255,255,255,0.5)) !important;
+}
+.mh-stat:hover .mh-trend,
+.mh-stat:hover .mh-desc {
+  color: rgba(248,198,74,0.6) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.1) !important;
 }
 
 /* ─── Dividers: gold-cyan gradient (matching header spine colors) ─── */
@@ -6279,28 +6259,18 @@ html { scroll-behavior: smooth; }
   text-shadow: 0 0 6px rgba(248,198,74,0.1) !important;
 }
 
-/* ─── Section headers: direction-tinted with animated accent line ─── */
+/* ─── Section headers: gold accent (matching SLATE CHECK title style) ─── */
 .movement-summary-section-header {
-  border-top: 1px solid rgba(255,255,255,0.05) !important;
+  border-top: 1px solid rgba(248,198,74,0.1) !important;
   padding: 10px 0 5px !important;
-}
-.movement-summary-section-header.rise {
-  text-shadow: 0 0 14px rgba(0,232,122,0.4) !important;
-}
-.movement-summary-section-header.drop {
-  text-shadow: 0 0 14px rgba(255,58,96,0.35) !important;
+  color: rgba(248,198,74,0.85) !important;
+  text-shadow: 0 0 14px rgba(248,198,74,0.25) !important;
+  letter-spacing: 0.12em !important;
 }
 .movement-summary-section-header::after {
   height: 1px !important;
-  box-shadow: 0 0 6px rgba(255,255,255,0.04) !important;
-}
-.movement-summary-section-header.rise::after {
-  background: linear-gradient(90deg, rgba(0,232,122,0.3), rgba(0,232,122,0.08), transparent) !important;
-  box-shadow: 0 0 8px rgba(0,232,122,0.1) !important;
-}
-.movement-summary-section-header.drop::after {
-  background: linear-gradient(90deg, rgba(255,58,96,0.25), rgba(255,58,96,0.06), transparent) !important;
-  box-shadow: 0 0 8px rgba(255,58,96,0.08) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.25), rgba(248,198,74,0.08), transparent) !important;
+  box-shadow: 0 0 6px rgba(248,198,74,0.06) !important;
 }
 
 /* ─── Section count badges: gold glass pill (direction via text color only) ─── */
@@ -6320,43 +6290,59 @@ html { scroll-behavior: smooth; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(248,198,74,0.04) !important;
 }
 
-/* ─── Rows: direction atmosphere on hover ─── */
+/* ─── Rows: gold hover atmosphere (matching Slate Check hover) ─── */
 .movement-summary-row {
-  border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.04) !important;
   border-radius: 4px !important;
   transition: all 0.15s ease !important;
+  color: var(--text-dim, rgba(255,255,255,0.6)) !important;
 }
-.movement-summary-row:has(.movement-summary-delta.rise):hover {
-  background: rgba(0,232,122,0.04) !important;
-  box-shadow: inset 3px 0 0 rgba(0,232,122,0.6) !important;
-}
-.movement-summary-row:has(.movement-summary-delta.drop):hover {
-  background: rgba(255,58,96,0.04) !important;
-  box-shadow: inset 3px 0 0 rgba(255,58,96,0.55) !important;
+.movement-summary-row:hover {
+  background: rgba(248,198,74,0.03) !important;
+  box-shadow: inset 3px 0 0 rgba(248,198,74,0.4) !important;
+  color: var(--text, rgba(255,255,255,0.87)) !important;
 }
 
-/* ─── Fighter name: gold neon on hover ─── */
+/* ─── Fighter name: neutral at rest, gold neon on hover ─── */
+.movement-summary-fighter {
+  color: var(--text-dim, rgba(255,255,255,0.6)) !important;
+  transition: all 0.15s ease !important;
+}
 .movement-summary-row:hover .movement-summary-fighter {
-  text-shadow: 0 0 10px rgba(248,198,74,0.25) !important;
+  color: rgba(248,198,74,0.9) !important;
+  text-shadow: 0 0 12px rgba(248,198,74,0.3) !important;
 }
 
-/* ─── Delta values: stronger neon ─── */
-.movement-summary-delta.rise {
-  text-shadow: 0 0 12px rgba(0,232,122,0.45) !important;
+/* ─── Line values: gold neon accented ─── */
+.movement-summary-line {
+  color: var(--text-dim, rgba(255,255,255,0.55)) !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.08) !important;
 }
-.movement-summary-delta.drop {
-  text-shadow: 0 0 12px rgba(255,58,96,0.4) !important;
+.movement-summary-row:hover .movement-summary-line {
+  color: rgba(248,198,74,0.8) !important;
+  text-shadow: 0 0 10px rgba(248,198,74,0.2) !important;
 }
 
-/* ─── Sparklines: direction-colored glow ─── */
-.movement-summary-row:has(.movement-summary-delta.rise) .movement-summary-spark {
-  filter: drop-shadow(0 0 4px rgba(0,232,122,0.25)) !important;
+/* ─── Delta values: gold neon (direction via color only, not glow) ─── */
+.movement-summary-delta {
+  text-shadow: 0 0 10px rgba(248,198,74,0.2) !important;
 }
-.movement-summary-row:has(.movement-summary-delta.drop) .movement-summary-spark {
-  filter: drop-shadow(0 0 4px rgba(255,58,96,0.2)) !important;
+.movement-summary-row:hover .movement-summary-delta {
+  text-shadow: 0 0 14px rgba(248,198,74,0.4) !important;
 }
+
+/* ─── Stat badge: gold accent on hover ─── */
+.movement-summary-stat {
+  color: var(--text-dim, rgba(255,255,255,0.45)) !important;
+  transition: all 0.15s ease !important;
+}
+.movement-summary-row:hover .movement-summary-stat {
+  color: rgba(248,198,74,0.7) !important;
+}
+
+/* ─── Sparklines: gold glow on hover ─── */
 .movement-summary-row:hover .movement-summary-spark {
-  filter: drop-shadow(0 0 6px rgba(248,198,74,0.3)) !important;
+  filter: drop-shadow(0 0 5px rgba(248,198,74,0.25)) !important;
 }
 
 /* ─── RLM tags: gold glass base with directional text ─── */
@@ -6393,19 +6379,7 @@ html { scroll-behavior: smooth; }
   color: rgba(248,198,74,0.9) !important;
 }
 
-/* ─── Line range: hover brighten ─── */
-.movement-summary-row:hover .movement-summary-line {
-  color: var(--text) !important;
-  text-shadow: 0 0 4px rgba(255,255,255,0.05);
-}
-
-/* ─── Stat type badge: subtle glass ─── */
-.movement-summary-stat {
-  transition: color 0.15s ease !important;
-}
-.movement-summary-row:hover .movement-summary-stat {
-  color: var(--text) !important;
-}
+/* (Line range + stat badge hover now in unified rows block above) */
 
 
 /* ── GLOW-UP 107: Fighter Cards — cinematic glass, lean atmosphere, stat neon, spine depth, badge shimmer ── */
