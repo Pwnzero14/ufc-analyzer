@@ -5771,6 +5771,161 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 110: Learning Drilldown — gold-accent cohesion, matching dashboard glass system ── */
+/* Replaces cyan/teal identity with gold-primary accent to match header, slate check,
+   fighter cards, and line movers. Same glass formula (white-gradient + var(--bg2)),
+   same hover pattern (translateY + box-shadow), gold spine, gold border rail. */
+
+/* ─── Keyframes ─── */
+@keyframes g110-icon-spark {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(248,198,74,0.5)); transform: translateY(0); }
+  50% { filter: drop-shadow(0 0 14px rgba(248,198,74,0.9)) drop-shadow(0 0 4px rgba(44,212,208,0.3)); transform: translateY(-2px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEARNING DIAGNOSTICS STRIP — gold glass, matching slate check
+   ═══════════════════════════════════════════════════════════════ */
+.learning-diagnostics-strip {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.008) 100%) var(--bg2) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+  border-left: 3px solid rgba(248,198,74,0.45) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 32px rgba(0,0,0,0.4),
+    0 0 20px rgba(248,198,74,0.04) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  transition: all 0.2s ease !important;
+}
+.learning-diagnostics-strip:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 12px 40px rgba(0,0,0,0.5),
+    0 0 1px rgba(255,255,255,0.06),
+    0 0 24px rgba(248,198,74,0.06) !important;
+  transform: translateY(-1px) !important;
+}
+/* Gold radial wash (replaces cyan) */
+.learning-diagnostics-strip::after {
+  background: radial-gradient(ellipse at 100% 30%, rgba(248,198,74,0.06), transparent 65%) !important;
+}
+
+/* ─── Lightning icon: gold spark ─── */
+.ld-drilldown-icon {
+  filter: drop-shadow(0 0 8px rgba(248,198,74,0.6)) !important;
+  animation: g110-icon-spark 3s ease-in-out infinite !important;
+}
+
+/* ─── Title: gold text-shadow (NOT gradient+clip — avoids filter conflict) ─── */
+.ld-drilldown-title {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  -webkit-text-fill-color: rgba(248,198,74,0.95) !important;
+  filter: none !important;
+  text-shadow: 0 0 20px rgba(248,198,74,0.3), 0 0 6px rgba(248,198,74,0.12) !important;
+}
+
+/* ─── Subtitle text: neutral (matching dashboard body text) ─── */
+.ld-drilldown-content {
+  color: var(--text-dim, rgba(255,255,255,0.55)) !important;
+}
+.learning-diagnostics-strip:hover .ld-drilldown-content {
+  color: var(--text, rgba(255,255,255,0.87)) !important;
+}
+
+/* ─── Footer: gold divider line (matching slate check pattern) ─── */
+.ld-footer {
+  border-top: 1px solid rgba(248,198,74,0.12) !important;
+}
+.ld-footer::before {
+  background: linear-gradient(90deg, transparent, rgba(248,198,74,0.2), rgba(44,212,208,0.12), transparent) !important;
+}
+
+/* ─── Footer summary: subtle gold glow ─── */
+.ld-footer-summary {
+  text-shadow: 0 0 8px rgba(248,198,74,0.1) !important;
+}
+
+/* ─── Details toggle: gold glass pill (matching platform pills) ─── */
+.ld-details-toggle {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)) !important;
+  border: 1px solid rgba(248,198,74,0.2) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(248,198,74,0.06) !important;
+  color: rgba(248,198,74,0.85) !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.12) !important;
+  transition: all 0.2s ease !important;
+}
+.ld-details-toggle:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)) !important;
+  border-color: rgba(248,198,74,0.4) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.25), 0 0 14px rgba(248,198,74,0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ─── Stat cards: same holographic glass as model health cards ─── */
+.ld-stat {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.04),
+    rgba(255,255,255,0.01)) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-color: rgba(248,198,74,0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 2px 8px rgba(0,0,0,0.2) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  transition: all 0.2s ease !important;
+}
+.ld-stat:hover {
+  border-color: rgba(248,198,74,0.25) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 8px 24px rgba(0,0,0,0.3),
+    0 0 16px rgba(248,198,74,0.06) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ─── Stat values: gold neon (matching hit-rate card) ─── */
+.ld-value {
+  text-shadow: 0 0 20px rgba(248,198,74,0.4), 0 0 6px rgba(248,198,74,0.15) !important;
+}
+.ld-stat:hover .ld-value {
+  text-shadow: 0 0 28px rgba(248,198,74,0.6), 0 0 10px rgba(248,198,74,0.25) !important;
+}
+
+/* ─── Stat labels: gold glow on hover ─── */
+.ld-stat:hover .ld-label {
+  color: var(--text) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.12) !important;
+}
+
+/* ─── Dividers: gold-cyan gradient (matching model health dividers) ─── */
+.ld-divider {
+  background: linear-gradient(180deg,
+    transparent 5%,
+    rgba(248,198,74,0.25) 30%,
+    rgba(44,212,208,0.18) 60%,
+    transparent 95%) !important;
+  box-shadow: 0 0 4px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Meta text: neutral, not cyan ─── */
+.ld-meta,
+.ld-meta-extra {
+  color: var(--text-dim, rgba(255,255,255,0.5)) !important;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .ld-drilldown-icon { animation: none !important; }
+}
+
+
 /* ── GLOW-UP 109 v3: Slate Check + Model Health — cohesive with header/fighter/line-mover glass system ── */
 /* Design DNA: same glass formula as fighter cards (white-gradient + var(--bg2)),
    gold as primary accent (matching header spine), per-identity neon on values only,
