@@ -6074,8 +6074,16 @@ function orderFightersByCard(fighters: AnalyzerFighter[]): AnalyzerFighter[] {
   const ordered: AnalyzerFighter[] = [];
   const used = new Set<AnalyzerFighter>();
   for (const cp of upcomingCardPairs) {
-    const f1 = findFighter(cp.f1);
-    const f2 = findFighter(cp.f2);
+    let f1 = findFighter(cp.f1);
+    let f2 = findFighter(cp.f2);
+    // Ensure favorite (negative ML) is always first (left side)
+    if (f1 && f2) {
+      const ml1 = f1.moneyline ?? resolveMoneylineFromMap(f1.name);
+      const ml2 = f2.moneyline ?? resolveMoneylineFromMap(f2.name);
+      if (ml1 != null && ml2 != null && ml1 > 0 && ml2 < 0) {
+        [f1, f2] = [f2, f1];
+      }
+    }
     if (f1 && !used.has(f1)) { ordered.push(f1); used.add(f1); }
     if (f2 && !used.has(f2)) { ordered.push(f2); used.add(f2); }
   }
@@ -13490,6 +13498,13 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const leanSuffix = lean._label || '';
   const leanText  = lean.lean === 'over' ? `▲ OVER${leanSuffix}` : lean.lean === 'under' ? `▼ UNDER${leanSuffix}` : lean.lean === 'push' ? '~ PUSH' : db.loaded ? '—' : '⟳';
   const leanRGB = lean.lean === 'over' ? '0,232,122' : lean.lean === 'under' ? '255,58,96' : lean.lean === 'push' ? '240,192,64' : '50,58,88';
+  const ownMl = f.moneyline ?? resolveMoneylineFromMap(f.name);
+  const _roleOppName = f.opponent || '';
+  const oppMl = _roleOppName ? (resolveMoneylineFromMap(_roleOppName) ?? allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(_roleOppName) || ''))?.moneyline ?? null) : null;
+  const isDog = ownMl != null && oppMl != null
+    ? (ownMl > oppMl)
+    : isMoneylineUnderdog(f);
+  const roleRGB = isDog ? '255,138,61' : '44,212,208';
   const rawConfPct = lean.conf || 0;
   const clvBoost = rawConfPct > 0 ? getClvBoost(f, lean) : null;
   const confPct = clvBoost
@@ -13498,7 +13513,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const recalConf = confPct > 0 ? getRecalibratedConfidence(confPct, lean._source) : null;
   const displayConf = recalConf != null ? recalConf : confPct;
   const leanGradStyle = lean.lean !== 'none' && displayConf > 0
-    ? `background:linear-gradient(90deg,rgba(${leanRGB},0.22) ${displayConf}%,rgba(${leanRGB},0.05) ${displayConf}%);`
+    ? `background:linear-gradient(90deg,rgba(${roleRGB},0.18) ${displayConf}%,rgba(${roleRGB},0.04) ${displayConf}%);`
     : '';
   const gradeLetter = displayConf > 0 ? getConfidenceGrade(displayConf) : '';
   const displayGrade = gradeLetter ? ` ${gradeLetter}` : '';
@@ -14514,9 +14529,9 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     </div>`;
 
   const row = document.createElement('div') as HTMLDivElement;
-  const rowLeanClass = lean.lean === 'over' ? ' lean-over-row' : lean.lean === 'under' ? ' lean-under-row' : '';
+  const rowRoleClass = isDog ? ' role-dog' : ' role-fav';
   const rowConfTier = displayConf >= 72 ? ' conf-tier-high' : displayConf >= 58 ? ' conf-tier-med' : displayConf > 0 ? ' conf-tier-low' : '';
-  row.className = 'fighter-row' + rowLeanClass + rowConfTier;
+  row.className = 'fighter-row' + rowRoleClass + rowConfTier;
   row.dataset['name'] = f.name;
   row.innerHTML = `
     <div class="fighter-main">
@@ -14597,7 +14612,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
       <div class="lean-cell">
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
-        ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgb(${leanRGB}); color: rgb(${leanRGB});"></div></div>` : ''}
+        ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgb(${roleRGB}); color: rgb(${roleRGB});"></div></div>` : ''}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
         ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b" title="Rival models disagree with the main lean — ${String(lean.rivalryDissent).replace(/"/g, '&quot;')}">⚔ Rival models dissent</div>` : ''}
@@ -14870,6 +14885,12 @@ function renderH2HModal(a: AnalyzerFighter, b: AnalyzerFighter): void {
   const modal = document.getElementById('h2hModal');
   const content = document.getElementById('h2hContent');
   if (!modal || !content) return;
+
+  const mlA = a.moneyline ?? resolveMoneylineFromMap(a.name);
+  const mlB = b.moneyline ?? resolveMoneylineFromMap(b.name);
+  if (mlA != null && mlB != null && mlA > mlB) {
+    [a, b] = [b, a];
+  }
 
   const da = a.db || {} as FighterDB;
   const db2 = b.db || {} as FighterDB;

@@ -427,10 +427,10 @@ body {
 }
 .fighter-row:hover { background: var(--bg3); border-color: var(--border2); }
 .fighter-row.expanded { border-left-color: var(--gold); border-color: var(--border2); }
-.fighter-row.lean-over-row  { border-left-color: rgba(0,232,122,0.5); }
-.fighter-row.lean-under-row { border-left-color: rgba(255,58,96,0.5); }
-.fighter-row.lean-over-row.expanded  { border-left-color: var(--green); }
-.fighter-row.lean-under-row.expanded { border-left-color: var(--red); }
+.fighter-row.role-fav  { border-left-color: rgba(44,212,208,0.5); }
+.fighter-row.role-dog  { border-left-color: rgba(255,138,61,0.5); }
+.fighter-row.role-fav.expanded  { border-left-color: var(--cyan); }
+.fighter-row.role-dog.expanded  { border-left-color: var(--orange); }
 
 .fighter-main {
   display: grid;
@@ -5771,6 +5771,120 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 111: Fighter Card Backgrounds — gold-accent atmosphere, role identity preserved ── */
+/* Background tint and hover glow shift from cyan/orange to gold for visual cohesion
+   with header, slate check, model health, line movers. Border-left, avatars, and
+   fighter names keep cyan(fav)/orange(dog) for role identity. */
+
+/* ─── Fighter row: gold-accented glass (same formula as slate check / line movers) ─── */
+.fighter-row:not(.expanded) {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.008) 100%) var(--bg2) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 4px 16px rgba(0,0,0,0.3),
+    0 0 18px rgba(248,198,74,0.03) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.fighter-row:not(.expanded):hover {
+  border-color: rgba(248,198,74,0.20) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 8px 28px rgba(0,0,0,0.4),
+    0 0 20px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Role rows: keep role border-left, gold on remaining borders ─── */
+.fighter-row.role-fav:not(.expanded) {
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  border-left: 3px solid rgba(44,212,208,0.55) !important;
+}
+.fighter-row.role-dog:not(.expanded) {
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  border-left: 3px solid rgba(255,138,61,0.55) !important;
+}
+.fighter-row.role-fav:not(.expanded):hover {
+  border-color: rgba(248,198,74,0.20) !important;
+  border-left-color: rgba(44,212,208,0.75) !important;
+}
+.fighter-row.role-dog:not(.expanded):hover {
+  border-color: rgba(248,198,74,0.20) !important;
+  border-left-color: rgba(255,138,61,0.75) !important;
+}
+
+/* ─── Fighter card (inner): gold glass atmosphere ─── */
+.fighter-row.role-fav .fighter-card,
+.fighter-row.role-dog .fighter-card {
+  background: linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(0,0,0,0.22),
+    0 0 0 1px rgba(248,198,74,0.06) !important;
+}
+.fighter-row.role-fav .fighter-card:hover,
+.fighter-row.role-dog .fighter-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 28px rgba(0,0,0,0.30),
+    0 0 24px rgba(248,198,74,0.08),
+    0 0 0 1px rgba(248,198,74,0.12) !important;
+}
+
+/* ─── Expanded state: gold glow (role border-left preserved by specificity) ─── */
+.fighter-row.expanded {
+  border-color: rgba(248,198,74,0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 18px 48px rgba(0,0,0,0.5),
+    0 0 36px rgba(248,198,74,0.08) !important;
+}
+.fighter-row.role-fav.expanded {
+  border-left-color: var(--cyan) !important;
+}
+.fighter-row.role-dog.expanded {
+  border-left-color: var(--orange) !important;
+}
+
+/* ─── Stat card hover: gold glow ─── */
+.role-fav .stat-card:hover,
+.role-dog .stat-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── FP stat card: gold accent (matching model health gold) ─── */
+.fighter-row > .fighter-main .stat-card-fp {
+  background: rgba(248,198,74,0.08) !important;
+  border-color: rgba(248,198,74,0.35) !important;
+  box-shadow: inset 0 1px 0 rgba(248,198,74,0.08), 0 2px 6px rgba(0,0,0,0.15) !important;
+}
+.fighter-row:hover > .fighter-main .stat-card-fp {
+  border-color: rgba(248,198,74,0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(248,198,74,0.10), 0 4px 14px rgba(0,0,0,0.3), 0 0 8px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Delta blocks: gold glow ─── */
+.role-fav .stat-delta-block.delta-plus,
+.role-dog .stat-delta-block.delta-plus,
+.role-fav .stat-delta-block.delta-minus,
+.role-dog .stat-delta-block.delta-minus {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Conic-gradient: gold instead of green ─── */
+.fighter-card::before {
+  background: conic-gradient(from 0deg, transparent, rgba(248,198,74,0.08), transparent 60deg, transparent 120deg, rgba(248,198,74,0.08), transparent 180deg, transparent 240deg, rgba(248,198,74,0.08), transparent) !important;
+}
+.fighter-card:hover {
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.3),
+    0 0 60px rgba(248,198,74,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+
+
 /* ── GLOW-UP 110: Learning Drilldown — gold-accent cohesion, matching dashboard glass system ── */
 /* Replaces cyan/teal identity with gold-primary accent to match header, slate check,
    fighter cards, and line movers. Same glass formula (white-gradient + var(--bg2)),
@@ -6402,22 +6516,22 @@ html { scroll-behavior: smooth; }
   transform: translateY(-1px);
 }
 
-/* ─── Lean-direction atmospheric tint (non-expanded only) ─── */
-.fighter-row.lean-over-row:not(.expanded) {
-  background: linear-gradient(135deg, rgba(0,232,122,0.03), transparent 40%) var(--bg2) !important;
-  border-left: 3px solid rgba(0,232,122,0.55) !important;
+/* ─── Role-based atmospheric tint: cyan fav / orange dog (non-expanded only) ─── */
+.fighter-row.role-fav:not(.expanded) {
+  background: linear-gradient(135deg, rgba(44,212,208,0.03), transparent 40%) var(--bg2) !important;
+  border-left: 3px solid rgba(44,212,208,0.55) !important;
 }
-.fighter-row.lean-under-row:not(.expanded) {
-  background: linear-gradient(135deg, rgba(255,58,96,0.03), transparent 40%) var(--bg2) !important;
-  border-left: 3px solid rgba(255,58,96,0.55) !important;
+.fighter-row.role-dog:not(.expanded) {
+  background: linear-gradient(135deg, rgba(255,138,61,0.03), transparent 40%) var(--bg2) !important;
+  border-left: 3px solid rgba(255,138,61,0.55) !important;
 }
-.fighter-row.lean-over-row:not(.expanded):hover {
-  background: linear-gradient(135deg, rgba(0,232,122,0.05), transparent 45%) var(--bg3) !important;
-  border-left-color: rgba(0,232,122,0.75) !important;
+.fighter-row.role-fav:not(.expanded):hover {
+  background: linear-gradient(135deg, rgba(44,212,208,0.05), transparent 45%) var(--bg3) !important;
+  border-left-color: rgba(44,212,208,0.75) !important;
 }
-.fighter-row.lean-under-row:not(.expanded):hover {
-  background: linear-gradient(135deg, rgba(255,58,96,0.05), transparent 45%) var(--bg3) !important;
-  border-left-color: rgba(255,58,96,0.75) !important;
+.fighter-row.role-dog:not(.expanded):hover {
+  background: linear-gradient(135deg, rgba(255,138,61,0.05), transparent 45%) var(--bg3) !important;
+  border-left-color: rgba(255,138,61,0.75) !important;
 }
 
 /* ─── Fighter avatar: cinematic glow ring ─── */
@@ -6428,17 +6542,17 @@ html { scroll-behavior: smooth; }
 .fighter-row:hover .fighter-avatar {
   box-shadow: 0 0 16px rgba(255,255,255,0.1), 0 0 6px rgba(255,255,255,0.05) !important;
 }
-.fighter-row.lean-over-row .fighter-avatar {
-  box-shadow: 0 0 12px rgba(0,232,122,0.15), 0 0 4px rgba(0,232,122,0.08) !important;
+.fighter-row.role-fav .fighter-avatar {
+  box-shadow: 0 0 12px rgba(44,212,208,0.15), 0 0 4px rgba(44,212,208,0.08) !important;
 }
-.fighter-row.lean-under-row .fighter-avatar {
-  box-shadow: 0 0 12px rgba(255,58,96,0.15), 0 0 4px rgba(255,58,96,0.08) !important;
+.fighter-row.role-dog .fighter-avatar {
+  box-shadow: 0 0 12px rgba(255,138,61,0.15), 0 0 4px rgba(255,138,61,0.08) !important;
 }
-.fighter-row.lean-over-row:hover .fighter-avatar {
-  box-shadow: 0 0 18px rgba(0,232,122,0.25), 0 0 6px rgba(0,232,122,0.12) !important;
+.fighter-row.role-fav:hover .fighter-avatar {
+  box-shadow: 0 0 18px rgba(44,212,208,0.25), 0 0 6px rgba(44,212,208,0.12) !important;
 }
-.fighter-row.lean-under-row:hover .fighter-avatar {
-  box-shadow: 0 0 18px rgba(255,58,96,0.25), 0 0 6px rgba(255,58,96,0.12) !important;
+.fighter-row.role-dog:hover .fighter-avatar {
+  box-shadow: 0 0 18px rgba(255,138,61,0.25), 0 0 6px rgba(255,138,61,0.12) !important;
 }
 
 /* ─── Fighter name: hover glow ─── */
@@ -6612,9 +6726,9 @@ html { scroll-behavior: smooth; }
 .fighter-row:hover .form-dot.win  { box-shadow: 0 0 10px rgba(0,232,122,0.5) !important; }
 .fighter-row:hover .form-dot.loss { box-shadow: 0 0 10px rgba(255,58,96,0.45) !important; }
 
-/* ─── Expand arrow: lean-colored on hover ─── */
-.fighter-row.lean-over-row:hover .expand-arrow  { color: rgba(0,232,122,0.7) !important; }
-.fighter-row.lean-under-row:hover .expand-arrow { color: rgba(255,58,96,0.7) !important; }
+/* ─── Expand arrow: role-colored on hover ─── */
+.fighter-row.role-fav:hover .expand-arrow  { color: rgba(44,212,208,0.7) !important; }
+.fighter-row.role-dog:hover .expand-arrow { color: rgba(255,138,61,0.7) !important; }
 .fighter-row.expanded .expand-arrow { filter: drop-shadow(0 0 4px currentColor) !important; }
 
 /* ─── Delta values: neon boost ─── */
@@ -9529,43 +9643,43 @@ html { scroll-behavior: smooth; }
 }
 
 /* ─ Confidence-tiered left border coloring ─ */
-.fighter-row.lean-over-row.conf-tier-high  { border-left-color: #1bdc88; }
-.fighter-row.lean-over-row.conf-tier-med   { border-left-color: rgba(0,232,122,0.5); }
-.fighter-row.lean-over-row.conf-tier-low   { border-left-color: rgba(0,232,122,0.25); }
-.fighter-row.lean-under-row.conf-tier-high { border-left-color: #ff6c88; }
-.fighter-row.lean-under-row.conf-tier-med  { border-left-color: rgba(255,58,96,0.5); }
-.fighter-row.lean-under-row.conf-tier-low  { border-left-color: rgba(255,58,96,0.25); }
+.fighter-row.role-fav.conf-tier-high  { border-left-color: #2cd4d0; }
+.fighter-row.role-fav.conf-tier-med   { border-left-color: rgba(44,212,208,0.5); }
+.fighter-row.role-fav.conf-tier-low   { border-left-color: rgba(44,212,208,0.25); }
+.fighter-row.role-dog.conf-tier-high { border-left-color: #ff9a4d; }
+.fighter-row.role-dog.conf-tier-med  { border-left-color: rgba(255,138,61,0.5); }
+.fighter-row.role-dog.conf-tier-low  { border-left-color: rgba(255,138,61,0.25); }
 
-/* ─ Expanded state: lean-colored glow ─ */
-.fighter-row.lean-over-row.expanded {
-  border-left-color: var(--green);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(0,232,122,0.06);
+/* ─ Expanded state: role-colored glow ─ */
+.fighter-row.role-fav.expanded {
+  border-left-color: var(--cyan);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(44,212,208,0.06);
 }
-.fighter-row.lean-under-row.expanded {
-  border-left-color: var(--red);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(255,58,96,0.06);
+.fighter-row.role-dog.expanded {
+  border-left-color: var(--orange);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 48px rgba(0,0,0,0.5), 0 0 32px rgba(255,138,61,0.06);
 }
 
-/* ─ Avatar: lean-colored ring on hover (scoped to .fighter-main) ─ */
-.fighter-row.lean-over-row:hover > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(0,232,122,0.4), 0 0 0 3px rgba(0,232,122,0.12), 0 4px 12px rgba(0,0,0,0.5);
+/* ─ Avatar: role-colored ring on hover (scoped to .fighter-main) ─ */
+.fighter-row.role-fav:hover > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(44,212,208,0.4), 0 0 0 3px rgba(44,212,208,0.12), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fighter-row.lean-under-row:hover > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(255,58,96,0.4), 0 0 0 3px rgba(255,58,96,0.12), 0 4px 12px rgba(0,0,0,0.5);
+.fighter-row.role-dog:hover > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,138,61,0.4), 0 0 0 3px rgba(255,138,61,0.12), 0 4px 12px rgba(0,0,0,0.5);
 }
 /* High-confidence avatar ring at rest */
-.fighter-row.lean-over-row.conf-tier-high > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(0,232,122,0.35), 0 0 0 2.5px rgba(0,232,122,0.1), 0 3px 8px rgba(0,0,0,0.4);
+.fighter-row.role-fav.conf-tier-high > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(44,212,208,0.35), 0 0 0 2.5px rgba(44,212,208,0.1), 0 3px 8px rgba(0,0,0,0.4);
 }
-.fighter-row.lean-under-row.conf-tier-high > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(255,58,96,0.35), 0 0 0 2.5px rgba(255,58,96,0.1), 0 3px 8px rgba(0,0,0,0.4);
+.fighter-row.role-dog.conf-tier-high > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,138,61,0.35), 0 0 0 2.5px rgba(255,138,61,0.1), 0 3px 8px rgba(0,0,0,0.4);
 }
 /* Expanded avatar glow */
-.fighter-row.lean-over-row.expanded > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(0,232,122,0.5), 0 0 0 3px rgba(0,232,122,0.18), 0 0 12px rgba(0,232,122,0.15), 0 4px 12px rgba(0,0,0,0.5);
+.fighter-row.role-fav.expanded > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(44,212,208,0.5), 0 0 0 3px rgba(44,212,208,0.18), 0 0 12px rgba(44,212,208,0.15), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fighter-row.lean-under-row.expanded > .fighter-main .fighter-avatar {
-  box-shadow: 0 0 0 1px rgba(255,58,96,0.5), 0 0 0 3px rgba(255,58,96,0.18), 0 0 12px rgba(255,58,96,0.15), 0 4px 12px rgba(0,0,0,0.5);
+.fighter-row.role-dog.expanded > .fighter-main .fighter-avatar {
+  box-shadow: 0 0 0 1px rgba(255,138,61,0.5), 0 0 0 3px rgba(255,138,61,0.18), 0 0 12px rgba(255,138,61,0.15), 0 4px 12px rgba(0,0,0,0.5);
 }
 
 /* ─ Stat card elevation + hover (scoped to .fighter-main) ─ */
@@ -9594,11 +9708,11 @@ html { scroll-behavior: smooth; }
 .fighter-row:hover > .fighter-main .stat-card-num {
   text-shadow: 0 0 12px rgba(244,247,255,0.15);
 }
-.fighter-row.lean-over-row:hover > .fighter-main .stat-delta-block.delta-plus .stat-delta-val {
-  text-shadow: 0 0 10px rgba(0,232,122,0.3);
+.fighter-row.role-fav:hover > .fighter-main .stat-delta-block.delta-plus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(44,212,208,0.3);
 }
-.fighter-row.lean-under-row:hover > .fighter-main .stat-delta-block.delta-minus .stat-delta-val {
-  text-shadow: 0 0 10px rgba(255,58,96,0.3);
+.fighter-row.role-dog:hover > .fighter-main .stat-delta-block.delta-minus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(255,138,61,0.3);
 }
 
 /* ─ Line cell hover refinement (scoped to .fighter-main) ─ */
@@ -9618,11 +9732,11 @@ html { scroll-behavior: smooth; }
 .fighter-row:hover > .fighter-main .fighter-name {
   text-shadow: 0 0 14px rgba(244,247,255,0.12);
 }
-.fighter-row.lean-over-row.conf-tier-high:hover > .fighter-main .fighter-name {
-  text-shadow: 0 0 16px rgba(0,232,122,0.18);
+.fighter-row.role-fav.conf-tier-high:hover > .fighter-main .fighter-name {
+  text-shadow: 0 0 16px rgba(44,212,208,0.18);
 }
-.fighter-row.lean-under-row.conf-tier-high:hover > .fighter-main .fighter-name {
-  text-shadow: 0 0 16px rgba(255,58,96,0.18);
+.fighter-row.role-dog.conf-tier-high:hover > .fighter-main .fighter-name {
+  text-shadow: 0 0 16px rgba(255,138,61,0.18);
 }
 
 /* ─ Lean badge glow intensification on hover (scoped to .fighter-main) ─ */
@@ -10161,18 +10275,18 @@ html { scroll-behavior: smooth; }
 
 
 /* ── GLOW-UP 22: Fighter card header strip ── */
-/* Avatar ring takes the lean color (gold ring stays for push / no-lean rows) */
-.fighter-row.lean-over-row .fighter-avatar {
-  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(0,232,122,0.35), 0 3px 8px rgba(0,0,0,0.4);
+/* Avatar ring takes the role color (cyan fav / orange dog) */
+.fighter-row.role-fav .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(44,212,208,0.35), 0 3px 8px rgba(0,0,0,0.4);
 }
-.fighter-row.lean-over-row:hover .fighter-avatar {
-  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(0,232,122,0.6), 0 4px 12px rgba(0,0,0,0.5);
+.fighter-row.role-fav:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(44,212,208,0.6), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fighter-row.lean-under-row .fighter-avatar {
-  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(255,58,96,0.33), 0 3px 8px rgba(0,0,0,0.4);
+.fighter-row.role-dog .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border2), 0 0 0 2.5px rgba(255,138,61,0.33), 0 3px 8px rgba(0,0,0,0.4);
 }
-.fighter-row.lean-under-row:hover .fighter-avatar {
-  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(255,58,96,0.58), 0 4px 12px rgba(0,0,0,0.5);
+.fighter-row.role-dog:hover .fighter-avatar {
+  box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(255,138,61,0.58), 0 4px 12px rgba(0,0,0,0.5);
 }
 
 /* Stat cards: tactile hover + gradient hero number on Proj FP */
@@ -14149,11 +14263,11 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 .fighter-row:hover .fighter-name {
   text-shadow: 0 0 10px rgba(255,255,255,0.12);
 }
-.fighter-row.lean-over-row:hover .fighter-name {
-  text-shadow: 0 0 10px rgba(0,232,122,0.20);
+.fighter-row.role-fav:hover .fighter-name {
+  text-shadow: 0 0 10px rgba(44,212,208,0.20);
 }
-.fighter-row.lean-under-row:hover .fighter-name {
-  text-shadow: 0 0 10px rgba(255,58,96,0.18);
+.fighter-row.role-dog:hover .fighter-name {
+  text-shadow: 0 0 10px rgba(255,138,61,0.18);
 }
 
 /* --- Fighter record: subtle brighten on hover --- */
@@ -20498,61 +20612,61 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 
 /* ── GLOW-UP 79: Lean Over & Under — Homo Sapiens Sapiens (final evolution) ── */
 
-/* === Fighter card: lean-scoped depth + colored left accent === */
-.fighter-row.lean-over-row .fighter-card {
-  border-left: 3px solid rgba(0,232,122,0.30);
-  background: linear-gradient(90deg, rgba(0,232,122,0.03), transparent 25%),
+/* === Fighter card: role-scoped depth + colored left accent === */
+.fighter-row.role-fav .fighter-card {
+  border-left: 3px solid rgba(44,212,208,0.30);
+  background: linear-gradient(90deg, rgba(44,212,208,0.03), transparent 25%),
               linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
     0 4px 16px rgba(0,0,0,0.22),
-    0 0 0 1px rgba(0,232,122,0.06);
+    0 0 0 1px rgba(44,212,208,0.06);
 }
-.fighter-row.lean-under-row .fighter-card {
-  border-left: 3px solid rgba(255,58,96,0.30);
-  background: linear-gradient(90deg, rgba(255,58,96,0.03), transparent 25%),
+.fighter-row.role-dog .fighter-card {
+  border-left: 3px solid rgba(255,138,61,0.30);
+  background: linear-gradient(90deg, rgba(255,138,61,0.03), transparent 25%),
               linear-gradient(170deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
     0 4px 16px rgba(0,0,0,0.22),
-    0 0 0 1px rgba(255,58,96,0.06);
+    0 0 0 1px rgba(255,138,61,0.06);
 }
 
-/* Card hover: lean-colored outer glow */
-.fighter-row.lean-over-row .fighter-card:hover {
-  border-left-color: rgba(0,232,122,0.50);
+/* Card hover: role-colored outer glow */
+.fighter-row.role-fav .fighter-card:hover {
+  border-left-color: rgba(44,212,208,0.50);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 28px rgba(0,0,0,0.30),
-    0 0 24px rgba(0,232,122,0.08),
-    0 0 0 1px rgba(0,232,122,0.12);
+    0 0 24px rgba(44,212,208,0.08),
+    0 0 0 1px rgba(44,212,208,0.12);
 }
-.fighter-row.lean-under-row .fighter-card:hover {
-  border-left-color: rgba(255,58,96,0.50);
+.fighter-row.role-dog .fighter-card:hover {
+  border-left-color: rgba(255,138,61,0.50);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 28px rgba(0,0,0,0.30),
-    0 0 24px rgba(255,58,96,0.08),
-    0 0 0 1px rgba(255,58,96,0.12);
+    0 0 24px rgba(255,138,61,0.08),
+    0 0 0 1px rgba(255,138,61,0.12);
 }
 
 /* Tame the 3D hover — keep subtle lift, drop the rotateX */
-.fighter-row.lean-over-row .fighter-card:hover,
-.fighter-row.lean-under-row .fighter-card:hover {
+.fighter-row.role-fav .fighter-card:hover,
+.fighter-row.role-dog .fighter-card:hover {
   transform: translateY(-3px) scale(1.005);
 }
 
-/* === Fighter name: lean-colored glow instead of generic shimmer === */
-.fighter-row.lean-over-row .fighter-name {
-  background: linear-gradient(90deg, var(--text), rgba(0,232,122,0.65), var(--text));
+/* === Fighter name: role-colored glow instead of generic shimmer === */
+.fighter-row.role-fav .fighter-name {
+  background: linear-gradient(90deg, var(--text), rgba(44,212,208,0.65), var(--text));
   background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: textShimmer 6s ease-in-out infinite;
 }
-.fighter-row.lean-under-row .fighter-name {
-  background: linear-gradient(90deg, var(--text), rgba(255,120,148,0.65), var(--text));
+.fighter-row.role-dog .fighter-name {
+  background: linear-gradient(90deg, var(--text), rgba(255,168,100,0.65), var(--text));
   background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -20560,33 +20674,33 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   animation: textShimmer 6s ease-in-out infinite;
 }
 
-/* === Avatar: enhanced lean-colored rings === */
-.fighter-row.lean-over-row .fighter-avatar {
+/* === Avatar: enhanced role-colored rings === */
+.fighter-row.role-fav .fighter-avatar {
   box-shadow:
-    0 0 0 1.5px rgba(0,232,122,0.12),
-    0 0 0 3px rgba(0,232,122,0.35),
-    0 0 12px rgba(0,232,122,0.12),
+    0 0 0 1.5px rgba(44,212,208,0.12),
+    0 0 0 3px rgba(44,212,208,0.35),
+    0 0 12px rgba(44,212,208,0.12),
     0 3px 8px rgba(0,0,0,0.40);
 }
-.fighter-row.lean-over-row:hover .fighter-avatar {
+.fighter-row.role-fav:hover .fighter-avatar {
   box-shadow:
-    0 0 0 1.5px rgba(0,232,122,0.20),
-    0 0 0 3px rgba(0,232,122,0.55),
-    0 0 18px rgba(0,232,122,0.20),
+    0 0 0 1.5px rgba(44,212,208,0.20),
+    0 0 0 3px rgba(44,212,208,0.55),
+    0 0 18px rgba(44,212,208,0.20),
     0 4px 12px rgba(0,0,0,0.50);
 }
-.fighter-row.lean-under-row .fighter-avatar {
+.fighter-row.role-dog .fighter-avatar {
   box-shadow:
-    0 0 0 1.5px rgba(255,58,96,0.12),
-    0 0 0 3px rgba(255,58,96,0.33),
-    0 0 12px rgba(255,58,96,0.10),
+    0 0 0 1.5px rgba(255,138,61,0.12),
+    0 0 0 3px rgba(255,138,61,0.33),
+    0 0 12px rgba(255,138,61,0.10),
     0 3px 8px rgba(0,0,0,0.40);
 }
-.fighter-row.lean-under-row:hover .fighter-avatar {
+.fighter-row.role-dog:hover .fighter-avatar {
   box-shadow:
-    0 0 0 1.5px rgba(255,58,96,0.20),
-    0 0 0 3px rgba(255,58,96,0.55),
-    0 0 18px rgba(255,58,96,0.18),
+    0 0 0 1.5px rgba(255,138,61,0.20),
+    0 0 0 3px rgba(255,138,61,0.55),
+    0 0 18px rgba(255,138,61,0.18),
     0 4px 12px rgba(0,0,0,0.50);
 }
 
@@ -20628,8 +20742,8 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 }
 
 /* === Line cells: glass pill evolution === */
-.lean-over-row .line-cell,
-.lean-under-row .line-cell {
+.role-fav .line-cell,
+.role-dog .line-cell {
   background: linear-gradient(155deg, rgba(255,255,255,0.04), rgba(0,0,0,0.03));
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -20637,42 +20751,42 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 6px rgba(0,0,0,0.15);
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.lean-over-row .line-cell:hover,
-.lean-under-row .line-cell:hover {
+.role-fav .line-cell:hover,
+.role-dog .line-cell:hover {
   transform: translateY(-2px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.25);
 }
 
 /* Line value: refined typography */
-.lean-over-row .line-value,
-.lean-under-row .line-value {
+.role-fav .line-value,
+.role-dog .line-value {
   font-weight: 800;
   font-size: 18px;
 }
 
-/* === Stat cards: deeper glass + lean glow hover === */
-.lean-over-row .stat-card,
-.lean-under-row .stat-card {
+/* === Stat cards: deeper glass + role glow hover === */
+.role-fav .stat-card,
+.role-dog .stat-card {
   border-radius: 8px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 12px rgba(0,0,0,0.20);
 }
-.lean-over-row .stat-card:hover {
-  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(0,232,122,0.06);
+.role-fav .stat-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(44,212,208,0.06);
 }
-.lean-under-row .stat-card:hover {
-  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(255,58,96,0.06);
+.role-dog .stat-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28), 0 0 12px rgba(255,138,61,0.06);
 }
 
 /* Stat card hero number: larger + glow */
-.lean-over-row .stat-card-num,
-.lean-under-row .stat-card-num {
+.role-fav .stat-card-num,
+.role-dog .stat-card-num {
   font-size: 20px;
   font-weight: 900;
 }
 
 /* === Consistency badge: refined === */
-.lean-over-row .consistency-badge,
-.lean-under-row .consistency-badge {
+.role-fav .consistency-badge,
+.role-dog .consistency-badge {
   font-weight: 800;
   letter-spacing: 0.06em;
   backdrop-filter: blur(4px);
@@ -20680,43 +20794,43 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 }
 
 /* === Row dividers: cleaner separation === */
-.lean-over-row .fighter-card,
-.lean-under-row .fighter-card {
+.role-fav .fighter-card,
+.role-dog .fighter-card {
   border-radius: 10px;
   margin-bottom: 3px;
 }
 
 /* === Fighter record: refined typography === */
-.lean-over-row .fighter-record,
-.lean-under-row .fighter-record {
+.role-fav .fighter-record,
+.role-dog .fighter-record {
   letter-spacing: 0.04em;
 }
 
 /* === Style tags: glass pills === */
-.lean-over-row .fighter-style-tag,
-.lean-under-row .fighter-style-tag {
+.role-fav .fighter-style-tag,
+.role-dog .fighter-style-tag {
   backdrop-filter: blur(4px);
   border-radius: 4px;
   font-weight: 700;
 }
 
 /* === Delta blocks in stat cards: refined === */
-.lean-over-row .stat-delta-block,
-.lean-under-row .stat-delta-block {
+.role-fav .stat-delta-block,
+.role-dog .stat-delta-block {
   border-radius: 6px;
 }
-.lean-over-row .stat-delta-block.delta-plus {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(0,232,122,0.06);
+.role-fav .stat-delta-block.delta-plus {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(44,212,208,0.06);
 }
-.lean-under-row .stat-delta-block.delta-minus {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(255,58,96,0.06);
+.role-dog .stat-delta-block.delta-minus {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 10px rgba(255,138,61,0.06);
 }
 
-/* === Lean sheen: faster + lean-colored === */
-.lean-over-row:hover .lean-badge.lean-over::after {
+/* === Lean sheen: faster + lean-colored (kept green/red for lean badges) === */
+.role-fav:hover .lean-badge.lean-over::after {
   background: linear-gradient(105deg, transparent, rgba(0,232,122,0.20), transparent);
 }
-.lean-under-row:hover .lean-badge.lean-under::after {
+.role-dog:hover .lean-badge.lean-under::after {
   background: linear-gradient(105deg, transparent, rgba(255,58,96,0.18), transparent);
 }
 
