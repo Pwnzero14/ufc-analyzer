@@ -5771,6 +5771,188 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 112: Line Shopping Diff — gold-accent glass cohesion ── */
+/* Modal container, title, headers, borders, close button → gold accent family.
+   Data colors (green best / red worst / orange spread) kept for semantics. */
+
+/* ─── Modal container: gold-accented glass ─── */
+.lineshop-modal-box {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.008) 100%) var(--bg2) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 24px 80px rgba(0,0,0,0.7),
+    0 0 24px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(12px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
+}
+
+/* ─── Gold accent spine at top (matching slate check / line movers) ─── */
+.lineshop-modal-box::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 10% !important; right: 10% !important;
+  height: 2px !important;
+  background: linear-gradient(90deg,
+    transparent 15%,
+    rgba(248,198,74,0.6) 35%,
+    rgba(44,212,208,0.35) 55%,
+    rgba(248,198,74,0.4) 75%,
+    transparent 90%) !important;
+  background-size: 200% 100% !important;
+  animation: g109-spine-sweep 6s linear infinite !important;
+  box-shadow: 0 0 14px rgba(248,198,74,0.25), 0 0 6px rgba(44,212,208,0.1) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* ─── Title: gold text + glow ─── */
+.lineshop-modal-box .modal-title {
+  color: rgba(248,198,74,0.95) !important;
+  text-shadow: 0 0 20px rgba(248,198,74,0.3), 0 0 6px rgba(248,198,74,0.12) !important;
+  letter-spacing: 0.10em !important;
+}
+
+/* ─── Subtitle: neutral dim, gold on hover ─── */
+.lineshop-modal-box .modal-sub {
+  color: var(--text-dim, rgba(255,255,255,0.55)) !important;
+}
+
+/* ─── Close button: gold glass pill ─── */
+.lineshop-modal-box .modal-close-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)) !important;
+  border: 1px solid rgba(248,198,74,0.2) !important;
+  color: rgba(248,198,74,0.85) !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.12) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(248,198,74,0.06) !important;
+  transition: all 0.2s ease !important;
+}
+.lineshop-modal-box .modal-close-btn:hover {
+  border-color: rgba(248,198,74,0.4) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.25), 0 0 14px rgba(248,198,74,0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ─── Legend: gold-tinted glass strip ─── */
+.lineshop-modal-box .lineshop-legend {
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), transparent 60%) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* ─── Platform bias bar: gold border accent ─── */
+.lineshop-modal-box .modal-head {
+  border-bottom: 1px solid rgba(248,198,74,0.10) !important;
+  padding-bottom: 6px !important;
+}
+
+/* ─── Table header: gold accents ─── */
+.lineshop-modal-box .lineshop-table th {
+  color: rgba(248,198,74,0.7) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.15) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.08) !important;
+}
+
+/* ─── Table rows: gold-tinted separators + hover ─── */
+.lineshop-modal-box .lineshop-table td {
+  border-bottom: 1px solid rgba(248,198,74,0.04) !important;
+}
+.lineshop-modal-box .lineshop-table tr:hover td {
+  background: rgba(248,198,74,0.03) !important;
+}
+.lineshop-modal-box .lineshop-table tr:nth-child(even) td {
+  background: rgba(248,198,74,0.015) !important;
+}
+.lineshop-modal-box .lineshop-table tr:nth-child(even):hover td {
+  background: rgba(248,198,74,0.04) !important;
+}
+
+/* ─── Fighter name: subtle gold shimmer ─── */
+.lineshop-modal-box .lineshop-fighter-name {
+  color: rgba(255,255,255,0.92) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.06) !important;
+}
+.lineshop-modal-box .lineshop-fighter-name small {
+  color: rgba(255,255,255,0.45) !important;
+}
+
+/* ─── Spread chips: gold glass (keep orange for high-spread semantic) ─── */
+.lineshop-modal-box .ls-spread-chip {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 10px !important;
+}
+
+/* ─── Best/worst line value cells: keep green/red semantics, add glass depth ─── */
+.lineshop-modal-box .ls-best {
+  box-shadow: inset 0 1px 0 rgba(72,199,142,0.08), 0 1px 4px rgba(0,0,0,0.15) !important;
+  border-radius: 4px !important;
+}
+.lineshop-modal-box .ls-worst {
+  box-shadow: inset 0 1px 0 rgba(255,100,100,0.08), 0 1px 4px rgba(0,0,0,0.15) !important;
+  border-radius: 4px !important;
+}
+
+/* ─── Neutral line values: gold instead of dull gray ─── */
+.lineshop-modal-box .ls-neutral {
+  color: rgba(248,198,74,0.8) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.1) !important;
+}
+
+/* ─── Platform tags above values: gold ─── */
+.lineshop-modal-box .ls-plat-tag {
+  color: rgba(248,198,74,0.55) !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Empty dashes: dimmer gold ─── */
+.lineshop-modal-box .ls-empty {
+  color: rgba(248,198,74,0.2) !important;
+}
+
+/* ─── Legend text labels: gold ─── */
+.lineshop-modal-box .lineshop-legend-item {
+  color: rgba(248,198,74,0.7) !important;
+  text-shadow: 0 0 6px rgba(248,198,74,0.06) !important;
+}
+
+/* ─── Legend explanation text: subtle gold ─── */
+.lineshop-modal-box .lineshop-legend > span:last-child {
+  color: rgba(248,198,74,0.4) !important;
+}
+
+/* ─── Spread chips: gold family ─── */
+.lineshop-modal-box .ls-spread-med {
+  background: rgba(248,198,74,0.10) !important;
+  color: rgba(248,198,74,0.8) !important;
+  border: 1px solid rgba(248,198,74,0.15) !important;
+}
+.lineshop-modal-box .ls-spread-low {
+  color: rgba(248,198,74,0.35) !important;
+}
+.lineshop-modal-box .ls-spread-high {
+  background: rgba(248,198,74,0.18) !important;
+  color: rgba(248,198,74,0.95) !important;
+  border: 1px solid rgba(248,198,74,0.25) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.2) !important;
+}
+
+/* ─── Lean chips: keep green/red data color, add glass ─── */
+.lineshop-modal-box .ls-lean-chip {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
+}
+
+
 /* ── GLOW-UP 111: Fighter Card Backgrounds — gold-accent atmosphere, role identity preserved ── */
 /* Background tint and hover glow shift from cyan/orange to gold for visual cohesion
    with header, slate check, model health, line movers. Border-left, avatars, and

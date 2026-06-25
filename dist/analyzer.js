@@ -12891,14 +12891,14 @@ function generateLineShopModal() {
       <span class="lineshop-legend-item"><span class="ls-lean-chip ls-lean-under">▼ UNDER 68%</span></span>
       <span style="color:var(--text4);font-size:10px">OVER = lowest line is best · UNDER = highest line is best · no lean = green/red by value</span>
     </div>
-    ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--cyan)">
-      <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-right:4px;align-self:center">Platform Bias</span>
+    ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:linear-gradient(135deg,rgba(248,198,74,0.05),rgba(248,198,74,0.01));border-radius:6px;border-left:3px solid rgba(248,198,74,0.45);border:1px solid rgba(248,198,74,0.10);border-left:3px solid rgba(248,198,74,0.45);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),0 2px 8px rgba(0,0,0,0.15)">
+      <span style="font-size:9px;color:rgba(248,198,74,0.75);text-transform:uppercase;letter-spacing:0.10em;margin-right:4px;align-self:center;text-shadow:0 0 8px rgba(248,198,74,0.1)">Platform Bias</span>
       ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 8).map(b => {
         const plat = PLAT_LABEL_MAP[b.platform] || b.platform.toUpperCase();
         const st = b.propType === 'FightTime' ? 'FT' : b.propType === 'Fantasy' ? 'FP' : b.propType === 'Fantasy_PP' ? 'FP·PP' : b.propType;
         const col = b.avgEdge > 0 ? 'var(--green)' : 'var(--red)';
         const dir = b.avgEdge > 0 ? 'soft OVER' : 'soft UNDER';
-        return `<span style="font-size:10px;padding:3px 7px;border-radius:4px;background:var(--surface)" title="${plat} ${st}: avg edge ${b.avgEdge > 0 ? '+' : ''}${b.avgEdge} (${dir}) · n=${b.total}"><span style="color:var(--text-muted)">${plat}</span> <span style="font-weight:700">${st}</span> <span style="color:${col};font-weight:700">${b.avgEdge > 0 ? '+' : ''}${b.avgEdge}</span></span>`;
+        return `<span style="font-size:10px;padding:3px 7px;border-radius:4px;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border:1px solid rgba(248,198,74,0.12);backdrop-filter:blur(4px)" title="${plat} ${st}: avg edge ${b.avgEdge > 0 ? '+' : ''}${b.avgEdge} (${dir}) · n=${b.total}"><span style="color:rgba(248,198,74,0.65)">${plat}</span> <span style="font-weight:700">${st}</span> <span style="color:${col};font-weight:700">${b.avgEdge > 0 ? '+' : ''}${b.avgEdge}</span></span>`;
     }).join('')}
     </div>` : ''}
     <table class="lineshop-table">
