@@ -18602,6 +18602,102 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   color: rgba(255,248,230,0.50) !important;
 }
 
+/* ── GLOW-UP 119: Platform Bias — gold-accent glass cohesion ── */
+/* Placed AFTER GLOW-UP 118 so cascade wins. Semantic data colors preserved. */
+
+/* Container: gold glass */
+.best-picks-section[data-section-id="bias"] {
+  --text: rgba(255,250,235,0.90) !important;
+  --text-muted: rgba(255,248,230,0.50) !important;
+  --text3: rgba(225,215,195,0.65) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
+  border: 1px solid rgba(248,198,74,0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(248,198,74,0.06),
+    inset 0 0 30px rgba(248,198,74,0.02),
+    0 8px 32px rgba(0,0,0,0.30),
+    0 0 40px rgba(248,198,74,0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+/* Header: gold glass + gold title gradient */
+.best-picks-section[data-section-id="bias"] > .best-picks-header {
+  background: linear-gradient(180deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.12) !important;
+}
+.best-picks-section[data-section-id="bias"] > .best-picks-header .best-picks-title {
+  background: linear-gradient(135deg, #f8c64a 0%, #ffdd70 35%, #f0a030 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(248,198,74,0.35)) !important;
+}
+.best-picks-section[data-section-id="bias"] > .best-picks-header::before {
+  background: linear-gradient(180deg, #f8c64a 0%, rgba(248,198,74,0.3) 100%) !important;
+  box-shadow: 0 0 8px rgba(248,198,74,0.4) !important;
+}
+.best-picks-section[data-section-id="bias"] .section-chevron {
+  color: rgba(248,198,74,0.45) !important;
+}
+.best-picks-section[data-section-id="bias"]:hover .section-chevron {
+  color: rgba(248,198,74,0.8) !important;
+}
+/* Platform summary chips: gold glass */
+.best-picks-section[data-section-id="bias"] span[style*="background:var(--surface2)"] {
+  background: rgba(248,198,74,0.05) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  border-radius: 6px !important;
+}
+/* Bias chart container: gold glass */
+.best-picks-section[data-section-id="bias"] div[style*="background:var(--surface2);border-radius:6px"] {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* Bias chart bar tracks: gold glass */
+.best-picks-section[data-section-id="bias"] div[style*="background:var(--surface2);border-radius:2px"] {
+  background: rgba(248,198,74,0.06) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+}
+/* Sort header row: warm cream */
+.best-picks-section[data-section-id="bias"] span[data-bias-sort] {
+  color: rgba(255,248,230,0.50) !important;
+}
+.best-picks-section[data-section-id="bias"] span[data-bias-sort][style*="color:var(--text)"] {
+  color: rgba(255,250,235,0.85) !important;
+}
+/* Bias rows: gold-tinted glass */
+.best-picks-section[data-section-id="bias"] .bias-row {
+  background: linear-gradient(135deg, rgba(248,198,74,0.03), rgba(248,198,74,0.01)) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+  border-radius: 8px !important;
+  border-bottom: 1px solid rgba(248,198,74,0.06) !important;
+  margin-bottom: 3px !important;
+}
+.best-picks-section[data-section-id="bias"] .bias-row:hover {
+  background: rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.15) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20), 0 0 10px rgba(248,198,74,0.06) !important;
+}
+/* Platform badge: gold glass */
+.best-picks-section[data-section-id="bias"] .bias-platform {
+  background: rgba(248,198,74,0.08) !important;
+  border: 1px solid rgba(248,198,74,0.15) !important;
+  color: rgba(255,248,230,0.80) !important;
+}
+/* Prop name: warm cream */
+.best-picks-section[data-section-id="bias"] .bias-prop {
+  color: rgba(255,250,235,0.88) !important;
+}
+/* Sub text: warm cream muted */
+.best-picks-section[data-section-id="bias"] .bias-sub {
+  color: rgba(255,248,230,0.45) !important;
+}
+/* Bias bar track: gold glass */
+.best-picks-section[data-section-id="bias"] .bias-bar {
+  background: rgba(248,198,74,0.06) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
