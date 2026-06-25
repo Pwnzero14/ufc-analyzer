@@ -5771,6 +5771,262 @@ html { scroll-behavior: smooth; }
 .parlay-leg-row:hover .parlay-leg-dir.under { text-shadow: 0 0 8px rgba(255,108,136,0.5); }
 
 
+/* ── GLOW-UP 107: Fighter Cards — cinematic glass, lean atmosphere, stat neon, spine depth, badge shimmer ── */
+/* Fighter row glass depth with lean-direction tinting, avatar cinematic rings,
+   stat card neon numbers, lean badge glow, confidence meter luminance, line cell
+   glass, fight spine atmospheric depth, fight badge shimmer, hover elevation. */
+
+/* ─── Fighter row: glass depth + inner highlight (non-expanded only) ─── */
+.fighter-row:not(.expanded) {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005)) var(--bg2) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(0,0,0,0.3) !important;
+}
+.fighter-row:not(.expanded):hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 28px rgba(0,0,0,0.4),
+    0 0 1px rgba(255,255,255,0.08) !important;
+  transform: translateY(-1px);
+}
+
+/* ─── Lean-direction atmospheric tint (non-expanded only) ─── */
+.fighter-row.lean-over-row:not(.expanded) {
+  background: linear-gradient(135deg, rgba(0,232,122,0.03), transparent 40%) var(--bg2) !important;
+  border-left: 3px solid rgba(0,232,122,0.55) !important;
+}
+.fighter-row.lean-under-row:not(.expanded) {
+  background: linear-gradient(135deg, rgba(255,58,96,0.03), transparent 40%) var(--bg2) !important;
+  border-left: 3px solid rgba(255,58,96,0.55) !important;
+}
+.fighter-row.lean-over-row:not(.expanded):hover {
+  background: linear-gradient(135deg, rgba(0,232,122,0.05), transparent 45%) var(--bg3) !important;
+  border-left-color: rgba(0,232,122,0.75) !important;
+}
+.fighter-row.lean-under-row:not(.expanded):hover {
+  background: linear-gradient(135deg, rgba(255,58,96,0.05), transparent 45%) var(--bg3) !important;
+  border-left-color: rgba(255,58,96,0.75) !important;
+}
+
+/* ─── Fighter avatar: cinematic glow ring ─── */
+.fighter-avatar {
+  box-shadow: 0 0 12px rgba(255,255,255,0.06), 0 0 4px rgba(255,255,255,0.03) !important;
+  transition: all 0.25s ease !important;
+}
+.fighter-row:hover .fighter-avatar {
+  box-shadow: 0 0 16px rgba(255,255,255,0.1), 0 0 6px rgba(255,255,255,0.05) !important;
+}
+.fighter-row.lean-over-row .fighter-avatar {
+  box-shadow: 0 0 12px rgba(0,232,122,0.15), 0 0 4px rgba(0,232,122,0.08) !important;
+}
+.fighter-row.lean-under-row .fighter-avatar {
+  box-shadow: 0 0 12px rgba(255,58,96,0.15), 0 0 4px rgba(255,58,96,0.08) !important;
+}
+.fighter-row.lean-over-row:hover .fighter-avatar {
+  box-shadow: 0 0 18px rgba(0,232,122,0.25), 0 0 6px rgba(0,232,122,0.12) !important;
+}
+.fighter-row.lean-under-row:hover .fighter-avatar {
+  box-shadow: 0 0 18px rgba(255,58,96,0.25), 0 0 6px rgba(255,58,96,0.12) !important;
+}
+
+/* ─── Fighter name: hover glow ─── */
+.fighter-row:hover .fighter-name {
+  text-shadow: 0 0 12px rgba(255,255,255,0.08) !important;
+}
+
+/* ─── Stat cards: glass depth + stat-colored atmosphere ─── */
+.stat-card {
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.2) !important;
+  transition: all 0.2s ease !important;
+}
+.stat-card-fp {
+  background: rgba(44,212,208,0.08) !important;
+  border-color: rgba(44,212,208,0.35) !important;
+  box-shadow: inset 0 1px 0 rgba(44,212,208,0.08), 0 2px 8px rgba(0,0,0,0.2) !important;
+}
+.stat-card-ss {
+  background: rgba(255,255,255,0.03) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.2) !important;
+}
+.fighter-row:hover .stat-card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+/* ─── Stat numbers: neon glow by stat type ─── */
+.stat-card-fp .stat-card-num {
+  text-shadow: 0 0 10px rgba(44,212,208,0.25) !important;
+}
+.stat-card-ss .stat-card-num {
+  text-shadow: 0 0 10px rgba(255,255,255,0.1) !important;
+}
+.fighter-row:hover .stat-card-fp .stat-card-num {
+  text-shadow: 0 0 16px rgba(44,212,208,0.4) !important;
+}
+.fighter-row:hover .stat-card-ss .stat-card-num {
+  text-shadow: 0 0 16px rgba(255,255,255,0.15) !important;
+}
+
+/* ─── Line cells: platform-colored glass ─── */
+.line-cell {
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+  transition: all 0.15s ease !important;
+}
+.line-cell.fp {
+  box-shadow: inset 0 1px 0 rgba(86,195,255,0.06), 0 0 6px rgba(86,195,255,0.06) !important;
+}
+.line-cell.ss {
+  box-shadow: inset 0 1px 0 rgba(44,212,208,0.08), 0 0 6px rgba(44,212,208,0.06) !important;
+}
+.line-cell.ft {
+  box-shadow: inset 0 1px 0 rgba(146,125,255,0.06), 0 0 6px rgba(146,125,255,0.06) !important;
+}
+.fighter-row:hover .line-cell {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* ─── Line values: neon on hover ─── */
+.fighter-row:hover .line-value.p6   { text-shadow: 0 0 8px rgba(86,195,255,0.3); }
+.fighter-row:hover .line-value.ud   { text-shadow: 0 0 8px rgba(168,120,255,0.3); }
+.fighter-row:hover .line-value.betr { text-shadow: 0 0 8px rgba(255,138,61,0.3); }
+.fighter-row:hover .line-value.pp   { text-shadow: 0 0 8px rgba(44,212,208,0.3); }
+
+/* ─── Lean badge: neon glass treatment ─── */
+.lean-badge {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  transition: all 0.2s ease !important;
+}
+.lean-over {
+  box-shadow: 0 0 14px rgba(0,232,122,0.2), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  text-shadow: 0 0 8px rgba(0,232,122,0.3) !important;
+}
+.lean-under {
+  box-shadow: 0 0 14px rgba(255,58,96,0.2), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  text-shadow: 0 0 8px rgba(255,58,96,0.3) !important;
+}
+.lean-push {
+  box-shadow: 0 0 12px rgba(240,192,64,0.15), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+.fighter-row:hover .lean-over {
+  box-shadow: 0 0 20px rgba(0,232,122,0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+.fighter-row:hover .lean-under {
+  box-shadow: 0 0 20px rgba(255,58,96,0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+
+/* ─── Confidence meter: luminance bar ─── */
+.confidence-meter {
+  background: rgba(255,255,255,0.05) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3) !important;
+}
+.confidence-fill {
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor !important;
+}
+
+/* ─── Fight spine: atmospheric glass center ─── */
+.fight-spine {
+  background: rgba(255,255,255,0.02) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.25) !important;
+}
+.fight-spine-rounds {
+  box-shadow: 0 0 10px rgba(240,192,64,0.15) !important;
+  text-shadow: 0 0 6px rgba(240,192,64,0.25) !important;
+}
+.fight-spine-ft {
+  box-shadow: inset 0 1px 0 rgba(146,125,255,0.1), 0 0 8px rgba(146,125,255,0.08) !important;
+}
+.fight-spine-ft-value {
+  text-shadow: 0 0 8px rgba(146,125,255,0.3) !important;
+}
+.fight-spine-corr {
+  box-shadow: 0 0 8px rgba(255,90,115,0.12) !important;
+}
+.fight-spine-top-edge {
+  box-shadow: 0 0 12px rgba(255,210,74,0.2) !important;
+  text-shadow: 0 0 6px rgba(255,210,74,0.2) !important;
+}
+
+/* ─── Fight badges: glass + shimmer ─── */
+.fight-badge {
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+.fight-badge.main {
+  box-shadow: 0 0 16px rgba(240,192,64,0.22), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+  text-shadow: 0 0 8px rgba(240,192,64,0.3) !important;
+}
+.fight-badge.co {
+  box-shadow: 0 0 14px rgba(77,176,255,0.18), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  text-shadow: 0 0 6px rgba(77,176,255,0.25) !important;
+}
+.fight-badge.card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 8px rgba(0,0,0,0.25) !important;
+}
+
+/* ─── Fight group lines: stronger glow ─── */
+.fgh-main .fight-group-line {
+  box-shadow: 0 0 12px rgba(248,198,74,0.25), 0 0 4px rgba(248,198,74,0.15) !important;
+}
+.fgh-co .fight-group-line {
+  box-shadow: 0 0 12px rgba(77,176,255,0.22), 0 0 4px rgba(77,176,255,0.12) !important;
+}
+
+/* ─── Main event spotlight: premium atmospheric glow ─── */
+.fgh-main + .fight-pair .fighter-row {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 12px 40px rgba(0,0,0,0.5),
+    0 0 32px rgba(248,198,74,0.08) !important;
+}
+.fgh-main + .fight-pair .fighter-row:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.09),
+    0 16px 48px rgba(0,0,0,0.55),
+    0 0 40px rgba(248,198,74,0.12) !important;
+}
+
+/* ─── Form dots: brighter glow ─── */
+.form-dot.win  { box-shadow: 0 0 5px rgba(0,232,122,0.35) !important; }
+.form-dot.loss { box-shadow: 0 0 5px rgba(255,58,96,0.3) !important; }
+.fighter-row:hover .form-dot.win  { box-shadow: 0 0 10px rgba(0,232,122,0.5) !important; }
+.fighter-row:hover .form-dot.loss { box-shadow: 0 0 10px rgba(255,58,96,0.45) !important; }
+
+/* ─── Expand arrow: lean-colored on hover ─── */
+.fighter-row.lean-over-row:hover .expand-arrow  { color: rgba(0,232,122,0.7) !important; }
+.fighter-row.lean-under-row:hover .expand-arrow { color: rgba(255,58,96,0.7) !important; }
+.fighter-row.expanded .expand-arrow { filter: drop-shadow(0 0 4px currentColor) !important; }
+
+/* ─── Delta values: neon boost ─── */
+.stat-delta-block.delta-plus .stat-delta-val {
+  text-shadow: 0 0 6px rgba(0,232,122,0.2) !important;
+}
+.stat-delta-block.delta-minus .stat-delta-val {
+  text-shadow: 0 0 6px rgba(255,58,96,0.2) !important;
+}
+.fighter-row:hover .stat-delta-block.delta-plus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(0,232,122,0.35) !important;
+}
+.fighter-row:hover .stat-delta-block.delta-minus .stat-delta-val {
+  text-shadow: 0 0 10px rgba(255,58,96,0.35) !important;
+}
+
+/* ─── BEST label: gold glow ─── */
+.best-shop-badge {
+  text-shadow: 0 0 6px rgba(240,192,64,0.3) !important;
+  box-shadow: 0 0 8px rgba(240,192,64,0.12) !important;
+}
+
+
 /* ── GLOW-UP 105: Command Center V3 — animated spine sweep, logo shimmer, status LED pulse, focus ring, tab underline beam ── */
 /* Traveling light across accent spine, logo text shimmer animation, live/pill dot
    pulse, search bar focus glow ring, active tab gold underline beam, header atmospheric
@@ -21373,4 +21629,3 @@ div[style*="Per-Stat Calibration"] div[style*="border-radius:50%"]:hover {
 <script type="module" src="dist/analyzer.js"></script>
 </body>
 </html>
-                                                                                                                                                                       

@@ -13041,23 +13041,6 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const bestTD = calcBestShop(tdCandidates, f.lean_td?.lean ?? null);
     const bestFT = calcBestShop(ftCandidates, f.lean_ft?.lean ?? null);
     const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
-    // Worst-line: the least favorable line for the lean direction (opposite of best)
-    function calcWorstShop(candidates, leanDir) {
-        const visible = candidates.filter(c => c.value != null && showSource(c.source));
-        if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none')
-            return null;
-        const vals = visible.map(c => c.value);
-        if (Math.max(...vals) - Math.min(...vals) < 0.5)
-            return null;
-        const worst = leanDir === 'over'
-            ? visible.reduce((w, c) => c.value > w.value ? c : w)
-            : visible.reduce((w, c) => c.value < w.value ? c : w);
-        return worst.source;
-    }
-    const worstSS = calcWorstShop(ssCandidates, f.lean_ss?.lean ?? null);
-    const worstTD = calcWorstShop(tdCandidates, f.lean_td?.lean ?? null);
-    const worstFT = calcWorstShop(ftCandidates, f.lean_ft?.lean ?? null);
-    const worstCTRL = calcWorstShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
     const lineCell = (source, stat, value) => {
         if (!showSource(source))
             return '';
@@ -13071,19 +13054,12 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const openDeltaRaw = (openVal != null) ? parseFloat((value - openVal).toFixed(1)) : null;
         const openDelta = sanitizeDelta(stat, openDeltaRaw);
         const movementHtml = (openDelta != null && Math.abs(openDelta) >= 0.5)
-            ? `<div class="line-movement ${openDelta > 0 ? 'mv-up' : 'mv-down'}" title="${openVal != null ? `Was: ${openVal}` : ''}"><span class="mv-arrow">${openDelta > 0 ? '▲' : '▼'}</span>${Math.abs(openDelta)}</div>`
-            : '';
-        const flashClass = (openDelta != null && Math.abs(openDelta) >= 0.5)
-            ? (openDelta > 0 ? ' line-flash-up' : ' line-flash-down')
+            ? `<div class="line-movement ${openDelta > 0 ? 'mv-up' : 'mv-down'}" title="${openVal != null ? `Was: ${openVal}` : ''}">${openDelta > 0 ? '▲' : '▼'}${Math.abs(openDelta)}</div>`
             : '';
         const isBest = (stat === 'ss' && bestSS === source) ||
             (stat === 'td' && bestTD === source) ||
             (stat === 'ft' && bestFT === source) ||
             (stat === 'ctrl' && bestCTRL === source);
-        const isWorst = !isBest && ((stat === 'ss' && worstSS === source) ||
-            (stat === 'td' && worstTD === source) ||
-            (stat === 'ft' && worstFT === source) ||
-            (stat === 'ctrl' && worstCTRL === source));
         const leanDir = stat === 'ss' ? f.lean_ss?.lean
             : stat === 'td' ? f.lean_td?.lean
                 : stat === 'ft' ? f.lean_ft?.lean
@@ -13092,8 +13068,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const bestBadge = isBest
             ? `<div class="best-shop-badge" title="Best line for ${leanDir?.toUpperCase()} on ${sourceLabel}: ${value} vs other books">best</div>`
             : '';
-        const lineClass = isBest ? ' best-line' : isWorst ? ' worst-line' : '';
-        return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${bestBadge}</div>`;
+        return `<div class="line-cell ${stat} src-${source}${isBest ? ' best-line' : ''}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${bestBadge}</div>`;
     };
     function platformStatLine(entry, stat) {
         if (!entry)
