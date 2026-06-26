@@ -3336,14 +3336,24 @@ async function autoScrapeAllPlatforms(): Promise<any> {
           }
 
           if (count === 0) {
-            const timeoutMs = platform === 'underdog' ? 7000 : 30000;
-            count = await waitForPlatformCapture(
-              platform as keyof typeof store,
-              baselineCount,
-              baselineCapturedAt,
-              timeoutMs,
-              1000,
-            );
+            // The DK moneyline page (fight-odds) has NO fighter props by design — it exists
+            // for odds / bet-handle, and its executeScript already merged the moneylines into
+            // the odds store. Without this skip, count stays 0 and we burn the full 30s
+            // capture timeout waiting for a LINES_CAPTURED that never comes — that single wait
+            // was ~30s of a ~57s scrape (the biggest delay by far).
+            const isDkMoneylinePage = platform === 'draftkings_sportsbook' && /fight-odds/.test(url);
+            if (!isDkMoneylinePage) {
+              // DK prop pages already capture via executeScript (count>0), so this wait is a
+              // rarely-hit fallback; 8s is plenty for the content-script path, vs 30s before.
+              const timeoutMs = platform === 'underdog' ? 7000 : platform === 'draftkings_sportsbook' ? 8000 : 30000;
+              count = await waitForPlatformCapture(
+                platform as keyof typeof store,
+                baselineCount,
+                baselineCapturedAt,
+                timeoutMs,
+                1000,
+              );
+            }
           }
 
           attempts[platform].push({ method: 'tab', url, count });
