@@ -5262,25 +5262,7 @@ body {
 }
 
 
-/* ── GLOW-UP 2: Main-event spotlight ── */
-.fgh-main + .fight-pair { position: relative; }
-.fgh-main + .fight-pair::before {
-  content: ''; position: absolute; inset: -16px -12px; z-index: 0; pointer-events: none;
-  background: radial-gradient(55% 90% at 50% 35%, rgba(248,198,74,0.075), transparent 70%);
-}
-.fgh-main + .fight-pair .fighter-row {
-  border-top-color: rgba(248,198,74,0.30);
-  border-right-color: rgba(248,198,74,0.30);
-  border-bottom-color: rgba(248,198,74,0.30);
-  background: linear-gradient(180deg, rgba(248,198,74,0.05), rgba(248,198,74,0.01) 45%), var(--card);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.45), 0 0 34px rgba(248,198,74,0.08);
-}
-.fgh-main + .fight-pair .fighter-row:hover {
-  border-top-color: rgba(248,198,74,0.5);
-  border-right-color: rgba(248,198,74,0.5);
-  border-bottom-color: rgba(248,198,74,0.5);
-}
-.fgh-main + .fight-pair .fighter-name { font-size: 19px; }
+/* ── GLOW-UP 2: Main-event spotlight — NEUTRALIZED by GLOW-UP 123 ── */
 
 /* ── GLOW-UP 2: Drilldown history bars — gradient + glow ── */
 .history-bar-wrap { background: rgba(13,18,33,0.9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
@@ -5378,10 +5360,7 @@ body::before {
 .fighter-row:hover .fighter-avatar {
   box-shadow: 0 0 0 1px var(--border3), 0 0 0 2.5px rgba(248,198,74,0.45), 0 4px 12px rgba(0,0,0,0.5);
 }
-.fgh-main + .fight-pair .fighter-avatar {
-  width: 42px; height: 42px;
-  box-shadow: 0 0 0 1px rgba(248,198,74,0.45), 0 0 0 3px rgba(248,198,74,0.14), 0 4px 12px rgba(0,0,0,0.55);
-}
+/* .fgh-main avatar size — NEUTRALIZED by GLOW-UP 123 */
 body.compact-view .fighter-avatar { width: 26px; height: 26px; }
 body.compact-view .fighter-avatar-flag { font-size: 12px; }
 
@@ -7058,19 +7037,7 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 0 12px rgba(77,176,255,0.22), 0 0 4px rgba(77,176,255,0.12) !important;
 }
 
-/* ─── Main event spotlight: premium atmospheric glow ─── */
-.fgh-main + .fight-pair .fighter-row {
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    0 12px 40px rgba(0,0,0,0.5),
-    0 0 32px rgba(248,198,74,0.08) !important;
-}
-.fgh-main + .fight-pair .fighter-row:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.09),
-    0 16px 48px rgba(0,0,0,0.55),
-    0 0 40px rgba(248,198,74,0.12) !important;
-}
+/* Main event atmospheric glow — NEUTRALIZED by GLOW-UP 123 */
 
 /* ─── Form dots: brighter glow ─── */
 .form-dot.win  { box-shadow: 0 0 5px rgba(0,232,122,0.35) !important; }
@@ -10174,13 +10141,7 @@ html { scroll-behavior: smooth; }
 .fighter-row:hover .expand-arrow { color: var(--text2); }
 .fighter-row.expanded .expand-arrow { color: var(--gold); }
 
-/* ─ Main event spotlight: premium glow for first fight pair ─ */
-.fgh-main + .fight-pair .fighter-row {
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.45), 0 0 28px rgba(248,198,74,0.06);
-}
-.fgh-main + .fight-pair .fighter-row:not(.expanded):hover {
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 44px rgba(0,0,0,0.5), 0 0 36px rgba(248,198,74,0.1);
-}
+/* Main event premium glow — NEUTRALIZED by GLOW-UP 123 */
 
 
 /* ── GLOW-UP 8: Level 6 — navigation & discoverability ── */
@@ -19275,6 +19236,33 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(248,198,74,0.08) !important;
   box-shadow: inset 0 1px 4px rgba(0,0,0,0.25), inset 0 0 8px rgba(248,198,74,0.03) !important;
 }
+
+/* ── GLOW-UP 123: Main-event unify — match rest-of-card look ── */
+
+/* Tone down the main-event fight-group-line to subtle neutral */
+.fgh-main .fight-group-line {
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent 0%, var(--border2) 30%, var(--border2) 70%, transparent 100%) !important;
+  box-shadow: none !important;
+}
+
+/* Main-event badge: subtle neutral glass (no bold orange glow) */
+.fight-badge.main {
+  background: rgba(255,255,255,0.05) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: none !important;
+}
+.fight-badge.main:hover {
+  box-shadow: 0 0 12px rgba(248,198,74,0.15), 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+/* Kill the radial gold glow behind the main-event pair */
+.fgh-main + .fight-pair::before {
+  display: none !important;
+}
+
+/* Source rules neutralized above — no fighter-row overrides needed */
 
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
