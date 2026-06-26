@@ -2978,7 +2978,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
             await waitForTabLoad(tabId, loadTimeoutMs);
           }
 
-          const settleDelayMs = platform === 'underdog' ? 900 : platform === 'draftkings_sportsbook' ? 2500 : 1500;
+          const settleDelayMs = platform === 'underdog' ? 900 : platform === 'draftkings_sportsbook' ? 1200 : 1500;
           await new Promise((r) => setTimeout(r, settleDelayMs));
 
           let count = 0;
@@ -3019,10 +3019,10 @@ async function autoScrapeAllPlatforms(): Promise<any> {
 
                   for (let i = 0; i < 4; i++) {
                     window.scrollTo(0, document.body.scrollHeight);
-                    await sleep(450);
+                    await sleep(350);
                   }
                   window.scrollTo(0, 0);
-                  await sleep(700);
+                  await sleep(400);
 
                   const pageText = document.body?.innerText || '';
                   const allEls = Array.from(document.querySelectorAll('span, td, div, p, button, li'));
