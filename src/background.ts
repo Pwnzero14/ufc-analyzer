@@ -1578,6 +1578,11 @@ async function handleLinesCaptured(platform: string, data: any): Promise<void> {
     const stored = allStored[platformKey];
     const existing = stored?.fighters || [];
 
+    // An empty scrape must never wipe good data. The PrizePicks board content-script DOM
+    // crawl now returns 0 (the real lines come via the MAIN-world API path in autoScrape),
+    // so its empty LINES_CAPTURED would otherwise clobber the freshly-stored fighters.
+    if (existing.length > 0 && data.fighters.length === 0) return;
+
     // Contamination guard: if a scrape returns fighters with zero overlap against the
     // current UFC card AND we already have data, the capture is from a non-UFC page
     // (e.g. a Pick6 category URL that redirected to the DK Fantasy home). Without this
@@ -3257,6 +3262,76 @@ async function autoScrapeAllPlatforms(): Promise<any> {
               }
             } catch (e) {
               console.warn('[UFC Auto-Scrape] DraftKings direct scrape injection failed:', e);
+            }
+          }
+
+          if (platform === 'prizepicks' && tabId != null) {
+            // PrizePicks put /projections behind DataDome bot protection (~2026-06): a
+            // cookieless background fetch — and even an isolated-world content-script fetch —
+            // gets 403 (geo.captcha-delivery interstitial). DataDome instruments fetch ONLY in
+            // the page's MAIN world, so run the request there via executeScript(world:'MAIN').
+            // The board tab holds the clearance, so the same request returns 200 (~20k
+            // projections, ~185 UFC). Filter to the UFC subset in-page to keep the returned
+            // payload small, then parse with the canonical parser here.
+            try {
+              const [res] = await chrome.scripting.executeScript({
+                target: { tabId },
+                world: 'MAIN',
+                func: async () => {
+                  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+                  const urls = [
+                    'https://api.prizepicks.com/projections?per_page=1000&single_stat=false',
+                    'https://api.prizepicks.com/projections?single_stat=false',
+                  ];
+                  // The board may still be resolving DataDome when this runs — retry on 403.
+                  for (let attempt = 1; attempt <= 6; attempt++) {
+                    let challenged = false;
+                    for (const url of urls) {
+                      try {
+                        const r = await fetch(url, { headers: { accept: 'application/json' } });
+                        if (r.status === 403 || r.status === 429) { challenged = true; break; }
+                        if (!r.ok) continue;
+                        const data: any = await r.json();
+                        const leagues: Record<string, string> = {};
+                        for (const inc of (data.included || [])) {
+                          if (inc && inc.type === 'league') {
+                            leagues[String(inc.id)] = String((inc.attributes && (inc.attributes.name || inc.attributes.display_name || inc.attributes.abbreviation)) || '').toLowerCase();
+                          }
+                        }
+                        const ufcProj = (data.data || []).filter((p: any) => {
+                          const lid = p && p.relationships && p.relationships.league && p.relationships.league.data ? String(p.relationships.league.data.id) : '';
+                          return /\bmma\b|\bufc\b/.test(leagues[lid] || '');
+                        });
+                        if (!ufcProj.length) continue;
+                        const playerIds = new Set<string>();
+                        for (const p of ufcProj) {
+                          const rel = p.relationships || {};
+                          const pid = (rel.new_player && rel.new_player.data && rel.new_player.data.id) || (rel.player && rel.player.data && rel.player.data.id);
+                          if (pid) playerIds.add(String(pid));
+                        }
+                        const included = (data.included || []).filter((i: any) => i && (i.type === 'league' || ((i.type === 'new_player' || i.type === 'player') && playerIds.has(String(i.id)))));
+                        return { status: 200, payload: { data: ufcProj, included } };
+                      } catch { /* network — retry */ }
+                    }
+                    if (challenged && attempt < 6) await sleep(2500);
+                    else if (!challenged) break;
+                  }
+                  return { status: 403, payload: null };
+                },
+              });
+              const out = res?.result as { status: number; payload: any } | undefined;
+              if (out?.status === 200 && out.payload) {
+                const fighters = parsePrizePicksApiFighters(out.payload);
+                console.log(`[UFC Auto-Scrape] prizepicks MAIN-world API: ${out.payload.data?.length || 0} UFC projections -> ${fighters.length} fighters`);
+                if (fighters.length > 0) {
+                  await handleLinesCaptured('prizepicks', { fighters });
+                  count = store.prizepicks?.fighters?.length || fighters.length;
+                }
+              } else {
+                console.warn(`[UFC Auto-Scrape] prizepicks MAIN-world API failed (status=${out?.status ?? 'n/a'}) — DataDome not cleared in time`);
+              }
+            } catch (e) {
+              console.warn('[UFC Auto-Scrape] prizepicks MAIN-world executeScript failed:', e);
             }
           }
 
