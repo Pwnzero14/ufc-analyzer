@@ -19264,6 +19264,72 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 
 /* Source rules neutralized above — no fighter-row overrides needed */
 
+/* ── GLOW-UP 124: Fight Spine — gold-accent glass cohesion ── */
+
+/* Section dividers: warm gold-tinted line */
+.spine-section + .spine-section {
+  border-top: 1px solid rgba(248,198,74,0.12) !important;
+}
+
+/* Section heads: warm gold tint + subtle glow */
+.spine-section-head {
+  color: rgba(248,198,74,0.55) !important;
+  text-shadow: 0 0 8px rgba(248,198,74,0.15) !important;
+  letter-spacing: 0.14em !important;
+}
+
+/* Matchup row labels: warm muted gold */
+.spine-row-label {
+  color: rgba(248,198,74,0.40) !important;
+}
+
+/* Matchup values: subtle glow on existing fighter colors */
+.spine-val-a {
+  text-shadow: 0 0 6px rgba(94,229,224,0.25) !important;
+}
+.spine-val-b {
+  text-shadow: 0 0 6px rgba(255,210,74,0.25) !important;
+}
+.spine-missing {
+  color: rgba(255,255,255,0.18) !important;
+}
+
+/* Common opponents: gold accent */
+.spine-cmn-name {
+  color: rgba(248,198,74,0.45) !important;
+}
+.spine-cmn-sep {
+  color: rgba(248,198,74,0.18) !important;
+}
+.spine-cmn-empty {
+  color: rgba(248,198,74,0.35) !important;
+}
+
+/* L5 trend labels + legend: warm gold tint */
+.spine-trend-label {
+  color: rgba(248,198,74,0.40) !important;
+}
+.spine-legend-a {
+  text-shadow: 0 0 6px rgba(94,229,224,0.20) !important;
+}
+.spine-legend-b {
+  text-shadow: 0 0 6px rgba(255,210,74,0.20) !important;
+}
+
+/* Ctrl chip: glass treatment */
+.fight-spine-ctrl {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.12) !important;
+  color: rgba(255,255,255,0.55) !important;
+}
+
+/* VS badge border: refined gold glass */
+.fight-spine:not(.fight-spine-empty)::before {
+  border: 1px solid rgba(248,198,74,0.22) !important;
+  background: rgba(248,198,74,0.06) !important;
+  box-shadow: 0 0 10px rgba(248,198,74,0.10) !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
