@@ -19330,6 +19330,90 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   box-shadow: 0 0 10px rgba(248,198,74,0.10) !important;
 }
 
+/* ── GLOW-UP 125: Drilldown History Bars — depth + readability evolution ── */
+
+/* Taller bars for better visual weight and readability */
+.history-bar-wrap {
+  height: 16px !important;
+  border-radius: 4px !important;
+  background: linear-gradient(180deg, rgba(3,6,14,0.9), rgba(8,12,24,0.85)) !important;
+}
+
+/* Inner bevel highlight on bar fills — 3D depth */
+.history-bar-fill {
+  border-radius: 3px !important;
+  position: relative;
+}
+.history-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 45%, rgba(0,0,0,0.08) 100%);
+  pointer-events: none;
+}
+
+/* Over fills: richer gradient with warm-to-cool sweep */
+.history-bar-fill.over-line {
+  background: linear-gradient(90deg,
+    rgba(0,232,122,0.55) 0%,
+    rgba(0,210,110,0.42) 40%,
+    rgba(0,232,122,0.22) 80%,
+    rgba(0,232,122,0.08) 100%) !important;
+}
+
+/* Under fills: richer gradient with depth */
+.history-bar-fill.under-line {
+  background: linear-gradient(90deg,
+    rgba(255,58,96,0.50) 0%,
+    rgba(255,58,96,0.35) 40%,
+    rgba(255,58,96,0.15) 80%,
+    rgba(255,58,96,0.05) 100%) !important;
+}
+
+/* Opponent names: slightly larger, softer weight */
+.history-opp {
+  font-size: 10px !important;
+  width: 90px !important;
+  color: rgba(255,255,255,0.50) !important;
+  letter-spacing: 0.01em;
+}
+
+/* Most recent fight (first row): stronger emphasis */
+.history-bar-row:first-child .history-opp {
+  color: rgba(255,255,255,0.72) !important;
+  font-weight: 600;
+}
+.history-bar-row:first-child .history-bar-wrap {
+  border-color: rgba(248,198,74,0.10) !important;
+}
+
+/* Bar values: bump size for readability */
+.history-bar-val {
+  font-size: 10.5px !important;
+  min-width: 36px !important;
+  letter-spacing: 0.02em;
+}
+
+/* Row spacing: breathe a bit more */
+.history-bar-row {
+  margin-bottom: 3px !important;
+}
+
+/* Panel meta "Line:" strip: bolder line value */
+.panel-meta {
+  margin-top: 10px !important;
+  font-size: 10.5px !important;
+}
+
+/* Detail panel title: bolder text + refined hairline */
+.detail-panel-title {
+  font-size: 9.5px !important;
+  letter-spacing: 0.14em !important;
+  color: rgba(255,255,255,0.50) !important;
+  margin-bottom: 12px !important;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
