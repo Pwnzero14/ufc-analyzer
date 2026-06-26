@@ -18873,85 +18873,85 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 
 /* ── GLOW-UP 121: Stat Head-to-Head — gold-accent glass cohesion ── */
 
-/* === Fighter detail container: warm cream text + gold glass === */
+/* === Fighter detail container: warm cream text + subtle gold === */
 .fighter-detail {
   --text: rgba(255,250,235,0.90) !important;
   --text-muted: rgba(255,248,230,0.50) !important;
   --text3: rgba(225,215,195,0.65) !important;
-  background: linear-gradient(180deg, rgba(248,198,74,0.03) 0%, rgba(248,198,74,0.05) 50%, rgba(248,198,74,0.02) 100%) !important;
-  border-top: 1px solid rgba(248,198,74,0.12) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.015) 0%, rgba(248,198,74,0.025) 50%, rgba(248,198,74,0.01) 100%) !important;
+  border-top: 1px solid rgba(248,198,74,0.08) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
 }
 
-/* === Section head: gold glass + enhanced glow === */
+/* === Section head: gold glass + controlled glow === */
 .detail-section-head {
-  background: linear-gradient(135deg, rgba(248,198,74,0.06) 0%, rgba(248,198,74,0.03) 50%, rgba(248,198,74,0.05) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.22) !important;
-  box-shadow: 0 10px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(248,198,74,0.06), 0 0 30px rgba(248,198,74,0.05) !important;
+  background: linear-gradient(135deg, rgba(248,198,74,0.04) 0%, rgba(248,198,74,0.02) 50%, rgba(248,198,74,0.035) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.18) !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(248,198,74,0.04), 0 0 20px rgba(248,198,74,0.03) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
 }
 .detail-section-head::after {
-  background: linear-gradient(90deg, rgba(248,198,74,0.28), rgba(248,198,74,0.08), transparent) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.22), rgba(248,198,74,0.06), transparent) !important;
 }
 
-/* === Stat pair: gold borders + gold outer glow === */
+/* === Stat pair: subtle gold borders + controlled glow === */
 .stat-pair {
-  background: linear-gradient(180deg, rgba(248,198,74,0.04) 0%, rgba(248,198,74,0.02) 50%, rgba(248,198,74,0.03) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.12) !important;
+  background: linear-gradient(180deg, rgba(248,198,74,0.02) 0%, rgba(248,198,74,0.01) 50%, rgba(248,198,74,0.015) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
   border-top: none !important;
-  box-shadow: 0 12px 44px rgba(0,0,0,0.45), inset 0 1px 0 rgba(248,198,74,0.05), 0 0 30px rgba(248,198,74,0.03) !important;
+  box-shadow: 0 12px 44px rgba(0,0,0,0.45), inset 0 1px 0 rgba(248,198,74,0.03), 0 0 15px rgba(248,198,74,0.02) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
 }
 .stat-pair:hover {
-  border-color: rgba(248,198,74,0.20) !important;
-  box-shadow: 0 16px 52px rgba(0,0,0,0.55), inset 0 1px 0 rgba(248,198,74,0.08), 0 0 40px rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.14) !important;
+  box-shadow: 0 16px 52px rgba(0,0,0,0.55), inset 0 1px 0 rgba(248,198,74,0.05), 0 0 20px rgba(248,198,74,0.03) !important;
 }
 
-/* === Stat pair top accent bar: gold-blended center === */
+/* === Stat pair top accent bar: keep cyan/orange, minimal gold === */
 .stat-pair > *:first-child::before {
-  background: linear-gradient(90deg, rgba(86,195,255,0.5) 0%, rgba(248,198,74,0.18) 45%, rgba(248,198,74,0.18) 55%, rgba(255,138,61,0.5) 100%) !important;
+  background: linear-gradient(90deg, rgba(86,195,255,0.5) 0%, rgba(248,198,74,0.08) 45%, rgba(248,198,74,0.08) 55%, rgba(255,138,61,0.5) 100%) !important;
 }
 
-/* === Center divider: enhanced gold glow pip === */
+/* === Center divider: controlled gold pip === */
 .stat-pair:has(> .detail-panel + .detail-panel)::before {
-  background: linear-gradient(180deg, transparent 2%, rgba(248,198,74,0.06) 10%, rgba(248,198,74,0.12) 50%, rgba(248,198,74,0.06) 90%, transparent 98%) !important;
+  background: linear-gradient(180deg, transparent 2%, rgba(248,198,74,0.04) 10%, rgba(248,198,74,0.08) 50%, rgba(248,198,74,0.04) 90%, transparent 98%) !important;
 }
 .stat-pair:has(> .detail-panel + .detail-panel)::after {
-  background: linear-gradient(135deg, rgba(248,198,74,0.06), rgba(248,198,74,0.03)) !important;
-  border: 1.5px solid rgba(248,198,74,0.40) !important;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.45), 0 0 20px rgba(248,198,74,0.30), 0 0 8px rgba(248,198,74,0.45), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  background: linear-gradient(135deg, rgba(248,198,74,0.04), rgba(248,198,74,0.02)) !important;
+  border: 1.5px solid rgba(248,198,74,0.30) !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.45), 0 0 14px rgba(248,198,74,0.20), 0 0 5px rgba(248,198,74,0.30), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 .stat-pair:hover::after {
-  box-shadow: 0 3px 12px rgba(0,0,0,0.45), 0 0 24px rgba(248,198,74,0.40), 0 0 10px rgba(248,198,74,0.55), inset 0 1px 0 rgba(255,255,255,0.10) !important;
-  border-color: rgba(248,198,74,0.55) !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.45), 0 0 18px rgba(248,198,74,0.28), 0 0 6px rgba(248,198,74,0.35), inset 0 1px 0 rgba(255,255,255,0.10) !important;
+  border-color: rgba(248,198,74,0.40) !important;
 }
 
-/* === Self-side panel: preserve cyan accent + gold glass blend === */
+/* === Self-side panel: preserve cyan accent, no gold blend === */
 .stat-pair > .detail-panel:first-child {
   border-left: 3.5px solid rgba(86,195,255,0.55) !important;
-  background: linear-gradient(135deg, rgba(86,195,255,0.05) 0%, rgba(248,198,74,0.02) 50%, transparent 100%) !important;
+  background: linear-gradient(135deg, rgba(86,195,255,0.05) 0%, transparent 50%) !important;
 }
-/* === Opp-side panel: preserve orange accent + gold glass blend === */
+/* === Opp-side panel: preserve orange accent, no gold blend === */
 .stat-pair > .detail-panel + .detail-panel {
   border-right: 3.5px solid rgba(255,138,61,0.55) !important;
   border-left: none !important;
-  background: linear-gradient(225deg, rgba(255,138,61,0.05) 0%, rgba(248,198,74,0.02) 50%, transparent 100%) !important;
+  background: linear-gradient(225deg, rgba(255,138,61,0.05) 0%, transparent 50%) !important;
 }
 
-/* === Standalone panels: gold glass borders + glow === */
+/* === Standalone panels: controlled gold glass === */
 .panel-pair > .detail-panel, .detail-grid > .detail-panel {
-  background: linear-gradient(145deg, rgba(248,198,74,0.04) 0%, rgba(248,198,74,0.02) 50%, rgba(248,198,74,0.03) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.12) !important;
-  box-shadow: 0 10px 36px rgba(0,0,0,0.40), inset 0 1px 0 rgba(248,198,74,0.05), 0 0 20px rgba(248,198,74,0.03) !important;
+  background: linear-gradient(145deg, rgba(248,198,74,0.03) 0%, rgba(248,198,74,0.015) 50%, rgba(248,198,74,0.02) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.40), inset 0 1px 0 rgba(248,198,74,0.04), 0 0 15px rgba(248,198,74,0.02) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
 }
 .panel-pair > .detail-panel:hover, .detail-grid > .detail-panel:hover {
-  border-color: rgba(248,198,74,0.20) !important;
-  box-shadow: 0 14px 44px rgba(0,0,0,0.50), inset 0 1px 0 rgba(248,198,74,0.08), 0 0 30px rgba(248,198,74,0.06) !important;
+  border-color: rgba(248,198,74,0.16) !important;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.50), inset 0 1px 0 rgba(248,198,74,0.06), 0 0 20px rgba(248,198,74,0.04) !important;
 }
 
 /* === Standalone panel titles: enhanced gold gradient === */
@@ -18997,47 +18997,47 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   filter: drop-shadow(0 0 8px rgba(248,198,74,0.25)) !important;
 }
 
-/* === History bar tracks: gold glass === */
+/* === History bar tracks: subtle gold glass === */
 .history-bar-wrap {
-  background: rgba(248,198,74,0.03) !important;
-  border: 1px solid rgba(248,198,74,0.06) !important;
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.30), inset 0 0 8px rgba(248,198,74,0.02) !important;
+  background: rgba(248,198,74,0.02) !important;
+  border: 1px solid rgba(248,198,74,0.04) !important;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.30) !important;
 }
-/* === History bar first row: gold accent === */
+/* === History bar first row: subtle gold accent === */
 .history-bar-row:first-child {
-  background: rgba(248,198,74,0.035) !important;
-  border-color: rgba(248,198,74,0.08) !important;
+  background: rgba(248,198,74,0.02) !important;
+  border-color: rgba(248,198,74,0.05) !important;
 }
 .history-bar-row:hover {
-  background: rgba(248,198,74,0.05) !important;
-  border-color: rgba(248,198,74,0.08) !important;
-}
-
-/* === Panel meta: gold glass strip === */
-.panel-meta {
-  background: linear-gradient(135deg, rgba(248,198,74,0.04) 0%, rgba(248,198,74,0.02) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.08) !important;
-  box-shadow: inset 0 1px 0 rgba(248,198,74,0.04), 0 2px 8px rgba(0,0,0,0.15) !important;
-}
-
-/* === Panel confidence pills: gold glass === */
-.panel-confidence {
-  background: linear-gradient(135deg, rgba(248,198,74,0.05) 0%, rgba(248,198,74,0.025) 100%) !important;
-  border: 1px solid rgba(248,198,74,0.10) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(248,198,74,0.04) !important;
-}
-
-/* === Stat rows: gold glass hover === */
-.stat-row:hover {
-  background: rgba(248,198,74,0.04) !important;
-  border-color: rgba(248,198,74,0.07) !important;
-}
-
-/* === Finish bar: gold glass === */
-.finish-bar-wrap {
   background: rgba(248,198,74,0.03) !important;
+  border-color: rgba(248,198,74,0.05) !important;
+}
+
+/* === Panel meta: subtle gold glass strip === */
+.panel-meta {
+  background: linear-gradient(135deg, rgba(248,198,74,0.025) 0%, rgba(248,198,74,0.01) 100%) !important;
   border: 1px solid rgba(248,198,74,0.06) !important;
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.25), inset 0 0 6px rgba(248,198,74,0.02) !important;
+  box-shadow: inset 0 1px 0 rgba(248,198,74,0.03), 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* === Panel confidence pills: subtle gold glass === */
+.panel-confidence {
+  background: linear-gradient(135deg, rgba(248,198,74,0.03) 0%, rgba(248,198,74,0.015) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.07) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(248,198,74,0.03) !important;
+}
+
+/* === Stat rows: subtle gold glass hover === */
+.stat-row:hover {
+  background: rgba(248,198,74,0.03) !important;
+  border-color: rgba(248,198,74,0.05) !important;
+}
+
+/* === Finish bar: subtle gold glass === */
+.finish-bar-wrap {
+  background: rgba(248,198,74,0.02) !important;
+  border: 1px solid rgba(248,198,74,0.04) !important;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.25) !important;
 }
 
 /* === Early-finish risk: enhanced gold glow === */
@@ -19069,6 +19069,212 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .panel-pair:has(.arch-panel):hover { border-color: rgba(248,198,74,0.12) !important; }
 .panel-pair:has(.ftb-panel):hover  { border-color: rgba(248,198,74,0.12) !important; }
 .panel-pair:has(.soh-panel):hover  { border-color: rgba(248,198,74,0.12) !important; }
+
+/* ── GLOW-UP 122: Matchup Models & Career inner elements — gold-accent glass cohesion ── */
+
+/* === Panel top accent bars: bold gold sweep === */
+.detail-grid > .panel-pair > .detail-panel::before {
+  background: linear-gradient(90deg, rgba(248,198,74,0.55) 0%, rgba(248,198,74,0.20) 40%, rgba(248,198,74,0.06) 80%, transparent 100%) !important;
+  height: 3px !important;
+}
+
+/* === Panel-pair containers: stronger gold glass === */
+.detail-grid > .panel-pair {
+  background: rgba(248,198,74,0.03) !important;
+  border: 1px solid rgba(248,198,74,0.10) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.30), 0 0 20px rgba(248,198,74,0.04) !important;
+}
+
+/* === Standalone panels in grid (Career Data, Archetype, SS/TD/FT Leans): gold spine + glass === */
+.detail-grid > .detail-panel {
+  border-left: 3px solid rgba(248,198,74,0.40) !important;
+  background: linear-gradient(145deg, rgba(248,198,74,0.06) 0%, rgba(248,198,74,0.02) 40%, rgba(248,198,74,0.04) 100%) !important;
+  border-right: 1px solid rgba(248,198,74,0.10) !important;
+  border-top: 1px solid rgba(248,198,74,0.10) !important;
+  border-bottom: 1px solid rgba(248,198,74,0.10) !important;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.40), inset 0 1px 0 rgba(248,198,74,0.06), 0 0 20px rgba(248,198,74,0.05) !important;
+}
+
+/* === Stat labels: gold gradient text === */
+.detail-grid .stat-label {
+  background: linear-gradient(90deg, rgba(248,198,74,0.80), rgba(225,215,195,0.60)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+
+/* === Stat row alternating + hover: gold glass === */
+.detail-grid .stat-row:nth-child(even) {
+  background: rgba(248,198,74,0.025) !important;
+}
+.detail-grid .stat-row:hover {
+  background: rgba(248,198,74,0.05) !important;
+  border-color: rgba(248,198,74,0.08) !important;
+}
+
+/* === Finish split section: gold glass === */
+.detail-grid .finish-split-section {
+  background: rgba(248,198,74,0.03) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+/* === Finish split header: bold gold gradient text === */
+.detail-grid .finish-split-header {
+  background: linear-gradient(90deg, #f8c64a, rgba(248,198,74,0.65)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.20)) !important;
+}
+
+/* === Finish bar wraps: gold glass === */
+.detail-grid .finish-bar-wrap {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25), inset 0 0 8px rgba(248,198,74,0.03) !important;
+}
+.detail-grid .finish-bar-row:hover {
+  background: rgba(248,198,74,0.05) !important;
+}
+/* === Finish bar labels: warm gold === */
+.detail-grid .finish-bar-label {
+  color: rgba(248,198,74,0.55) !important;
+}
+.detail-grid .finish-bar-pct {
+  color: rgba(255,250,235,0.80) !important;
+}
+
+/* === Panel link: gold glass pill === */
+.detail-grid .panel-link {
+  background: linear-gradient(135deg, rgba(248,198,74,0.10) 0%, rgba(248,198,74,0.04) 100%) !important;
+  border: 1px solid rgba(248,198,74,0.25) !important;
+  color: #f8c64a !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 8px rgba(248,198,74,0.06) !important;
+}
+.detail-grid .panel-link:hover {
+  background: linear-gradient(135deg, rgba(248,198,74,0.18) 0%, rgba(248,198,74,0.08) 100%) !important;
+  border-color: rgba(248,198,74,0.40) !important;
+  color: #ffe08a !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 16px rgba(248,198,74,0.12) !important;
+}
+
+/* === Lean reason columns: gold-tinted glass === */
+.detail-grid .lean-reason-col {
+  background: rgba(248,198,74,0.02) !important;
+  border: 1px solid rgba(248,198,74,0.06) !important;
+}
+.detail-grid .lean-reason-col.pro {
+  border-color: rgba(0,232,122,0.10) !important;
+  background: linear-gradient(180deg, rgba(0,232,122,0.03) 0%, rgba(248,198,74,0.015) 60%) !important;
+}
+.detail-grid .lean-reason-col.risk {
+  border-color: rgba(255,58,96,0.10) !important;
+  background: linear-gradient(180deg, rgba(255,58,96,0.03) 0%, rgba(248,198,74,0.015) 60%) !important;
+}
+/* === Lean reason PRO/RISK headers: gold glow === */
+.detail-grid .lean-reason-head {
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.12)) !important;
+}
+
+/* === Lean point hover: gold glass === */
+.detail-grid .lean-point:hover {
+  background: rgba(248,198,74,0.04) !important;
+}
+
+/* === Lean verdict: gold glass border accent === */
+.detail-grid .lean-verdict {
+  box-shadow: inset 0 1px 0 rgba(248,198,74,0.04), 0 4px 16px rgba(0,0,0,0.25) !important;
+}
+.detail-grid .lean-verdict.push {
+  border-color: rgba(248,198,74,0.30) !important;
+  background: rgba(248,198,74,0.06) !important;
+}
+
+/* === MA rows: gold glass alternating + hover === */
+.ma-panel .ma-row {
+  border-radius: 5px !important;
+}
+.ma-panel .ma-row:nth-child(even) {
+  background: rgba(248,198,74,0.02) !important;
+}
+.ma-panel .ma-row:hover {
+  background: rgba(248,198,74,0.05) !important;
+}
+
+/* === MA labels: gold gradient text === */
+.ma-label {
+  background: linear-gradient(90deg, rgba(248,198,74,0.75), rgba(225,215,195,0.55)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+
+/* === MA fighter names: enhanced warm cream === */
+.ma-panel > span[style*="font-weight:700"],
+.ma-panel > span[style*="font-weight: 700"] {
+  color: rgba(255,250,235,0.92) !important;
+  filter: drop-shadow(0 0 6px rgba(248,198,74,0.15)) !important;
+}
+
+/* === MA verdict chip: gold glass base === */
+.ma-verdict-chip {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.20), 0 0 6px rgba(248,198,74,0.05) !important;
+}
+.ma-verdict-chip.none {
+  color: rgba(225,215,195,0.55) !important;
+  background: rgba(248,198,74,0.05) !important;
+  border-color: rgba(248,198,74,0.12) !important;
+}
+
+/* === MA confidence bar track: gold glass === */
+.ma-conf-bar {
+  background: rgba(248,198,74,0.05) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+}
+
+/* === MA value dim: warm cream === */
+.ma-value-dim {
+  color: rgba(225,215,195,0.45) !important;
+}
+
+/* === MA subhead: gold separator line === */
+.ma-ss .ma-subhead {
+  border-bottom-color: rgba(248,198,74,0.15) !important;
+}
+.ma-ctrl .ma-subhead {
+  border-bottom-color: rgba(248,198,74,0.15) !important;
+}
+
+/* === Model Rivalry model cards: gold glass outer glow === */
+.mr-panel div[style*="border-radius:10px"] {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25), 0 0 10px rgba(248,198,74,0.05) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+.mr-panel div[style*="border-radius:10px"]:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 0 14px rgba(248,198,74,0.08) !important;
+}
+
+/* === Style matchup chips: gold glass base === */
+.style-matchup-chip {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18), 0 0 6px rgba(248,198,74,0.04) !important;
+}
+
+/* === Archetype learner badge: gold glass === */
+.arch-panel .arch-tag {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 6px rgba(248,198,74,0.06) !important;
+}
+
+/* === Code/pre blocks: gold glass === */
+.detail-grid .detail-panel pre,
+.detail-grid .detail-panel code {
+  background: rgba(248,198,74,0.04) !important;
+  border: 1px solid rgba(248,198,74,0.08) !important;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.25), inset 0 0 8px rgba(248,198,74,0.03) !important;
+}
 
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
