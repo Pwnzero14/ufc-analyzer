@@ -8517,9 +8517,16 @@ function renderPredictionsHtml(cSec) {
         // A past-event prediction that hasn't been learned from yet — surface the
         // button even when prior learning history exists, so each settled event can
         // be absorbed without re-checking whether the log is empty.
-        const pendingLearn = preds.find(p => !p.settled &&
-            p.event !== (upcomingEventName || '').trim() &&
-            p.event !== upcomingEventName);
+        // Surface the learning button once the event is OVER, even if upcomingEventName hasn't
+        // flipped to the next card yet — lets a just-finished, settled card (e.g. same-day Baku)
+        // be absorbed immediately instead of waiting for the next slate's lines to load.
+        const eventIsOver = Number.isFinite(upcomingEventTs) && upcomingEventTs > 0 && upcomingEventTs < Date.now();
+        const pendingLearn = preds.find(p => {
+            if (p.settled)
+                return false;
+            const isDifferentEvent = p.event !== (upcomingEventName || '').trim() && p.event !== upcomingEventName;
+            return isDifferentEvent || eventIsOver;
+        });
         const pendingBanner = pendingLearn ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:10px;background:rgba(56,176,0,0.08);border:1px solid rgba(56,176,0,0.3);border-radius:6px;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--text);flex:1;min-width:160px">Predictions for "${pendingLearn.event}" ready for learning</span>
       <button id="predictorLearnBtn" class="btn btn-sm" style="background:var(--green);color:#000;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600">▶ Run Learning Cycle</button>
@@ -8600,7 +8607,8 @@ function renderPredictionsHtml(cSec) {
         // Show learn button if we have unsettled predictions and settled archive data
         const unsettled = (preds).find(p => !p.settled);
         if (unsettled) {
-            const isCurrentEvent = unsettled.event === (upcomingEventName || '').trim() || unsettled.event === upcomingEventName;
+            const eventOver = Number.isFinite(upcomingEventTs) && upcomingEventTs > 0 && upcomingEventTs < Date.now();
+            const isCurrentEvent = (unsettled.event === (upcomingEventName || '').trim() || unsettled.event === upcomingEventName) && !eventOver;
             const deleteBtn = `<button id="predictorDeleteBtn" class="btn btn-sm" style="background:none;border:1px solid var(--text-muted);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:10px;margin-left:8px" title="Delete these predictions">✕ Delete</button>`;
             if (isCurrentEvent) {
                 // Predictions match the upcoming event — not ready for learning yet
