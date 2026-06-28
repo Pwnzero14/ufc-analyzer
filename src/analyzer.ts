@@ -10290,11 +10290,15 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const raw = await new Promise<Record<string, any>>(res => chrome.storage.local.get(['prop_archive_v1'], res));
       const archive: PropArchiveRecord[] = Array.isArray(raw.prop_archive_v1) ? raw.prop_archive_v1 : [];
       const preds = await PropLinePredictorService.getPredictions();
-      const unsettled = preds.find(p =>
-        !p.settled &&
-        p.event !== (upcomingEventName || '').trim() &&
-        p.event !== upcomingEventName
-      );
+      // Match the button-visibility gate: learn a prediction when it's a different event
+      // OR the current event is already over (date passed) — so a just-finished, settled
+      // card can be absorbed before the next slate flips upcomingEventName.
+      const eventIsOver = Number.isFinite(upcomingEventTs) && upcomingEventTs > 0 && upcomingEventTs < Date.now();
+      const unsettled = preds.find(p => {
+        if (p.settled) return false;
+        const isDifferentEvent = p.event !== (upcomingEventName || '').trim() && p.event !== upcomingEventName;
+        return isDifferentEvent || eventIsOver;
+      });
       if (!unsettled) { showToast('No unsettled predictions to learn from'); return; }
       const result = await PropLinePredictorService.runLearningCycle(unsettled.event, archive);
       if (result) {
