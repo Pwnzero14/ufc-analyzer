@@ -15928,6 +15928,21 @@ async function loadData(): Promise<void> {
         const base = (result['lines_betr'] as { fighters?: RawLineFighter[]; capturedAt?: number } | null)?.fighters || [];
         const merged = applyBetrManualOverrides(base, manualBetr.fighters);
         result['lines_betr'] = { fighters: merged, capturedAt: manualBetr.capturedAt ?? Date.now() };
+
+        // Stamp betr_event_date with the current card's date whenever manual Betr lines exist.
+        // Betr lines are entered via console snippet (which doesn't set it), so the date stays
+        // undefined — and the × DISMISS / RESET LINES buttons then treat ANY time as "event
+        // over" and wipe freshly-entered fight-week Betr. Back-filling it here lets those
+        // buttons correctly PRESERVE Betr during fight week (date in future) and only clear it
+        // after the event (date past). The post-settlement auto-clear (handleClearBetrLines)
+        // removes both the lines and this key, so it won't go stale across cards.
+        if (Number.isFinite(upcomingEventTs) && upcomingEventTs > 0) {
+          const cardDateIso = new Date(upcomingEventTs).toISOString().slice(0, 10);
+          const curMeta = await storageGet<Record<string, unknown>>(['betr_event_date']);
+          if (curMeta['betr_event_date'] !== cardDateIso) {
+            await storageSet({ betr_event_date: cardDateIso });
+          }
+        }
       }
 
       const filteredPick6 = filterPayloadToUpcomingCard(result['lines_pick6'] || null);
