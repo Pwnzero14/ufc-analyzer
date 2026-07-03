@@ -1954,6 +1954,39 @@ function formatSourcePlatformLabel(f, source, platformOverride) {
                     : 'Betr';
     return `${label} ${line}`;
 }
+function platformKeyShort(k) {
+    return k === 'pick6' ? 'P6'
+        : k === 'underdog' ? 'UD'
+            : k === 'prizepicks' ? 'PP'
+                : k === 'betr' ? 'BT'
+                    : k === 'draftkings_sportsbook' ? 'DK'
+                        : 'LINE';
+}
+// Panel-footer book chips: one chip per book; when books disagree, the lowest
+// line gets a cool (cyan) edge and the highest a warm (orange) edge — lowest is
+// the best OVER entry, highest the best UNDER entry — plus a Δ spread readout.
+function buildPanelMetaChips(books, fmt) {
+    const fmtVal = (n) => (fmt ? fmt(n) : String(n));
+    const presentVals = books
+        .map((b) => (b.raw != null && Number.isFinite(Number(b.raw)) ? Number(b.raw) : null))
+        .filter((v) => v != null);
+    const min = presentVals.length ? Math.min(...presentVals) : null;
+    const max = presentVals.length ? Math.max(...presentVals) : null;
+    const hasSpread = min != null && max != null && max > min && presentVals.length >= 2;
+    const chips = books.map((b) => {
+        if (b.raw == null || !Number.isFinite(Number(b.raw))) {
+            return `<span class="pm-book pm-missing"><i>${b.tag}</i><b>—</b></span>`;
+        }
+        const n = Number(b.raw);
+        const cls = hasSpread && n === min ? ' pm-lo' : hasSpread && n === max ? ' pm-hi' : '';
+        const tip = cls === ' pm-lo' ? ' title="Lowest line across books — best OVER entry"'
+            : cls === ' pm-hi' ? ' title="Highest line across books — best UNDER entry"' : '';
+        return `<span class="pm-book${cls}"${tip}><i>${b.tag}</i><b>${b.display ?? fmtVal(n)}</b></span>`;
+    }).join('');
+    const spreadTxt = hasSpread ? (fmt ? fmt(max - min) : String(parseFloat((max - min).toFixed(2)))) : '';
+    const spread = hasSpread ? `<span class="pm-spread" title="Line spread across books">Δ ${spreadTxt}</span>` : '';
+    return chips + spread;
+}
 function computeStatStdDev(values) {
     if (values.length < 2)
         return values.length === 1 ? 0 : null;
@@ -13325,10 +13358,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     // platform(s) actually supplied a line (PP is shown first when both exist).
     const ssR1Sources = [f.line_pp_ss_r1 != null ? 'PP' : null, f.line_ud_ss_r1 != null ? 'UD' : null].filter(Boolean);
     const ssR1Badge = ssR1Sources.length === 1 ? `${ssR1Sources[0]}-only` : ssR1Sources.join('+');
-    const ssR1Meta = [
-        f.line_pp_ss_r1 != null ? `PP R1 SS: ${f.line_pp_ss_r1}` : null,
-        f.line_ud_ss_r1 != null ? `UD R1 SS: ${f.line_ud_ss_r1}` : null,
-    ].filter(Boolean).join(' · ');
+    const ssR1Meta = buildPanelMetaChips([
+        ...(f.line_pp_ss_r1 != null ? [{ tag: 'PP', raw: f.line_pp_ss_r1 }] : []),
+        ...(f.line_ud_ss_r1 != null ? [{ tag: 'UD', raw: f.line_ud_ss_r1 }] : []),
+    ]);
     const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
     // Body/Leg sig strikes (Underdog + PrizePicks only). History bars use per-fight body/leg
     // landed from UFCStats (populated after the v50 cache re-fetch). The displayed line
@@ -13344,12 +13377,18 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const bodyLine = platformBodyLegLine(f.line_ud_ss_body, f.line_pp_ss_body);
     const bodySources = [f.line_ud_ss_body != null ? 'UD' : null, f.line_pp_ss_body != null ? 'PP' : null].filter(Boolean);
     const bodyBadge = bodySources.length === 1 ? `${bodySources[0]}-only` : bodySources.join('+');
-    const bodyMeta = [f.line_ud_ss_body != null ? `UD Body: ${f.line_ud_ss_body}` : null, f.line_pp_ss_body != null ? `PP Body: ${f.line_pp_ss_body}` : null].filter(Boolean).join(' · ');
+    const bodyMeta = buildPanelMetaChips([
+        ...(f.line_ud_ss_body != null ? [{ tag: 'UD', raw: f.line_ud_ss_body }] : []),
+        ...(f.line_pp_ss_body != null ? [{ tag: 'PP', raw: f.line_pp_ss_body }] : []),
+    ]);
     const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss');
     const legLine = platformBodyLegLine(f.line_ud_ss_leg, f.line_pp_ss_leg);
     const legSources = [f.line_ud_ss_leg != null ? 'UD' : null, f.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean);
     const legBadge = legSources.length === 1 ? `${legSources[0]}-only` : legSources.join('+');
-    const legMeta = [f.line_ud_ss_leg != null ? `UD Leg: ${f.line_ud_ss_leg}` : null, f.line_pp_ss_leg != null ? `PP Leg: ${f.line_pp_ss_leg}` : null].filter(Boolean).join(' · ');
+    const legMeta = buildPanelMetaChips([
+        ...(f.line_ud_ss_leg != null ? [{ tag: 'UD', raw: f.line_ud_ss_leg }] : []),
+        ...(f.line_pp_ss_leg != null ? [{ tag: 'PP', raw: f.line_pp_ss_leg }] : []),
+    ]);
     const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
     const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td');
     const ftHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.timeSecs)) ? Number(h.timeSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ft');
@@ -14062,11 +14101,14 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
         <div class="detail-section-head">📊 Stat Head-to-Head — ${prettyName(f.name)} vs ${prettyName(oppName || 'Opponent')}</div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine ? `<div class="panel-meta"><div class="panel-meta-line"></div> Line: ${activeLine}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([{ tag: platformKeyShort(getSourceActivePlatformKey(f, 'fp')), raw: activeLine }])}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length ? oppFPHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'} · BT: ${f.line_betr_ss || '—'}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        { tag: 'P6', raw: f.line_p6_ss }, { tag: 'UD', raw: f.line_ud_ss }, { tag: 'PP', raw: f.line_pp_ss }, { tag: 'BT', raw: f.line_betr_ss },
+        ...(f.line_dk_ss != null ? [{ tag: 'DK', raw: f.line_dk_ss }] : []),
+    ])}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp SS Scored vs ${f.name}${oppCompareSsLine != null ? ` · ${oppName} SS line ${oppCompareSsLine}` : ''}</div>${oppFights.length ? oppSSHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
         ${(ssR1Line != null || oppCompareSsR1Line != null) ? `<div class="stat-pair">` : ''}
@@ -14082,15 +14124,24 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${oppCompareLegLine != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp Leg SS Scored vs ${f.name} · ${oppName} Leg line ${oppCompareLegLine} <span class="panel-confidence low">${oppLegBadge}</span></div>${oppFights.length ? oppLegHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         ${(legLine != null || oppCompareLegLine != null) ? `</div>` : ''}
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine != null ? ` vs Line ${tdLine}` : ''}${trendChip(tdTrend, `TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'} · BT: ${f.line_betr_td || '—'}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine != null ? ` vs Line ${tdLine}` : ''}${trendChip(tdTrend, `TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        { tag: 'P6', raw: f.line_p6_td }, { tag: 'UD', raw: f.line_ud_td }, { tag: 'PP', raw: f.line_pp_td }, { tag: 'BT', raw: f.line_betr_td },
+        ...(f.line_dk_td != null ? [{ tag: 'DK', raw: f.line_dk_td }] : []),
+    ])}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length ? oppTDHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine != null ? ` vs Line ${formatMinutesAsClock(ctrlLine)}` : ''}${panelBadge(ctrlConf)}${f.line_p6_ctrl != null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ctrl != null ? formatMinutesAsClock(f.line_p6_ctrl) : '—'} · UD: ${f.line_ud_ctrl != null ? formatMinutesAsClock(f.line_ud_ctrl) : '—'} · PP: ${f.line_pp_ctrl != null ? formatMinutesAsClock(f.line_pp_ctrl) : '—'} · BT: ${f.line_betr_ctrl != null ? formatMinutesAsClock(f.line_betr_ctrl) : '—'}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine != null ? ` vs Line ${formatMinutesAsClock(ctrlLine)}` : ''}${panelBadge(ctrlConf)}${f.line_p6_ctrl != null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        { tag: 'P6', raw: f.line_p6_ctrl }, { tag: 'UD', raw: f.line_ud_ctrl }, { tag: 'PP', raw: f.line_pp_ctrl }, { tag: 'BT', raw: f.line_betr_ctrl },
+        ...(f.line_dk_ctrl != null ? [{ tag: 'DK', raw: f.line_dk_ctrl }] : []),
+    ], formatMinutesAsClock)}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp CTRL Scored vs ${f.name}${oppCompareCtrlLine != null ? ` · ${oppName} CTRL line ${formatMinutesAsClock(oppCompareCtrlLine)}` : ''}${panelBadge(oppCtrlConf)}</div>${oppFights.length ? oppCTRLHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Fight Time History${ftLine != null ? ` vs Line ${formatMinutesAsClock(ftLine)}` : ''}</div>${ftHistoryHTML}${ftLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div> P6: ${f.line_p6_ft != null ? formatMinutesAsClock(f.line_p6_ft) : '—'} · UD: ${f.line_ud_ft != null ? formatMinutesAsClock(f.line_ud_ft) : '—'} · PP: ${f.line_pp_ft != null ? formatMinutesAsClock(f.line_pp_ft) : '—'} · BT: ${f.line_betr_ft != null ? formatMinutesAsClock(f.line_betr_ft) : '—'}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">Fight Time History${ftLine != null ? ` vs Line ${formatMinutesAsClock(ftLine)}` : ''}</div>${ftHistoryHTML}${ftLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        { tag: 'P6', raw: f.line_p6_ft }, { tag: 'UD', raw: f.line_ud_ft }, { tag: 'PP', raw: f.line_pp_ft }, { tag: 'BT', raw: f.line_betr_ft },
+        ...(f.line_dk_ft != null ? [{ tag: 'DK', raw: f.line_dk_ft }] : []),
+    ], formatMinutesAsClock)}</div>` : ''}</div>
         ${buildFightTimeSummaryPanel(db, oppEntry?.db || null, platformStatLine(f, 'ft'))}
         </div>
         <div class="detail-section-head">🧠 Matchup Models &amp; Career</div>

@@ -19516,6 +19516,79 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .fight-spine-corr { animation: none; }
 }
 
+/* ── GLOW-UP 128: Panel footer book chips — line-shopping at a glance ── */
+/* Flat "P6: 40.5 · UD: 39.5 ..." runs become per-book chips. When books
+   disagree: lowest = cool cyan (best OVER entry), highest = warm orange
+   (best UNDER entry), plus a Δ spread pill. Uniform books stay neutral. */
+
+.panel-meta {
+  flex-wrap: wrap;
+  gap: 5px !important;
+}
+.pm-book {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pm-book:hover {
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.055);
+}
+.pm-book i {
+  font-style: normal;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(248,198,74,0.55);
+}
+.pm-book b {
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--text);
+}
+.pm-book.pm-missing { opacity: 0.4; }
+
+/* Lowest line: cool edge (best OVER entry) */
+.pm-book.pm-lo {
+  border-color: rgba(94,229,224,0.35);
+  background: rgba(94,229,224,0.06);
+}
+.pm-book.pm-lo b {
+  color: #5ee5e0;
+  text-shadow: 0 0 6px rgba(94,229,224,0.25);
+}
+
+/* Highest line: warm edge (best UNDER entry) */
+.pm-book.pm-hi {
+  border-color: rgba(255,150,60,0.35);
+  background: rgba(255,150,60,0.06);
+}
+.pm-book.pm-hi b {
+  color: #ffa53c;
+  text-shadow: 0 0 6px rgba(255,150,60,0.25);
+}
+
+/* Spread pill */
+.pm-spread {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(248,198,74,0.8);
+  background: rgba(248,198,74,0.07);
+  border: 1px solid rgba(248,198,74,0.22);
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
