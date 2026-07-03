@@ -502,6 +502,14 @@ function strictCardNameMatch(a: string, b: string): boolean {
   if (na === nb) return true;
   const aParts = na.split(' ');
   const bParts = nb.split(' ');
+  // Family-name-first reversal: platforms list "Cong Wang" where UFCStats has
+  // "Wang Cong" (Chinese/Korean name order). The exact same two tokens swapped
+  // is unambiguous — same fighter. Without this, the fighter fails every
+  // strict path (opponent canonicalization, card membership, ordering), gets
+  // pruned, and every fight after theirs pairs off-by-one.
+  if (aParts.length === 2 && bParts.length === 2 && aParts[0] === bParts[1] && aParts[1] === bParts[0]) {
+    return true;
+  }
   // Single-word name (e.g. platform opponent listed as just "Valenzuela")
   // matches the multi-word side's last word, gated on a distinctive length
   // to avoid common-surname collisions like "Silva" or "Jones".
@@ -15530,7 +15538,20 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
   for (const cp of upcomingCardPairs) {
     for (const [self, opp] of [[cp.f1, cp.f2], [cp.f2, cp.f1]] as const) {
       if (map[self]) continue;
-      if (Object.keys(map).some(k => namesMatch(k, self))) continue;
+      // A platform may carry this card fighter under a variant name form
+      // (reversed token order, extra surname, etc). Rename that entry to the
+      // card's canonical form so every exact-key path downstream (opponent
+      // canonicalization, reciprocal prune, card ordering) lines up, instead
+      // of leaving a variant key that strict-fails everything and gets pruned.
+      const looseKey = Object.keys(map).find(k => namesMatch(k, self) || strictCardNameMatch(k, self));
+      if (looseKey) {
+        const entry = map[looseKey];
+        delete map[looseKey];
+        entry.name = self;
+        if (!entry.opponent) entry.opponent = opp;
+        map[self] = entry;
+        continue;
+      }
       const placeholder = createMergedLineEntry(self);
       placeholder.opponent = opp;
       map[self] = placeholder;
@@ -15569,7 +15590,11 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     const beforeMissingOppPrune = mergedEntries.length;
     mergedEntries = mergedEntries.filter((entry) => {
       const opp = normalizeName(entry.opponent || '');
-      return !!opp && opp !== entry.name;
+      if (!!opp && opp !== entry.name) return true;
+      // Never prune a fighter who is on the upcoming card — a missing/garbled
+      // opponent string is a data quirk, and dropping the row cascades wrong
+      // pairings for every later fight (positional i/2 grouping).
+      return isUpcomingCardFighter(entry.name);
     });
     if (mergedEntries.length >= 4) {
       debugLog(`Pruned missing-opponent fighters: ${beforeMissingOppPrune} -> ${mergedEntries.length}`);
@@ -15591,7 +15616,11 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
         return isUpcomingCardFighter(entry.name);
       }
       const oppOpp = normalizeName(oppEntry.opponent || '');
-      return oppOpp === entry.name;
+      if (oppOpp === entry.name) return true;
+      // Non-reciprocal opponent strings (platform name-form quirks) must not
+      // evaporate a confirmed card fighter — that's how Wang Cong vanished
+      // and shifted every pairing after Cortez by one.
+      return isUpcomingCardFighter(entry.name);
     });
 
     if (mergedEntries.length >= 4) {
