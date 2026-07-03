@@ -7352,7 +7352,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label||''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
         </div>
         <div class="best-pick-line">${line || '—'}</div>
       </div>`;

@@ -19968,6 +19968,90 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .sort-trend-popover { animation: none; }
 }
 
+/* ── GLOW-UP 134: AI Best Picks round 2 — podium ranks, platform identity, money tag ── */
+
+/* Rank medallions: circular discs; podium rows get metal identities */
+.best-pick-rank {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 9px !important;
+}
+
+/* #1 — gold disc behind the crown */
+.best-picks-section .best-pick-row:nth-child(2) .best-pick-rank {
+  background: radial-gradient(circle at 35% 30%, rgba(248,198,74,0.28), rgba(248,198,74,0.08));
+  border-color: rgba(248,198,74,0.55);
+  box-shadow: 0 0 12px rgba(248,198,74,0.30), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* #2 — silver */
+.best-picks-section .best-pick-row:nth-child(3) .best-pick-rank {
+  color: #dbe1ec !important;
+  background: radial-gradient(circle at 35% 30%, rgba(219,225,236,0.20), rgba(219,225,236,0.05));
+  border-color: rgba(219,225,236,0.45);
+  box-shadow: 0 0 8px rgba(219,225,236,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+  text-shadow: 0 0 6px rgba(219,225,236,0.4);
+  font-weight: 700;
+}
+
+/* #3 — bronze */
+.best-picks-section .best-pick-row:nth-child(4) .best-pick-rank {
+  color: #e0a878 !important;
+  background: radial-gradient(circle at 35% 30%, rgba(210,154,107,0.22), rgba(210,154,107,0.06));
+  border-color: rgba(210,154,107,0.45);
+  box-shadow: 0 0 8px rgba(210,154,107,0.20), inset 0 1px 0 rgba(255,255,255,0.10);
+  text-shadow: 0 0 6px rgba(210,154,107,0.4);
+  font-weight: 700;
+}
+
+/* Platform chip: book brand colors (same DNA as the lines strip) */
+.best-pick-platform.plat-pick6 {
+  color: #7cc4ff !important;
+  border-color: rgba(86,195,255,0.35) !important;
+  background: rgba(86,195,255,0.07) !important;
+  text-shadow: 0 0 6px rgba(86,195,255,0.3);
+}
+.best-pick-platform.plat-underdog {
+  color: #a8aeff !important;
+  border-color: rgba(127,136,255,0.35) !important;
+  background: rgba(127,136,255,0.07) !important;
+  text-shadow: 0 0 6px rgba(127,136,255,0.3);
+}
+.best-pick-platform.plat-prizepicks {
+  color: #5fe0dc !important;
+  border-color: rgba(44,212,208,0.35) !important;
+  background: rgba(44,212,208,0.07) !important;
+  text-shadow: 0 0 6px rgba(44,212,208,0.3);
+}
+.best-pick-platform.plat-betr {
+  color: #ffa06b !important;
+  border-color: rgba(255,138,61,0.35) !important;
+  background: rgba(255,138,61,0.07) !important;
+  text-shadow: 0 0 6px rgba(255,138,61,0.3);
+}
+.best-pick-platform.plat-draftkings_sportsbook {
+  color: #ffc75e !important;
+  border-color: rgba(245,158,11,0.35) !important;
+  background: rgba(245,158,11,0.07) !important;
+  text-shadow: 0 0 6px rgba(245,158,11,0.3);
+}
+
+/* Better-line tag: green money chip instead of plain blue text */
+.best-pick-lineshop {
+  color: #6fe8a8 !important;
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.30);
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-shadow: 0 0 6px rgba(0,232,122,0.3);
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
