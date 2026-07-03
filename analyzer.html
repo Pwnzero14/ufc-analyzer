@@ -19589,6 +19589,101 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(248,198,74,0.22);
 }
 
+/* ── GLOW-UP 129: Fighter news — warn chip + modal glass evolution ── */
+
+/* Card chip: solid amber alert — same "high priority" language as the
+   header ACTIVE badge. Injury/withdrawal news is the one thing that can
+   nuke a slate, so this chip is allowed to be loud. */
+.news-warn-badge {
+  background: linear-gradient(180deg, #ffc164, #f59a2e);
+  color: #221203;
+  border: 1px solid rgba(255,205,120,0.9);
+  letter-spacing: 0.05em;
+  text-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 10px rgba(255,170,60,0.28);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+  animation: newsPulse129 2.8s ease-in-out infinite;
+}
+@keyframes newsPulse129 {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 8px rgba(255,170,60,0.22); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 18px rgba(255,170,60,0.5); }
+}
+.news-warn-badge:hover {
+  animation: none;
+  transform: scale(1.06);
+  filter: brightness(1.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 0 20px rgba(255,170,60,0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-warn-badge { animation: none; }
+}
+
+/* Modal frame: amber identity to match the chip that opened it */
+.news-modal-box {
+  border: 1px solid rgba(255,170,60,0.18) !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 40px rgba(255,170,60,0.05), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+.news-modal-box .modal-title {
+  color: #ffb24a;
+  text-shadow: 0 0 14px rgba(255,170,60,0.35);
+  letter-spacing: 0.08em;
+}
+
+/* Headline rows: glass cards instead of ruled list */
+.news-item {
+  padding: 9px 11px;
+  margin-bottom: 5px;
+  border: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.news-item:last-child {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  margin-bottom: 0;
+}
+.news-item:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.09);
+}
+
+/* Titles: bright by default, warm on hover */
+.news-item-title a {
+  color: var(--text);
+  transition: color 0.15s ease;
+}
+.news-item-title a:hover {
+  color: #ffb24a;
+  text-decoration: none;
+  text-shadow: 0 0 10px rgba(255,170,60,0.25);
+}
+
+/* Date · source: quiet uppercase stamp */
+.news-item-meta {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 9px;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* Alert headlines (injury/withdrawal keywords): red-tinted alert card */
+.news-item-alert {
+  border-left: 3px solid rgba(255,58,96,0.6);
+  background: linear-gradient(90deg, rgba(255,58,96,0.06), rgba(255,58,96,0.015) 55%, transparent);
+  border-color: rgba(255,58,96,0.16);
+}
+.news-item-alert:hover {
+  background: linear-gradient(90deg, rgba(255,58,96,0.09), rgba(255,58,96,0.03) 55%, rgba(255,255,255,0.02));
+  border-color: rgba(255,58,96,0.28);
+  border-left-color: rgba(255,58,96,0.75);
+}
+.news-item-alert .news-item-title a:hover {
+  color: #ff8a97;
+  text-shadow: 0 0 10px rgba(255,58,96,0.3);
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
