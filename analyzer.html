@@ -19765,6 +19765,56 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   box-shadow: 0 0 10px rgba(255,255,255,0.06);
 }
 
+/* ── GLOW-UP 131: Toast — glass voice card with drain timer ── */
+
+.toast {
+  background: linear-gradient(165deg, rgba(20,26,44,0.95), rgba(10,14,26,0.97));
+  border: 1px solid rgba(248,198,74,0.22);
+  border-top: 1px solid rgba(248,198,74,0.22);
+  border-radius: 9px;
+  padding: 11px 18px 12px 21px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #fff;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 0 24px rgba(248,198,74,0.10), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* Gold spine on the left — same accent family as panel titles */
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, var(--gold), rgba(248,198,74,0.35));
+  box-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+
+/* Drain timer along the bottom — shows how long the toast will stay
+   (must match the 3000ms timeout in showToast) */
+.toast::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--gold), rgba(248,198,74,0.3));
+  box-shadow: 0 0 6px rgba(248,198,74,0.4);
+  opacity: 0;
+}
+.toast.show::after {
+  opacity: 1;
+  animation: toastDrain131 3s linear forwards;
+}
+@keyframes toastDrain131 {
+  from { width: 100%; }
+  to   { width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast.show::after { animation: none; }
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
