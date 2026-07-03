@@ -725,7 +725,15 @@ function findHeadlinerPair(): { f1: string; f2: string } | null {
   const m = title.match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
   if (!m) return null;
   const h1 = m[1].trim();
-  const h2 = m[2].trim();
+  const h2raw = m[2].trim();
+  // Rematch titles ("… vs Holloway 2", "… vs Poirier III") append a bout
+  // number that card names don't carry, which strict/loose matchers reject —
+  // leaving the main event unidentified and stuck at 3R. Try the raw tail
+  // first (suffix surnames like "Kamaka III" are real names), then retry
+  // with the trailing bout number stripped.
+  const h2Candidates = [h2raw];
+  const h2Stripped = h2raw.replace(/\s+(?:\d{1,2}|ii|iii|iv|v)$/i, '').trim();
+  if (h2Stripped && h2Stripped !== h2raw) h2Candidates.push(h2Stripped);
   for (const pair of upcomingCardPairs) {
     const matches = (raw: string): boolean => {
       if (strictCardNameMatch(raw, pair.f1) || strictCardNameMatch(raw, pair.f2)) return true;
@@ -735,7 +743,7 @@ function findHeadlinerPair(): { f1: string; f2: string } | null {
       if (pair.f1.endsWith(' ' + nr) || pair.f2.endsWith(' ' + nr)) return true;
       return false;
     };
-    if (matches(h1) && matches(h2)) {
+    if (matches(h1) && h2Candidates.some((h) => matches(h))) {
       return { f1: pair.f1, f2: pair.f2 };
     }
   }
@@ -5433,7 +5441,10 @@ function calcFTLean(
   // fight's max so 5R history can't inflate the OVER case. The hit-rate
   // check below stays uncapped on purpose: lasting 22m is still real
   // evidence the fighter lasted past a 12.5m line.
-  const schedRounds = scheduledRoundsMap.get(name) ?? scheduledRoundsMap.get(normalizeName(name) || '') ?? null;
+  // Headliner-aware rounds (findHeadlinerPair → 5R), not the raw scrape map —
+  // UFCStats pre-fight pages default to 3, which would cap the main event's
+  // history at 15m. No upcoming card at all → no cap (unknown context).
+  const schedRounds = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
   const maxMins = schedRounds != null ? schedRounds * 5 : null;
   const cappedMins = maxMins != null ? mins.map(v => Math.min(v, maxMins)) : mins;
   const rawAvgFT = mins.reduce((s, v) => s + v, 0) / mins.length;
