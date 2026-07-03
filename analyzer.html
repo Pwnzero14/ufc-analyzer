@@ -19406,6 +19406,88 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   font-size: 10.5px !important;
 }
 
+/* ── GLOW-UP 126: History-bar hover tooltip — glass card evolution ── */
+
+/* Container: deep glass card, layered shadow, refined radius */
+#histTip {
+  background: linear-gradient(165deg, rgba(16,22,40,0.97), rgba(8,12,24,0.96));
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 10px;
+  padding: 9px 12px 10px 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+
+/* Accent edge keyed to the hovered bar: over = green, under = red */
+#histTip::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 9px; bottom: 9px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0.06));
+}
+#histTip:has(.ht-val.over)::before {
+  background: linear-gradient(180deg, var(--green), rgba(0,232,122,0.25));
+  box-shadow: 0 0 8px rgba(0,232,122,0.35);
+}
+#histTip:has(.ht-val.under)::before {
+  background: linear-gradient(180deg, var(--red), rgba(255,58,96,0.25));
+  box-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+
+/* Opponent name: brighter hero header */
+#histTip .ht-head {
+  font-size: 11.5px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+/* Result: tinted glass pill badge */
+#histTip .ht-res {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+}
+#histTip .ht-res.w {
+  border-color: rgba(0,232,122,0.35);
+  background: rgba(0,232,122,0.10);
+  text-shadow: 0 0 8px rgba(0,232,122,0.4);
+}
+#histTip .ht-res.l {
+  border-color: rgba(255,58,96,0.35);
+  background: rgba(255,58,96,0.10);
+  text-shadow: 0 0 8px rgba(255,58,96,0.35);
+}
+
+/* Date: quiet uppercase stamp */
+#histTip .ht-date {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+/* Value row: hairline divider + hero number with glow */
+#histTip .ht-val {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 13px;
+}
+#histTip .ht-val.over { text-shadow: 0 0 10px rgba(0,232,122,0.35); }
+#histTip .ht-val.under { text-shadow: 0 0 10px rgba(255,58,96,0.3); }
+
+/* Delta readout: slightly stronger */
+#histTip .ht-delta {
+  font-size: 10.5px;
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
