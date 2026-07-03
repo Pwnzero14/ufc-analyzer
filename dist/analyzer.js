@@ -6982,6 +6982,8 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             bestPickConfidenceCache.clear();
             bestPickReasonCache.clear();
+            const tierCounts = { High: 0, Med: 0, Low: 0 };
+            const confVals = [];
             const rows = fighters.map((f, i) => {
                 const el = getBestPickLeanForDir(f, type) || getBestPickLean(f);
                 // For SS/TD/FT/CTRL: override the displayed line with the easiest one
@@ -6998,6 +7000,9 @@ function renderBestPicks(container, renderSeq = 0) {
                     }
                 }
                 const tier = pickTier(f);
+                tierCounts[tier.label] = (tierCounts[tier.label] || 0) + 1;
+                if (el.conf)
+                    confVals.push(Number(el.conf) || 0);
                 const archiveNote = getBestPickArchiveNote(f);
                 let reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
                 // If we overrode the displayed line, sync the line value embedded in
@@ -7013,7 +7018,13 @@ function renderBestPicks(container, renderSeq = 0) {
                         }
                     }
                 }
-                const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source">(${el._source === 'ss_r1' ? 'R1 SS' : el._source?.toUpperCase()} line)</span>` : '';
+                const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source src-${el._source}">(${el._source === 'ss_r1' ? 'R1 SS' : el._source?.toUpperCase()} line)</span>` : '';
+                // Brighten the key numbers in the reason (projection + edge vs line)
+                const reasonHtml = reason
+                    .replace(/\(proj ([\d.]+)\)/, '(proj <b class="bpr-key">$1</b>)')
+                    .replace(/\(avg ([\d.]+m?)\)/, '(avg <b class="bpr-key">$1</b>)')
+                    .replace(/by ([\d.]+m?)/, 'by <b class="bpr-key">$1</b>')
+                    .replace(/is ([\d.]+m?) (above|below)/, 'is <b class="bpr-key">$1</b> $2');
                 // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts show ⚡ corr
                 const corrPenalty = corrPenaltyMap.get(f.name) || 0;
                 const conflictTag = corrPenalty > 0
@@ -7045,7 +7056,7 @@ function renderBestPicks(container, renderSeq = 0) {
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reason}</div></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reasonHtml}</div></div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label || ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -7057,7 +7068,9 @@ function renderBestPicks(container, renderSeq = 0) {
         </div>
       </div>`;
             }).join('');
-            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span><span class="best-picks-count">${fighters.length} picks</span></div>${rows}</div>`;
+            const avgConf = confVals.length ? Math.round(confVals.reduce((a, b) => a + b, 0) / confVals.length) : null;
+            const summary = `<div class="best-picks-summary">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bps-avg">avg confidence <b>${avgConf}%</b></span>` : ''}</div>`;
+            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span><span class="best-picks-count">${fighters.length} picks</span></div>${rows}${summary}</div>`;
         }
         const html = `<div class="best-picks-grid">${buildSection(overs, 'over')}${buildSection(unders, 'under')}</div>`;
         container.innerHTML = html || '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';

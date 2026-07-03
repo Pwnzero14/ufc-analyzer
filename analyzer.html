@@ -20134,6 +20134,84 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .best-picks-section.under .best-picks-count { animation: none; }
 }
 
+/* ── GLOW-UP 136: AI Best Picks L3 — section intelligence footer ── */
+/* Tier tally + average model confidence at the bottom of each column,
+   so the overs slate and unders slate can be compared at a glance. */
+
+.best-picks-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px 10px;
+  background: rgba(255,255,255,0.015);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  position: relative;
+  z-index: 1;
+}
+.bps-tally {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.bps-high {
+  color: #5ff0b0;
+  background: rgba(27,220,136,0.08);
+  border: 1px solid rgba(27,220,136,0.28);
+  text-shadow: 0 0 6px rgba(27,220,136,0.3);
+}
+.bps-med {
+  color: #ffd884;
+  background: rgba(248,198,74,0.08);
+  border: 1px solid rgba(248,198,74,0.28);
+  text-shadow: 0 0 6px rgba(248,198,74,0.3);
+}
+.bps-low {
+  color: rgba(255,255,255,0.50);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.bps-avg {
+  margin-left: auto;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.bps-avg b {
+  color: var(--text);
+  font-size: 10.5px;
+  text-shadow: 0 0 8px rgba(255,255,255,0.18);
+}
+
+/* ── GLOW-UP 137: AI Best Picks L4 — stat identity + reason key numbers ── */
+
+/* Source tags: stat-family colors (same DNA as the stat cards) */
+.best-pick-source.src-ss,
+.best-pick-source.src-ss_r1 {
+  color: rgba(44,212,208,0.85);
+  text-shadow: 0 0 6px rgba(44,212,208,0.3);
+}
+.best-pick-source.src-td {
+  color: rgba(240,192,64,0.85);
+  text-shadow: 0 0 6px rgba(240,192,64,0.3);
+}
+.best-pick-source.src-ft {
+  color: rgba(146,125,255,0.9);
+  text-shadow: 0 0 6px rgba(146,125,255,0.35);
+}
+.best-pick-source.src-ctrl {
+  color: rgba(255,91,120,0.85);
+  text-shadow: 0 0 6px rgba(255,91,120,0.3);
+}
+
+/* Key numbers in the reason line: projection + edge pop out of the gray */
+.bpr-key {
+  color: rgba(255,255,255,0.92);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255,255,255,0.20);
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
