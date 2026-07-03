@@ -17768,12 +17768,18 @@ function initAnalyzerCore() {
             .filter(f => !ql || f.name.toLowerCase().includes(ql) || (f.opponent || '').toLowerCase().includes(ql))
             .slice(0, 12);
         cmdSel = Math.min(cmdSel, Math.max(0, items.length - 1));
-        cmdResults.innerHTML = items.length ? items.map((f, i) => `
+        cmdResults.innerHTML = items.length ? items.map((f, i) => {
+            const cl = f.lean?.lean;
+            const leanChip = (cl === 'over' || cl === 'under') && f.lean?.conf
+                ? `<span class="cmd-item-lean ${cl}">${cl === 'over' ? '▲' : '▼'} ${f.lean.conf}%</span>`
+                : '';
+            return `
       <div class="cmd-item ${i === cmdSel ? 'sel' : ''}" data-name="${f.name}">
         <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></span>
-        <span class="cmd-item-name">${prettyName(f.name)}</span>
+        <span class="cmd-item-name">${prettyName(f.name)}</span>${leanChip}
         <span class="cmd-item-meta">${f.db?.record || ''} · vs ${prettyName(f.opponent || '—')}</span>
-      </div>`).join('') : '<div class="cmd-item-empty">No fighters match</div>';
+      </div>`;
+        }).join('') : '<div class="cmd-item-empty">No fighters match</div>';
         hydrateAvatarImgs(cmdResults);
         cmdResults.querySelectorAll('.cmd-item').forEach(el => {
             el.addEventListener('click', () => { closePalette(); jumpToFighterCard(el.dataset['name'] || ''); });
