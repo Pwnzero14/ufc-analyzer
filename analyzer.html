@@ -20212,6 +20212,60 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: 0 0 8px rgba(255,255,255,0.20);
 }
 
+/* ── GLOW-UP 138: AI Best Picks L5 — champion finale ── */
+
+/* ★ TOP PICK badge on each section's #1 */
+.bp-top-pick {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(248,198,74,0.22), rgba(248,198,74,0.10));
+  border: 1px solid rgba(248,198,74,0.55);
+  color: #ffe9ad;
+  text-shadow: 0 0 8px rgba(248,198,74,0.5);
+  box-shadow: 0 0 10px rgba(248,198,74,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+/* Champion shimmer: slow gold sheen sweeps the #1 cards (idle → sweep → idle) */
+.best-picks-section.over > .section-body > .best-pick-row:first-child,
+.best-picks-section.over > .best-pick-row:nth-child(2),
+.best-picks-section.under > .section-body > .best-pick-row:first-child,
+.best-picks-section.under > .best-pick-row:nth-child(2) {
+  background:
+    linear-gradient(115deg, transparent 0%, transparent 42%, rgba(248,198,74,0.10) 50%, transparent 58%, transparent 100%),
+    linear-gradient(135deg, rgba(248,198,74,0.09), rgba(13,18,33,0.75) 55%) !important;
+  background-size: 250% 100%, 100% 100%;
+  background-position: 200% 0, 0 0;
+  animation: bpChampSweep138 6.5s ease-in-out infinite;
+}
+@keyframes bpChampSweep138 {
+  0%, 55%   { background-position: 200% 0, 0 0; }
+  85%, 100% { background-position: -80% 0, 0 0; }
+}
+
+/* #1 avatar: gold champion ring with a breathing halo (halo animates filter —
+   the ring box-shadow must stay static !important to win the tier-ring cascade) */
+.best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar {
+  box-shadow: 0 0 0 2px rgba(248,198,74,0.65), 0 0 14px rgba(248,198,74,0.35), 0 3px 8px rgba(0,0,0,0.5) !important;
+  animation: bpChampRing138 3.2s ease-in-out infinite;
+}
+@keyframes bpChampRing138 {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(248,198,74,0.20)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(248,198,74,0.55)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .best-picks-section.over > .best-pick-row:nth-child(2),
+  .best-picks-section.under > .best-pick-row:nth-child(2),
+  .best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar { animation: none; }
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */

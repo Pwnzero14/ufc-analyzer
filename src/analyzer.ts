@@ -7359,7 +7359,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reasonHtml}</div></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reasonHtml}</div></div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label||''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
