@@ -14666,6 +14666,14 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       <div class="lean-cell">
         <div class="lean-badge ${leanClass}" style="${leanGradStyle}" title="${lean.verdict}">${leanText}${confInlineLabel}</div>
         ${confPct > 0 ? `<div class="confidence-meter" title="Confidence${displayGrade}: ${confPct}%${recalConf != null && recalConf !== confPct ? ' (recal: ' + recalConf + '%)' : ''}"><div class="confidence-fill" data-fill-width="${displayConf}%" style="width:0%; background: rgb(${roleRGB}); color: rgb(${roleRGB});"></div></div>` : ''}
+        ${(() => {
+          const wm = _weightMissSignals.get(f.name.toLowerCase());
+          if (!wm) return '';
+          const lbsLabel = wm.lbsOver != null ? `${wm.lbsOver % 1 === 0 ? wm.lbsOver : wm.lbsOver.toFixed(1)} LB` : '';
+          const tip = wm.source.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+          return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
+        })()}
+        ${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
         ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b" title="Rival models disagree with the main lean — ${String(lean.rivalryDissent).replace(/"/g, '&quot;')}">⚔ Rival models dissent</div>` : ''}
@@ -14686,7 +14694,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           const totalEvents = Math.max(...Object.values(stats).map(d => d.total));
           return `<div class="archive-accuracy-badge" title="Archive hit rate for ${f.name} across ${totalEvents} settled event(s)">📊 ${parts.join(' · ')}</div>`;
         })()}
-        ${leanEvDetail != null ? `<div class="ev-label" title="${leanEvDetail.isAssumedVig ? 'Assumed -110 vig (no book odds for FP)' : `Actual odds · profit ${leanEvDetail.profit.toFixed(2)}x${leanEvDetail.vig != null ? ` · vig ${leanEvDetail.vig}%` : ''}`}">${leanEvDetail.isAssumedVig ? '~' : ''}EV: ${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%${!leanEvDetail.isAssumedVig && leanEvDetail.vig != null ? ` <span style="color:${leanEvDetail.vig > 5 ? 'var(--red)' : leanEvDetail.vig > 3 ? 'var(--amber)' : 'var(--green)'};font-size:8px">(${leanEvDetail.vig}%)</span>` : ''}</div>` : ''}
+        ${leanEvDetail != null ? `<div class="ev-label ${leanEvDetail.ev > 0 ? 'ev-pos' : leanEvDetail.ev < 0 ? 'ev-neg' : ''}" title="${leanEvDetail.isAssumedVig ? 'Assumed -110 vig (no book odds for FP)' : `Actual odds · profit ${leanEvDetail.profit.toFixed(2)}x${leanEvDetail.vig != null ? ` · vig ${leanEvDetail.vig}%` : ''}`}">${leanEvDetail.isAssumedVig ? '~' : ''}EV: ${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%${!leanEvDetail.isAssumedVig && leanEvDetail.vig != null ? ` <span style="color:${leanEvDetail.vig > 5 ? 'var(--red)' : leanEvDetail.vig > 3 ? 'var(--amber)' : 'var(--green)'};font-size:8px">(${leanEvDetail.vig}%)</span>` : ''}</div>` : ''}
         ${weightedAvg != null ? `<div class="weighted-avg-label">W.Avg: ${weightedAvg.toFixed(1)}</div>` : ''}
         ${(() => {
           const fvEdge = lean.fairValueEdge;
@@ -14698,13 +14706,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           return `<div class="fair-value-chip" style="font-size:9px;padding:2px 7px;border-radius:6px;background:${bg};border:1px solid ${col}40;color:${col};letter-spacing:0.04em" title="Fair value ${fvVal.toFixed(1)} — edge ${fvEdge > 0 ? '+' : ''}${fvEdge.toFixed(1)} pts vs active line">FV ${fvEdge > 0 ? '+' : ''}${fvEdge.toFixed(1)}</div>`;
         })()}
       </div>
-      <div class="row-expand-slot">${(() => {
-        const wm = _weightMissSignals.get(f.name.toLowerCase());
-        if (!wm) return '';
-        const lbsLabel = wm.lbsOver != null ? `${wm.lbsOver % 1 === 0 ? wm.lbsOver : wm.lbsOver.toFixed(1)} LB` : '';
-        const tip = wm.source.replace(/"/g, '&quot;').replace(/</g, '&lt;');
-        return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
-      })()}${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}<span class="expand-arrow">▼</span></div>
+      <div class="row-expand-slot"><span class="expand-arrow">▼</span></div>
     </div>
     <div class="fighter-detail"></div>`;
 

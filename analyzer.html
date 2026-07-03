@@ -19684,6 +19684,87 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: 0 0 10px rgba(255,58,96,0.3);
 }
 
+/* ── GLOW-UP 130: Lean annotation stack — mini-chip family ── */
+/* The readouts under the lean badge (consensus, stat-split/dissent, EV,
+   W.Avg, archive accuracy, FV) unify into one glass chip family. */
+
+/* Consensus: gold glass chip */
+.consensus-lean {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(248,198,74,0.08);
+  border: 1px solid rgba(248,198,74,0.26);
+}
+
+/* Warning chips (⚠ Stat split / ⚔ Rival models dissent): real chip body.
+   Base border also lets the dissent variant's inline border-color render —
+   it was setting border-color on a borderless element before. */
+.conflict-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(240,192,64,0.07);
+  border: 1px solid rgba(240,192,64,0.30);
+  opacity: 1;
+}
+
+/* EV: sign-aware identity — green chip when +EV, red chip when -EV */
+.ev-label.ev-pos {
+  background: linear-gradient(135deg, rgba(0,232,122,0.10), rgba(0,232,122,0.04));
+  border: 1px solid rgba(0,232,122,0.22);
+  color: rgba(150,255,205,0.95);
+}
+.ev-label.ev-neg {
+  background: linear-gradient(135deg, rgba(255,58,96,0.10), rgba(255,58,96,0.04));
+  border: 1px solid rgba(255,58,96,0.22);
+  color: rgba(255,150,165,0.95);
+}
+.ev-label.ev-neg::after {
+  background: linear-gradient(90deg, var(--red), var(--orange));
+  box-shadow: 0 0 10px rgba(255,58,96,0.4);
+}
+.ev-label.ev-neg:hover {
+  background: linear-gradient(135deg, rgba(255,58,96,0.18), rgba(255,58,96,0.08));
+  box-shadow: 0 8px 20px rgba(255,58,96,0.15);
+}
+
+/* W.Avg: quiet glass chip */
+.weighted-avg-label {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  font-size: 9px;
+  color: var(--text2);
+}
+
+/* Archive accuracy: glass chip, per-stat colors stay */
+.archive-accuracy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+/* FV chip: hover lift on top of its inline identity colors */
+.fair-value-chip {
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+}
+.fair-value-chip:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 10px rgba(255,255,255,0.06);
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */
