@@ -20052,6 +20052,88 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: 0 0 6px rgba(0,232,122,0.3);
 }
 
+/* ── GLOW-UP 135: AI Best Picks L2 — confidence meters, click affordance, depth ── */
+
+/* Line value wrapper: value + confidence meter stacked, right-aligned */
+.best-pick-line-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  justify-self: end;
+}
+
+/* Confidence meter: exact % under the line value (tier chips only say HIGH/MED) */
+.best-pick-conf {
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+.best-pick-conf i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.best-pick-conf.high i {
+  background: linear-gradient(90deg, rgba(27,220,136,0.45), #1bdc88);
+  box-shadow: 0 0 6px rgba(27,220,136,0.45);
+}
+.best-pick-conf.med i {
+  background: linear-gradient(90deg, rgba(248,198,74,0.45), var(--gold));
+  box-shadow: 0 0 6px rgba(248,198,74,0.40);
+}
+.best-pick-conf.low i {
+  background: rgba(255,255,255,0.28);
+}
+
+/* Click affordance: chevron slides in on hover (rows jump to the fighter card) */
+.best-pick-row[data-jump]::after {
+  content: '›';
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translate(-5px, -50%);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: rgba(248,198,74,0);
+  transition: color 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.best-pick-row[data-jump]:hover::after {
+  color: rgba(248,198,74,0.75);
+  transform: translate(0, -50%);
+}
+
+/* Hover depth for every row (spotlight rows keep their stronger shadows) */
+.best-pick-row[data-jump]:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.30);
+}
+
+/* Count badges: slow breathing glow in section color */
+.best-picks-section.over .best-picks-count {
+  animation: bpCountOver135 3.6s ease-in-out infinite;
+}
+.best-picks-section.under .best-picks-count {
+  animation: bpCountUnder135 3.6s ease-in-out infinite;
+}
+@keyframes bpCountOver135 {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 12px rgba(32,223,143,0.25); }
+}
+@keyframes bpCountUnder135 {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 12px rgba(255,91,120,0.25); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .best-picks-section.over .best-picks-count,
+  .best-picks-section.under .best-picks-count { animation: none; }
+}
+
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */
 
 /* === Lab header: deep glass + radial atmosphere === */

@@ -7051,7 +7051,10 @@ function renderBestPicks(container, renderSeq = 0) {
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
           <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
         </div>
-        <div class="best-pick-line">${line || '—'}</div>
+        <div class="best-pick-line-wrap">
+          <div class="best-pick-line">${line || '—'}</div>
+          ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
+        </div>
       </div>`;
             }).join('');
             return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span><span class="best-picks-count">${fighters.length} picks</span></div>${rows}</div>`;
