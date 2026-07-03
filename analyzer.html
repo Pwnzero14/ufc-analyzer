@@ -7003,9 +7003,7 @@ html { scroll-behavior: smooth; }
 .fight-spine-ft-value {
   text-shadow: 0 0 8px rgba(146,125,255,0.3) !important;
 }
-.fight-spine-corr {
-  box-shadow: 0 0 8px rgba(255,90,115,0.12) !important;
-}
+/* .fight-spine-corr box-shadow — NEUTRALIZED by GLOW-UP 127 (direction-aware) */
 .fight-spine-top-edge {
   box-shadow: 0 0 12px rgba(255,210,74,0.2) !important;
   text-shadow: 0 0 6px rgba(255,210,74,0.2) !important;
@@ -11772,14 +11770,7 @@ html { scroll-behavior: smooth; }
 }
 
 /* --- Correlation warning: breathing glow --- */
-.fight-spine-corr {
-  box-shadow: 0 0 8px rgba(255,90,115,0.12);
-  animation: corrPulse 3s ease-in-out infinite;
-}
-@keyframes corrPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(255,90,115,0.12); }
-  50%      { box-shadow: 0 0 14px rgba(255,90,115,0.22); }
-}
+/* corr pulse — NEUTRALIZED by GLOW-UP 127 (direction-aware pulse lives there) */
 
 /* --- Top edge badge: shimmer sweep --- */
 .fight-spine-top-edge { position: relative; overflow: hidden; }
@@ -19486,6 +19477,43 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* Delta readout: slightly stronger */
 #histTip .ht-delta {
   font-size: 10.5px;
+}
+
+/* ── GLOW-UP 127: Correlation warning chip — direction-aware glass ── */
+/* Same-fight double-lean warning (⚠ OVER/UNDER × 2). Stays in the caution
+   family, but direction is now scannable: double-UNDER = red, double-OVER
+   = amber. One --corr-c channel drives bg/border/text/glow/pulse. */
+
+.fight-spine-corr {
+  --corr-c: 255,90,115; /* fallback = red (legacy no-class chips) */
+  background: linear-gradient(180deg, rgba(var(--corr-c),0.15), rgba(var(--corr-c),0.05));
+  color: rgb(var(--corr-c));
+  border: 1px solid rgba(var(--corr-c),0.45);
+  border-radius: 4px;
+  padding: 4px 8px;
+  letter-spacing: 0.10em;
+  text-shadow: 0 0 8px rgba(var(--corr-c),0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(var(--corr-c),0.12);
+  animation: corrPulse127 3s ease-in-out infinite;
+}
+.fight-spine-corr.corr-under { --corr-c: 255,90,115; }
+.fight-spine-corr.corr-over  { --corr-c: 255,150,60; }
+
+@keyframes corrPulse127 {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 8px rgba(var(--corr-c),0.12); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 16px rgba(var(--corr-c),0.28); }
+}
+
+/* Hover: pause the pulse, hold the strong glow (animations beat normal
+   declarations, so the pulse must stop for hover shadow to apply) */
+.fight-pair:hover .fight-spine-corr {
+  animation: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 16px rgba(var(--corr-c),0.32);
+  transform: scale(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fight-spine-corr { animation: none; }
 }
 
 /* ── GLOW-UP 93: Parlay Lab — Homo Sapiens Sapiens (final evolution) ── */

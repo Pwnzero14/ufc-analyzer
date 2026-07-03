@@ -11775,7 +11775,7 @@ function buildFightSpine(fight: FightPair): HTMLDivElement {
   let corrBlock = '';
   if (fight.correlation) {
     const c = fight.correlation;
-    corrBlock = `<div class="fight-spine-corr" title="${c.note}">⚠ ${c.direction.toUpperCase()} ${c.stat} ×2</div>`;
+    corrBlock = `<div class="fight-spine-corr corr-${c.direction}" title="${c.note}">⚠ ${c.direction.toUpperCase()} ${c.stat} ×2</div>`;
   }
 
   let topEdgeBlock = '';
