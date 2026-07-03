@@ -5427,9 +5427,22 @@ function calcFTLean(
   if (history.length < 3) return null;
 
   const mins = history.map(h => (Number(h.timeSecs) / 60));
-  const avgFT = mins.reduce((s, v) => s + v, 0) / mins.length;
+  // Round-normalize the average for THIS fight's scheduled duration: a 22m
+  // five-round war cannot happen in a 15m three-rounder — it would have gone
+  // the 3R distance instead. Cap each historical fight at the upcoming
+  // fight's max so 5R history can't inflate the OVER case. The hit-rate
+  // check below stays uncapped on purpose: lasting 22m is still real
+  // evidence the fighter lasted past a 12.5m line.
+  const schedRounds = scheduledRoundsMap.get(name) ?? scheduledRoundsMap.get(normalizeName(name) || '') ?? null;
+  const maxMins = schedRounds != null ? schedRounds * 5 : null;
+  const cappedMins = maxMins != null ? mins.map(v => Math.min(v, maxMins)) : mins;
+  const rawAvgFT = mins.reduce((s, v) => s + v, 0) / mins.length;
+  const avgFT = cappedMins.reduce((s, v) => s + v, 0) / cappedMins.length;
   const reasons: LeanReason[] = [];
   let score = 0;
+  if (maxMins != null && rawAvgFT - avgFT > 0.3) {
+    reasons.push({ icon: 'neu', text: `Round-normalized: raw avg ${rawAvgFT.toFixed(1)}m capped to ${avgFT.toFixed(1)}m for a ${schedRounds}R fight (${maxMins}m max)` });
+  }
 
   const diff = avgFT - line_ft;
   if      (diff > 2.0) { score += 2.4; reasons.push({ icon:'pos', text:`Avg fight time (${avgFT.toFixed(1)}m) is ${diff.toFixed(1)}m above line` }); }
@@ -5453,7 +5466,10 @@ function calcFTLean(
     else if (db.finishRate < 0.35) { score += 0.6; reasons.push({ icon:'pos', text:`Decision-heavy profile supports longer fight time` }); }
   }
 
-  if (db.fiveRoundRate != null && db.fiveRoundRate > 0.3) {
+  // Only credit 4-5 round durability when this fight can actually go there —
+  // in a 3R fight that upside is capped at 15m. Unknown schedule keeps the
+  // legacy behavior.
+  if ((schedRounds == null || schedRounds === 5) && db.fiveRoundRate != null && db.fiveRoundRate > 0.3) {
     score += 0.5;
     reasons.push({ icon:'pos', text:`Frequent 4-5 round sample profile increases duration upside` });
   }
