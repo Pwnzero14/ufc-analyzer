@@ -9495,7 +9495,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const pendingEvents = Array.from(pendingEventMap.values()).sort((a, b) => b.total - a.total);
 
   // ── AI pick accuracy by stat type (lean-direction correct, over + under) ──
-  const aiAccuracyByType: Record<string, { hits: number; total: number }> = {};
+  const aiAccuracyByType: Record<string, { hits: number; total: number; overHits: number; overTotal: number; underHits: number; underTotal: number }> = {};
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || !pastEventKeys.has(key)) continue;
@@ -9521,11 +9521,14 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           return Math.abs(Number(a.line ?? activeLine) - activeLine) - Math.abs(Number(b.line ?? activeLine) - activeLine);
         })[0];
       if (!match) continue;
-      if (!aiAccuracyByType[propType]) aiAccuracyByType[propType] = { hits: 0, total: 0 };
-      aiAccuracyByType[propType].total++;
+      if (!aiAccuracyByType[propType]) aiAccuracyByType[propType] = { hits: 0, total: 0, overHits: 0, overTotal: 0, underHits: 0, underTotal: 0 };
+      const bucket = aiAccuracyByType[propType];
+      bucket.total++;
       const res = Number(match.result);
-      if (lean === 'over' && res > activeLine) aiAccuracyByType[propType].hits++;
-      if (lean === 'under' && res < activeLine) aiAccuracyByType[propType].hits++;
+      const dirHit = lean === 'over' ? res > activeLine : res < activeLine;
+      if (dirHit) bucket.hits++;
+      if (lean === 'over') { bucket.overTotal++; if (dirHit) bucket.overHits++; }
+      else { bucket.underTotal++; if (dirHit) bucket.underHits++; }
     }
   }
 
@@ -9753,7 +9756,17 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     // Don't color-grade until 5+ samples — small samples produce misleading red/green signals
     const color = lowN ? 'var(--text-muted)' : pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
     const nTag = lowN ? ` <span style="opacity:0.5;font-size:9px">(n=${d.total})</span>` : '';
-    return `<span class="archive-stat-badge"${lowN ? '' : ` style="--asb-color:${color}"`}><span class="asb-label">${label}</span><span class="asb-val" style="color:${color}">${d.hits}/${d.total} <span style="opacity:0.7">(${pct}%)${nTag}</span></span><span class="asb-bar"><span style="width:${Math.max(2, Math.min(100, pct))}%;background:${color}"></span></span></span>`;
+    // Direction split: the aggregate hides the actionable read ("trust FP
+    // overs, fade FP unders"). Same 5-sample rule before color-grading.
+    const splitRow = (arrow: string, dirLabel: string, h: number, t: number): string => {
+      if (!t) return '';
+      const p = Math.round((h / t) * 100);
+      const low = t < 5;
+      const c = low ? 'var(--text-muted)' : p >= 65 ? 'var(--green)' : p >= 45 ? 'var(--amber)' : 'var(--red)';
+      return `<span class="asb-split" title="${dirLabel} picks: ${h}/${t} correct${low ? ' (low sample)' : ''}">${arrow} <b style="color:${c}">${p}%</b><i>${h}/${t}</i></span>`;
+    };
+    const splits = `<span class="asb-splits">${splitRow('▲', 'OVER', d.overHits, d.overTotal)}${splitRow('▼', 'UNDER', d.underHits, d.underTotal)}</span>`;
+    return `<span class="archive-stat-badge"${lowN ? '' : ` style="--asb-color:${color}"`}><span class="asb-label">${label}</span><span class="asb-val" style="color:${color}">${d.hits}/${d.total} <span style="opacity:0.7">(${pct}%)${nTag}</span></span><span class="asb-bar"><span style="width:${Math.max(2, Math.min(100, pct))}%;background:${color}"></span><span class="asb-tick" title="~55% — rough break-even zone for pick-em entries"></span></span>${splits}</span>`;
   };
   const statSummaryHtml = `
     <div class="archive-stat-summary">
