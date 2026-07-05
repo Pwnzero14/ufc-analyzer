@@ -24820,6 +24820,105 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .parlay-count-pill { animation: none; }
 }
 
+/* ── GLOW-UP 140: Parlay Lab L2 — leg rows in the Best Picks language ── */
+
+/* Platform chip: book brand colors, same DNA as best-pick-platform */
+.parlay-leg-plat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex: none;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text3);
+}
+.parlay-leg-plat.plat-pick6 {
+  color: #7cc4ff; border-color: rgba(86,195,255,0.35); background: rgba(86,195,255,0.07);
+  text-shadow: 0 0 6px rgba(86,195,255,0.3);
+}
+.parlay-leg-plat.plat-underdog {
+  color: #a8aeff; border-color: rgba(127,136,255,0.35); background: rgba(127,136,255,0.07);
+  text-shadow: 0 0 6px rgba(127,136,255,0.3);
+}
+.parlay-leg-plat.plat-prizepicks {
+  color: #5fe0dc; border-color: rgba(44,212,208,0.35); background: rgba(44,212,208,0.07);
+  text-shadow: 0 0 6px rgba(44,212,208,0.3);
+}
+.parlay-leg-plat.plat-betr {
+  color: #ffa06b; border-color: rgba(255,138,61,0.35); background: rgba(255,138,61,0.07);
+  text-shadow: 0 0 6px rgba(255,138,61,0.3);
+}
+.parlay-leg-plat.plat-draftkings_sportsbook {
+  color: #ffc75e; border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.07);
+  text-shadow: 0 0 6px rgba(245,158,11,0.3);
+}
+
+/* Stat tag: stat-family colors (same DNA as best-pick-source tags) */
+.parlay-leg-stat.src-ss, .parlay-leg-stat.src-ss_r1 {
+  color: rgba(44,212,208,0.9) !important;
+  text-shadow: 0 0 6px rgba(44,212,208,0.3);
+}
+.parlay-leg-stat.src-td {
+  color: rgba(240,192,64,0.9) !important;
+  text-shadow: 0 0 6px rgba(240,192,64,0.3);
+}
+.parlay-leg-stat.src-ft {
+  color: rgba(146,125,255,0.95) !important;
+  text-shadow: 0 0 6px rgba(146,125,255,0.35);
+}
+.parlay-leg-stat.src-fp {
+  color: rgba(255,255,255,0.75) !important;
+  text-shadow: 0 0 6px rgba(255,255,255,0.15);
+}
+
+/* Confidence: % with a tier-colored meter under it (Best Picks family) */
+.parlay-leg-conf {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 46px;
+}
+.plc-bar {
+  display: block;
+  width: 42px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.plc-bar b {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.parlay-leg-row.conf-high .plc-bar b {
+  background: linear-gradient(90deg, rgba(27,220,136,0.45), #1bdc88);
+  box-shadow: 0 0 6px rgba(27,220,136,0.45);
+}
+.parlay-leg-row.conf-med .plc-bar b {
+  background: linear-gradient(90deg, rgba(248,198,74,0.45), var(--gold));
+  box-shadow: 0 0 6px rgba(248,198,74,0.40);
+}
+.parlay-leg-row.conf-low .plc-bar b {
+  background: rgba(255,255,255,0.28);
+}
+
+/* Check square: quiet by default, gold when the leg is in the slip */
+.parlay-leg-check {
+  color: var(--text3);
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.parlay-leg-row:hover .parlay-leg-check { color: var(--text2); }
+.parlay-leg-row.selected .parlay-leg-check {
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(248,198,74,0.5);
+}
+
 </style>
 </head>
 <body>

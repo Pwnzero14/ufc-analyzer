@@ -8119,11 +8119,13 @@ function renderParlayLab(container: HTMLElement): void {
   }
   availableLegs.sort((a, b) => b.leg.confidence - a.leg.confidence);
 
-  // Determine which are selected
+  // Determine which are selected (keep the fighter ref for render-time
+  // platform-key lookups on slip rows)
   const selectedLegs: ParlayLeg[] = [];
+  const selectedPairs: { leg: ParlayLeg; fighter: AnalyzerFighter }[] = [];
   for (const a of availableLegs) {
     const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
-    if (parlaySelectedLegs.has(key)) selectedLegs.push(a.leg);
+    if (parlaySelectedLegs.has(key)) { selectedLegs.push(a.leg); selectedPairs.push(a); }
   }
 
   // Compute health for current parlay
@@ -8139,25 +8141,31 @@ function renderParlayLab(container: HTMLElement): void {
     const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
     const sel = parlaySelectedLegs.has(key);
     const confClass = a.leg.confidence >= 72 ? 'conf-high' : a.leg.confidence >= 58 ? 'conf-med' : 'conf-low';
+    const pk = getSourceActivePlatformKey(a.fighter, a.leg.stat);
+    const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(a.fighter, a.leg.stat)}">${platformKeyShort(pk)}</span>` : '';
     return `<div class="parlay-leg-row${sel ? ' selected' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
-      <span class="parlay-leg-stat">${a.leg.stat.toUpperCase()}</span>
+      <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
-      <span class="parlay-leg-conf">${a.leg.confidence}%</span>
+      ${platChip}
+      <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
     </div>`;
   }).join('');
 
-  const slipRows = selectedLegs.length > 0
-    ? selectedLegs.map(l => {
+  const slipRows = selectedPairs.length > 0
+    ? selectedPairs.map(({ leg: l, fighter: lf }) => {
         const key = parlayLegKey(l.fighter, l.stat, l.direction);
+        const pk = getSourceActivePlatformKey(lf, l.stat);
+        const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>` : '';
         return `<div class="parlay-slip-leg">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
           <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
           <span class="parlay-leg-dir ${l.direction}">${l.direction.toUpperCase()}</span>
-          <span class="parlay-leg-stat">${l.stat.toUpperCase()}</span>
+          <span class="parlay-leg-stat src-${l.stat}">${l.stat === 'ss_r1' ? 'R1 SS' : l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
+          ${platChip}
         </div>`;
       }).join('')
     : '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
