@@ -9015,6 +9015,20 @@ function renderPredictionsHtml(
     const age = Date.now() - latest.generatedAt;
     const agoLabel = age < 3600000 ? `${Math.round(age / 60000)}m ago` : `${Math.round(age / 3600000)}h ago`;
 
+    // Model-vs-book: the predictor ran pre-lines; once books post, the gap
+    // between predicted and posted line IS the signal. Green = model sees
+    // more than the book (over-shaded), red = less (under-shaded).
+    const predByName = new Map(allFighters.map(f => [(normalizeName(f.name) || f.name).toLowerCase(), f] as const));
+    const bookCell = (fighterName: string, src: 'ss' | 'td' | 'fp', pred: number): string => {
+      const f = predByName.get((normalizeName(fighterName) || fighterName).toLowerCase());
+      const book = f ? getSourceActiveLine(f, src) : null;
+      if (book == null || !Number.isFinite(Number(pred))) return `<div class="pred-book none">no line</div>`;
+      const d = pred - book;
+      const thr = src === 'td' ? 0.5 : 2;
+      const cls = d >= thr ? 'pos' : d <= -thr ? 'neg' : 'flat';
+      return `<div class="pred-book ${cls}" title="Model ${pred} vs book ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">BK ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
+    };
+
     const rows = latest.predictions.map(p => {
       const ssArrow = p.ss.lean === 'over' ? '▲' : '▼';
       const tdArrow = p.td.lean === 'over' ? '▲' : '▼';
@@ -9025,12 +9039,12 @@ function renderPredictionsHtml(
       const confWidth = Math.round(p.fantasy.confidence);
       const confColor = confWidth >= 65 ? 'var(--green)' : confWidth >= 45 ? 'var(--amber)' : 'var(--red)';
       const reasons = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...p.fantasy.reasons.slice(0, 2)]
-        .map(r => `<span style="display:inline-block;font-size:9px;color:var(--text-muted);background:rgba(255,255,255,0.04);padding:1px 5px;border-radius:3px;margin:1px 2px">${r}</span>`).join('');
+        .map(r => `<span class="pred-factor">${r}</span>`).join('');
       return `<div class="pred-row" data-jump="${p.fighter}" title="Open fighter card">
         <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text)">${prettyName(p.fighter)}</div><div style="font-size:9px;color:var(--text-muted)">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</div></div></div>
-        <div style="min-width:55px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">SS</div><div style="font-size:12px;font-weight:700;color:${ssColor}">${p.ss.line} ${ssArrow}</div></div>
-        <div style="min-width:45px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">TD</div><div style="font-size:12px;font-weight:700;color:${tdColor}">${p.td.line} ${tdArrow}</div></div>
-        <div style="min-width:55px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div></div>
+        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">SS</div><div style="font-size:12px;font-weight:700;color:${ssColor}">${p.ss.line} ${ssArrow}</div>${bookCell(p.fighter, 'ss', p.ss.line)}</div>
+        <div style="min-width:56px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">TD</div><div style="font-size:12px;font-weight:700;color:${tdColor}">${p.td.line} ${tdArrow}</div>${bookCell(p.fighter, 'td', p.td.line)}</div>
+        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div>${bookCell(p.fighter, 'fp', p.fantasy.line)}</div>
         <div style="min-width:70px"><div style="font-size:10px;color:var(--text-muted)">Conf</div><div style="background:rgba(255,255,255,0.06);border-radius:3px;height:10px;margin-top:2px;overflow:hidden"><div style="width:${confWidth}%;height:100%;background:${confColor};border-radius:3px"></div></div><div style="font-size:9px;color:${confColor};margin-top:1px">${confWidth}%</div></div>
         <div style="flex:1;min-width:0"><div style="display:flex;flex-wrap:wrap;margin-top:2px">${reasons}</div></div>
       </div>`;

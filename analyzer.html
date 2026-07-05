@@ -25128,6 +25128,71 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .parlay-suggest-section .parlay-suggest-card:nth-child(2) { animation: none; }
 }
 
+/* ── GLOW-UP 144: Prop Line Predictions — model-vs-book edge chips ── */
+
+/* Book comparison chip under each predicted stat: BK <line> <±gap>.
+   Green = book shaded under the model (over-side value), red = book shaded
+   over the model (under-side value), flat = book agrees. */
+.pred-book {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  white-space: nowrap;
+}
+.pred-book b {
+  font-weight: 700;
+  margin-left: 2px;
+}
+.pred-book.pos {
+  color: rgba(150,255,205,0.75);
+  background: rgba(0,232,122,0.06);
+  border-color: rgba(0,232,122,0.28);
+}
+.pred-book.pos b {
+  color: #6fe8a8;
+  text-shadow: 0 0 6px rgba(0,232,122,0.35);
+}
+.pred-book.neg {
+  color: rgba(255,170,185,0.75);
+  background: rgba(255,58,96,0.06);
+  border-color: rgba(255,58,96,0.28);
+}
+.pred-book.neg b {
+  color: #ff8a97;
+  text-shadow: 0 0 6px rgba(255,58,96,0.35);
+}
+.pred-book.flat b { color: var(--text2); }
+.pred-book.none {
+  opacity: 0.38;
+  font-style: italic;
+}
+
+/* Factor chips: promoted from inline gray runs to quiet glass chips */
+.pred-factor {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin: 1px 2px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.pred-row:hover .pred-factor {
+  color: rgba(255,255,255,0.72);
+  border-color: rgba(255,255,255,0.12);
+}
+
 </style>
 </head>
 <body>
