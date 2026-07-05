@@ -9121,21 +9121,52 @@ function renderPredictionsHtml(
       <button id="predictorDeleteBtn" class="btn btn-sm" style="background:none;border:1px solid var(--text-muted);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:10px" title="Delete these predictions">✕ Delete</button>
     </div>` : '';
 
+    // Accuracy trajectory: compare against the PREVIOUS learning cycle so the
+    // summary answers "is the model getting better?" instead of being a
+    // memoryless snapshot. Lower |Δ| = better, so ▼ is the good direction.
+    const prevLearn = log.length > 1 ? log[log.length - 2] : null;
+    const prevS = prevLearn?.summary ?? null;
+    const trendTag = (cur: number, prev: number | null | undefined): string => {
+      if (prev == null || !Number.isFinite(prev)) return '';
+      const d = cur - prev;
+      if (Math.abs(d) < 0.05) return `<span class="learn-trend-chip flat" title="Unchanged vs last learning cycle">＝</span>`;
+      const better = d < 0;
+      return `<span class="learn-trend-chip ${better ? 'better' : 'worse'}" title="${better ? 'Improved' : 'Regressed'} vs last cycle (${prev.toFixed(1)} → ${cur.toFixed(1)})">${better ? '▼' : '▲'}${Math.abs(d).toFixed(1)}</span>`;
+    };
+
     const chipColor = (v: number) => v < 8 ? 'var(--green)' : v < 16 ? 'var(--amber)' : 'var(--red)';
     const chipGrade = (v: number) => v < 8 ? 'good' : v < 16 ? 'mid' : 'bad';
-    const statChip = (label: string, val: number) => {
+    const statChip = (label: string, val: number, prevVal?: number | null) => {
       const c = chipColor(val);
       const g = chipGrade(val);
       const pct = Math.min(100, Math.round((val / 40) * 100));
       return `<div class="learn-stat-chip" data-grade="${g}">
         <div class="learn-chip-header"><span class="learn-chip-dot" style="background:${c}"></span><span class="learn-chip-label">Avg |Δ| ${label}</span></div>
-        <span class="learn-chip-value" style="color:${c}">±${val.toFixed(1)}</span>
+        <span class="learn-chip-value" style="color:${c}">±${val.toFixed(1)}</span>${trendTag(val, prevVal)}
         <div class="learn-chip-bar-track"><div class="learn-chip-bar-fill" style="width:${pct}%;background:${c}"></div></div>
       </div>`;
     };
     const overallAvg = (s.avgAbsDeltaSS + s.avgAbsDeltaTD + s.avgAbsDeltaFP) / 3;
     const overallGrade = overallAvg < 10 ? 'A' : overallAvg < 18 ? 'B' : overallAvg < 28 ? 'C' : 'D';
     const overallColor = overallAvg < 10 ? 'var(--green)' : overallAvg < 18 ? 'var(--amber)' : 'var(--red)';
+    const prevOverall = prevS ? (prevS.avgAbsDeltaSS + prevS.avgAbsDeltaTD + prevS.avgAbsDeltaFP) / 3 : null;
+
+    // Mini trajectory chart: overall avg |Δ| across the last learning cycles
+    // (bar height ∝ error, so a shrinking skyline = an improving model).
+    const trajEntries = log.slice(-8);
+    let trajHtml = '';
+    if (trajEntries.length > 1) {
+      const trajVals = trajEntries.map((e) => (e.summary.avgAbsDeltaSS + e.summary.avgAbsDeltaTD + e.summary.avgAbsDeltaFP) / 3);
+      const trajMax = Math.max(...trajVals, 1);
+      const bars = trajEntries.map((e, i) => {
+        const v = trajVals[i];
+        const h = Math.max(14, Math.round((v / trajMax) * 100));
+        const g = v < 10 ? 'g-a' : v < 18 ? 'g-b' : v < 28 ? 'g-c' : 'g-d';
+        const evName = (e as { event?: string }).event ?? 'earlier cycle';
+        return `<i class="${g}${i === trajEntries.length - 1 ? ' cur' : ''}" style="height:${h}%" title="${String(evName).replace(/"/g, '&quot;')} — avg |Δ| ${v.toFixed(1)}"></i>`;
+      }).join('');
+      trajHtml = `<div class="learn-traj" title="Accuracy trajectory — last ${trajEntries.length} learning cycles (shorter bars = better)">${bars}</div>`;
+    }
 
     const sortedDeltas = latestLearn.predictions
       .filter(p => Number.isFinite(p.delta.ss) || Number.isFinite(p.delta.fp))
@@ -9168,17 +9199,18 @@ function renderPredictionsHtml(
       <div class="learn-grade-ring" style="--grade-color:${overallColor}"><span class="learn-grade-letter">${overallGrade}</span></div>
       <div class="learn-hero-meta">
         <div class="learn-hero-title">Prediction Accuracy</div>
-        <div class="learn-hero-subtitle">Avg |Δ| ${overallAvg.toFixed(1)} across ${sortedDeltas.length} fighters</div>
+        <div class="learn-hero-subtitle">Avg |Δ| ${overallAvg.toFixed(1)} across ${sortedDeltas.length} fighters${trendTag(overallAvg, prevOverall)}</div>
         <div class="learn-hero-badges">
           <span class="learn-badge-best">▲ Best · ${s.bestPrediction}</span>
           <span class="learn-badge-worst">▼ Worst · ${s.worstPrediction}</span>
         </div>
       </div>
+      ${trajHtml}
     </div>
     <div class="learn-chips-row">
-      ${statChip('SS', s.avgAbsDeltaSS)}
-      ${statChip('TD', s.avgAbsDeltaTD)}
-      ${statChip('FP', s.avgAbsDeltaFP)}
+      ${statChip('SS', s.avgAbsDeltaSS, prevS?.avgAbsDeltaSS)}
+      ${statChip('TD', s.avgAbsDeltaTD, prevS?.avgAbsDeltaTD)}
+      ${statChip('FP', s.avgAbsDeltaFP, prevS?.avgAbsDeltaFP)}
     </div>
     <div class="learn-meta-row">
       <details class="weights-details"><summary>Weights — click to expand</summary><div class="weights-body">${wAdj}</div></details>

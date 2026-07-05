@@ -25193,6 +25193,70 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(255,255,255,0.12);
 }
 
+/* ── GLOW-UP 145: Learning Summary — accuracy trajectory ── */
+
+/* Trend chip: vs previous learning cycle. Lower error is better, so ▼ = green. */
+.learn-trend-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 7px;
+  vertical-align: middle;
+}
+.learn-trend-chip.better {
+  color: #6fe8a8;
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.32);
+  text-shadow: 0 0 6px rgba(0,232,122,0.35);
+}
+.learn-trend-chip.worse {
+  color: #ff8a97;
+  background: rgba(255,58,96,0.08);
+  border: 1px solid rgba(255,58,96,0.32);
+  text-shadow: 0 0 6px rgba(255,58,96,0.35);
+}
+.learn-trend-chip.flat {
+  color: var(--text3);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+/* Trajectory chart: one bar per learning cycle, shrinking skyline = improving */
+.learn-traj {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 46px;
+  margin-left: auto;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  align-self: center;
+}
+.learn-traj i {
+  display: block;
+  width: 8px;
+  border-radius: 2px 2px 0 0;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+.learn-traj i:hover { opacity: 1; }
+.learn-traj i.g-a { background: linear-gradient(180deg, #1bdc88, rgba(27,220,136,0.4)); }
+.learn-traj i.g-b { background: linear-gradient(180deg, var(--gold), rgba(248,198,74,0.4)); }
+.learn-traj i.g-c { background: linear-gradient(180deg, #ff9646, rgba(255,150,60,0.4)); }
+.learn-traj i.g-d { background: linear-gradient(180deg, #ff5a73, rgba(255,58,96,0.4)); }
+.learn-traj i.cur {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(255,255,255,0.18);
+}
+
 </style>
 </head>
 <body>
