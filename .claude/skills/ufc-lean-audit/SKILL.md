@@ -46,6 +46,13 @@ platform-specific reality, not theory.
   pairs are allowed but demoted.
 - Never recommend same-fight OVERs on opposite stat types either (grappler
   FP-OVER + striker SS-OVER) — negatively correlated, lean one side only.
+- **FT is a SHARED stat** — the fight only has one duration. Same-fight FT
+  picks in OPPOSITE directions (A "FT OVER 12.5" + B "FT UNDER 12.5") are
+  contradictory: at most one can cash. The Best Picks builder auto-drops the
+  weaker-confidence side (cross-section FT exclusivity pass, added 2026-07-04).
+  If an audit ever sees both again, that pass regressed. Opposite-direction
+  pairs on per-fighter stats (SS/TD) remain fine — that's the coherent
+  "A outworks B" shape.
 
 ## Data traps — when a line or delta looks wrong
 

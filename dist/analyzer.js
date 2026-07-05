@@ -6991,6 +6991,37 @@ function renderBestPicks(container, renderSeq = 0) {
         };
         const overs = dedupeNegCorrelatedSameFight(allOversSorted, 'over', 8, 7);
         const unders = dedupeNegCorrelatedSameFight(allUndersSorted, 'under', 8, 7);
+        // FT exclusivity across sections: fight time is a SHARED stat — the fight
+        // only has one duration. Fighter A "FT OVER 12.5" in the overs column and
+        // opponent B "FT UNDER 12.5" in the unders column are contradictory (at
+        // most one can cash), so keep only the higher-confidence side. Opposite-
+        // direction pairs on per-fighter stats (SS/TD) are untouched — those are
+        // the coherent "A outworks B" shape.
+        {
+            const underByName = new Map(unders.map((f) => [f.name.toLowerCase(), f]));
+            for (const overF of [...overs]) {
+                const overLean = getBestPickLeanForDir(overF, 'over');
+                if (overLean?._source !== 'ft' || !overF.opponent)
+                    continue;
+                const oppUnder = underByName.get(overF.opponent.toLowerCase());
+                if (!oppUnder)
+                    continue;
+                const underLean = getBestPickLeanForDir(oppUnder, 'under');
+                if (underLean?._source !== 'ft')
+                    continue;
+                const overConf = Number(overLean.conf) || 0;
+                const underConf = Number(underLean.conf) || 0;
+                if (overConf >= underConf) {
+                    unders.splice(unders.indexOf(oppUnder), 1);
+                    underByName.delete(oppUnder.name.toLowerCase());
+                    debugLog(`FT exclusivity: dropped ${oppUnder.name} FT UNDER (conf ${underConf}) — opponent ${overF.name} FT OVER stronger (conf ${overConf})`);
+                }
+                else {
+                    overs.splice(overs.indexOf(overF), 1);
+                    debugLog(`FT exclusivity: dropped ${overF.name} FT OVER (conf ${overConf}) — opponent ${oppUnder.name} FT UNDER stronger (conf ${underConf})`);
+                }
+            }
+        }
         void persistBestPicksSnapshot(overs, unders);
         // Flag fighters whose opponent is still in the SAME section after demotion
         const overNames = new Set(overs.map(f => f.name.toLowerCase()));
