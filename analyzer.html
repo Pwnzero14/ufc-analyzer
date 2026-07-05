@@ -25026,6 +25026,108 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .pss-conflict { animation: none; }
 }
 
+/* ── GLOW-UP 143: Parlay Lab L5 — champion finale ── */
+
+/* Suggested parlay cards: glass depth + hover lift + load affordance */
+.parlay-suggest-card {
+  position: relative;
+  border-radius: 12px !important;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+}
+.parlay-suggest-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 18px rgba(248,198,74,0.08) !important;
+}
+.parlay-suggest-card::after {
+  content: 'LOAD ›';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translate(-4px, -50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: rgba(248,198,74,0);
+  border: 1px solid rgba(248,198,74,0);
+  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.parlay-suggest-card:hover::after {
+  color: rgba(248,198,74,0.85);
+  border-color: rgba(248,198,74,0.35);
+  transform: translate(0, -50%);
+}
+
+/* #1 suggestion: champion gold frame with the slow shimmer sweep */
+.parlay-suggest-section .parlay-suggest-card:nth-child(2) {
+  border: 1px solid rgba(248,198,74,0.40) !important;
+  background:
+    linear-gradient(115deg, transparent 0%, transparent 42%, rgba(248,198,74,0.09) 50%, transparent 58%, transparent 100%),
+    linear-gradient(135deg, rgba(248,198,74,0.08), rgba(13,18,33,0.75) 55%) !important;
+  background-size: 250% 100%, 100% 100%;
+  background-position: 200% 0, 0 0;
+  animation: plChampSweep143 7s ease-in-out infinite;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 0 24px rgba(248,198,74,0.08) !important;
+}
+@keyframes plChampSweep143 {
+  0%, 55%   { background-position: 200% 0, 0 0; }
+  85%, 100% { background-position: -80% 0, 0 0; }
+}
+
+/* Grade identity on score numbers + card edges */
+.parlay-suggest-card.grade-excellent { border-left: 3px solid rgba(27,220,136,0.6) !important; }
+.parlay-suggest-card.grade-good      { border-left: 3px solid rgba(248,198,74,0.55) !important; }
+.parlay-suggest-card.grade-fair      { border-left: 3px solid rgba(255,150,60,0.5) !important; }
+.parlay-suggest-card.grade-poor      { border-left: 3px solid rgba(255,58,96,0.5) !important; }
+
+/* Health score: grade-colored glow */
+.parlay-health-score.excellent { text-shadow: 0 0 18px rgba(27,220,136,0.45), 0 0 6px rgba(27,220,136,0.25); }
+.parlay-health-score.good      { text-shadow: 0 0 18px rgba(248,198,74,0.40), 0 0 6px rgba(248,198,74,0.22); }
+.parlay-health-score.fair      { text-shadow: 0 0 16px rgba(255,150,60,0.38); }
+.parlay-health-score.poor      { text-shadow: 0 0 16px rgba(255,58,96,0.38); }
+
+/* Synergy pair cards: glass hover + money impact chip + IN SLIP state */
+.synergy-pair-card {
+  border-radius: 12px !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+  cursor: pointer;
+}
+.synergy-pair-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.30), 0 0 14px rgba(27,220,136,0.06) !important;
+}
+.synergy-pair-impact {
+  font-weight: 700;
+  color: #6fe8a8 !important;
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.30);
+  border-radius: 4px;
+  padding: 1px 7px;
+  text-shadow: 0 0 6px rgba(0,232,122,0.3);
+}
+.synergy-pair-added {
+  font-weight: 700;
+  color: #ffe9ad !important;
+  background: rgba(248,198,74,0.12);
+  border: 1px solid rgba(248,198,74,0.45);
+  border-radius: 999px;
+  padding: 1px 8px;
+  text-shadow: 0 0 8px rgba(248,198,74,0.4);
+}
+.synergy-pair-card.synergy-active {
+  border-color: rgba(248,198,74,0.40) !important;
+  background: linear-gradient(90deg, rgba(248,198,74,0.08), transparent 60%) !important;
+  box-shadow: inset 3px 0 0 0 rgba(248,198,74,0.6), 0 0 18px rgba(248,198,74,0.06) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parlay-suggest-section .parlay-suggest-card:nth-child(2) { animation: none; }
+}
+
 </style>
 </head>
 <body>
