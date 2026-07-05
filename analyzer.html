@@ -24746,6 +24746,80 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .platform-lines > .line-cell:hover .line-value.betr { text-shadow: 0 0 22px rgba(255,138,61,0.65) !important; }
 .platform-lines > .line-cell:hover .line-value.dk   { text-shadow: 0 0 22px rgba(245,158,11,0.65) !important; }
 
+/* ── GLOW-UP 139: Parlay Lab L1 — frame entrance + live count chips ── */
+/* Placed at stylesheet end so it wins GLOW-UP 93's !important collisions. */
+
+/* Section entrance: staggered pop, same family as cmd palette / popover */
+.parlay-lab-header   { animation: plIn139 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+.parlay-pool         { animation: plIn139 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) 0.05s both; }
+.parlay-builder      { animation: plIn139 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) 0.09s both; }
+.parlay-suggest-section { animation: plIn139 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) 0.13s both; }
+.synergy-pairs-section  { animation: plIn139 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) 0.17s both; }
+@keyframes plIn139 {
+  from { opacity: 0; transform: translateY(6px) scale(0.995); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Live count pills (Best Picks family). --plc drives the color channel:
+   lab orange by default, gold inside the builder title. The explicit
+   -webkit-text-fill-color reset is required — the gradient-text titles set
+   transparent fill, which inherits into child spans. */
+.parlay-count-pill {
+  --plc: 255,165,0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  background: rgba(var(--plc), 0.08);
+  border: 1px solid rgba(var(--plc), 0.30);
+  color: rgb(var(--plc));
+  -webkit-text-fill-color: rgb(var(--plc));
+  text-shadow: 0 0 8px rgba(var(--plc), 0.35);
+  filter: none;
+  animation: plPill139 3.6s ease-in-out infinite;
+}
+.parlay-builder-title .parlay-count-pill { --plc: 248,198,74; }
+@keyframes plPill139 {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 12px rgba(var(--plc), 0.25); }
+}
+
+/* Header selected-count: quiet chip that lights gold once parlay-ready (2+) */
+.parlay-selected-chip {
+  position: relative;
+  z-index: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text3);
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.parlay-selected-chip.ready {
+  background: linear-gradient(180deg, rgba(248,198,74,0.16), rgba(248,198,74,0.07));
+  border-color: rgba(248,198,74,0.45);
+  color: #ffe9ad;
+  text-shadow: 0 0 8px rgba(248,198,74,0.4);
+  box-shadow: 0 0 14px rgba(248,198,74,0.15), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parlay-lab-header, .parlay-pool, .parlay-builder,
+  .parlay-suggest-section, .synergy-pairs-section,
+  .parlay-count-pill { animation: none; }
+}
+
 </style>
 </head>
 <body>

@@ -7855,18 +7855,18 @@ function renderParlayLab(container) {
         <div class="parlay-lab-title">PARLAY LAB</div>
         <div class="parlay-lab-subtitle">Build multi-leg parlays with correlation analysis · ${availableLegs.length} available legs</div>
       </div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">
+      <div class="parlay-selected-chip${selectedLegs.length >= 2 ? ' ready' : ''}">
         ${selectedLegs.length} leg${selectedLegs.length !== 1 ? 's' : ''} selected
       </div>
     </div>
     <div class="parlay-lab-cols">
       <div class="parlay-pool">
-        <div class="parlay-pool-title">AVAILABLE LEGS (${availableLegs.length})</div>
+        <div class="parlay-pool-title">AVAILABLE LEGS <span class="parlay-count-pill">${availableLegs.length}</span></div>
         ${poolRows || '<div class="parlay-slip-empty">No leans calculated yet</div>'}
       </div>
       <div>
         <div class="parlay-builder">
-          <div class="parlay-builder-title">YOUR PARLAY</div>
+          <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}</div>
           <div class="parlay-slip">${slipRows}</div>
           ${healthHtml}
         </div>
