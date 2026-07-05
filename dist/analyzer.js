@@ -7764,15 +7764,39 @@ function renderParlayLab(container) {
     // Suggest parlays
     const suggestions = suggestParlays(visibleFighters, 3, 3);
     // ── Render ──
+    // Live slip guards: flag pool legs that would CONTRADICT the current slip
+    // before they're clicked. FT is a shared stat (one fight, one duration), so
+    // same-fight opposite-direction FT legs are mutually exclusive; same-fight
+    // same-direction FP legs are zero-sum (only one side gets the win bonus).
+    const legNorm = (s) => (normalizeName(s) || s).toLowerCase();
+    const conflictsWithSlip = (cand) => {
+        for (const s of selectedLegs) {
+            if (s.fighter === cand.fighter && s.stat === cand.stat && s.direction === cand.direction)
+                continue;
+            const sameFight = legNorm(cand.opponent) === legNorm(s.fighter) || legNorm(cand.fighter) === legNorm(s.opponent);
+            if (!sameFight)
+                continue;
+            if (cand.stat === 'ft' && s.stat === 'ft' && cand.direction !== s.direction) {
+                return `Contradicts ${prettyName(s.fighter)} FT ${s.direction.toUpperCase()} in your slip — one fight, one duration; both legs can't cash`;
+            }
+            if (cand.stat === 'fp' && s.stat === 'fp' && cand.direction === s.direction) {
+                return `FP zero-sum vs ${prettyName(s.fighter)} in your slip — only one fighter gets the win bonus`;
+            }
+        }
+        return null;
+    };
     const poolRows = availableLegs.map(a => {
         const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
         const sel = parlaySelectedLegs.has(key);
+        const conflict = sel ? null : conflictsWithSlip(a.leg);
         const confClass = a.leg.confidence >= 72 ? 'conf-high' : a.leg.confidence >= 58 ? 'conf-med' : 'conf-low';
         const pk = getSourceActivePlatformKey(a.fighter, a.leg.stat);
         const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(a.fighter, a.leg.stat)}">${platformKeyShort(pk)}</span>` : '';
-        return `<div class="parlay-leg-row${sel ? ' selected' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
+        const warnTag = conflict ? `<span class="parlay-leg-warn" title="${conflict.replace(/"/g, '&quot;')}">✗ vs slip</span>` : '';
+        return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
+      ${warnTag}
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
@@ -7802,10 +7826,12 @@ function renderParlayLab(container) {
     if (selectedLegs.length >= 2) {
         const combined = Math.round(selectedLegs.reduce((p, l) => p * (Math.min(95, Math.max(5, l.confidence)) / 100), 1) * 100);
         const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
+        const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m) => !!m) || null;
         slipSummaryHtml = `<div class="parlay-slip-summary">
       <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
       <span class="pss-item" title="Product of leg confidences — assumes independent legs; correlated legs shift the true number">COMBINED <b>~${combined}%</b></span>
       <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
+      ${slipContradiction ? `<span class="pss-conflict" title="${slipContradiction.replace(/"/g, '&quot;')}">⛔ CONTRADICTORY LEGS</span>` : ''}
     </div>`;
     }
     // Health display

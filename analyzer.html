@@ -24973,6 +24973,59 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .parlay-slip-summary { animation: none; }
 }
 
+/* ── GLOW-UP 142: Parlay Lab L4 — live contradiction guards ── */
+
+/* Pool rows that would contradict the current slip: red-washed + dimmed
+   (still clickable — it's a warning, not a lock) */
+.parlay-leg-row.leg-conflict {
+  border: 1px solid rgba(255,58,96,0.22) !important;
+  background: linear-gradient(90deg, rgba(255,58,96,0.05), transparent 55%) !important;
+  opacity: 0.72;
+}
+.parlay-leg-row.leg-conflict:hover {
+  opacity: 1;
+  border-color: rgba(255,58,96,0.38) !important;
+  box-shadow: 0 0 14px rgba(255,58,96,0.10) !important;
+}
+
+/* The "✗ vs slip" tag on conflicted rows */
+.parlay-leg-warn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  flex: none;
+  color: #ff8a97;
+  background: rgba(255,58,96,0.09);
+  border: 1px solid rgba(255,58,96,0.35);
+  text-shadow: 0 0 6px rgba(255,58,96,0.3);
+}
+
+/* Slip alarm: contradictory legs made it into the slip anyway */
+.pss-conflict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #ff8a97;
+  background: rgba(255,58,96,0.10);
+  border: 1px solid rgba(255,58,96,0.45);
+  text-shadow: 0 0 8px rgba(255,58,96,0.4);
+  animation: pssConflict142 2.4s ease-in-out infinite;
+}
+@keyframes pssConflict142 {
+  0%, 100% { box-shadow: 0 0 6px rgba(255,58,96,0.15); }
+  50%      { box-shadow: 0 0 14px rgba(255,58,96,0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pss-conflict { animation: none; }
+}
+
 </style>
 </head>
 <body>
