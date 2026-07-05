@@ -25382,6 +25382,39 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   pointer-events: auto;
 }
 
+/* ── GLOW-UP 148: Platform Bias — side-verdict chips ── */
+/* Translates signed edges into the actionable read per book+stat:
+   shades HIGH → under value, shades LOW → over value, else fair. */
+.bias-verdict {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 7px;
+  vertical-align: middle;
+}
+.bias-verdict.under {
+  color: #ff8a97;
+  background: rgba(255,58,96,0.08);
+  border: 1px solid rgba(255,58,96,0.34);
+  text-shadow: 0 0 7px rgba(255,58,96,0.35);
+}
+.bias-verdict.over {
+  color: #6fe8a8;
+  background: rgba(0,232,122,0.08);
+  border: 1px solid rgba(0,232,122,0.34);
+  text-shadow: 0 0 7px rgba(0,232,122,0.35);
+}
+.bias-verdict.fair {
+  color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
 </style>
 </head>
 <body>

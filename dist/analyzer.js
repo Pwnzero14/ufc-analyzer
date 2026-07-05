@@ -9407,6 +9407,25 @@ async function renderArchivePanel(container) {
     };
     const biasSorted = [...biasRows].sort(sortFn);
     const biasHdr = (label, key) => `<span data-bias-sort="${key}" style="cursor:pointer;text-decoration:underline dotted;color:${sk === key ? 'var(--text)' : 'var(--text-muted)'}">${label}${sk === key ? ' ▼' : ''}</span>`;
+    // Side verdict: translate the signed edge into the actionable read. Edge is
+    // result − line, so a NEGATIVE edge means results land below the book's
+    // lines → the book shades HIGH → the UNDER side carries the value.
+    // Thresholds are stat-scaled (FP points ≠ TD counts) and verdicts need 5+
+    // records — below that the chip stays off rather than faking a signal.
+    const biasVerdict = (propType, avgEdge, total) => {
+        if (total < 5)
+            return '';
+        const pt = propType.toLowerCase();
+        const thr = pt.startsWith('fantasy') ? 4.0
+            : pt === 'td' ? 0.4
+                : pt === 'fighttime' ? 1.0
+                    : 2.0; // SS family (SS, SS_R1, ss leg, ss body)
+        if (avgEdge <= -thr)
+            return ` <span class="bias-verdict under" title="Results average ${Math.abs(avgEdge)} below this book's ${propType} lines (n=${total}) — lines shade HIGH, the UNDER side carries the value">▼ UNDER VALUE</span>`;
+        if (avgEdge >= thr)
+            return ` <span class="bias-verdict over" title="Results average +${avgEdge} above this book's ${propType} lines (n=${total}) — lines shade LOW, the OVER side carries the value">▲ OVER VALUE</span>`;
+        return ` <span class="bias-verdict fair" title="Lines track results within ±${thr} (n=${total}) — no exploitable shading">≈ FAIR</span>`;
+    };
     const biasHtml = biasSorted.length
         ? `<div style="display:flex;gap:12px;font-size:10px;margin-bottom:6px;padding:0 4px">
         <span style="flex:1;color:var(--text-muted)">Platform / Prop</span>
@@ -9416,7 +9435,7 @@ async function renderArchivePanel(container) {
                 const rc = x.hitRate >= 55 ? 'var(--green)' : x.hitRate >= 45 ? 'var(--gold)' : 'var(--red)';
                 return `<div class="bias-row">
         <span class="bias-platform">${x.platform.toUpperCase()}</span>
-        <div class="bias-main"><div class="bias-prop">${x.propType}</div><div class="bias-sub">${x.total} records · avg edge ${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</div></div>
+        <div class="bias-main"><div class="bias-prop">${x.propType}${biasVerdict(x.propType, x.avgEdge, x.total)}</div><div class="bias-sub">${x.total} records · avg edge ${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</div></div>
         <span class="bias-bar"><span style="width:${Math.max(2, Math.min(100, x.hitRate))}%;background:${rc}"></span></span>
         <span class="bias-rate" style="color:${rc}">${x.hitRate}%</span>
       </div>`;
