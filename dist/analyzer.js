@@ -9254,39 +9254,40 @@ async function renderArchivePanel(container) {
         .filter(d => d.unresolved > 0 || d.total > 0) // hide empty shell events
         .map(d => `<div class="event-row" style="opacity:0.6">
         <div class="event-pct" style="font-size:9px;color:var(--text-muted)">SOON</div>
-        <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${d.unresolved} lines archived · awaiting results</div></div>
+        <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="evr-chips"><span class="evr-chip pending">${d.unresolved} LINES ARCHIVED · AWAITING RESULTS</span></div></div>
         ${deleteBtn(d.display)}
       </div>`).join('');
     const eventHtml = (pastEventRows.length || upcomingHtml)
         ? upcomingHtml + pastEventRows.map((d) => {
             const key = eventDedupeKey(d.display);
             const rate = d.total ? Math.round((d.hits / d.total) * 100) : null;
-            const rateStr = rate !== null ? `overs: ${d.hits}/${d.total} (${rate}%)` : '—';
-            const unresStr = d.unresolved > 0 ? `<span style="color:var(--text-muted);font-size:10px"> · ${d.unresolved} pending</span>` : '';
             const ai = aiAccuracyMap.get(key);
             const aiRate = ai ? Math.round((ai.hits / ai.total) * 100) : null;
-            const aiStr = ai
-                ? `<span style="color:${aiRate >= 60 ? 'var(--green)' : aiRate >= 45 ? 'var(--amber)' : 'var(--red)'};font-size:10px;margin-left:8px">AI picks: ${ai.hits}/${ai.total} (${aiRate}%)</span>`
+            // AI pick accuracy is the real per-event scoreboard — promote it from
+            // buried mid-sentence text to a graded badge beside the event name.
+            const aiBadge = ai
+                ? `<span class="evr-ai ${aiRate >= 60 ? 'good' : aiRate >= 45 ? 'mid' : 'bad'}" title="AI pick accuracy this event: ${ai.hits}/${ai.total} lean directions correct">AI ${aiRate}%</span>`
                 : '';
-            let clvStr = '';
+            const chips = [];
+            chips.push(`<span class="evr-chip" title="Market overs rate — share of all archived lines that settled OVER">OVERS ${d.hits}/${d.total}</span>`);
+            if (d.unresolved > 0)
+                chips.push(`<span class="evr-chip pending">${d.unresolved} PENDING</span>`);
             if (d.clvTracked > 0) {
                 const avgAbs = d.clvMoved > 0 ? (d.clvAbsSum / d.clvMoved).toFixed(2) : '0.00';
-                const bm = d.biggestMover;
-                const biggestStr = bm
-                    ? ` · biggest: ${bm.fighter} ${bm.propType} ${bm.openLine}→${bm.line} (${bm.delta > 0 ? '+' : ''}${bm.delta.toFixed(1)})`
-                    : '';
+                chips.push(`<span class="evr-chip" title="Closing-line value: how many lines moved from open, and the average absolute move">CLV ${d.clvMoved}/${d.clvTracked} · |Δ| ${avgAbs}</span>`);
                 const agreement = aiClvAgreementMap.get(key);
-                let agreementStr = '';
                 if (agreement) {
                     const pct = Math.round((agreement.aligned / agreement.total) * 100);
-                    const color = pct >= 60 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red)';
-                    agreementStr = ` · <span style="color:${color}">AI×CLV: ${agreement.aligned}/${agreement.total} aligned (${pct}%)</span>`;
+                    chips.push(`<span class="evr-chip agree ${pct >= 60 ? 'good' : pct >= 40 ? 'mid' : 'bad'}" title="How often the AI lean direction matched the market's line movement (${agreement.aligned}/${agreement.total})">AI×CLV ${pct}%</span>`);
                 }
-                clvStr = `<div class="best-pick-reason" style="font-size:10px;color:var(--text-muted)">CLV: ${d.clvMoved}/${d.clvTracked} moved · avg |Δ| ${avgAbs}${biggestStr}${agreementStr}</div>`;
+                const bm = d.biggestMover;
+                if (bm) {
+                    chips.push(`<span class="evr-chip mover" title="Biggest line move of the event">⚡ ${bm.fighter} ${bm.propType} ${bm.openLine}→${bm.line} (${bm.delta > 0 ? '+' : ''}${bm.delta.toFixed(1)})</span>`);
+                }
             }
             return `<div class="event-row">
           <div class="event-pct" style="color:${rate === null ? 'var(--text3)' : rate >= 60 ? 'var(--green)' : rate >= 40 ? 'var(--gold)' : 'var(--red)'}">${rate !== null ? rate + '%' : '—'}</div>
-          <div style="flex:1"><div class="best-pick-name" style="font-size:12px">${d.display}</div><div class="best-pick-reason">${rateStr}${unresStr}${aiStr}</div>${clvStr}</div>
+          <div style="flex:1;min-width:0"><div class="best-pick-name" style="font-size:12px">${d.display}${aiBadge}</div><div class="evr-chips">${chips.join('')}</div></div>
           ${deleteBtn(d.display)}
         </div>`;
         }).join('')
