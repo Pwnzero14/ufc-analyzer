@@ -7795,6 +7795,19 @@ function renderParlayLab(container) {
         </div>`;
         }).join('')
         : '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
+    // Slip intelligence: combined hit probability (product of leg confidences,
+    // clamped to 5-95 so one optimistic leg can't produce silly numbers) and
+    // the weakest leg — the link most likely to sink the slip.
+    let slipSummaryHtml = '';
+    if (selectedLegs.length >= 2) {
+        const combined = Math.round(selectedLegs.reduce((p, l) => p * (Math.min(95, Math.max(5, l.confidence)) / 100), 1) * 100);
+        const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
+        slipSummaryHtml = `<div class="parlay-slip-summary">
+      <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
+      <span class="pss-item" title="Product of leg confidences — assumes independent legs; correlated legs shift the true number">COMBINED <b>~${combined}%</b></span>
+      <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
+    </div>`;
+    }
     // Health display
     let healthHtml = '';
     if (health) {
@@ -7878,6 +7891,7 @@ function renderParlayLab(container) {
         <div class="parlay-builder">
           <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}</div>
           <div class="parlay-slip">${slipRows}</div>
+          ${slipSummaryHtml}
           ${healthHtml}
         </div>
         ${suggestHtml}
