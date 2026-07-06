@@ -9157,7 +9157,7 @@ async function renderArchivePanel(container) {
             if (Math.abs(raw) > 20)
                 continue;
             if (!entryClvByType[propType])
-                entryClvByType[propType] = { picks: 0, clvSum: 0, clvPosCount: 0, hitCount: 0, resolvedCount: 0 };
+                entryClvByType[propType] = { picks: 0, clvSum: 0, clvPosCount: 0, hitCount: 0, resolvedCount: 0, posHit: 0, posResolved: 0, nonPosHit: 0, nonPosResolved: 0 };
             const b = entryClvByType[propType];
             b.picks++;
             b.clvSum += raw;
@@ -9166,10 +9166,19 @@ async function renderArchivePanel(container) {
             const res = Number(match.result);
             if (Number.isFinite(res)) {
                 b.resolvedCount++;
-                if (lean === 'over' && res > activeLine)
+                const hit = lean === 'over' ? res > activeLine : res < activeLine;
+                if (hit)
                     b.hitCount++;
-                if (lean === 'under' && res < activeLine)
-                    b.hitCount++;
+                if (raw > 0) {
+                    b.posResolved++;
+                    if (hit)
+                        b.posHit++;
+                }
+                else {
+                    b.nonPosResolved++;
+                    if (hit)
+                        b.nonPosHit++;
+                }
             }
         }
     }
@@ -9369,7 +9378,21 @@ async function renderArchivePanel(container) {
         const beatColor = lowN ? 'var(--text-muted)' : beatPct >= 55 ? 'var(--green)' : beatPct >= 45 ? 'var(--amber)' : 'var(--red)';
         const hitStr = d.resolvedCount > 0 ? ` · <span style="opacity:0.8">${Math.round((d.hitCount / d.resolvedCount) * 100)}% hit</span>` : '';
         const nTag = lowN ? ` <span style="opacity:0.5;font-size:9px">(n=${d.picks})</span>` : ` <span style="opacity:0.5;font-size:9px">(n=${d.picks})</span>`;
-        return `<span class="archive-stat-badge"><span class="asb-label">${label}</span><span class="asb-val"><span style="color:${clvColor};font-weight:700">${avgClv > 0 ? '+' : ''}${avgClv.toFixed(2)}</span> <span style="opacity:0.7;font-size:9px">· <span style="color:${beatColor}">${beatPct}% beat</span>${hitStr}${nTag}</span></span></span>`;
+        // CLV validation split: hit rate when the entry beat the close vs when it
+        // didn't. A real gap means line movement is confirming the picks; no gap
+        // means CLV is noise for this stat. Same 5-sample color floor as elsewhere.
+        const clvSplit = (splitLabel, h, t, tip) => {
+            if (!t)
+                return '';
+            const p = Math.round((h / t) * 100);
+            const low = t < 5;
+            const c = low ? 'var(--text-muted)' : p >= 55 ? 'var(--green)' : p >= 45 ? 'var(--amber)' : 'var(--red)';
+            return `<span class="asb-split" title="${tip}: ${h}/${t} hit${low ? ' (low sample)' : ''}">${splitLabel} <b style="color:${c}">${p}%</b><i>${h}/${t}</i></span>`;
+        };
+        const splits = (d.posResolved || d.nonPosResolved)
+            ? `<span class="asb-splits">${clvSplit('BEAT', d.posHit, d.posResolved, 'Picks where your entry beat the close — hit rate')}${clvSplit('OTHER', d.nonPosHit, d.nonPosResolved, 'Picks where the close was flat or moved against you — hit rate')}</span>`
+            : '';
+        return `<span class="archive-stat-badge"><span class="asb-label">${label}</span><span class="asb-val"><span style="color:${clvColor};font-weight:700">${avgClv > 0 ? '+' : ''}${avgClv.toFixed(2)}</span> <span style="opacity:0.7;font-size:9px">· <span style="color:${beatColor}">${beatPct}% beat</span>${hitStr}${nTag}</span></span>${splits}</span>`;
     };
     const entryClvHtml = `
     <div class="archive-stat-summary">
