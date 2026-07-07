@@ -16169,7 +16169,13 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
 
     const ssLineA   = f.line_p6_ss   ?? f.line_ud_ss   ?? f.line_pp_ss   ?? f.line_betr_ss   ?? f.line_dk_ss   ?? null;
     const tdLineA   = f.line_p6_td   ?? f.line_ud_td   ?? f.line_pp_td   ?? f.line_betr_td   ?? f.line_dk_td   ?? null;
-    const ftLineA   = f.line_p6_ft   ?? f.line_ud_ft   ?? f.line_pp_ft   ?? f.line_betr_ft   ?? f.line_dk_ft   ?? null;
+    // FT prefers PrizePicks first (then DK) — unlike the other stats. Books post
+    // genuinely different fight-time-minutes lines (e.g. McKinney UD 2.5m vs PP 4.5m),
+    // and the lean's direction is line-dependent, so the arbitrary p6-first order was
+    // handing the lean whichever book happened to be present. PP's "Fight Time (Mins)"
+    // is the canonical per-fighter line and the book these picks are placed on; the
+    // display still best-sides the entry via bestSideLineForPick.
+    const ftLineA   = f.line_pp_ft   ?? f.line_dk_ft   ?? f.line_ud_ft   ?? f.line_p6_ft   ?? f.line_betr_ft   ?? null;
     const ctrlLineA = f.line_p6_ctrl ?? f.line_ud_ctrl ?? f.line_pp_ctrl ?? f.line_betr_ctrl ?? f.line_dk_ctrl ?? null;
     const ssLinesA   = [f.line_p6_ss,   f.line_ud_ss,   f.line_pp_ss,   f.line_betr_ss,   f.line_dk_ss].filter((value): value is number => value != null);
     const tdLinesA   = [f.line_p6_td,   f.line_ud_td,   f.line_pp_td,   f.line_betr_td,   f.line_dk_td].filter((value): value is number => value != null);
@@ -16186,7 +16192,7 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (opp) {
       const ssLineB   = opp.line_p6_ss   ?? opp.line_ud_ss   ?? opp.line_pp_ss   ?? opp.line_betr_ss   ?? opp.line_dk_ss   ?? null;
       const tdLineB   = opp.line_p6_td   ?? opp.line_ud_td   ?? opp.line_pp_td   ?? opp.line_betr_td   ?? opp.line_dk_td   ?? null;
-      const ftLineB   = opp.line_p6_ft   ?? opp.line_ud_ft   ?? opp.line_pp_ft   ?? opp.line_betr_ft   ?? opp.line_dk_ft   ?? null;
+      const ftLineB   = opp.line_pp_ft   ?? opp.line_dk_ft   ?? opp.line_ud_ft   ?? opp.line_p6_ft   ?? opp.line_betr_ft   ?? null;
       const ctrlLineB = opp.line_p6_ctrl ?? opp.line_ud_ctrl ?? opp.line_pp_ctrl ?? opp.line_betr_ctrl ?? opp.line_dk_ctrl ?? null;
       const ssLinesB   = [opp.line_p6_ss,   opp.line_ud_ss,   opp.line_pp_ss,   opp.line_betr_ss,   opp.line_dk_ss].filter((value): value is number => value != null);
       const tdLinesB   = [opp.line_p6_td,   opp.line_ud_td,   opp.line_pp_td,   opp.line_betr_td,   opp.line_dk_td].filter((value): value is number => value != null);
