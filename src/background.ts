@@ -446,12 +446,15 @@ function normalizeFightTimeLineToMinutes(raw: unknown): number | null {
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) return null;
 
-  // Convert round-based FT lines (1.5/2.5/3.5 rounds) into minutes.
-  const roundedToHalf = Math.abs(value * 2 - Math.round(value * 2)) < 0.0001;
-  if (value <= 5 && roundedToHalf) {
-    return Number((value * 5).toFixed(1));
-  }
-
+  // All sportsbooks post fight-time props already in MINUTES ("Fight Time (Mins)",
+  // e.g. 4.5, 14.99, 24.99), so the value is used as-is. Do NOT rescale.
+  //
+  // The previous ×5 "rounds→minutes" heuristic (value <= 5 && half-integer → value*5)
+  // wrongly inflated legit sub-5-minute lines: a fast finisher's real 4.5-min line
+  // became 4.5×5 = 22.5 (observed: Terrance McKinney FT UNDER, UFC 329). A minutes
+  // value and a rounds value collide exactly in the ≤5 half-integer range, so the
+  // value alone can't disambiguate — the prop NAME is the only reliable signal, and
+  // rounds-denominated props ("Total Rounds") are no longer funneled into line_ft.
   return value;
 }
 
@@ -2247,7 +2250,12 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     else if (stat.includes('strike') && stat.includes('leg')) lineType = 'ss_leg';
     else if (stat.includes('significant strike')) lineType = isRound1 ? 'ss_r1' : 'ss';
     else if (stat.includes('takedown')) lineType = 'td';
-    else if (stat.includes('fight time') || stat.includes('fighttime') || stat.includes('fight duration') || stat.includes('rounds')) lineType = 'ft';
+    // NOTE: 'rounds'/'total rounds' is a DISTINCT prop denominated in ROUNDS, not the
+    // minutes-based "Fight Time (Mins)" line the FT model wants. It used to map here too
+    // and would clobber the real Fight Time line via upsert (observed: Conor McGregor's
+    // real 24.99-min line overwritten by his "Total Rounds" 2.5 → 12.5). Excluded so the
+    // minutes-denominated line always wins.
+    else if (stat.includes('fight time') || stat.includes('fighttime') || stat.includes('fight duration')) lineType = 'ft';
     else if (stat.includes('fantasy score') || stat.includes('fantasy points')) lineType = 'fp';
     if (!lineType) continue;
 
