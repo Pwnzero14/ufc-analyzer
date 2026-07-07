@@ -291,6 +291,10 @@ async function loadFighterClvDrift(): Promise<void> {
 // ── WEIGHT-MISS DETECTION ──────────────────────────────────────────────────
 // Extracted to ./analyzer/weight-miss.ts — re-exported via the import above.
 let fightOddsMoneylineByName: Record<string, number> = {};
+// DK "To Start Round X" round-props ladder, keyed by normalized fighter name:
+// { name: { "2": {yes,no}, "3": {...}, ... } } in American odds. Feeds the FT
+// lean's market-implied finish-timing prior (see marketFtUnderProb).
+let dkRoundStartByName: Record<string, Record<string, { yes: number | null; no: number | null }>> = {};
 // DK bonus payloads captured alongside moneylines (representing-country codes
 // and DK's own vig-free win probabilities).
 let dkCountryByName: Record<string, string> = {};
@@ -5436,6 +5440,54 @@ function calcTDLean(
   };
 }
 
+// American odds → implied probability (includes vig).
+function americanToImplied(a: number | null | undefined): number | null {
+  if (a == null || !Number.isFinite(a) || a === 0) return null;
+  return a < 0 ? (-a) / ((-a) + 100) : 100 / (a + 100);
+}
+
+// De-vigged P(fight REACHES round N) from a "Fight to Start Round N" Yes/No pair.
+function devigReachRound(pair?: { yes: number | null; no: number | null } | null): number | null {
+  if (!pair) return null;
+  const y = americanToImplied(pair.yes), n = americanToImplied(pair.no);
+  if (y == null || n == null) return null;
+  const s = y + n;
+  if (s <= 0) return null;
+  return Math.min(1, Math.max(0, y / s));
+}
+
+// Resolve a fighter's DK round-start ladder (fuzzy name match, like moneylines).
+function resolveRoundStartFromMap(name: string): Record<string, { yes: number | null; no: number | null }> | null {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  if (dkRoundStartByName[normalized]) return dkRoundStartByName[normalized];
+  for (const [k, v] of Object.entries(dkRoundStartByName)) {
+    if (namesMatch(k, normalized)) return v;
+  }
+  return null;
+}
+
+// Market-implied P(fight duration < `line` minutes) from DK's round-start ladder.
+// Returns null when the line falls in the FINAL scheduled round (the ladder can't
+// separate a late finish from a decision there without the distance market) or when
+// the covering round markets are missing — callers then fall back to stat-only logic.
+function marketFtUnderProb(name: string, line: number, schedRounds: number | null): number | null {
+  if (!Number.isFinite(line) || line <= 0) return null;
+  const ladder = resolveRoundStartFromMap(name);
+  if (!ladder) return null;
+  const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
+  const r = Math.min(maxRound, Math.max(1, Math.ceil(line / 5))); // round the line sits in
+  if (r >= maxRound) return null;                                 // final round — decision mass unknown
+  const offset = Math.min(5, Math.max(0, line - (r - 1) * 5));    // minutes into round r
+  const reach = (k: number): number | null => (k <= 1 ? 1 : devigReachRound(ladder[String(k)]));
+  const rr = reach(r), rr1 = reach(r + 1);
+  if (rr == null || rr1 == null) return null;
+  const endedBeforeRoundR = 1 - rr;                               // finished in rounds 1..r-1
+  const endsInRoundR = Math.max(0, rr - rr1);                     // finishes during round r (uniform within round)
+  const p = endedBeforeRoundR + endsInRoundR * (offset / 5);
+  return Math.min(1, Math.max(0, p));
+}
+
 function calcFTLean(
   name: string,
   db: FighterDB|null,
@@ -5445,9 +5497,21 @@ function calcFTLean(
   availableLines: number[] = [],
   moneyline: number | null = null,
 ): LeanResult|null {
-  if (!line_ft || !db || !db.loaded) return null;
-  const history = (db.history || []).filter(h => Number.isFinite(Number(h.timeSecs)) && Number(h.timeSecs) > 0);
-  if (history.length < 3) return null;
+  if (!line_ft) return null;
+  const schedRounds = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
+  const mktUnderP = marketFtUnderProb(name, line_ft, schedRounds);
+
+  const history = (db?.history || []).filter(h => Number.isFinite(Number(h.timeSecs)) && Number(h.timeSecs) > 0);
+  const hasHistory = !!(db && db.loaded && history.length >= 3);
+
+  // No usable UFCStats duration history (e.g. debut/low-sample fighters). If DK's
+  // round-start market prices a finish-timing distribution, emit a market-only FT
+  // lean so those spots surface; otherwise stay silent as before.
+  if (!hasHistory) {
+    if (mktUnderP == null) return null;
+    return buildMarketOnlyFtLean(name, line_ft, mktUnderP, db, oppDB, availableLines, moneyline);
+  }
+  if (!db || !db.loaded) return null;
 
   const mins = history.map(h => (Number(h.timeSecs) / 60));
   // Round-normalize the average for THIS fight's scheduled duration: a 22m
@@ -5459,7 +5523,6 @@ function calcFTLean(
   // Headliner-aware rounds (findHeadlinerPair → 5R), not the raw scrape map —
   // UFCStats pre-fight pages default to 3, which would cap the main event's
   // history at 15m. No upcoming card at all → no cap (unknown context).
-  const schedRounds = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
   const maxMins = schedRounds != null ? schedRounds * 5 : null;
   const cappedMins = maxMins != null ? mins.map(v => Math.min(v, maxMins)) : mins;
   const rawAvgFT = mins.reduce((s, v) => s + v, 0) / mins.length;
@@ -5539,6 +5602,18 @@ function calcFTLean(
     }
   }
 
+  // DK round-market corroboration — nudge the score toward the market-implied
+  // finish timing (sharp signal). Bounded so it tilts toss-ups and adds conviction
+  // but can't fully override a strong stat read.
+  if (mktUnderP != null) {
+    const nudge = Math.max(-1.8, Math.min(1.8, (0.5 - mktUnderP) * 6));
+    score += nudge;
+    reasons.push({
+      icon: nudge < -0.05 ? 'neg' : nudge > 0.05 ? 'pos' : 'neu',
+      text: `DK round market implies ${Math.round(mktUnderP * 100)}% chance under ${line_ft}m (Fight to Start Round odds)`,
+    });
+  }
+
   let lean: 'over'|'under'|'push', conf: number;
   if      (score >= 3)   { lean = 'over';  conf = Math.min(89, 68 + score * 4); }
   else if (score >= 1.5) { lean = 'over';  conf = Math.min(74, 56 + score * 5); }
@@ -5585,6 +5660,58 @@ function calcFTLean(
     avg: avgFT,
     line: line_ft,
     type: 'ft'
+  };
+}
+
+// FT lean built purely from DK's round-start market, used when a fighter has no
+// usable UFCStats duration history but DK prices a finish-timing distribution
+// (e.g. Olympic-wrestler debuts). Confidence comes directly from the de-vigged
+// market probability and is capped below a fully stat-corroborated lean.
+function buildMarketOnlyFtLean(
+  name: string,
+  line_ft: number,
+  mktUnderP: number,
+  db: FighterDB | null,
+  oppDB: FighterDB | null,
+  availableLines: number[],
+  moneyline: number | null,
+): LeanResult | null {
+  const lean: 'over'|'under'|'push' = mktUnderP >= 0.56 ? 'under' : mktUnderP <= 0.44 ? 'over' : 'push';
+  const pForSide = lean === 'under' ? mktUnderP : 1 - mktUnderP;
+  let conf = lean === 'push' ? 50 : Math.min(80, Math.max(53, Math.round(pForSide * 100)));
+  const score = parseFloat(((0.5 - mktUnderP) * 6).toFixed(2));
+  const reasons: LeanReason[] = [{
+    icon: lean === 'under' ? 'neg' : lean === 'over' ? 'pos' : 'neu',
+    text: `No fight-time history — DK round market implies ${Math.round(mktUnderP * 100)}% under ${line_ft}m (Fight to Start Round odds)`,
+  }];
+
+  if (db && db.loaded) {
+    const memoryAdjustment = applyConfidenceMemoryAdjustment({
+      fighterName: name, source: 'ft', lean, baseConfidence: conf, score,
+      db, avgValue: line_ft, line: line_ft, selectedLine: line_ft,
+      availableLines: availableLines.length ? availableLines : [line_ft], oppDB, moneyline,
+    });
+    conf = memoryAdjustment.confidence;
+    if (memoryAdjustment.note) {
+      reasons.push({ icon: memoryAdjustment.delta > 0 ? 'pos' : 'neg', text: memoryAdjustment.note });
+    }
+    const verdict = lean === 'push'
+      ? `FT NO LEAN at ${line_ft}m (market ~50/50)`
+      : `FT ${lean.toUpperCase()} ${line_ft}m — DK round market ${Math.round(mktUnderP * 100)}% under`;
+    return {
+      lean, conf: Math.round(conf), confidenceGrade: getConfidenceGrade(Math.round(conf)),
+      memoryDelta: memoryAdjustment.delta, memoryNote: memoryAdjustment.note,
+      score, reasons, verdict, avg: line_ft, line: line_ft, type: 'ft',
+    };
+  }
+
+  const verdict = lean === 'push'
+    ? `FT NO LEAN at ${line_ft}m (market ~50/50)`
+    : `FT ${lean.toUpperCase()} ${line_ft}m — DK round market ${Math.round(mktUnderP * 100)}% under`;
+  return {
+    lean, conf: Math.round(conf), confidenceGrade: getConfidenceGrade(Math.round(conf)),
+    memoryDelta: 0, memoryNote: undefined,
+    score, reasons, verdict, avg: line_ft, line: line_ft, type: 'ft',
   };
 }
 
@@ -16301,7 +16428,7 @@ async function loadData(): Promise<void> {
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
-      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1']);
+      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1', 'fight_round_start_dk_v1']);
       // Signature from the RAW storage values (before the betr manual-override
       // mutation below), so the periodic heartbeat — which reads raw storage —
       // compares apples to apples.
@@ -16310,6 +16437,16 @@ async function loadData(): Promise<void> {
       dkCountryByName = (result['fighter_countries_dk_v1'] as Record<string, string>) || {};
       dkTrueProbByName = (result['fight_trueprob_dk_v1'] as Record<string, number>) || {};
       dkBetHandleByName = (result['fight_bethandle_dk_v1'] as Record<string, number>) || {};
+      // DK round-start ladder — re-key by normalizeName (background stored via
+      // normalizeOddsName) so the FT lean's resolveRoundStartFromMap lookup hits.
+      dkRoundStartByName = {};
+      const rawRoundStart = result['fight_round_start_dk_v1'] as Record<string, Record<string, { yes: number | null; no: number | null }>> | undefined;
+      if (rawRoundStart && typeof rawRoundStart === 'object') {
+        for (const [name, ladder] of Object.entries(rawRoundStart)) {
+          const nn = normalizeName(name);
+          if (nn && ladder && typeof ladder === 'object') dkRoundStartByName[nn] = ladder;
+        }
+      }
       fightOddsMoneylineByName = {};
       if (rawOdds && typeof rawOdds === 'object') {
         for (const [name, val] of Object.entries(rawOdds as Record<string, unknown>)) {

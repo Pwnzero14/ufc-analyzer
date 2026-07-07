@@ -218,7 +218,10 @@ export const NAME_ALIASES = {
 // v2 (2026-07-07): hit-rate shrinkage (Laplace) + backfill projection floor.
 // v3 (2026-07-07): EV win prob uses the displayed-confidence pipeline (CLV
 //   boost → recalibration) instead of raw conf; Parlay Lab payout-aware slip EV.
-export const MODEL_VERSION = 3;
+// v4 (2026-07-07): FT lean uses DK "To Start Round X" round market as a
+//   finish-timing prior — blends with the stat lean and, for no-history fighters,
+//   emits a market-only FT lean (bypasses the calcFTLean history<3 gate).
+export const MODEL_VERSION = 4;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
