@@ -1838,6 +1838,7 @@ async function autoBackupOnStartup() {
         await initializeBetrLines();
         await refreshFightOddsFromBestFightOdds('startup');
         void refreshDKMoneylinesFromApi('startup');
+        void refreshDKRoundStartFromApi('startup');
         // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
         // ── Startup catch-up settle ─────────────────────────────────────────
         // If the browser was closed during the event, alarms never fired.
@@ -2628,6 +2629,97 @@ async function mergeDKMoneylines(dkOdds) {
         console.error('[UFC Odds] Failed to merge DK moneylines:', e);
     }
 }
+// DK "To Start Round X" round-props market (category 677 / subcategory 5800 —
+// stable market-type IDs, so this URL is event-agnostic like the ML feed).
+// "Fight to Start Round N": Yes = fight reaches round N, No = ends before it.
+// De-vigging these gives a market-implied finish-timing distribution, which the
+// FT lean uses as a prior — especially for fighters with no UFCStats history.
+// Stored as { [normName]: { "2": {yes,no}, "3": {...}, ... } } in AMERICAN odds;
+// both fighters of a bout share the fight-level values. The analyzer de-vigs.
+const DK_ROUND_START_URL = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/677/subcategories/5800';
+async function refreshDKRoundStartFromApi(reason) {
+    try {
+        const res = await fetch(DK_ROUND_START_URL, {
+            signal: AbortSignal.timeout(15000),
+            headers: { accept: 'application/json' },
+        });
+        if (!res.ok) {
+            console.warn(`[UFC Odds] DK round-start HTTP ${res.status} (${reason})`);
+            return 0;
+        }
+        const data = await res.json();
+        const markets = Array.isArray(data?.markets) ? data.markets : [];
+        const selections = Array.isArray(data?.selections) ? data.selections : [];
+        const events = Array.isArray(data?.events) ? data.events : [];
+        if (!markets.length || !selections.length || !events.length) {
+            console.warn(`[UFC Odds] DK round-start empty payload (${reason})`);
+            return 0;
+        }
+        // eventId → [normName, normName]
+        const eventFighters = {};
+        for (const ev of events) {
+            const parts = Array.isArray(ev?.participants) ? ev.participants : [];
+            const names = parts.map((p) => normalizeOddsName(p?.name)).filter(Boolean);
+            if (ev?.id && names.length >= 2)
+                eventFighters[String(ev.id)] = names;
+        }
+        // marketId → { round, eventId } for "Fight to Start Round N"
+        const marketInfo = {};
+        for (const m of markets) {
+            const mm = String(m?.name || '').match(/start\s+round\s+(\d)/i);
+            if (!mm)
+                continue;
+            marketInfo[String(m.id)] = { round: parseInt(mm[1], 10), eventId: String(m.eventId || '') };
+        }
+        // Yes/No american odds per marketId (DK renders negatives with U+2212).
+        const yesNoByMarket = {};
+        for (const sel of selections) {
+            const mid = String(sel?.marketId || '');
+            if (!marketInfo[mid])
+                continue;
+            // DK renders negatives with U+2212 (0x2212), not an ASCII hyphen — detect by
+            // code point so the source stays plain-ASCII and encoding can't break it.
+            const raw = String(sel?.displayOdds?.american ?? '').trim();
+            const neg = raw.charCodeAt(0) === 0x2212 || raw.charCodeAt(0) === 0x2d;
+            const digits = raw.replace(/[^0-9]/g, '');
+            const american = digits ? (neg ? -parseInt(digits, 10) : parseInt(digits, 10)) : NaN;
+            if (!Number.isFinite(american))
+                continue;
+            const outcome = String(sel?.outcomeType || sel?.label || '').toLowerCase();
+            if (!yesNoByMarket[mid])
+                yesNoByMarket[mid] = { yes: null, no: null };
+            if (outcome === 'yes')
+                yesNoByMarket[mid].yes = american;
+            else if (outcome === 'no')
+                yesNoByMarket[mid].no = american;
+        }
+        // Attach each round market's Yes/No to BOTH fighters of its event.
+        const out = {};
+        for (const [mid, info] of Object.entries(marketInfo)) {
+            const odds = yesNoByMarket[mid];
+            const fighters = eventFighters[info.eventId];
+            if (!odds || !fighters || (odds.yes == null && odds.no == null))
+                continue;
+            for (const nm of fighters) {
+                if (!out[nm])
+                    out[nm] = {};
+                out[nm][String(info.round)] = odds;
+            }
+        }
+        const n = Object.keys(out).length;
+        if (n >= 2) {
+            await chrome.storage.local.set({ fight_round_start_dk_v1: out });
+            console.log(`[UFC Odds] DK round-start: ${n} fighters across ${Object.keys(marketInfo).length} markets (${reason})`);
+            return n;
+        }
+        console.warn(`[UFC Odds] DK round-start parsed ${n} fighters — structure changed? (${reason})`);
+        return 0;
+    }
+    catch (e) {
+        console.warn(`[UFC Odds] DK round-start fetch failed (${reason}):`, e);
+        return 0;
+    }
+}
 async function fetchDKBetHandles(reason) {
     const apiUrl = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034';
     try {
@@ -3410,6 +3502,7 @@ async function autoScrapeAllPlatforms() {
         autoScrapeInProgress = false;
         await refreshFightOddsFromBestFightOdds('auto-scrape');
         await refreshDKMoneylinesFromApi('auto-scrape');
+        await refreshDKRoundStartFromApi('auto-scrape');
         // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
     }
     return { status: 'done', results, attempts };
