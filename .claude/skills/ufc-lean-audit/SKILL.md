@@ -90,6 +90,13 @@ platform-specific reality, not theory.
 - Weight-miss adjustments mutate sub-leans before effective-lean computation.
 - **Never propose Kelly or fractional-Kelly stake sizing.** Declined twice.
   Audits report edges and risks, not bet sizes.
+- Hit-rate score ladders use `shrunkHitRate` (Laplace: +1 phantom hit/+1 miss) —
+  thin samples score toward 50%. Reason text shows the RAW record on purpose; a
+  "75%" reason string beside a mid-tier score is shrinkage working, not a bug.
+- **Bump `MODEL_VERSION` in `src/config/index.ts` on ANY change to lean
+  scoring, tiering, correlation passes, or EV math.** It's stamped into
+  best-picks snapshots and predictions so the Archive can compare accuracy per
+  version; an unbumped model change silently pollutes that comparison.
 - After any `src/analyzer.ts` change: `npm run build`, commit `dist/` with the
   src, push feature branch AND master.
 
