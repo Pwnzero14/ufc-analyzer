@@ -86,7 +86,15 @@ platform-specific reality, not theory.
   uppercase on screen is CSS). Stat leans use stricter thresholds
   (78 conf/8 samples for High) than FP (72/7).
 - EV: `leanEvDetail` uses assumed -110 vig when no book odds exist (shown
-  with `~` prefix); actual-odds path carries real vig.
+  with `~` prefix); actual-odds path carries real vig. Since v3 the win prob
+  behind EV is the DISPLAYED-confidence pipeline (CLV boost → recalibration
+  against realized accuracy, `evWinProb`) — not raw conf. An EV chip with ↻
+  means recalibrated. EV and the conf chip beside it must never disagree.
+- Parlay Lab slip EV multiplies calibrated leg probabilities (clamped 35-85)
+  against `PICKEM_PAYOUTS` in `src/config/index.ts` — UD + PP Power/Flex only;
+  Betr/Pick6 are absent on purpose until their multipliers are confirmed
+  in-app (adding a table entry lights them up). Contradictory slips show ⛔
+  instead of an EV number.
 - Weight-miss adjustments mutate sub-leans before effective-lean computation.
 - **Never propose Kelly or fractional-Kelly stake sizing.** Declined twice.
   Audits report edges and risks, not bet sizes.

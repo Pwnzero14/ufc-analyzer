@@ -1,6 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
-import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES, MODEL_VERSION } from './config/index.js';
+import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES, MODEL_VERSION, PICKEM_PAYOUTS } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
@@ -6009,13 +6009,26 @@ function computeVig(overOdds: number | null | undefined, underOdds: number | nul
  * EV% = round((winProb * profitPerUnit - lossProb) * 100)
  * Returns { ev, isAssumedVig, vig } or null for push/none leans.
  */
-interface EVResult { ev: number; isAssumedVig: boolean; vig: number | null; profit: number }
+interface EVResult { ev: number; isAssumedVig: boolean; vig: number | null; profit: number; prob: number; recalibrated: boolean }
+
+// Win probability for EV — matched step-for-step to the pipeline that produces
+// the DISPLAYED confidence (CLV boost → clamp → recalibration against realized
+// accuracy), so the EV chip can never disagree with the confidence chip beside
+// it. Falls back to raw conf while the recalibration map is unpopulated.
+function evWinProb(f: AnalyzerFighter, el: EffectiveLean): { p: number; recalibrated: boolean } {
+  const raw = el.conf || 0;
+  if (raw <= 0) return { p: 0, recalibrated: false };
+  const clv = getClvBoost(f, el);
+  const boosted = clv ? Math.max(25, Math.min(90, raw + clv.delta)) : raw;
+  const recal = getRecalibratedConfidence(boosted, el._source);
+  return { p: (recal ?? boosted) / 100, recalibrated: recal != null };
+}
 function computeFighterEV(f: AnalyzerFighter, el: EffectiveLean): number | null {
   return computeDetailedEV(f, el)?.ev ?? null;
 }
 function computeDetailedEV(f: AnalyzerFighter, el: EffectiveLean): EVResult | null {
   if (el.lean !== 'over' && el.lean !== 'under') return null;
-  const winProb = (el.conf || 0) / 100;
+  const { p: winProb, recalibrated } = evWinProb(f, el);
   if (winProb <= 0) return null;
   const isOver = el.lean === 'over';
 
@@ -6042,13 +6055,13 @@ function computeDetailedEV(f: AnalyzerFighter, el: EffectiveLean): EVResult | nu
       isOver ? oppOdds : leanOdds,
     );
     const ev = Math.round((winProb * profit - (1 - winProb)) * 100);
-    return { ev, isAssumedVig: false, vig, profit };
+    return { ev, isAssumedVig: false, vig, profit, prob: winProb, recalibrated };
   }
 
   // No real odds — use assumed -110 standard vig (breakeven 52.38%)
   const ASSUMED_PROFIT = 100 / 110; // 0.909
   const ev = Math.round((winProb * ASSUMED_PROFIT - (1 - winProb)) * 100);
-  return { ev, isAssumedVig: true, vig: null, profit: ASSUMED_PROFIT };
+  return { ev, isAssumedVig: true, vig: null, profit: ASSUMED_PROFIT, prob: winProb, recalibrated };
 }
 
 /** Per-book EV breakdown for stat leans with odds from multiple platforms.
@@ -6056,7 +6069,7 @@ function computeDetailedEV(f: AnalyzerFighter, el: EffectiveLean): EVResult | nu
 interface PerBookEV { source: string; odds: number; profit: number; ev: number; vig: number | null; isBest: boolean }
 function computePerBookEV(f: AnalyzerFighter, el: EffectiveLean): PerBookEV[] {
   if (el.lean !== 'over' && el.lean !== 'under') return [];
-  const winProb = (el.conf || 0) / 100;
+  const { p: winProb } = evWinProb(f, el);
   if (winProb <= 0) return [];
   const isOver = el.lean === 'over';
 
@@ -8219,20 +8232,55 @@ function renderParlayLab(container: HTMLElement): void {
       }).join('')
     : '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
 
-  // Slip intelligence: combined hit probability (product of leg confidences,
-  // clamped to 5-95 so one optimistic leg can't produce silly numbers) and
-  // the weakest leg — the link most likely to sink the slip.
+  // Slip intelligence: calibrated per-leg probabilities (same recalibration the
+  // board's confidence chips use, clamped 35-85 so one hot leg can't print
+  // silly numbers), their product as combined hit probability, the weakest leg,
+  // and stake-inclusive payout EV per platform table. Independence assumed —
+  // contradictory slips get the ⛔ chip instead of an EV number.
   let slipSummaryHtml = '';
   if (selectedLegs.length >= 2) {
-    const combined = Math.round(
-      selectedLegs.reduce((p, l) => p * (Math.min(95, Math.max(5, l.confidence)) / 100), 1) * 100,
-    );
+    const legProbs = selectedLegs.map((l) => {
+      const recal = getRecalibratedConfidence(l.confidence, l.stat);
+      return Math.min(0.85, Math.max(0.35, (recal ?? l.confidence) / 100));
+    });
+    const anyRecal = selectedLegs.some((l) => getRecalibratedConfidence(l.confidence, l.stat) != null);
+    const combined = Math.round(legProbs.reduce((p, x) => p * x, 1) * 100);
     const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
     const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m): m is string => !!m) || null;
+
+    let payoutHtml = '';
+    if (!slipContradiction) {
+      const n = legProbs.length;
+      // P(exactly k hits) via subset enumeration — n ≤ 6 keeps this ≤ 64 terms.
+      const pByHits = new Array<number>(n + 1).fill(0);
+      for (let mask = 0; mask < (1 << n); mask++) {
+        let p = 1, k = 0;
+        for (let i = 0; i < n; i++) {
+          if (mask & (1 << i)) { p *= legProbs[i]; k++; }
+          else p *= 1 - legProbs[i];
+        }
+        pByHits[k] += p;
+      }
+      const evRows: { label: string; mult: number; ev: number }[] = [];
+      for (const key of Object.keys(PICKEM_PAYOUTS)) {
+        const table = PICKEM_PAYOUTS[key].byLegs[n];
+        if (!table) continue;
+        let ret = 0;
+        for (const hitsStr of Object.keys(table)) ret += (pByHits[Number(hitsStr)] || 0) * table[Number(hitsStr)];
+        const topMult = table[n] ?? Math.max(...Object.values(table));
+        evRows.push({ label: PICKEM_PAYOUTS[key].label, mult: topMult, ev: Math.round((ret - 1) * 100) });
+      }
+      evRows.sort((a, b) => b.ev - a.ev);
+      if (evRows.length) {
+        payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities (independence assumed). Verify multipliers in-app — promos and boosts change them.">${evRows.map((r) => `<span class="pss-ev ${r.ev >= 0 ? 'pos' : 'neg'}">${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
+      }
+    }
+
     slipSummaryHtml = `<div class="parlay-slip-summary">
       <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
-      <span class="pss-item" title="Product of leg confidences — assumes independent legs; correlated legs shift the true number">COMBINED <b>~${combined}%</b></span>
+      <span class="pss-item" title="Product of ${anyRecal ? 'recalibrated' : 'model'} leg probabilities (clamped 35-85) — assumes independent legs; correlated legs shift the true number">COMBINED <b>~${combined}%</b></span>
       <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
+      ${payoutHtml}
       ${slipContradiction ? `<span class="pss-conflict" title="${slipContradiction.replace(/"/g, '&quot;')}">⛔ CONTRADICTORY LEGS</span>` : ''}
     </div>`;
   }
@@ -14956,7 +15004,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           const totalEvents = Math.max(...Object.values(stats).map(d => d.total));
           return `<div class="archive-accuracy-badge" title="Archive hit rate for ${f.name} across ${totalEvents} settled event(s)">📊 ${parts.join(' · ')}</div>`;
         })()}
-        ${leanEvDetail != null ? `<div class="ev-label ${leanEvDetail.ev > 0 ? 'ev-pos' : leanEvDetail.ev < 0 ? 'ev-neg' : ''}" title="${leanEvDetail.isAssumedVig ? 'Assumed -110 vig (no book odds for FP)' : `Actual odds · profit ${leanEvDetail.profit.toFixed(2)}x${leanEvDetail.vig != null ? ` · vig ${leanEvDetail.vig}%` : ''}`}">${leanEvDetail.isAssumedVig ? '~' : ''}EV: ${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%${!leanEvDetail.isAssumedVig && leanEvDetail.vig != null ? ` <span style="color:${leanEvDetail.vig > 5 ? 'var(--red)' : leanEvDetail.vig > 3 ? 'var(--amber)' : 'var(--green)'};font-size:8px">(${leanEvDetail.vig}%)</span>` : ''}</div>` : ''}
+        ${leanEvDetail != null ? `<div class="ev-label ${leanEvDetail.ev > 0 ? 'ev-pos' : leanEvDetail.ev < 0 ? 'ev-neg' : ''}" title="EV from ${Math.round(leanEvDetail.prob * 100)}% win prob${leanEvDetail.recalibrated ? ' (recalibrated from realized accuracy ↻)' : ''} · ${leanEvDetail.isAssumedVig ? 'assumed -110 vig (no book odds for FP)' : `actual odds · profit ${leanEvDetail.profit.toFixed(2)}x${leanEvDetail.vig != null ? ` · vig ${leanEvDetail.vig}%` : ''}`}">${leanEvDetail.isAssumedVig ? '~' : ''}EV: ${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%${leanEvDetail.recalibrated ? ' <span style="font-size:8px;opacity:0.6">↻</span>' : ''}${!leanEvDetail.isAssumedVig && leanEvDetail.vig != null ? ` <span style="color:${leanEvDetail.vig > 5 ? 'var(--red)' : leanEvDetail.vig > 3 ? 'var(--amber)' : 'var(--green)'};font-size:8px">(${leanEvDetail.vig}%)</span>` : ''}</div>` : ''}
         ${weightedAvg != null ? `<div class="weighted-avg-label">W.Avg: ${weightedAvg.toFixed(1)}</div>` : ''}
         ${(() => {
           const fvEdge = lean.fairValueEdge;

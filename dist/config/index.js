@@ -216,5 +216,27 @@ export const NAME_ALIASES = {
 // (PropLinePredictorService) so the Archive can compare accuracy per version.
 // Rows without the field predate stamping ≙ v1.
 // v2 (2026-07-07): hit-rate shrinkage (Laplace) + backfill projection floor.
-export const MODEL_VERSION = 2;
+// v3 (2026-07-07): EV win prob uses the displayed-confidence pipeline (CLV
+//   boost → recalibration) instead of raw conf; Parlay Lab payout-aware slip EV.
+export const MODEL_VERSION = 3;
+// ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
+// Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
+// Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
+// and state rules shift them. Betr and Pick6 are intentionally absent until
+// their multipliers are confirmed in-app; adding an entry here is all it takes
+// to light them up in Parlay Lab's slip EV row.
+export const PICKEM_PAYOUTS = {
+    ud_standard: { label: 'UD', byLegs: {
+            2: { 2: 3 }, 3: { 3: 6 }, 4: { 4: 10 }, 5: { 5: 20 },
+        } },
+    pp_power: { label: 'PP Power', byLegs: {
+            2: { 2: 3 }, 3: { 3: 5 }, 4: { 4: 10 }, 5: { 5: 20 }, 6: { 6: 37.5 },
+        } },
+    pp_flex: { label: 'PP Flex', byLegs: {
+            3: { 3: 2.25, 2: 1.25 },
+            4: { 4: 5, 3: 1.5 },
+            5: { 5: 10, 4: 2, 3: 0.4 },
+            6: { 6: 25, 5: 2, 4: 0.4 },
+        } },
+};
 //# sourceMappingURL=index.js.map

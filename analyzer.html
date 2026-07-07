@@ -25434,6 +25434,38 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   box-shadow: 0 0 6px rgba(245, 158, 11, 0.75);
   pointer-events: none;
 }
+
+/* ── GLOW-UP 151: Parlay slip payout EV chips — stake-inclusive payout tables ×
+   calibrated leg probabilities. Green = +EV, red = −EV at that platform's
+   multiplier for the current slip size. ── */
+.pss-payouts {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pss-ev {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(50, 58, 88, 0.35);
+  border: 1px solid rgba(120, 130, 160, 0.25);
+  color: var(--text-muted, #9aa3b8);
+  white-space: nowrap;
+}
+.pss-ev b { font-size: 11px; }
+.pss-ev.pos {
+  color: #6ee7a8;
+  border-color: rgba(0, 232, 122, 0.35);
+  background: rgba(0, 232, 122, 0.10);
+}
+.pss-ev.neg {
+  color: #ff8fa3;
+  border-color: rgba(255, 58, 96, 0.30);
+  background: rgba(255, 58, 96, 0.08);
+}
 </style>
 </head>
 <body>

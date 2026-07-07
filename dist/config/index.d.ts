@@ -157,5 +157,9 @@ export declare const PRIZEPICKS_SCORING: {
     };
 };
 export declare const NAME_ALIASES: Record<string, string>;
-export declare const MODEL_VERSION = 2;
+export declare const MODEL_VERSION = 3;
+export declare const PICKEM_PAYOUTS: Record<string, {
+    label: string;
+    byLegs: Record<number, Record<number, number>>;
+}>;
 //# sourceMappingURL=index.d.ts.map
