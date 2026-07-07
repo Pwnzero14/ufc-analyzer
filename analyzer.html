@@ -25415,6 +25415,25 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(255,255,255,0.10);
 }
 
+
+/* ── GLOW-UP 150: backup staleness nudge — amber dot on the ⋯ More trigger when
+   the last storage backup is >7 days old or missing (line data is irreplaceable).
+   Set/cleared from the backup handler in analyzer.ts. ── */
+#headerOverflowBtn.backup-stale {
+  position: relative;
+}
+#headerOverflowBtn.backup-stale::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffc164, #f59a2e);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.75);
+  pointer-events: none;
+}
 </style>
 </head>
 <body>

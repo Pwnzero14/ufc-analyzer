@@ -210,4 +210,11 @@ export const NAME_ALIASES = {
     'Sharabutdin Magomedov': 'Shara Magomedov',
     'Abusupiyan Magomedov': 'Abus Magomedov',
 };
+// ── MODEL VERSION ───────────────────────────────────────────────────────
+// Bump on ANY change to lean scoring, tiering, correlation passes, or EV math.
+// Stamped into Best Picks snapshots (analyzer.ts) and prop predictions
+// (PropLinePredictorService) so the Archive can compare accuracy per version.
+// Rows without the field predate stamping ≙ v1.
+// v2 (2026-07-07): hit-rate shrinkage (Laplace) + backfill projection floor.
+export const MODEL_VERSION = 2;
 //# sourceMappingURL=index.js.map

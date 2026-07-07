@@ -1,6 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
-import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES } from './config/index.js';
+import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES, MODEL_VERSION } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass } from './types/index.js';
@@ -4431,6 +4431,17 @@ function calcMLAdjustedFP(history: FightResult[], moneyline: number | null): num
 }
 
 // ── LEAN ENGINE ────────────────────────────────────────────────────────────
+// Empirical-Bayes hit-rate shrinkage (Laplace / Beta(1,1)): one phantom hit +
+// one phantom miss pull thin samples toward 50% so the score ladders can't
+// award full strength on tiny records (3/4 scores like 67%, not 75%, while
+// 12/16 barely moves). Reason text keeps the RAW record — only the ladder
+// comparisons read this. Ladder thresholds are tuned so deep records at the
+// old raw cutoffs land in the same tier they always did.
+function shrunkHitRate(hits: number, n: number): number {
+  if (n <= 0) return 0.5;
+  return (hits + 1) / (n + 2);
+}
+
 function calcLean(
   name: string,
   db: FighterDB|null,
@@ -4609,10 +4620,11 @@ function calcLean(
   if (history.length >= 3) {
     const hits = historyFP.filter(v => v != null && v > line).length;
     const rate = hits / history.length;
-    if (rate >= 0.75)      { score += 2;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) went over this exact line` }); }
-    else if (rate >= 0.6)  { score += 1;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights over — consistent over tendency` }); }
-    else if (rate <= 0.25) { score -= 2;   reasons.push({ icon: 'neg', text: `Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared this line — line is hard to hit` }); }
-    else if (rate <= 0.4)  { score -= 1;   reasons.push({ icon: 'neg', text: `Hit rate: ${hits}/${history.length} fights over — under tendency at this line` }); }
+    const rateAdj = shrunkHitRate(hits, history.length);
+    if (rateAdj >= 0.72)      { score += 2;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) went over this exact line` }); }
+    else if (rateAdj >= 0.58) { score += 1;   reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights over — consistent over tendency` }); }
+    else if (rateAdj <= 0.28) { score -= 2;   reasons.push({ icon: 'neg', text: `Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared this line — line is hard to hit` }); }
+    else if (rateAdj <= 0.42) { score -= 1;   reasons.push({ icon: 'neg', text: `Hit rate: ${hits}/${history.length} fights over — under tendency at this line` }); }
     else                   {               reasons.push({ icon: 'neu', text: `Hit rate: ${hits}/${history.length} fights over — nearly 50/50` }); }
   }
 
@@ -5026,10 +5038,11 @@ function calcSSLean(
 
   const hits = history.filter(h => (h.sigStr || 0) > line_ss).length;
   const rate = hits / history.length;
-  if      (rate >= 0.75) { score += 2;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) went over SS line` }); }
-  else if (rate >= 0.6)  { score += 1;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights over SS line` }); }
-  else if (rate <= 0.25) { score -= 2;   reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared SS line` }); }
-  else if (rate <= 0.4)  { score -= 1;   reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} fights over SS line — under tendency` }); }
+  const rateAdj = shrunkHitRate(hits, history.length);
+  if      (rateAdj >= 0.72) { score += 2;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) went over SS line` }); }
+  else if (rateAdj >= 0.58) { score += 1;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights over SS line` }); }
+  else if (rateAdj <= 0.28) { score -= 2;   reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared SS line` }); }
+  else if (rateAdj <= 0.42) { score -= 1;   reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} fights over SS line — under tendency` }); }
   else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${history.length} fights over SS line — near 50/50` }); }
 
   if (history.length >= 3) {
@@ -5197,13 +5210,14 @@ function calcSSR1Lean(
   // weighted accordingly; it also flags the lean as high-conviction below.
   const hits = history.filter(h => (h.sigStrR1 || 0) > line).length;
   const rate = hits / history.length;
+  const rateAdj = shrunkHitRate(hits, history.length);
   const extremeClean = (rate === 0 || rate === 1) && history.length >= 8;
   if      (rate === 1 && history.length >= 8) { score += 3.0; reasons.push({ icon:'pos', text:`Cleared R1 SS line in ALL ${history.length} UFC fights (${history.length}/${history.length}) — structurally clean over` }); }
-  else if (rate >= 0.8)  { score += 1.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
-  else if (rate >= 0.6)  { score += 0.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} over R1 SS line` }); }
+  else if (rateAdj >= 0.78) { score += 1.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
+  else if (rateAdj >= 0.58) { score += 0.8; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} over R1 SS line` }); }
   else if (rate === 0 && history.length >= 8) { score -= 3.0; reasons.push({ icon:'neg', text:`Never cleared R1 SS line in ${history.length} UFC fights (0/${history.length}) — structurally clean under` }); }
-  else if (rate <= 0.2)  { score -= 1.8; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
-  else if (rate <= 0.4)  { score -= 0.8; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} over R1 SS line — under tendency` }); }
+  else if (rateAdj <= 0.22) { score -= 1.8; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} (${Math.round(rate*100)}%) cleared R1 SS line` }); }
+  else if (rateAdj <= 0.42) { score -= 0.8; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} over R1 SS line — under tendency` }); }
   else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${history.length} over R1 SS line — near 50/50` }); }
 
   if (history.length >= 3) {
@@ -5323,10 +5337,11 @@ function calcTDLean(
 
   const hits = history.filter(h => (h.td || 0) > line_td).length;
   const rate = hits / history.length;
-  if      (rate >= 0.75) { score += 2;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) exceeded TD line` }); }
-  else if (rate >= 0.6)  { score += 1;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights over TD line` }); }
-  else if (rate <= 0.25) { score -= 2;   reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared TD line` }); }
-  else if (rate <= 0.4)  { score -= 1;   reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} fights over TD line — under tendency` }); }
+  const rateAdj = shrunkHitRate(hits, history.length);
+  if      (rateAdj >= 0.72) { score += 2;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights (${Math.round(rate*100)}%) exceeded TD line` }); }
+  else if (rateAdj >= 0.58) { score += 1;   reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${history.length} fights over TD line` }); }
+  else if (rateAdj <= 0.28) { score -= 2;   reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${history.length} fights (${Math.round(rate*100)}%) cleared TD line` }); }
+  else if (rateAdj <= 0.42) { score -= 1;   reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${history.length} fights over TD line — under tendency` }); }
   else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${history.length} fights over TD line — near 50/50` }); }
 
   if (history.length >= 3) {
@@ -5466,10 +5481,11 @@ function calcFTLean(
 
   const hits = mins.filter(v => v > line_ft).length;
   const rate = hits / mins.length;
-  if      (rate >= 0.75) { score += 1.6; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${mins.length} fights (${Math.round(rate*100)}%) over fight-time line` }); }
-  else if (rate >= 0.6)  { score += 0.9; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${mins.length} fights over line` }); }
-  else if (rate <= 0.25) { score -= 1.6; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${mins.length} fights (${Math.round(rate*100)}%) over line` }); }
-  else if (rate <= 0.4)  { score -= 0.9; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${mins.length} fights over line — under tendency` }); }
+  const rateAdj = shrunkHitRate(hits, mins.length);
+  if      (rateAdj >= 0.72) { score += 1.6; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${mins.length} fights (${Math.round(rate*100)}%) over fight-time line` }); }
+  else if (rateAdj >= 0.58) { score += 0.9; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${mins.length} fights over line` }); }
+  else if (rateAdj <= 0.28) { score -= 1.6; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${mins.length} fights (${Math.round(rate*100)}%) over line` }); }
+  else if (rateAdj <= 0.42) { score -= 0.9; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${mins.length} fights over line — under tendency` }); }
   else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${mins.length} fights over line — near 50/50` }); }
 
   if (db.finishRate != null) {
@@ -5602,10 +5618,11 @@ function calcCTRLLean(
 
   const hits = ctrlMinsSamples.filter(v => v > line_ctrl).length;
   const rate = hits / ctrlMinsSamples.length;
-  if      (rate >= 0.75) { score += 1.6; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights (${Math.round(rate*100)}%) over control line` }); }
-  else if (rate >= 0.6)  { score += 0.9; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights over line` }); }
-  else if (rate <= 0.25) { score -= 1.6; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${ctrlMinsSamples.length} fights (${Math.round(rate*100)}%) over line` }); }
-  else if (rate <= 0.4)  { score -= 0.9; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights over line — under tendency` }); }
+  const rateAdj = shrunkHitRate(hits, ctrlMinsSamples.length);
+  if      (rateAdj >= 0.72) { score += 1.6; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights (${Math.round(rate*100)}%) over control line` }); }
+  else if (rateAdj >= 0.58) { score += 0.9; reasons.push({ icon:'pos', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights over line` }); }
+  else if (rateAdj <= 0.28) { score -= 1.6; reasons.push({ icon:'neg', text:`Hit rate: only ${hits}/${ctrlMinsSamples.length} fights (${Math.round(rate*100)}%) over line` }); }
+  else if (rateAdj <= 0.42) { score -= 0.9; reasons.push({ icon:'neg', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights over line — under tendency` }); }
   else                   {               reasons.push({ icon:'neu', text:`Hit rate: ${hits}/${ctrlMinsSamples.length} fights over line — near 50/50` }); }
 
   // Style profile: grappler pushes CTRL up, striker pushes it down.
@@ -7282,6 +7299,13 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         const fk = oppName2 ? [key, oppName2].sort().join('|') : '';
         const lean2 = getBestPickLeanForDir(f, dir);
         const src2 = lean2?._source || 'fp';
+        // Projection floor: a backfilled pick must not argue against itself —
+        // its own avg/projection has to sit on the direction's side of the line.
+        const line2 = getSourceActiveLine(f, src2);
+        const avg2 = lean2?.avg;
+        if (line2 != null && typeof avg2 === 'number' && Number.isFinite(avg2)) {
+          if (dir === 'over' ? avg2 <= line2 : avg2 >= line2) continue;
+        }
         if (fk && src2 === 'fp' && fightFpSeen.has(fk)) continue;
         if (fk && fightHasFpPick.has(fk) && src2 !== 'fp') continue;
         const ex = fk ? fightFirstStat.get(fk) : undefined;
@@ -7538,6 +7562,7 @@ async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: Analyz
         confidenceGrade: el.confidenceGrade || getConfidenceGrade(el.conf || 0),
         verdict: el.verdict || '',
         memoryTags: buildMemoryTagsForFighter(f, source, el),
+        modelVersion: MODEL_VERSION,
       };
     };
 
@@ -7561,6 +7586,7 @@ async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: Analyz
       key,
       event: eventName,
       date,
+      modelVersion: MODEL_VERSION,
       total: picks.length,
       overs: overs.length,
       unders: unders.length,
@@ -18251,10 +18277,34 @@ function initAnalyzerCore(): void {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       showToast(`✓ Backup: ${keys.length} keys saved`);
+      void storageSet({ ufc_last_backup_ts: Date.now() });
+      const overflowTrigger = document.getElementById('headerOverflowBtn');
+      if (overflowTrigger) {
+        overflowTrigger.classList.remove('backup-stale');
+        overflowTrigger.title = 'More actions';
+      }
     } catch (e) {
       showToast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   });
+
+  // Line data is irreplaceable (4 events were lost to an uninstall once) —
+  // surface backup age: amber dot on the ⋯ More trigger when the last backup
+  // is older than 7 days or was never taken. Cleared on a successful backup.
+  void (async () => {
+    try {
+      const BACKUP_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+      const data = await storageGet<{ ufc_last_backup_ts?: number }>(['ufc_last_backup_ts']);
+      const ts = data.ufc_last_backup_ts;
+      if (ts && Date.now() - ts <= BACKUP_STALE_MS) return;
+      const trigger = document.getElementById('headerOverflowBtn');
+      if (!trigger) return;
+      trigger.classList.add('backup-stale');
+      trigger.title = ts
+        ? `More actions — last storage backup ${Math.floor((Date.now() - ts) / 86400000)}d ago`
+        : 'More actions — no storage backup on record yet';
+    } catch { /* nudge only — never block init */ }
+  })();
 
   const restoreFileInput = document.getElementById('restoreStorageFile') as HTMLInputElement | null;
   document.getElementById('restoreStorageBtn')?.addEventListener('click', () => restoreFileInput?.click());

@@ -275,6 +275,7 @@ export interface PropPrediction {
     fighter: string;
     opponent: string;
     scheduledRounds: number;
+    modelVersion?: number;
     weightClass?: WeightClass;
     ss: StatPrediction;
     td: StatPrediction;

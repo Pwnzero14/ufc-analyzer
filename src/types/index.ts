@@ -351,6 +351,7 @@ export interface PropPrediction {
   fighter: string;
   opponent: string;
   scheduledRounds: number;
+  modelVersion?: number; // missing on rows predating version stamping (≙ v1)
   weightClass?: WeightClass;
   ss: StatPrediction;
   td: StatPrediction;

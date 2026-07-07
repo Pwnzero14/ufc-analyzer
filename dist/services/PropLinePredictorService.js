@@ -2,7 +2,7 @@
 // Predicts SS, TD, and Fantasy lines for upcoming fights using fighter history,
 // opponent data, and self-learned weights. After settlement, runs a learning
 // cycle to update fighter trends and formula weights.
-import { FANTASY_SCORING } from '../config/index.js';
+import { FANTASY_SCORING, MODEL_VERSION } from '../config/index.js';
 // ── Storage Keys ────────────────────────────────────────────────────────
 const PREDICTIONS_KEY = 'prop_predictions_v1';
 const WEIGHTS_KEY = 'prop_predictor_weights_v1';
@@ -549,7 +549,7 @@ export class PropLinePredictorService {
         const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
         const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
         const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
-        return { fighter, opponent, scheduledRounds, weightClass: weightClass ?? undefined, ss, td, fantasy };
+        return { fighter, opponent, scheduledRounds, modelVersion: MODEL_VERSION, weightClass: weightClass ?? undefined, ss, td, fantasy };
     }
     // ── Learning Cycle ──────────────────────────────────────────────────
     static async runLearningCycle(eventName, archiveRecords) {

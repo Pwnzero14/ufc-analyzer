@@ -3,7 +3,7 @@
 // opponent data, and self-learned weights. After settlement, runs a learning
 // cycle to update fighter trends and formula weights.
 
-import { FANTASY_SCORING } from '../config/index.js';
+import { FANTASY_SCORING, MODEL_VERSION } from '../config/index.js';
 import type {
   FighterDB,
   FighterTrend,
@@ -665,7 +665,7 @@ export class PropLinePredictorService {
     const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
     const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
 
-    return { fighter, opponent, scheduledRounds, weightClass: weightClass ?? undefined, ss, td, fantasy };
+    return { fighter, opponent, scheduledRounds, modelVersion: MODEL_VERSION, weightClass: weightClass ?? undefined, ss, td, fantasy };
   }
 
   // ── Learning Cycle ──────────────────────────────────────────────────
