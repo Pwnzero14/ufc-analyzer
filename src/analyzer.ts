@@ -5825,6 +5825,24 @@ function calcFTLean(
     reasons.push({ icon: memoryAdjustment.delta > 0 ? 'pos' : 'neg', text: memoryAdjustment.note });
   }
 
+  // Market confidence cap: the career-average stat must not be MORE confident in a
+  // fight-time lean than the sharp book is. Cap the FT confidence at the market-implied
+  // probability for the lean's side; if the market actively contradicts the lean
+  // (<50%), drop it to no-lean. Reins in the overconfidence the bounded nudge can't —
+  // e.g. McGregor's 8.0m career avg implies a strong under 12.25, but DK prices it a
+  // coinflip because Holloway is famously durable (the average can't see that).
+  if (mktUnderP != null && lean !== 'push') {
+    const marketConfForLean = (lean === 'under' ? mktUnderP : 1 - mktUnderP) * 100;
+    if (marketConfForLean < 50) {
+      reasons.push({ icon: 'neu', text: `DK market puts the ${lean} at only ${Math.round(marketConfForLean)}% — no edge, lean dropped` });
+      lean = 'push';
+      conf = 50;
+    } else if (marketConfForLean < conf) {
+      reasons.push({ icon: 'neu', text: `Confidence capped to DK market ${Math.round(marketConfForLean)}% (sharp fight-time line ceiling)` });
+      conf = marketConfForLean;
+    }
+  }
+
   const verdict = lean === 'over'
     ? `FT OVER ${line_ft}m (avg ${avgFT.toFixed(1)}m) — ${reasons[0]?.text}`
     : lean === 'under'
