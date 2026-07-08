@@ -5222,16 +5222,29 @@ function calcFTLean(name, db, line_ft, oppDB, dkLine, availableLines = [], money
             reasons.push({ icon: 'pos', text: `DK Sportsbook sets FT at ${dkLine}m vs fantasy book ${line_ft}m — sharp line implies longer fight` });
         }
     }
-    // DK round-market corroboration — nudge the score toward the market-implied
-    // finish timing (sharp signal). Bounded so it tilts toss-ups and adds conviction
-    // but can't fully override a strong stat read.
+    // DK market blend. NON-final-round lines: the market corroborates the stat via a
+    // bounded nudge. FINAL-round lines: the avg-based stat read is unreliable — a
+    // decision-heavy fighter's fight time is bimodal (early finish OR the full-distance
+    // spike), so the average understates duration and pushes a bogus under. The market's
+    // P(under) (round ladder + "Fight to Go the Distance") is the sharp, correct read
+    // there, so let it DRIVE the lean rather than merely nudge it.
     if (mktUnderP != null) {
-        const nudge = Math.max(-1.8, Math.min(1.8, (0.5 - mktUnderP) * 6));
-        score += nudge;
-        reasons.push({
-            icon: nudge < -0.05 ? 'neg' : nudge > 0.05 ? 'pos' : 'neu',
-            text: `DK round market implies ${Math.round(mktUnderP * 100)}% chance under ${line_ft}m (Fight to Start Round odds)`,
-        });
+        const isFinalRoundLine = schedRounds != null && Math.ceil(line_ft / 5) >= schedRounds;
+        if (isFinalRoundLine) {
+            score = (0.5 - mktUnderP) * 12;
+            reasons.push({
+                icon: mktUnderP < 0.45 ? 'pos' : mktUnderP > 0.55 ? 'neg' : 'neu',
+                text: `DK round+distance market implies ${Math.round(mktUnderP * 100)}% under ${line_ft}m — market-led (avg unreliable near the distance)`,
+            });
+        }
+        else {
+            const nudge = Math.max(-1.8, Math.min(1.8, (0.5 - mktUnderP) * 6));
+            score += nudge;
+            reasons.push({
+                icon: nudge < -0.05 ? 'neg' : nudge > 0.05 ? 'pos' : 'neu',
+                text: `DK round market implies ${Math.round(mktUnderP * 100)}% chance under ${line_ft}m (Fight to Start Round odds)`,
+            });
+        }
     }
     let lean, conf;
     if (score >= 3) {
