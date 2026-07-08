@@ -25026,6 +25026,24 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   .pss-conflict { animation: none; }
 }
 
+/* Correlation flag: same-fight legs share fight duration — informational (the combined %
+   and EV are the joint probability, not the independent product). Calm violet "link" tone,
+   distinct from the amber WEAKEST chip and the red CONTRADICTORY alarm. */
+.pss-corr {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #bcacff;
+  background: rgba(150,120,255,0.09);
+  border: 1px solid rgba(150,120,255,0.34);
+  text-shadow: 0 0 8px rgba(150,120,255,0.30);
+}
+
 /* ── GLOW-UP 143: Parlay Lab L5 — champion finale ── */
 
 /* Suggested parlay cards: glass depth + hover lift + load affordance */
