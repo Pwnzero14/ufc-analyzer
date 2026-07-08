@@ -4600,7 +4600,9 @@ function calcSSLean(name, db, line_ss, oppDB, dkLine, availableLines = [], money
     if (memoryAdjustment.note) {
         reasons.push({ icon: memoryAdjustment.delta > 0 ? 'pos' : 'neg', text: memoryAdjustment.note });
     }
-    const ssVerdict = projSSLean != null ? `proj ${projSSLean.toFixed(1)}` : `avg ${avgSS.toFixed(1)}`;
+    // Show the EFFECTIVE projection (opp-adjusted AND v6 duration-adjusted), so the headline
+    // matches the "SS proj 59→70" reason and the value the score was actually built from.
+    const ssVerdict = (projSSLean != null || durAdjSS != null) ? `proj ${effectiveSS.toFixed(1)}` : `avg ${avgSS.toFixed(1)}`;
     const verdict = lean === 'over'
         ? `SS OVER ${line_ss} (${ssVerdict}) — ${reasons[0]?.text}`
         : lean === 'under'
@@ -5009,7 +5011,8 @@ function calcTDLean(name, db, line_td, oppDB, dkLine, availableLines = [], money
     if (memoryAdjustment.note) {
         reasons.push({ icon: memoryAdjustment.delta > 0 ? 'pos' : 'neg', text: memoryAdjustment.note });
     }
-    const tdVerdict = projTD != null ? `proj ${projTD.toFixed(1)}` : `avg ${avgTD.toFixed(1)}`;
+    // Effective projection = opp-adjusted AND v6 duration-adjusted, matching the reason text.
+    const tdVerdict = (projTD != null || durAdjTD != null) ? `proj ${effectiveTD.toFixed(1)}` : `avg ${avgTD.toFixed(1)}`;
     const verdict = lean === 'over'
         ? `TD OVER ${line_td} (${tdVerdict}) — ${reasons[0]?.text}`
         : lean === 'under'
