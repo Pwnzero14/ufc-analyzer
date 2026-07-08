@@ -4378,7 +4378,7 @@ function calcSSLean(name, db, line_ss, oppDB, dkLine, availableLines = [], money
     const projSSLean = oppAvgSSAllowedLean != null
         ? parseFloat(((avgSS + oppAvgSSAllowedLean) / 2).toFixed(1))
         : null;
-    const effectiveSS = projSSLean ?? avgSS;
+    let effectiveSS = projSSLean ?? avgSS;
     const reasons = [];
     let score = 0;
     // ── Venue / altitude / cage factors ──────────────────────────────────────
@@ -4391,6 +4391,18 @@ function calcSSLean(name, db, line_ss, oppDB, dkLine, availableLines = [], money
     if (currentVenueFactor.cageSizeFt === 25) {
         score -= 0.3;
         reasons.push({ icon: 'neg', text: 'Small cage (25ft) — less space to maintain distance, lower SS volume' });
+    }
+    // ── Duration adjustment ───────────────────────────────────────────────────
+    // SS accrues with time on the feet; when the market prices this fight much
+    // shorter/longer than the fighter's norm, shift the projection (the bimodal-
+    // duration blind spot fixed for FT). Bounded, only on a meaningful gap.
+    const durAdjSS = durationAdjustProjection(name, db, effectiveSS);
+    if (durAdjSS) {
+        reasons.push({
+            icon: durAdjSS.factor < 1 ? 'neg' : 'pos',
+            text: `Duration-adjusted: market ~${durAdjSS.expMins.toFixed(1)}m vs ${durAdjSS.ownMins.toFixed(1)}m career — SS proj ${effectiveSS.toFixed(0)}→${durAdjSS.adjusted.toFixed(0)} (×${durAdjSS.factor.toFixed(2)})`,
+        });
+        effectiveSS = durAdjSS.adjusted;
     }
     const ssLabel = projSSLean != null
         ? `Proj SS (${effectiveSS.toFixed(1)} — avg ${avgSS.toFixed(1)} + opp allows ${oppAvgSSAllowedLean})`
@@ -4790,7 +4802,7 @@ function calcTDLean(name, db, line_td, oppDB, dkLine, availableLines = [], money
     const projTD = (oppAvgTDAllowed != null)
         ? parseFloat(((avgTD + oppAvgTDAllowed) / 2).toFixed(1))
         : null;
-    const effectiveTD = projTD ?? avgTD;
+    let effectiveTD = projTD ?? avgTD;
     const reasons = [];
     let score = 0;
     // ── Venue / altitude / cage factors ──────────────────────────────────────
@@ -4803,6 +4815,16 @@ function calcTDLean(name, db, line_td, oppDB, dkLine, availableLines = [], money
     if (currentVenueFactor.cageSizeFt === 25) {
         score += 0.4;
         reasons.push({ icon: 'pos', text: 'Small cage (25ft) — less space to sprawl, more TD opportunities' });
+    }
+    // Duration adjustment — TDs accrue with time on the feet/mat too. Same bounded
+    // market-vs-career scaling as SS.
+    const durAdjTD = durationAdjustProjection(name, db, effectiveTD);
+    if (durAdjTD) {
+        reasons.push({
+            icon: durAdjTD.factor < 1 ? 'neg' : 'pos',
+            text: `Duration-adjusted: market ~${durAdjTD.expMins.toFixed(1)}m vs ${durAdjTD.ownMins.toFixed(1)}m career — TD proj ${effectiveTD.toFixed(1)}→${durAdjTD.adjusted.toFixed(1)} (×${durAdjTD.factor.toFixed(2)})`,
+        });
+        effectiveTD = durAdjTD.adjusted;
     }
     const tdLabel = projTD != null
         ? `Proj TDs (${effectiveTD.toFixed(1)} — avg ${avgTD.toFixed(1)} + opp allows ${oppAvgTDAllowed})`
@@ -5082,6 +5104,58 @@ function marketFtUnderProb(name, line, schedRounds) {
     const endsInRoundR = Math.max(0, rr - rr1); // finishes during round r (uniform within round)
     const p = endedBeforeRoundR + endsInRoundR * (offset / 5);
     return Math.min(1, Math.max(0, p));
+}
+// Fighter's average fight duration (minutes) from UFCStats history.
+function avgFightMinutes(db) {
+    const timed = (db?.history || []).map(h => Number(h.timeSecs)).filter(v => Number.isFinite(v) && v > 0);
+    if (timed.length < 3)
+        return null;
+    return (timed.reduce((s, v) => s + v, 0) / timed.length) / 60;
+}
+// Market-implied EXPECTED fight duration (minutes) from DK's round ladder + distance
+// market. Used to duration-adjust SS/TD projections (both scale with time on the feet).
+// Σ P(finish in round r)·(mid-round mins) + P(decision)·(full duration).
+function marketExpectedFightMinutes(name, schedRounds) {
+    const ladder = resolveRoundStartFromMap(name);
+    if (!ladder)
+        return null;
+    const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
+    const reach = (k) => (k <= 1 ? 1 : devigReachRound(ladder[String(k)]));
+    const pDecision = resolveDistanceDecisionProb(name);
+    let expected = 0;
+    for (let r = 1; r <= maxRound; r++) {
+        const rr = reach(r);
+        if (rr == null)
+            return null;
+        const midFinishMins = (r - 1) * 5 + 2.5; // uniform finish within the round
+        if (r < maxRound) {
+            const rNext = reach(r + 1);
+            if (rNext == null)
+                return null;
+            expected += Math.max(0, rr - rNext) * midFinishMins;
+        }
+        else {
+            const dec = pDecision ?? 0;
+            expected += Math.max(0, rr - dec) * midFinishMins; // finishes in the final round
+            expected += dec * (maxRound * 5); // decisions at full duration
+        }
+    }
+    return expected;
+}
+// Duration-scale a per-fight stat projection when the market prices THIS fight
+// materially shorter/longer than the fighter's own norm (SS/TD both accrue with time
+// on the feet). Returns { adjusted, factor, expMins, ownMins } or null when it doesn't
+// apply (no market/history, or the gap is within noise). Bounded 0.5–1.4×.
+function durationAdjustProjection(name, db, value) {
+    const schedR = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
+    const expMins = marketExpectedFightMinutes(name, schedR);
+    const ownMins = avgFightMinutes(db);
+    if (expMins == null || ownMins == null || ownMins <= 0)
+        return null;
+    const factor = Math.max(0.5, Math.min(1.4, expMins / ownMins));
+    if (Math.abs(factor - 1) < 0.12)
+        return null; // within noise — leave it
+    return { adjusted: parseFloat((value * factor).toFixed(1)), factor, expMins, ownMins };
 }
 function calcFTLean(name, db, line_ft, oppDB, dkLine, availableLines = [], moneyline = null) {
     if (!line_ft)
