@@ -181,6 +181,11 @@ export const NAME_ALIASES = {
     'Meng Ding': 'Ding Meng',
     'Mingyang Zhang': 'Zhang Mingyang',
     'Jingnan Xiong': 'Xiong Jingnan',
+    // UFC 329: Pick6 lists her Chinese-order "Wang Cong" (family Wang) while
+    // UD/PP/Betr use Western-order "Cong Wang" — the mismatch split her into a real
+    // card + a ghost and broke opponent/moneyline resolution (Tracy Cortez's dog-FP
+    // gate). normalizeName applies this so all platforms + settle collapse to one key.
+    'Cong Wang': 'Wang Cong',
     'Damon Jackson': 'Donte Johnson',
     'Myktybek Orolbai': 'Myktybek Orolbai Uulu',
     'Orolbai': 'Myktybek Orolbai Uulu',
