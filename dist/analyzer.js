@@ -10898,6 +10898,20 @@ async function initPlatformBiasCache() {
 // Populated by renderCalibrationPanel, consumed by getRecalibratedConfidence.
 let _recalibrationMap = null;
 let _recalibrationByType = {};
+// Pseudo-count for Bayesian shrinkage of a calibration bucket's empirical hit-rate
+// toward the bucket's OWN confidence prior (its midpoint). The effective calibration
+// pool is only settled rows that matched a surfaced AI pick — spread across 4 types ×
+// 9 buckets, so most active cells are single-digit-n. A raw hits/total there overfits
+// hard (3/3 → "100%", 0/3 → "0%"), and that noise flows into displayed confidence, the
+// EV chip, and parlay leg probabilities. K phantom observations at the prior rate pull
+// thin cells back toward the model's own number; only real sample volume earns a big
+// move. Same Laplace idea as shrunkHitRate, anchored to the displayed confidence rather
+// than 50%. Panel-displayed empirical rates stay RAW; only this live-transform map is shrunk.
+const RECAL_SHRINK_K = 6;
+function shrunkRecalRate(hits, total, midpoint) {
+    const prior = midpoint / 100;
+    return Math.round(((hits + RECAL_SHRINK_K * prior) / (total + RECAL_SHRINK_K)) * 100);
+}
 function getRecalibratedConfidence(rawConf, source) {
     if (!_recalibrationMap || _recalibrationMap.size < 2)
         return null;
@@ -11050,13 +11064,13 @@ async function renderCalibrationPanel(container) {
     const newRecalByType = {};
     for (const b of calibBuckets) {
         if (b.total >= 3)
-            newRecalMap.set(b.midpoint, Math.round((b.hits / b.total) * 100));
+            newRecalMap.set(b.midpoint, shrunkRecalRate(b.hits, b.total, b.midpoint));
     }
     for (const pt of CALIB_STAT_TYPES) {
         newRecalByType[pt] = new Map();
         for (const b of calibByType[pt]) {
             if (b.total >= 3)
-                newRecalByType[pt].set(b.midpoint, Math.round((b.hits / b.total) * 100));
+                newRecalByType[pt].set(b.midpoint, shrunkRecalRate(b.hits, b.total, b.midpoint));
         }
     }
     _recalibrationMap = newRecalMap;
@@ -11420,16 +11434,17 @@ async function renderCalibrationPanel(container) {
     // SECTION 5: Confidence Recalibration Engine Table
     // ═══════════════════════════════════════════════════════════════════════════
     const recalRows = calibBuckets.filter(b => b.total >= 3).map(b => {
-        const actual = Math.round((b.hits / b.total) * 100);
-        const delta = actual - b.midpoint;
+        const rawRate = Math.round((b.hits / b.total) * 100); // honest empirical hit rate
+        const applied = shrunkRecalRate(b.hits, b.total, b.midpoint); // what the engine actually applies (shrunk toward prior)
+        const delta = applied - b.midpoint;
         const origGrade = getConfidenceGrade(b.midpoint);
-        const newGrade = getConfidenceGrade(actual);
+        const newGrade = getConfidenceGrade(applied);
         const deltaColor = delta > 0 ? 'var(--green)' : delta < -5 ? 'var(--red)' : 'var(--amber)';
         const gradeChanged = origGrade !== newGrade;
         return `<tr>
       <td>${b.rangeLabel}</td>
       <td style="text-align:center">${b.midpoint}%</td>
-      <td style="text-align:center"><span class="calib-recal-arrow">→</span><span class="calib-recal-adjusted" style="color:${deltaColor}">${actual}%</span></td>
+      <td style="text-align:center"><span class="calib-recal-arrow">→</span><span class="calib-recal-adjusted" style="color:${deltaColor}">${applied}%</span><br><span style="font-size:9px;color:var(--text-muted)" title="Raw empirical hit rate before shrinkage toward the confidence prior">raw ${rawRate}%</span></td>
       <td style="text-align:center"><span class="calib-recal-delta" style="color:${deltaColor}">${delta > 0 ? '+' : ''}${delta}</span></td>
       <td style="text-align:center">${origGrade}${gradeChanged ? ` <span class="calib-recal-arrow">→</span> <span style="color:${deltaColor};font-weight:700">${newGrade}</span>` : ''}</td>
       <td style="text-align:center;color:var(--text-muted)">${b.total}</td>
@@ -11443,10 +11458,11 @@ async function renderCalibrationPanel(container) {
             return '';
         const label = pt === 'FightTime' ? 'FT' : pt === 'Fantasy' ? 'FP' : pt;
         const rows = eligible.map(b => {
-            const actual = Math.round((b.hits / b.total) * 100);
-            const delta = actual - b.midpoint;
+            const applied = shrunkRecalRate(b.hits, b.total, b.midpoint);
+            const rawRate = Math.round((b.hits / b.total) * 100);
+            const delta = applied - b.midpoint;
             const col = delta > 0 ? 'var(--green)' : delta < -5 ? 'var(--red)' : 'var(--amber)';
-            return `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--surface2)">${b.rangeLabel}: <span style="color:${col};font-weight:600">${actual}%</span> <span style="color:${col};font-size:9px">(${delta > 0 ? '+' : ''}${delta})</span></span>`;
+            return `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--surface2)" title="Raw empirical hit rate: ${rawRate}% (${b.hits}/${b.total}); shrunk toward the ${b.midpoint}% prior">${b.rangeLabel}: <span style="color:${col};font-weight:600">${applied}%</span> <span style="color:${col};font-size:9px">(${delta > 0 ? '+' : ''}${delta})</span></span>`;
         }).join(' ');
         return `<div style="margin-top:8px"><span style="font-size:10px;font-weight:700;color:var(--text);margin-right:6px">${label}:</span>${rows}</div>`;
     }).filter(Boolean).join('');
@@ -16033,14 +16049,14 @@ async function initRecalibrationMap() {
         const newMap = new Map();
         for (const b of globalB) {
             if (b.total >= 3)
-                newMap.set(b.midpoint, Math.round((b.hits / b.total) * 100));
+                newMap.set(b.midpoint, shrunkRecalRate(b.hits, b.total, b.midpoint));
         }
         const newTypeMap = {};
         for (const pt of STAT_TYPES) {
             newTypeMap[pt] = new Map();
             for (const b of typeB[pt]) {
                 if (b.total >= 3)
-                    newTypeMap[pt].set(b.midpoint, Math.round((b.hits / b.total) * 100));
+                    newTypeMap[pt].set(b.midpoint, shrunkRecalRate(b.hits, b.total, b.midpoint));
             }
         }
         _recalibrationMap = newMap;
