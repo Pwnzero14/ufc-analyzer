@@ -226,7 +226,10 @@ export const NAME_ALIASES = {
 // v6 (2026-07-07): SS/TD projections duration-adjusted by the market-implied expected
 //   fight length (round ladder + distance) — scales the per-fight avg when the fight
 //   is priced materially shorter/longer than the fighter's career norm.
-export const MODEL_VERSION = 6;
+// v7 (2026-07-07): DK "Time of Finish" 1-minute finish distribution becomes the
+//   preferred source for the FT prior + expected-duration (actual within-round shape
+//   instead of uniform); round ladder is the fallback.
+export const MODEL_VERSION = 7;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
