@@ -234,7 +234,9 @@ export const NAME_ALIASES: Record<string, string> = {
 // v4 (2026-07-07): FT lean uses DK "To Start Round X" round market as a
 //   finish-timing prior — blends with the stat lean and, for no-history fighters,
 //   emits a market-only FT lean (bypasses the calcFTLean history<3 gate).
-export const MODEL_VERSION = 4;
+// v5 (2026-07-07): FT prior extended to FINAL-round lines via DK "Fight to Go the
+//   Distance" market (pins P(decision)); previously those lines were stat-only.
+export const MODEL_VERSION = 5;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
