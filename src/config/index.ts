@@ -236,7 +236,10 @@ export const NAME_ALIASES: Record<string, string> = {
 //   emits a market-only FT lean (bypasses the calcFTLean history<3 gate).
 // v5 (2026-07-07): FT prior extended to FINAL-round lines via DK "Fight to Go the
 //   Distance" market (pins P(decision)); previously those lines were stat-only.
-export const MODEL_VERSION = 5;
+// v6 (2026-07-07): SS/TD projections duration-adjusted by the market-implied expected
+//   fight length (round ladder + distance) — scales the per-fight avg when the fight
+//   is priced materially shorter/longer than the fighter's career norm.
+export const MODEL_VERSION = 6;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
