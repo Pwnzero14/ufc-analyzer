@@ -1803,6 +1803,7 @@ async function autoBackupOnStartup(): Promise<void> {
     await refreshFightOddsFromBestFightOdds('startup');
     void refreshDKMoneylinesFromApi('startup');
     void refreshDKRoundStartFromApi('startup');
+    void refreshDKDistanceFromApi('startup');
     // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
 
     // ── Startup catch-up settle ─────────────────────────────────────────
@@ -2737,6 +2738,81 @@ async function refreshDKRoundStartFromApi(reason: string): Promise<number> {
   }
 }
 
+// DK "Fight to Go the Distance" market (category 556 / subcategory 17644 — stable
+// market-type IDs, event-agnostic). Yes = decision (goes the distance), No = finish.
+// De-vigging Yes gives P(decision), which lets the FT prior price lines in the FINAL
+// scheduled round (splitting the last-round mass into finishes vs the decision spike).
+// Stored as { [normName]: { yes, no } } in AMERICAN odds; both fighters share it.
+const DK_DISTANCE_URL =
+  'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/556/subcategories/17644';
+
+async function refreshDKDistanceFromApi(reason: string): Promise<number> {
+  try {
+    const res = await fetch(DK_DISTANCE_URL, {
+      signal: AbortSignal.timeout(15000),
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) { console.warn(`[UFC Odds] DK distance HTTP ${res.status} (${reason})`); return 0; }
+    const data: any = await res.json();
+    const markets = Array.isArray(data?.markets) ? data.markets : [];
+    const selections = Array.isArray(data?.selections) ? data.selections : [];
+    const events = Array.isArray(data?.events) ? data.events : [];
+    if (!markets.length || !selections.length || !events.length) {
+      console.warn(`[UFC Odds] DK distance empty payload (${reason})`);
+      return 0;
+    }
+
+    const eventFighters: Record<string, string[]> = {};
+    for (const ev of events) {
+      const parts = Array.isArray(ev?.participants) ? ev.participants : [];
+      const names = parts.map((p: any) => normalizeOddsName(p?.name)).filter(Boolean);
+      if (ev?.id && names.length >= 2) eventFighters[String(ev.id)] = names;
+    }
+
+    // marketId → eventId for "Fight to Go the Distance"
+    const marketEvent: Record<string, string> = {};
+    for (const m of markets) {
+      if (!/go\s+the\s+distance/i.test(String(m?.name || ''))) continue;
+      marketEvent[String(m.id)] = String(m.eventId || '');
+    }
+
+    const yesNoByMarket: Record<string, { yes: number | null; no: number | null }> = {};
+    for (const sel of selections) {
+      const mid = String(sel?.marketId || '');
+      if (!marketEvent[mid]) continue;
+      const raw = String(sel?.displayOdds?.american ?? '').trim();
+      const neg = raw.charCodeAt(0) === 0x2212 || raw.charCodeAt(0) === 0x2d;
+      const digits = raw.replace(/[^0-9]/g, '');
+      const american = digits ? (neg ? -parseInt(digits, 10) : parseInt(digits, 10)) : NaN;
+      if (!Number.isFinite(american)) continue;
+      const outcome = String(sel?.outcomeType || sel?.label || '').toLowerCase();
+      if (!yesNoByMarket[mid]) yesNoByMarket[mid] = { yes: null, no: null };
+      if (outcome === 'yes') yesNoByMarket[mid].yes = american;
+      else if (outcome === 'no') yesNoByMarket[mid].no = american;
+    }
+
+    const out: Record<string, { yes: number | null; no: number | null }> = {};
+    for (const [mid, eventId] of Object.entries(marketEvent)) {
+      const odds = yesNoByMarket[mid];
+      const fighters = eventFighters[eventId];
+      if (!odds || !fighters || (odds.yes == null && odds.no == null)) continue;
+      for (const nm of fighters) out[nm] = odds;
+    }
+
+    const n = Object.keys(out).length;
+    if (n >= 2) {
+      await chrome.storage.local.set({ fight_distance_dk_v1: out });
+      console.log(`[UFC Odds] DK distance: ${n} fighters (${reason})`);
+      return n;
+    }
+    console.warn(`[UFC Odds] DK distance parsed ${n} fighters — structure changed? (${reason})`);
+    return 0;
+  } catch (e) {
+    console.warn(`[UFC Odds] DK distance fetch failed (${reason}):`, e);
+    return 0;
+  }
+}
+
 async function fetchDKBetHandles(reason: string): Promise<number> {
   const apiUrl = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034';
   try {
@@ -3490,6 +3566,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
     await refreshFightOddsFromBestFightOdds('auto-scrape');
     await refreshDKMoneylinesFromApi('auto-scrape');
     await refreshDKRoundStartFromApi('auto-scrape');
+    await refreshDKDistanceFromApi('auto-scrape');
     // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
   }
 

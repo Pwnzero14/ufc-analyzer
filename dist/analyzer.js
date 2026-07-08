@@ -147,6 +147,9 @@ let fightOddsMoneylineByName = {};
 // { name: { "2": {yes,no}, "3": {...}, ... } } in American odds. Feeds the FT
 // lean's market-implied finish-timing prior (see marketFtUnderProb).
 let dkRoundStartByName = {};
+// DK "Fight to Go the Distance" Yes/No by normalized fighter name (American odds).
+// De-vigged Yes = P(decision); lets the FT prior price final-round lines.
+let dkDistanceByName = {};
 // DK bonus payloads captured alongside moneylines (representing-country codes
 // and DK's own vig-free win probabilities).
 let dkCountryByName = {};
@@ -5020,10 +5023,34 @@ function resolveRoundStartFromMap(name) {
     }
     return null;
 }
-// Market-implied P(fight duration < `line` minutes) from DK's round-start ladder.
-// Returns null when the line falls in the FINAL scheduled round (the ladder can't
-// separate a late finish from a decision there without the distance market) or when
-// the covering round markets are missing — callers then fall back to stat-only logic.
+// De-vigged P(fight goes to DECISION) from DK's "Fight to Go the Distance" market.
+function resolveDistanceDecisionProb(name) {
+    const normalized = normalizeName(name);
+    if (!normalized)
+        return null;
+    let pair = dkDistanceByName[normalized];
+    if (!pair) {
+        for (const [k, v] of Object.entries(dkDistanceByName)) {
+            if (namesMatch(k, normalized)) {
+                pair = v;
+                break;
+            }
+        }
+    }
+    if (!pair)
+        return null;
+    const y = americanToImplied(pair.yes), n = americanToImplied(pair.no);
+    if (y == null || n == null)
+        return null;
+    const s = y + n;
+    if (s <= 0)
+        return null;
+    return Math.min(1, Math.max(0, y / s)); // Yes = goes the distance
+}
+// Market-implied P(fight duration < `line` minutes) from DK's round-start ladder,
+// with the "Fight to Go the Distance" market pinning the decision spike so the FINAL
+// scheduled round can be priced too. Returns null when the covering markets are
+// missing — callers then fall back to stat-only logic.
 function marketFtUnderProb(name, line, schedRounds) {
     if (!Number.isFinite(line) || line <= 0)
         return null;
@@ -5032,10 +5059,22 @@ function marketFtUnderProb(name, line, schedRounds) {
         return null;
     const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
     const r = Math.min(maxRound, Math.max(1, Math.ceil(line / 5))); // round the line sits in
-    if (r >= maxRound)
-        return null; // final round — decision mass unknown
     const offset = Math.min(5, Math.max(0, line - (r - 1) * 5)); // minutes into round r
     const reach = (k) => (k <= 1 ? 1 : devigReachRound(ladder[String(k)]));
+    if (r >= maxRound) {
+        // Final scheduled round: the round ladder alone can't split a late finish from a
+        // decision. DK's "Fight to Go the Distance" gives P(decision), which sits at the
+        // full duration (never under a sub-max line), so the finishes in the last round
+        // are (reachFinal - pDecision), spread uniformly across the round.
+        const pDecision = resolveDistanceDecisionProb(name);
+        const reachFinal = reach(maxRound);
+        if (pDecision == null || reachFinal == null)
+            return null;
+        const endedBeforeFinal = 1 - reachFinal; // finished in rounds 1..maxRound-1
+        const finishesInFinal = Math.max(0, reachFinal - pDecision); // finishes during the final round
+        const p = endedBeforeFinal + finishesInFinal * (offset / 5);
+        return Math.min(1, Math.max(0, p));
+    }
     const rr = reach(r), rr1 = reach(r + 1);
     if (rr == null || rr1 == null)
         return null;
@@ -15840,7 +15879,7 @@ async function loadData() {
             await loadOpeningLines();
             await loadLineHistory();
             await loadConfidenceMemoryEngine();
-            const result = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1', 'fight_round_start_dk_v1']);
+            const result = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1', 'fight_round_start_dk_v1', 'fight_distance_dk_v1']);
             // Signature from the RAW storage values (before the betr manual-override
             // mutation below), so the periodic heartbeat — which reads raw storage —
             // compares apples to apples.
@@ -15858,6 +15897,15 @@ async function loadData() {
                     const nn = normalizeName(name);
                     if (nn && ladder && typeof ladder === 'object')
                         dkRoundStartByName[nn] = ladder;
+                }
+            }
+            dkDistanceByName = {};
+            const rawDistance = result['fight_distance_dk_v1'];
+            if (rawDistance && typeof rawDistance === 'object') {
+                for (const [name, pair] of Object.entries(rawDistance)) {
+                    const nn = normalizeName(name);
+                    if (nn && pair && typeof pair === 'object')
+                        dkDistanceByName[nn] = pair;
                 }
             }
             fightOddsMoneylineByName = {};
