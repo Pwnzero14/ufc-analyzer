@@ -298,6 +298,10 @@ let dkRoundStartByName: Record<string, Record<string, { yes: number | null; no: 
 // DK "Fight to Go the Distance" Yes/No by normalized fighter name (American odds).
 // De-vigged Yes = P(decision); lets the FT prior price final-round lines.
 let dkDistanceByName: Record<string, { yes: number | null; no: number | null }> = {};
+// DK "Time of Finish" 1-minute finish buckets by normalized fighter name:
+// [{ start: minutes-into-fight, odds: American }]. The actual finish-time shape,
+// preferred over the round ladder's uniform-within-round assumption.
+let dkTimeOfFinishByName: Record<string, Array<{ start: number; odds: number }>> = {};
 // DK bonus payloads captured alongside moneylines (representing-country codes
 // and DK's own vig-free win probabilities).
 let dkCountryByName: Record<string, string> = {};
@@ -5512,12 +5516,63 @@ function resolveDistanceDecisionProb(name: string): number | null {
   return Math.min(1, Math.max(0, y / s)); // Yes = goes the distance
 }
 
-// Market-implied P(fight duration < `line` minutes) from DK's round-start ladder,
-// with the "Fight to Go the Distance" market pinning the decision spike so the FINAL
-// scheduled round can be priced too. Returns null when the covering markets are
-// missing — callers then fall back to stat-only logic.
+// De-vigged CONDITIONAL finish-time shape from DK's Time-of-Finish 1-minute buckets:
+// [{ start, p }] with p summing to 1 (P of finishing in that minute GIVEN a finish).
+function finishHistogramConditional(name: string): Array<{ start: number; p: number }> | null {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  let buckets = dkTimeOfFinishByName[normalized];
+  if (!buckets) {
+    for (const [k, v] of Object.entries(dkTimeOfFinishByName)) {
+      if (namesMatch(k, normalized)) { buckets = v; break; }
+    }
+  }
+  if (!buckets || !buckets.length) return null;
+  const implied = buckets
+    .map(b => ({ start: b.start, p: americanToImplied(b.odds) }))
+    .filter((b): b is { start: number; p: number } => b.p != null && b.p > 0);
+  const sum = implied.reduce((s, b) => s + b.p, 0);
+  if (sum <= 0) return null;
+  return implied.map(b => ({ start: b.start, p: b.p / sum }));
+}
+
+// P(fight duration < line) straight from the Time-of-Finish histogram (finish shape)
+// × (1 − P(decision)) from the distance market. Preferred over the round-ladder
+// derivation — no uniform-within-round assumption. Null if either market is missing.
+function marketFtUnderProbDirect(name: string, line: number): number | null {
+  const shape = finishHistogramConditional(name);
+  const pDecision = resolveDistanceDecisionProb(name);
+  if (!shape || pDecision == null) return null;
+  const pFinish = 1 - pDecision;
+  let p = 0;
+  for (const b of shape) {
+    const abs = b.p * pFinish;                             // absolute P(finish in this 1-min bucket)
+    if (b.start + 1 <= line) p += abs;                     // whole bucket before the line
+    else if (b.start < line) p += abs * (line - b.start);  // partial (buckets are 1 min wide)
+  }
+  return Math.min(1, Math.max(0, p));                      // decisions sit at full duration — never under a sub-max line
+}
+
+// E[fight minutes] straight from the Time-of-Finish histogram + distance market.
+function marketExpectedFightMinutesDirect(name: string, schedRounds: number | null): number | null {
+  const shape = finishHistogramConditional(name);
+  const pDecision = resolveDistanceDecisionProb(name);
+  if (!shape || pDecision == null) return null;
+  const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
+  const pFinish = 1 - pDecision;
+  let e = pDecision * (maxRound * 5);
+  for (const b of shape) e += b.p * pFinish * (b.start + 0.5);  // mid-bucket finish time
+  return e;
+}
+
+// Market-implied P(fight duration < `line` minutes). Prefers DK's Time-of-Finish
+// histogram; falls back to the round-start ladder (+ "Fight to Go the Distance" for the
+// final round). Returns null when the covering markets are missing — callers then fall
+// back to stat-only logic.
 function marketFtUnderProb(name: string, line: number, schedRounds: number | null): number | null {
   if (!Number.isFinite(line) || line <= 0) return null;
+  const direct = marketFtUnderProbDirect(name, line);
+  if (direct != null) return direct;
   const ladder = resolveRoundStartFromMap(name);
   if (!ladder) return null;
   const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
@@ -5558,6 +5613,8 @@ function avgFightMinutes(db: FighterDB | null): number | null {
 // market. Used to duration-adjust SS/TD projections (both scale with time on the feet).
 // Σ P(finish in round r)·(mid-round mins) + P(decision)·(full duration).
 function marketExpectedFightMinutes(name: string, schedRounds: number | null): number | null {
+  const direct = marketExpectedFightMinutesDirect(name, schedRounds);
+  if (direct != null) return direct;
   const ladder = resolveRoundStartFromMap(name);
   if (!ladder) return null;
   const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
@@ -16560,7 +16617,7 @@ async function loadData(): Promise<void> {
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
-      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1', 'fight_round_start_dk_v1', 'fight_distance_dk_v1']);
+      const result = await storageGet<Record<string, any>>([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, STORAGE_BETR_MANUAL_KEY, 'fighter_countries_dk_v1', 'fight_trueprob_dk_v1', 'fight_bethandle_dk_v1', 'fight_round_start_dk_v1', 'fight_distance_dk_v1', 'fight_time_of_finish_dk_v1']);
       // Signature from the RAW storage values (before the betr manual-override
       // mutation below), so the periodic heartbeat — which reads raw storage —
       // compares apples to apples.
@@ -16585,6 +16642,14 @@ async function loadData(): Promise<void> {
         for (const [name, pair] of Object.entries(rawDistance)) {
           const nn = normalizeName(name);
           if (nn && pair && typeof pair === 'object') dkDistanceByName[nn] = pair;
+        }
+      }
+      dkTimeOfFinishByName = {};
+      const rawToF = result['fight_time_of_finish_dk_v1'] as Record<string, Array<{ start: number; odds: number }>> | undefined;
+      if (rawToF && typeof rawToF === 'object') {
+        for (const [name, buckets] of Object.entries(rawToF)) {
+          const nn = normalizeName(name);
+          if (nn && Array.isArray(buckets) && buckets.length) dkTimeOfFinishByName[nn] = buckets;
         }
       }
       fightOddsMoneylineByName = {};

@@ -1804,6 +1804,7 @@ async function autoBackupOnStartup(): Promise<void> {
     void refreshDKMoneylinesFromApi('startup');
     void refreshDKRoundStartFromApi('startup');
     void refreshDKDistanceFromApi('startup');
+    void refreshDKTimeOfFinishFromApi('startup');
     // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
 
     // ── Startup catch-up settle ─────────────────────────────────────────
@@ -2738,6 +2739,83 @@ async function refreshDKRoundStartFromApi(reason: string): Promise<number> {
   }
 }
 
+// DK "Time of Finish" market (category 556 / subcategory 7096) — the full finish-time
+// distribution in 1-minute buckets ("Round N - Fight to Be Won Between MM:00 - MM:59").
+// Gives the ACTUAL within-round finish shape (vs the round ladder's uniform assumption),
+// which sharpens fight-time unders. Stored as { [normName]: [{ start, odds }] } where
+// start = minutes-into-fight of the bucket and odds are American. Decision/no-finish is
+// NOT in this market — the finish/decision split comes from fight_distance_dk_v1.
+const DK_TIME_OF_FINISH_URL =
+  'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/556/subcategories/7096';
+
+async function refreshDKTimeOfFinishFromApi(reason: string): Promise<number> {
+  try {
+    const res = await fetch(DK_TIME_OF_FINISH_URL, {
+      signal: AbortSignal.timeout(15000),
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) { console.warn(`[UFC Odds] DK time-of-finish HTTP ${res.status} (${reason})`); return 0; }
+    const data: any = await res.json();
+    const markets = Array.isArray(data?.markets) ? data.markets : [];
+    const selections = Array.isArray(data?.selections) ? data.selections : [];
+    const events = Array.isArray(data?.events) ? data.events : [];
+    if (!markets.length || !selections.length || !events.length) {
+      console.warn(`[UFC Odds] DK time-of-finish empty payload (${reason})`);
+      return 0;
+    }
+
+    const eventFighters: Record<string, string[]> = {};
+    for (const ev of events) {
+      const parts = Array.isArray(ev?.participants) ? ev.participants : [];
+      const names = parts.map((p: any) => normalizeOddsName(p?.name)).filter(Boolean);
+      if (ev?.id && names.length >= 2) eventFighters[String(ev.id)] = names;
+    }
+
+    const marketEvent: Record<string, string> = {};
+    for (const m of markets) marketEvent[String(m.id)] = String(m.eventId || '');
+
+    // Parse "Round R - Fight to Be Won Between MM:00 - ..." → minutes-into-fight bucket.
+    const bucketsByMarket: Record<string, Array<{ start: number; odds: number }>> = {};
+    for (const sel of selections) {
+      const mid = String(sel?.marketId || '');
+      if (!marketEvent[mid]) continue;
+      const mm = String(sel?.label || '').match(/Round\s+(\d).*?Between\s+(\d{1,2}):00/i);
+      if (!mm) continue;
+      const round = parseInt(mm[1], 10), startMin = parseInt(mm[2], 10);
+      if (!Number.isFinite(round) || !Number.isFinite(startMin)) continue;
+      const start = (round - 1) * 5 + startMin;
+      const raw = String(sel?.displayOdds?.american ?? '').trim();
+      const neg = raw.charCodeAt(0) === 0x2212 || raw.charCodeAt(0) === 0x2d;
+      const digits = raw.replace(/[^0-9]/g, '');
+      const odds = digits ? (neg ? -parseInt(digits, 10) : parseInt(digits, 10)) : NaN;
+      if (!Number.isFinite(odds)) continue;
+      if (!bucketsByMarket[mid]) bucketsByMarket[mid] = [];
+      bucketsByMarket[mid].push({ start, odds });
+    }
+
+    const out: Record<string, Array<{ start: number; odds: number }>> = {};
+    for (const [mid, eventId] of Object.entries(marketEvent)) {
+      const buckets = bucketsByMarket[mid];
+      const fighters = eventFighters[eventId];
+      if (!buckets || !buckets.length || !fighters) continue;
+      buckets.sort((a, b) => a.start - b.start);
+      for (const nm of fighters) out[nm] = buckets;
+    }
+
+    const n = Object.keys(out).length;
+    if (n >= 2) {
+      await chrome.storage.local.set({ fight_time_of_finish_dk_v1: out });
+      console.log(`[UFC Odds] DK time-of-finish: ${n} fighters (${reason})`);
+      return n;
+    }
+    console.warn(`[UFC Odds] DK time-of-finish parsed ${n} fighters — structure changed? (${reason})`);
+    return 0;
+  } catch (e) {
+    console.warn(`[UFC Odds] DK time-of-finish fetch failed (${reason}):`, e);
+    return 0;
+  }
+}
+
 // DK "Fight to Go the Distance" market (category 556 / subcategory 17644 — stable
 // market-type IDs, event-agnostic). Yes = decision (goes the distance), No = finish.
 // De-vigging Yes gives P(decision), which lets the FT prior price lines in the FINAL
@@ -3567,6 +3645,7 @@ async function autoScrapeAllPlatforms(): Promise<any> {
     await refreshDKMoneylinesFromApi('auto-scrape');
     await refreshDKRoundStartFromApi('auto-scrape');
     await refreshDKDistanceFromApi('auto-scrape');
+    await refreshDKTimeOfFinishFromApi('auto-scrape');
     // DK bet-handle fetch is manual-only (Auto-Fetch button) to avoid tab spam
   }
 
