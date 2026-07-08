@@ -5590,7 +5590,14 @@ function durationAdjustProjection(name: string, db: FighterDB | null, value: num
   const expMins = marketExpectedFightMinutes(name, schedR);
   const ownMins = avgFightMinutes(db);
   if (expMins == null || ownMins == null || ownMins <= 0) return null;
-  const factor = Math.max(0.5, Math.min(1.4, expMins / ownMins));
+  const raw = expMins / ownMins;
+  // Asymmetric: the DOWNWARD scale is ~linear (less time genuinely = fewer strikes)
+  // and kept full. The UPWARD scale is sub-linear — a finisher who goes longer than
+  // his norm doesn't land proportionally more SS (the extra minutes skew to clinch /
+  // grappling / feeling-out), so a raw 1.4× over-projects. Damp upward by half and
+  // cap it, so the boost TEMPERS leans instead of creating them.
+  let factor = raw >= 1 ? 1 + (raw - 1) * 0.5 : raw;
+  factor = Math.max(0.5, Math.min(1.2, factor));
   if (Math.abs(factor - 1) < 0.12) return null;             // within noise — leave it
   return { adjusted: parseFloat((value * factor).toFixed(1)), factor, expMins, ownMins };
 }
