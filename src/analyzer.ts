@@ -8126,6 +8126,78 @@ function areSameFighter(f1Name: string, f2Name: string): boolean {
  *   A Over SS + A Under TD → synergy (consistent striking style)
  *   A Over FP + A Under FP → impossible (filtered out)
  */
+// ── Correlation-aware parlay joint probability ─────────────────────────────
+// Inverse standard-normal CDF (Acklam's rational approximation) — maps a leg
+// probability to its Gaussian-copula threshold.
+function invNormalCDF(p: number): number {
+  if (p <= 0) return -1e9;
+  if (p >= 1) return 1e9;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const plow = 0.02425, phigh = 1 - plow;
+  if (p < plow) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p <= phigh) { const q = p - 0.5, r = q * q; return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+  const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+
+let _spareNorm: number | null = null;
+function randn(): number {
+  if (_spareNorm != null) { const s = _spareNorm; _spareNorm = null; return s; }
+  let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random();
+  const mag = Math.sqrt(-2 * Math.log(u)); _spareNorm = mag * Math.sin(2 * Math.PI * v); return mag * Math.cos(2 * Math.PI * v);
+}
+
+// Cholesky of a correlation matrix, shrinking off-diagonals toward identity until it's
+// positive-definite (the heuristic ρ's aren't guaranteed PSD).
+function choleskyCorr(sigma: number[][]): number[][] {
+  const n = sigma.length;
+  for (let lambda = 0; lambda <= 1.0001; lambda += 0.05) {
+    const m = sigma.map((row, i) => row.map((val, j) => (i === j ? 1 : (1 - lambda) * val)));
+    const L = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+    let ok = true;
+    for (let i = 0; i < n && ok; i++) {
+      for (let j = 0; j <= i; j++) {
+        let sum = m[i][j];
+        for (let k = 0; k < j; k++) sum -= L[i][k] * L[j][k];
+        if (i === j) { if (sum <= 1e-9) { ok = false; break; } L[i][j] = Math.sqrt(sum); }
+        else L[i][j] = sum / L[j][j];
+      }
+    }
+    if (ok) return L;
+  }
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+}
+
+// Independent P(exactly k hits) via exact subset enumeration (n ≤ 6 → ≤ 64 terms).
+function independentHitCounts(probs: number[]): number[] {
+  const n = probs.length; const out = new Array<number>(n + 1).fill(0);
+  for (let mask = 0; mask < (1 << n); mask++) {
+    let p = 1, k = 0;
+    for (let i = 0; i < n; i++) { if (mask & (1 << i)) { p *= probs[i]; k++; } else p *= 1 - probs[i]; }
+    out[k] += p;
+  }
+  return out;
+}
+
+// Correlation-aware P(exactly k hits) via a Gaussian copula, Monte-Carlo'd: draw
+// correlated normals, threshold each leg at its marginal, count hits. Same-fight legs
+// (ρ ≠ 0) rise/fall together; cross-fight legs (ρ = 0) stay independent.
+function correlatedHitCounts(probs: number[], rho: number[][], iters = 8000): number[] {
+  const n = probs.length;
+  const thresh = probs.map(p => invNormalCDF(1 - Math.min(0.999, Math.max(0.001, p))));
+  const L = choleskyCorr(rho);
+  const counts = new Array<number>(n + 1).fill(0);
+  for (let it = 0; it < iters; it++) {
+    const zr = new Array<number>(n); for (let i = 0; i < n; i++) zr[i] = randn();
+    let k = 0;
+    for (let i = 0; i < n; i++) { let zi = 0; for (let j = 0; j <= i; j++) zi += L[i][j] * zr[j]; if (zi >= thresh[i]) k++; }
+    counts[k]++;
+  }
+  return counts.map(c => c / iters);
+}
+
 function calcPairCorrelation(
   leg1: ParlayLeg, f1: AnalyzerFighter,
   leg2: ParlayLeg, f2: AnalyzerFighter,
@@ -8572,23 +8644,34 @@ function renderParlayLab(container: HTMLElement): void {
       return Math.min(0.85, Math.max(0.35, (recal ?? l.confidence) / 100));
     });
     const anyRecal = selectedLegs.some((l) => getRecalibratedConfidence(l.confidence, l.stat) != null);
-    const combined = Math.round(legProbs.reduce((p, x) => p * x, 1) * 100);
+    const n = legProbs.length;
+
+    // Correlation-aware joint: same-fight / same-fighter legs share the fight's duration,
+    // so they aren't independent. Reuse calcPairCorrelation's impact as a correlation
+    // coefficient (ρ = impact × 4, clamped ±0.85) and Monte-Carlo the joint hit-count
+    // distribution via a Gaussian copula; cross-fight legs stay independent (ρ = 0).
+    const corrFMap = new Map<string, AnalyzerFighter>();
+    for (const cf of visibleFighters) corrFMap.set((normalizeName(cf.name) || cf.name).toLowerCase(), cf);
+    const rho: number[][] = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+    let maxPosCorr = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const cf1 = corrFMap.get((normalizeName(selectedLegs[i].fighter) || selectedLegs[i].fighter).toLowerCase());
+      const cf2 = corrFMap.get((normalizeName(selectedLegs[j].fighter) || selectedLegs[j].fighter).toLowerCase());
+      if (!cf1 || !cf2) continue;
+      const alert = calcPairCorrelation(selectedLegs[i], cf1, selectedLegs[j], cf2);
+      if (!alert) continue;
+      const r = Math.max(-0.85, Math.min(0.85, alert.impact * 4));
+      rho[i][j] = rho[j][i] = r;
+      if (r > maxPosCorr) maxPosCorr = r;
+    }
+    const anyCorr = rho.some((row) => row.some((v) => Math.abs(v) > 0.01));
+    const pByHits = anyCorr ? correlatedHitCounts(legProbs, rho) : independentHitCounts(legProbs);
+    const combined = Math.round((pByHits[n] || 0) * 100);
     const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
     const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m): m is string => !!m) || null;
 
     let payoutHtml = '';
     if (!slipContradiction) {
-      const n = legProbs.length;
-      // P(exactly k hits) via subset enumeration — n ≤ 6 keeps this ≤ 64 terms.
-      const pByHits = new Array<number>(n + 1).fill(0);
-      for (let mask = 0; mask < (1 << n); mask++) {
-        let p = 1, k = 0;
-        for (let i = 0; i < n; i++) {
-          if (mask & (1 << i)) { p *= legProbs[i]; k++; }
-          else p *= 1 - legProbs[i];
-        }
-        pByHits[k] += p;
-      }
       const evRows: { label: string; mult: number; ev: number }[] = [];
       for (const key of Object.keys(PICKEM_PAYOUTS)) {
         const table = PICKEM_PAYOUTS[key].byLegs[n];
@@ -8600,14 +8683,15 @@ function renderParlayLab(container: HTMLElement): void {
       }
       evRows.sort((a, b) => b.ev - a.ev);
       if (evRows.length) {
-        payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities (independence assumed). Verify multipliers in-app — promos and boosts change them.">${evRows.map((r) => `<span class="pss-ev ${r.ev >= 0 ? 'pos' : 'neg'}">${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
+        payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs (Gaussian copula)' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them.">${evRows.map((r) => `<span class="pss-ev ${r.ev >= 0 ? 'pos' : 'neg'}">${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
       }
     }
 
     slipSummaryHtml = `<div class="parlay-slip-summary">
       <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
-      <span class="pss-item" title="Product of ${anyRecal ? 'recalibrated' : 'model'} leg probabilities (clamped 35-85) — assumes independent legs; correlated legs shift the true number">COMBINED <b>~${combined}%</b></span>
+      <span class="pss-item" title="${anyCorr ? 'Joint P(all hit) — correlation-adjusted for same-fight legs via a duration copula, not the independent product' : 'Product of independent leg probabilities'} (clamped 35-85)">COMBINED <b>~${combined}%</b></span>
       <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
+      ${maxPosCorr >= 0.5 ? `<span class="pss-corr" title="Same-fight legs here are strongly positively correlated — they mostly hit or miss together, so this slip is closer to ONE bet than ${selectedLegs.length}. The combined % and EV account for it, but you are not diversifying.">🔗 ~1 BET (correlated)</span>` : anyCorr ? `<span class="pss-corr" title="Same-fight legs are correlated — the combined % and EV are the joint probability, not the independent product.">🔗 corr-adjusted</span>` : ''}
       ${payoutHtml}
       ${slipContradiction ? `<span class="pss-conflict" title="${slipContradiction.replace(/"/g, '&quot;')}">⛔ CONTRADICTORY LEGS</span>` : ''}
     </div>`;
