@@ -2207,15 +2207,27 @@ const PICKEM_UNDER_FORBIDDEN_PLATFORMS: Set<SourcePlatformKey> = new Set(['pick6
 function isMoneylineUnderdog(f: AnalyzerFighter): boolean {
   // Prefer the already-merged moneyline on the fighter, fall back to the odds map.
   const own = f.moneyline ?? resolveMoneylineFromMap(f.name);
-  if (own != null && Number.isFinite(own)) return own > 0;
-  // Fallback: if opponent's moneyline is a known favorite (negative), this fighter is the underdog.
+  // Resolve the opponent's moneyline up front — needed both as a fallback (own missing)
+  // AND for the near-pick-em case where BOTH fighters carry negative juice.
   const opponentNorm = normalizeName(f.opponent || '')?.toLowerCase() || '';
-  if (!opponentNorm) return false;
-  const opp = _fighterByNorm?.get(opponentNorm)
-    || allFighters.find((entry) => (normalizeName(entry.name) || entry.name).toLowerCase() === opponentNorm)
-    || null;
+  const opp = opponentNorm
+    ? (_fighterByNorm?.get(opponentNorm)
+        || allFighters.find((entry) => (normalizeName(entry.name) || entry.name).toLowerCase() === opponentNorm)
+        || null)
+    : null;
   const oppMl = opp?.moneyline ?? (opp ? resolveMoneylineFromMap(opp.name) : null);
-  if (oppMl != null && Number.isFinite(oppMl) && oppMl < 0) return true;
+  const oppHasMl = oppMl != null && Number.isFinite(oppMl);
+
+  if (own != null && Number.isFinite(own)) {
+    if (own > 0) return true; // clear plus-money underdog
+    // Near pick-em: both sides can be negative (e.g. Tracy Cortez -110 vs Wang Cong -114).
+    // The dog is the LESS favored side = the higher (less negative) American price. The
+    // own>0 test alone judged Tracy a favorite and leaked her unplaceable Pick6 FP UNDER.
+    if (oppHasMl) return own > oppMl;
+    return false; // own negative, no opponent price to compare → treat as favorite
+  }
+  // Fallback: own moneyline missing — if opponent is a known favorite (negative), we're the dog.
+  if (oppHasMl && oppMl < 0) return true;
   return false;
 }
 
