@@ -1504,6 +1504,8 @@ function mergeFighters(
       if (fighter.fp_under_available != null) merged.fp_under_available = fighter.fp_under_available;
       if (fighter.ss_over_odds != null) merged.ss_over_odds = fighter.ss_over_odds;
       if (fighter.ss_under_odds != null) merged.ss_under_odds = fighter.ss_under_odds;
+      if (fighter.ss_r1_over_odds != null) merged.ss_r1_over_odds = fighter.ss_r1_over_odds;
+      if (fighter.ss_r1_under_odds != null) merged.ss_r1_under_odds = fighter.ss_r1_under_odds;
       if (fighter.td_over_odds != null) merged.td_over_odds = fighter.td_over_odds;
       if (fighter.td_under_odds != null) merged.td_under_odds = fighter.td_under_odds;
       if (fighter.ft_over_odds != null) merged.ft_over_odds = fighter.ft_over_odds;
@@ -2751,6 +2753,10 @@ const DK_SS_OU_URL =
   'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/1707/subcategories/19390';
 const DK_TD_OU_URL =
   'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/1707/subcategories/19392';
+// "Round 1 Significant Strikes O/U" (added by DK ~2026-07-09) — same per-fighter market
+// shape, name = "{Fighter} Round 1 Significant Strikes O/U".
+const DK_SS_R1_OU_URL =
+  'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/1707/subcategories/20060';
 
 // DK renders negatives with U+2212 (0x2212), not an ASCII hyphen — parse by code point.
 function parseDkAmerican(raw: unknown): number | null {
@@ -2767,7 +2773,7 @@ async function refreshDKFighterPropsFromApi(reason: string): Promise<number> {
   // Fetch one O/U subcategory → { byName: { rawFighter: {line, over, under, eventId} }, eventParts }
   const fetchStat = async (
     url: string,
-    kind: 'ss' | 'td',
+    kind: 'ss' | 'td' | 'ss_r1',
     inBounds: (n: number) => boolean,
   ): Promise<{ byName: Record<string, { line: number; over: number | null; under: number | null; eventId: string }>; eventParts: Record<string, string[]> } | null> => {
     try {
@@ -2790,10 +2796,17 @@ async function refreshDKFighterPropsFromApi(reason: string): Promise<number> {
       // marketId → { fighter, eventId }. Market name = "{Fighter} [Total ]<Stat> O/U".
       const suffix = kind === 'ss'
         ? /\s*(?:total\s+)?significant\s+strikes?\s+o\/u\s*$/i
+        : kind === 'ss_r1'
+        ? /\s*round\s*1\s+significant\s+strikes?\s+o\/u\s*$/i
         : /\s*(?:total\s+)?takedowns?\s+landed\s+o\/u\s*$/i;
       const mkt: Record<string, { fighter: string; eventId: string }> = {};
       for (const m of markets) {
         const nm = String(m?.name || '');
+        // "{Fighter} Round 1 Significant Strikes O/U" also matches the full-fight SS
+        // suffix (leaving "{Fighter} Round 1" as the name). Distinct subcategories keep
+        // them apart today, but if DK ever co-mingles markets, an unguarded parse would
+        // clobber full-fight SS lines with R1 values — reject round-scoped names outright.
+        if (kind !== 'ss_r1' && /\bround\s*\d/i.test(nm)) continue;
         if (!suffix.test(nm)) continue;
         const fighter = nm.replace(suffix, '').trim();
         if (fighter.length < 3) continue;
@@ -2831,9 +2844,10 @@ async function refreshDKFighterPropsFromApi(reason: string): Promise<number> {
   try {
     const ss = await fetchStat(DK_SS_OU_URL, 'ss', (n) => n >= 4 && n < 220);
     const td = await fetchStat(DK_TD_OU_URL, 'td', (n) => n >= 0 && n < 20);
-    if (!ss && !td) { console.warn(`[UFC Odds] DK fighter props: both feeds empty (${reason})`); return 0; }
+    const r1 = await fetchStat(DK_SS_R1_OU_URL, 'ss_r1', (n) => n >= 2 && n < 80);
+    if (!ss && !td && !r1) { console.warn(`[UFC Odds] DK fighter props: all feeds empty (${reason})`); return 0; }
 
-    const eventParts = { ...(td?.eventParts || {}), ...(ss?.eventParts || {}) };
+    const eventParts = { ...(r1?.eventParts || {}), ...(td?.eventParts || {}), ...(ss?.eventParts || {}) };
     const fighters: Record<string, any> = {};
     const ensure = (name: string, eventId?: string) => {
       if (!fighters[name]) {
@@ -2843,8 +2857,9 @@ async function refreshDKFighterPropsFromApi(reason: string): Promise<number> {
         }
         fighters[name] = {
           name, opponent,
-          line_fp: null, line_ss: null, line_td: null, line_ft: null,
-          ss_over_odds: null, ss_under_odds: null, td_over_odds: null, td_under_odds: null,
+          line_fp: null, line_ss: null, line_ss_r1: null, line_td: null, line_ft: null,
+          ss_over_odds: null, ss_under_odds: null, ss_r1_over_odds: null, ss_r1_under_odds: null,
+          td_over_odds: null, td_under_odds: null,
           ft_over_odds: null, ft_under_odds: null,
         };
       }
@@ -2856,12 +2871,15 @@ async function refreshDKFighterPropsFromApi(reason: string): Promise<number> {
     for (const [name, v] of Object.entries(td?.byName || {})) {
       const f = ensure(name, v.eventId); f.line_td = v.line; f.td_over_odds = v.over; f.td_under_odds = v.under;
     }
+    for (const [name, v] of Object.entries(r1?.byName || {})) {
+      const f = ensure(name, v.eventId); f.line_ss_r1 = v.line; f.ss_r1_over_odds = v.over; f.ss_r1_under_odds = v.under;
+    }
 
     const arr = Object.values(fighters);
     if (arr.length >= 2) {
       await handleLinesCaptured('draftkings_sportsbook', { fighters: arr });
       const n = store.draftkings_sportsbook?.fighters?.length || arr.length;
-      console.log(`[UFC Odds] DK fighter props (JSON): ${arr.length} fighters — SS ${Object.keys(ss?.byName || {}).length}, TD ${Object.keys(td?.byName || {}).length} (${reason})`);
+      console.log(`[UFC Odds] DK fighter props (JSON): ${arr.length} fighters — SS ${Object.keys(ss?.byName || {}).length}, TD ${Object.keys(td?.byName || {}).length}, R1 SS ${Object.keys(r1?.byName || {}).length} (${reason})`);
       return n;
     }
     console.warn(`[UFC Odds] DK fighter props parsed ${arr.length} fighters — structure changed? (${reason})`);
