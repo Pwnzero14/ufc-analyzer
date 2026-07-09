@@ -25577,6 +25577,58 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 @media (prefers-reduced-motion: reduce) {
   .model-health-strip .mh-meter-fill { transition: none !important; }
 }
+
+/* ── GLOW-UP 153: Slate Check list rows → severity-forward ──
+   The panel already knows each issue's level ('err'|'warn'); list mode threw it
+   away visually (one muted color, severity carried only by a tiny bullet dot).
+   Now each row wears its severity: a colored badge (✕ / !), a left accent bar,
+   a tinted background wash, and severity-tinted text — reusing the exact red/
+   amber tokens chip mode already uses so both render as one system. Rows are
+   sorted blockers-first in JS (implicit grouping), and the summary breaks the
+   count into "N blockers · M warnings". Base qa CSS is non-important, so these
+   later equal/higher-specificity rules win cleanly. ── */
+.qa-issues li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  line-height: 1.35;
+}
+.qa-issues li::before { content: none; }   /* retire the bullet — the badge carries it */
+.qa-issue-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px; height: 15px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: 'JetBrains Mono', monospace;
+}
+.qa-issue-text { color: var(--text2); min-width: 0; }
+
+.qa-issues li.qa-issue-err {
+  background: rgba(229,62,62,0.07);
+  border-left-color: #e53e3e;
+}
+.qa-issues li.qa-issue-err .qa-issue-icon { background: #e53e3e; color: #fff; }
+.qa-issues li.qa-issue-err .qa-issue-text { color: #ffb3bd; }
+
+.qa-issues li.qa-issue-warn {
+  background: rgba(248,198,74,0.06);
+  border-left-color: #f6b73c;
+}
+.qa-issues li.qa-issue-warn .qa-issue-icon { background: #f6b73c; color: #221203; }
+.qa-issues li.qa-issue-warn .qa-issue-text { color: #f4d58a; }
+
+/* Summary breakdown chips */
+.qa-sum-err  { color: #fc8181; font-weight: 700; }
+.qa-sum-warn { color: #f6d55c; font-weight: 700; }
+.qa-sum-sep  { color: var(--text-muted); opacity: 0.6; margin: 0 8px; }
 </style>
 </head>
 <body>
