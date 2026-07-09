@@ -316,12 +316,16 @@ function renderVisitBriefing() {
     const ago = gapMs < 3600e3 ? `${Math.round(gapMs / 60000)}m` : gapMs < 86400e3 ? `${Math.round(gapMs / 3600e3)}h` : `${Math.round(gapMs / 86400e3)}d`;
     const big = moves[0];
     const movesStr = moves.length
-        ? `<span class="vb-item">📈 <b>${moves.length}</b> line${moves.length > 1 ? 's' : ''} moved${big ? ` · biggest: <b>${prettyName(big.name)}</b> ${big.stat} ${big.from}→${big.to} <span class="${big.d > 0 ? 'vb-up' : 'vb-down'}">${big.d > 0 ? '▲' : '▼'}${Math.abs(big.d).toFixed(1)}</span>` : ''}</span>`
+        ? `<span class="vb-seg"><span class="vb-seg-count">📈 ${moves.length} moved</span>${big ? `<span class="vb-mover"><b>${prettyName(big.name)}</b> <span class="vb-mover-stat">${big.stat}</span> ${big.from}→${big.to} <span class="vb-delta ${big.d > 0 ? 'up' : 'down'}">${big.d > 0 ? '▲' : '▼'}${Math.abs(big.d).toFixed(1)}</span></span>` : ''}</span>`
         : '';
+    const flipChips = flips.slice(0, 3).map(x => {
+        const fromTxt = x.from === 'none' ? 'no lean' : x.from.toUpperCase();
+        return `<span class="vb-flip ${x.to}" title="${prettyName(x.name)}: ${fromTxt} → ${x.to.toUpperCase()}"><b>${prettyName(x.name)}</b> ${x.to === 'over' ? '▲' : '▼'}${x.to.toUpperCase()}</span>`;
+    }).join('');
     const flipsStr = flips.length
-        ? `<span class="vb-item">🔄 <b>${flips.length}</b> lean${flips.length > 1 ? 's' : ''} flipped: ${flips.slice(0, 3).map(x => `<b>${prettyName(x.name)}</b> ${x.from === 'none' ? '' : x.from.toUpperCase() + '→'}${x.to.toUpperCase()}`).join(', ')}${flips.length > 3 ? '…' : ''}</span>`
+        ? `<span class="vb-seg"><span class="vb-seg-count">🔄 ${flips.length} flipped</span>${flipChips}${flips.length > 3 ? `<span class="vb-flip-more">+${flips.length - 3}</span>` : ''}</span>`
         : '';
-    el.innerHTML = `<span class="vb-title">⏱ Since your last visit · ${ago} ago</span>${movesStr}${flipsStr}<button class="vb-close" title="Dismiss">✕</button>`;
+    el.innerHTML = `<span class="vb-brand"><span class="vb-brand-ico" aria-hidden="true">⏱</span>Since your last visit <span class="vb-ago">${ago}</span></span>${movesStr}${flipsStr}<button class="vb-close" title="Dismiss">✕</button>`;
     el.classList.remove('is-hidden');
     el.querySelector('.vb-close')?.addEventListener('click', () => el.classList.add('is-hidden'));
     save();
