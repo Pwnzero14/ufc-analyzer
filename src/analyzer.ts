@@ -12462,7 +12462,10 @@ function spineFighterStatLine(f: FightResult, color: string): string {
   const fp = f.fp != null ? String(Math.round(f.fp)) : '—';
   const res = spineResultLetter(f.result);
   const meth = spineMethodShort(f.method);
-  return `<span class="spine-cmn-stat" style="color:${color}">${ss}·${fp}·${res}/${meth}</span>`;
+  // Result letter carries its own W/L color (green/red) inside the
+  // fighter-colored line, and the title decodes the compact format.
+  const resCls = res === 'W' ? ' cmn-res-w' : res === 'L' ? ' cmn-res-l' : '';
+  return `<span class="spine-cmn-stat" style="color:${color}" title="vs this opponent: SS ${ss} · FP ${fp} · ${res} by ${meth}">${ss}·${fp}·<b class="cmn-res${resCls}">${res}/${meth}</b></span>`;
 }
 
 function spineMatchupHTML(a: AnalyzerFighter, b: AnalyzerFighter): string {

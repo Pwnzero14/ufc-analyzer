@@ -25782,6 +25782,55 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-overflow: ellipsis;
 }
 .ld-fchip-note { color: var(--text3); font-weight: 500; }
+
+/* ── GLOW-UP 156: center matchup column (MATCHUP / COMMON OPPS / L5 TRENDS) —
+   coherence pass on the GLOW-UP 20-era spine sections. Winner values pop and
+   losers recede (opacity split on .adv-win), advantage bars get thickness +
+   rounded segments + a 50% center notch so "who's ahead" reads instantly,
+   section-head hairlines pick up the A-teal/B-gold column identity, common-opp
+   result letters go W-green/L-red inside the fighter-colored stat line, and
+   L5 trend labels take stat-family tints (SS cyan / TD gold). Base rules are
+   non-important; these later rules win cleanly. ── */
+.spine-val-a, .spine-val-b { opacity: 0.75; transition: opacity 0.15s ease; }
+.spine-val-a.adv-win, .spine-val-b.adv-win { opacity: 1; font-weight: 700; }
+
+.spine-adv-bar {
+  height: 4px;
+  border-radius: 3px;
+  overflow: visible;
+  position: relative;
+  margin: 2px 10px 6px;
+}
+.spine-adv-bar .adv-a, .spine-adv-bar .adv-b { border-radius: 3px; }
+.spine-adv-bar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.30);
+  pointer-events: none;
+}
+
+.spine-section-head { color: #8a90a4; }
+.spine-section-head::before {
+  background: linear-gradient(90deg, transparent, rgba(94, 229, 224, 0.30));
+}
+.spine-section-head::after {
+  background: linear-gradient(90deg, rgba(255, 210, 74, 0.28), transparent);
+}
+
+.cmn-res { font-weight: 700; }
+.cmn-res-w { color: #4ade80; }
+.cmn-res-l { color: #ff6b81; }
+.spine-cmn-stat { cursor: help; }
+
+/* Trend rows render in fixed SS / FP / TD order after the section head —
+   tint each label to its stat family (only trend sections contain these). */
+.spine-section > div:nth-child(2) .spine-trend-label { color: #2cd4d0; }
+.spine-section > div:nth-child(3) .spine-trend-label { color: #d7dcf0; }
+.spine-section > div:nth-child(4) .spine-trend-label { color: #f0c040; }
 </style>
 </head>
 <body>
