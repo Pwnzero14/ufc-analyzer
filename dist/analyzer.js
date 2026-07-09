@@ -6562,6 +6562,26 @@ async function renderLearningDiagnosticsWidget() {
         if (el)
             el.textContent = value;
     };
+    const setHtml = (id, value) => {
+        const el = document.getElementById(id);
+        if (el)
+            el.innerHTML = value;
+    };
+    const escLd = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    // Directive line: verb chip (▲ LEAN INTO green / ▼ FADE red) + target text.
+    // The target inherits its container's styling (gold headline in the title
+    // slot, muted meta in the fade slot) so only the verb becomes a badge.
+    const directiveHtml = (verb, target) => `<span class="ld-chip ld-chip-${verb}">${verb === 'lean' ? '▲ LEAN INTO' : '▼ FADE'}</span><span class="ld-target">${escLd(target)}</span>`;
+    // Footer becomes stat chips instead of one gray string. SS/FP are market
+    // over-rates (share of resolved props that went OVER), not model accuracy —
+    // the titles say so to head off misreading.
+    const footerHtml = (resolved, ss, fp, top, note) => [
+        `<span class="ld-fchip ld-fchip-n">${resolved} resolved</span>`,
+        `<span class="ld-fchip ld-fchip-ss" title="Share of resolved SS props that went OVER — market over-rate, not model accuracy">SS ${ss}</span>`,
+        `<span class="ld-fchip ld-fchip-fp" title="Share of resolved FP props that went OVER — market over-rate, not model accuracy">FP ${fp}</span>`,
+        top ? `<span class="ld-fchip ld-fchip-top" title="Strongest archive pattern right now">★ ${escLd(top)}</span>` : '',
+        note ? `<span class="ld-fchip ld-fchip-note">${escLd(note)}</span>` : '',
+    ].filter(Boolean).join('');
     const hasWidget = !!document.getElementById('learningDiagnosticsWidget');
     if (!hasWidget)
         return;
@@ -6660,20 +6680,20 @@ async function renderLearningDiagnosticsWidget() {
                 setText('ldPatternMiss', 'Top miss tag: Need >=3 settled tagged rows');
             }
             if (topHit && topMiss) {
-                setText('ldDrilldownTitle', `Lean into ${hitLabel}`);
-                setText('ldDrilldownMeta', `Fade ${missLabel}`);
+                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel));
+                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel));
             }
             else if (topHit) {
-                setText('ldDrilldownTitle', `Lean into ${hitLabel}`);
+                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel));
                 setText('ldDrilldownMeta', 'No clear fade yet');
             }
             else {
                 setText('ldDrilldownTitle', 'No clear lean yet');
-                setText('ldDrilldownMeta', `Fade ${missLabel}`);
+                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel));
             }
-            setText('ldDrilldownBody', `Based on ${memoryProfile.taggedSamples} tagged samples tracked.`);
-            const topShort = topHit ? hitLabel : (topMiss ? `fade ${missLabel}` : '--');
-            setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · Top: ${topShort}`);
+            setHtml('ldDrilldownBody', `<span class="ld-evidence" title="Settled picks carrying context tags — the sample base behind this directive">📎 ${memoryProfile.taggedSamples} tagged samples</span>`);
+            const topShort = topHit ? hitLabel : (topMiss ? `fade ${missLabel}` : null);
+            setHtml('ldFooterSummary', footerHtml(resolvedRows.length, ssLabel, fpLabel, topShort));
             return;
         }
         const patternMap = new Map();
@@ -6720,7 +6740,7 @@ async function renderLearningDiagnosticsWidget() {
             setText('ldDrilldownTitle', 'Not enough pattern samples yet');
             setText('ldDrilldownMeta', `${resolvedRows.length} resolved rows captured`);
             setText('ldDrilldownBody', 'Keep grading events to unlock stronger tag diagnostics.');
-            setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · keep grading to unlock patterns`);
+            setHtml('ldFooterSummary', footerHtml(resolvedRows.length, ssLabel, fpLabel, null, 'keep grading to unlock patterns'));
             return;
         }
         const topHit = [...candidates].sort((a, b) => b.rate - a.rate || b.total - a.total)[0];
@@ -6729,12 +6749,12 @@ async function renderLearningDiagnosticsWidget() {
         const missPct = Math.round(topMiss.rate * 100);
         setText('ldPatternWin', `Top hit tag: ${topHit.label} (${hitPct}% · ${topHit.wins}/${topHit.total})`);
         setText('ldPatternMiss', `Top miss tag: ${topMiss.label} (${missPct}% · ${topMiss.wins}/${topMiss.total})`);
-        setText('ldDrilldownTitle', `Lean into ${topHit.label}`);
-        setText('ldDrilldownMeta', `Fade ${topMiss.label}`);
+        setHtml('ldDrilldownTitle', directiveHtml('lean', topHit.label));
+        setHtml('ldDrilldownMeta', directiveHtml('fade', topMiss.label));
         setText('ldDrilldownBody', missPct <= 45
             ? `${topMiss.label} hits only ${missPct}% on ${topMiss.total} rows — strong fade.`
             : `${topMiss.label} hits ${missPct}% on ${topMiss.total} rows — soft fade.`);
-        setText('ldFooterSummary', `${resolvedRows.length} resolved · SS ${ssLabel} / FP ${fpLabel} · Top: ${topHit.label}`);
+        setHtml('ldFooterSummary', footerHtml(resolvedRows.length, ssLabel, fpLabel, topHit.label));
     }
     catch (e) {
         debugLog(`learning diagnostics render failed: ${e.message}`);

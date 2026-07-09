@@ -25685,6 +25685,103 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .vb-flip-more { font-size: 9px; color: var(--text3); }
 .vb-close { margin-left: auto; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
 .vb-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+/* ── GLOW-UP 155: Learning Drilldown → directive chips + footer stat chips ──
+   Last flat-text block in the top strip. The gold headline stays the headline,
+   but the directive verbs become badges: ▲ LEAN INTO (green) on the title,
+   ▼ FADE (red) on the meta — the target text keeps inheriting its container's
+   styling (17px gold in the title, muted meta below). The sample count becomes
+   a small evidence badge, and the footer's gray string breaks into stat chips
+   with stat-family colors (SS cyan / FP gold) matching the board's language.
+   Base ld-* rules are non-important; id selectors below win layout cleanly. ── */
+#ldDrilldownTitle, #ldDrilldownMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ld-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ld-chip-lean {
+  color: #6ee7a8;
+  background: rgba(0, 232, 122, 0.10);
+  border: 1px solid rgba(0, 232, 122, 0.35);
+  box-shadow: 0 0 12px rgba(0, 232, 122, 0.10);
+}
+.ld-chip-fade {
+  color: #ff8fa3;
+  background: rgba(255, 58, 96, 0.10);
+  border: 1px solid rgba(255, 58, 96, 0.32);
+  box-shadow: 0 0 12px rgba(255, 58, 96, 0.08);
+}
+.ld-target { min-width: 0; }
+
+/* The body slot used to hold a sentence prefixed by a '·' — orphaned now that
+   it holds a badge. */
+.ld-meta-extra::before { content: none; }
+.ld-evidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #7fe9e6;
+  background: rgba(44, 212, 208, 0.08);
+  border: 1px solid rgba(44, 212, 208, 0.22);
+  cursor: help;
+}
+
+#ldFooterSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ld-fchip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: var(--text2);
+}
+.ld-fchip-n  { color: var(--text); }
+.ld-fchip-ss {
+  color: #7fe9e6;
+  border-color: rgba(44, 212, 208, 0.30);
+  background: rgba(44, 212, 208, 0.08);
+  cursor: help;
+}
+.ld-fchip-fp {
+  color: #f4d58a;
+  border-color: rgba(240, 192, 64, 0.30);
+  background: rgba(240, 192, 64, 0.07);
+  cursor: help;
+}
+.ld-fchip-top {
+  color: var(--gold, #ffbe6b);
+  border-color: rgba(248, 198, 74, 0.28);
+  background: rgba(248, 198, 74, 0.06);
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ld-fchip-note { color: var(--text3); font-weight: 500; }
 </style>
 </head>
 <body>
