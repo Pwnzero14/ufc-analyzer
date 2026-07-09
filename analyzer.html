@@ -25484,6 +25484,99 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(255, 58, 96, 0.30);
   background: rgba(255, 58, 96, 0.08);
 }
+
+/* ── GLOW-UP 152: Model-health KPI row → semantic stat tiles ──
+   Retires GLOW-UP 109's "uniform gold across all three" (identical gold
+   values/labels/dividers) and restores per-tile meaning the RIGHT way —
+   data-driven, not the static per-position colors of GLOW-UP 27:
+     · Calibrated Hit Rate → meter with a breakeven tick (the number to beat)
+     · Top Edge            → value sign-colored green/red by EV
+     · Actionable Leans    → coverage fill bar, neutral cyan (a count, not a verdict)
+   Status green/amber/red replaces the flat gold so the row reads as a verdict
+   at a glance. Layout comes from the non-important base (overrides cleanly);
+   color/-webkit-text-fill wins the 109 !important rules via higher specificity. ── */
+.model-health-strip .mh-stat {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 72px;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  border-bottom-width: 1px !important;   /* drop 109's 2px gold underline */
+}
+.model-health-strip .mh-divider { display: none !important; }
+
+.model-health-strip .mh-label {
+  color: var(--text3) !important;        /* de-gold the label back to muted ink */
+  letter-spacing: 0.12em !important;
+  text-shadow: none !important;
+  font-size: 10px !important;
+}
+.model-health-strip .mh-value {
+  font-size: 26px !important;
+  line-height: 1 !important;
+  background-image: none !important;     /* kill any leftover gradient-clip values */
+  filter: none !important;
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
+  text-shadow: none !important;
+}
+.model-health-strip .mh-trend {
+  color: var(--text2) !important;
+  text-shadow: none !important;
+  font-size: 10px !important;
+}
+
+/* Verdict coloring — specificity (0,4,0) beats every 109 !important value rule */
+.model-health-strip .mh-stat.mh-good .mh-value {
+  color: #4ade80 !important; -webkit-text-fill-color: #4ade80 !important;
+  text-shadow: 0 0 22px rgba(74,222,128,0.35) !important;
+}
+.model-health-strip .mh-stat.mh-warn .mh-value {
+  color: #f5c542 !important; -webkit-text-fill-color: #f5c542 !important;
+  text-shadow: 0 0 22px rgba(245,197,66,0.30) !important;
+}
+.model-health-strip .mh-stat.mh-bad .mh-value {
+  color: #ff6b81 !important; -webkit-text-fill-color: #ff6b81 !important;
+  text-shadow: 0 0 22px rgba(255,107,129,0.32) !important;
+}
+.model-health-strip .mh-stat.mh-info .mh-value {
+  color: #46d4d0 !important; -webkit-text-fill-color: #46d4d0 !important;
+  text-shadow: 0 0 20px rgba(70,212,208,0.28) !important;
+}
+
+/* Meter track + fill */
+.model-health-strip .mh-meter {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.07);
+  margin: 1px 0;
+}
+.model-health-strip .mh-meter-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.20), rgba(255,255,255,0.50));
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.mh-stat.mh-good .mh-meter-fill { background: linear-gradient(90deg, rgba(74,222,128,0.30), #4ade80); }
+.mh-stat.mh-warn .mh-meter-fill { background: linear-gradient(90deg, rgba(245,197,66,0.30), #f5c542); }
+.mh-stat.mh-bad  .mh-meter-fill { background: linear-gradient(90deg, rgba(255,107,129,0.30), #ff6b81); }
+.mh-meter-fill-cov { background: linear-gradient(90deg, rgba(70,212,208,0.30), #46d4d0) !important; }
+
+/* Breakeven tick — the "line to beat"; overhangs the track as a goalpost */
+.model-health-strip .mh-meter-be {
+  position: absolute; top: -2px; bottom: -2px; left: 52.4%;
+  width: 2px; border-radius: 1px;
+  background: rgba(255,255,255,0.72);
+  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-health-strip .mh-meter-fill { transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -25702,21 +25795,26 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 <div id="qaPanel" class="qa-panel" aria-live="polite" style="display:none"></div>
 
 <div id="modelHealthWidget" class="model-health-strip" aria-live="polite">
-  <div class="mh-stat">
+  <div class="mh-stat mh-tile" id="mhTileHit">
     <span class="mh-label">Calibrated Hit Rate</span>
     <span class="mh-value" id="mhHitRate">--%</span>
+    <div class="mh-meter" aria-hidden="true">
+      <div class="mh-meter-fill" id="mhHitFill" style="width:0%"></div>
+      <span class="mh-meter-be" title="Breakeven 52.4% (−110)"></span>
+    </div>
     <span class="mh-trend" id="mhHitTrend">Waiting for model data</span>
   </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
+  <div class="mh-stat mh-tile" id="mhTileEdge">
     <span class="mh-label">Top Edge</span>
     <span class="mh-value" id="mhTopEdge">--</span>
     <span class="mh-trend" id="mhTopEdgeTrend">No actionable edges</span>
   </div>
-  <div class="mh-divider" aria-hidden="true"></div>
-  <div class="mh-stat">
+  <div class="mh-stat mh-tile" id="mhTileCov">
     <span class="mh-label">Actionable Leans</span>
     <span class="mh-value" id="mhCoverage">0</span>
+    <div class="mh-meter" aria-hidden="true">
+      <div class="mh-meter-fill mh-meter-fill-cov" id="mhCoverageFill" style="width:0%"></div>
+    </div>
     <span class="mh-trend" id="mhCoverageTrend">fighters with actionable leans</span>
   </div>
 </div>
