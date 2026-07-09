@@ -1838,6 +1838,7 @@ async function autoBackupOnStartup() {
         await initializeBetrLines();
         await refreshFightOddsFromBestFightOdds('startup');
         void refreshDKMoneylinesFromApi('startup');
+        void refreshDKFighterPropsFromApi('startup');
         void refreshDKRoundStartFromApi('startup');
         void refreshDKDistanceFromApi('startup');
         void refreshDKTimeOfFinishFromApi('startup');
@@ -1921,10 +1922,10 @@ const AUTO_SCRAPE_URLS = {
         // 2026-06-12: MLs were never scraped — this page was missing, so the odds
         // store only ever held (stale) BestFightOdds medians.
         'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fight-odds',
-        // DraftKings Sportsbook UFC Fighter Props (SS + TD + Odds)
-        // 2026-05-15: DK restructured params — category=fights, stat moved to nav_1
-        'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=significant-strikes-o-u',
-        'https://sportsbook.draftkings.com/leagues/mma/ufc?category=fights&subcategory=fighter-props&nav_1=takedowns-landed-o-u',
+        // SS/TD fighter props are NO LONGER HTML-scraped here — the ?nav_1= tab routing
+        // kept breaking (2026-05-15, then again ~07-09 → "DK no data"). They now come from
+        // the sportscontent JSON API via refreshDKFighterPropsFromApi (cat 1707 / sub
+        // 19390 SS O/U + 19392 TD O/U), same robust path as the round/distance/ToF markets.
     ],
 };
 let autoScrapeInProgress = false;
@@ -2719,6 +2720,148 @@ async function refreshDKRoundStartFromApi(reason) {
     }
     catch (e) {
         console.warn(`[UFC Odds] DK round-start fetch failed (${reason}):`, e);
+        return 0;
+    }
+}
+// DK fighter SS/TD O/U props via the sportscontent JSON API (category 1707 — Fighter Props).
+// Subcategories: 19390 = "Significant Strikes O/U" (per-fighter total), 19392 = "Takedowns
+// Landed O/U". These replaced the fragile HTML tab-scrape (DK reshuffled its ?nav_1= routing
+// so the old ?category=fights&subcategory=fighter-props pages loaded the default view → "DK no
+// data"). Markets are per-fighter, named "{Fighter} Total Significant Strikes O/U"; the line is
+// in the selection label ("Over 42.5"), odds in displayOdds.american (U+2212 minus). NOTE we use
+// 19390 (per-fighter O/U), NOT 19389 "Total Significant Strikes" which is the both-fighters combo.
+const DK_SS_OU_URL = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/1707/subcategories/19390';
+const DK_TD_OU_URL = 'https://sportsbook-nash.draftkings.com/api/sportscontent/dkusoh/v1/leagues/9034/categories/1707/subcategories/19392';
+// DK renders negatives with U+2212 (0x2212), not an ASCII hyphen — parse by code point.
+function parseDkAmerican(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s)
+        return null;
+    const neg = s.charCodeAt(0) === 0x2212 || s.charCodeAt(0) === 0x2d;
+    const digits = s.replace(/[^0-9]/g, '');
+    if (!digits)
+        return null;
+    const v = parseInt(digits, 10);
+    return Number.isFinite(v) && v !== 0 ? (neg ? -v : v) : null;
+}
+async function refreshDKFighterPropsFromApi(reason) {
+    // Fetch one O/U subcategory → { byName: { rawFighter: {line, over, under, eventId} }, eventParts }
+    const fetchStat = async (url, kind, inBounds) => {
+        try {
+            const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { accept: 'application/json' } });
+            if (!res.ok) {
+                console.warn(`[UFC Odds] DK ${kind} O/U HTTP ${res.status} (${reason})`);
+                return null;
+            }
+            const data = await res.json();
+            const markets = Array.isArray(data?.markets) ? data.markets : [];
+            const selections = Array.isArray(data?.selections) ? data.selections : [];
+            const events = Array.isArray(data?.events) ? data.events : [];
+            if (!markets.length || !selections.length)
+                return null;
+            // eventId → [rawName, rawName] (for opponent pairing)
+            const eventParts = {};
+            for (const ev of events) {
+                const names = (Array.isArray(ev?.participants) ? ev.participants : [])
+                    .map((p) => String(p?.name || '').trim()).filter(Boolean);
+                if (ev?.id && names.length >= 2)
+                    eventParts[String(ev.id)] = names;
+            }
+            // marketId → { fighter, eventId }. Market name = "{Fighter} [Total ]<Stat> O/U".
+            const suffix = kind === 'ss'
+                ? /\s*(?:total\s+)?significant\s+strikes?\s+o\/u\s*$/i
+                : /\s*(?:total\s+)?takedowns?\s+landed\s+o\/u\s*$/i;
+            const mkt = {};
+            for (const m of markets) {
+                const nm = String(m?.name || '');
+                if (!suffix.test(nm))
+                    continue;
+                const fighter = nm.replace(suffix, '').trim();
+                if (fighter.length < 3)
+                    continue;
+                mkt[String(m.id)] = { fighter, eventId: String(m.eventId || '') };
+            }
+            // marketId → { line, over, under } from Over/Under selections (line lives in the label).
+            const legs = {};
+            for (const sel of selections) {
+                const mid = String(sel?.marketId || '');
+                if (!mkt[mid])
+                    continue;
+                const lm = String(sel?.label || '').match(/([\d.]+)/);
+                const line = lm ? parseFloat(lm[1]) : NaN;
+                const american = parseDkAmerican(sel?.displayOdds?.american);
+                const side = String(sel?.outcomeType || sel?.label || '').toLowerCase();
+                if (!legs[mid])
+                    legs[mid] = { line: null, over: null, under: null };
+                if (Number.isFinite(line))
+                    legs[mid].line = line;
+                if (side.startsWith('over'))
+                    legs[mid].over = american;
+                else if (side.startsWith('under'))
+                    legs[mid].under = american;
+            }
+            const byName = {};
+            for (const [mid, info] of Object.entries(mkt)) {
+                const l = legs[mid];
+                if (!l || l.line == null || !inBounds(l.line))
+                    continue;
+                byName[info.fighter] = { line: l.line, over: l.over, under: l.under, eventId: info.eventId };
+            }
+            return { byName, eventParts };
+        }
+        catch (e) {
+            console.warn(`[UFC Odds] DK ${kind} O/U fetch failed (${reason}):`, e);
+            return null;
+        }
+    };
+    try {
+        const ss = await fetchStat(DK_SS_OU_URL, 'ss', (n) => n >= 4 && n < 220);
+        const td = await fetchStat(DK_TD_OU_URL, 'td', (n) => n >= 0 && n < 20);
+        if (!ss && !td) {
+            console.warn(`[UFC Odds] DK fighter props: both feeds empty (${reason})`);
+            return 0;
+        }
+        const eventParts = { ...(td?.eventParts || {}), ...(ss?.eventParts || {}) };
+        const fighters = {};
+        const ensure = (name, eventId) => {
+            if (!fighters[name]) {
+                let opponent = '';
+                if (eventId && eventParts[eventId]) {
+                    opponent = eventParts[eventId].find((n) => n.trim().toLowerCase() !== name.trim().toLowerCase()) || '';
+                }
+                fighters[name] = {
+                    name, opponent,
+                    line_fp: null, line_ss: null, line_td: null, line_ft: null,
+                    ss_over_odds: null, ss_under_odds: null, td_over_odds: null, td_under_odds: null,
+                    ft_over_odds: null, ft_under_odds: null,
+                };
+            }
+            return fighters[name];
+        };
+        for (const [name, v] of Object.entries(ss?.byName || {})) {
+            const f = ensure(name, v.eventId);
+            f.line_ss = v.line;
+            f.ss_over_odds = v.over;
+            f.ss_under_odds = v.under;
+        }
+        for (const [name, v] of Object.entries(td?.byName || {})) {
+            const f = ensure(name, v.eventId);
+            f.line_td = v.line;
+            f.td_over_odds = v.over;
+            f.td_under_odds = v.under;
+        }
+        const arr = Object.values(fighters);
+        if (arr.length >= 2) {
+            await handleLinesCaptured('draftkings_sportsbook', { fighters: arr });
+            const n = store.draftkings_sportsbook?.fighters?.length || arr.length;
+            console.log(`[UFC Odds] DK fighter props (JSON): ${arr.length} fighters — SS ${Object.keys(ss?.byName || {}).length}, TD ${Object.keys(td?.byName || {}).length} (${reason})`);
+            return n;
+        }
+        console.warn(`[UFC Odds] DK fighter props parsed ${arr.length} fighters — structure changed? (${reason})`);
+        return 0;
+    }
+    catch (e) {
+        console.warn(`[UFC Odds] DK fighter props fetch failed (${reason}):`, e);
         return 0;
     }
 }
@@ -3666,6 +3809,7 @@ async function autoScrapeAllPlatforms() {
         autoScrapeInProgress = false;
         await refreshFightOddsFromBestFightOdds('auto-scrape');
         await refreshDKMoneylinesFromApi('auto-scrape');
+        await refreshDKFighterPropsFromApi('auto-scrape');
         await refreshDKRoundStartFromApi('auto-scrape');
         await refreshDKDistanceFromApi('auto-scrape');
         await refreshDKTimeOfFinishFromApi('auto-scrape');
