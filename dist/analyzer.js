@@ -6365,8 +6365,12 @@ async function renderQAPanel() {
             chip: `Betr ${manualRowCount}/${totalFighters}`,
         });
     }
-    const hasErr = issues.some(i => i.level === 'err');
-    const hasWarn = issues.some(i => i.level === 'warn');
+    // Blockers before warnings — implicit grouping without needing section headers.
+    issues.sort((a, b) => (a.level === b.level ? 0 : a.level === 'err' ? -1 : 1));
+    const errCount = issues.filter(i => i.level === 'err').length;
+    const warnCount = issues.filter(i => i.level === 'warn').length;
+    const hasErr = errCount > 0;
+    const hasWarn = warnCount > 0;
     const level = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
     const chipMode = issues.length > 0 && issues.length <= 3;
     const fetchBtn = document.getElementById('autoScrapeBtn');
@@ -6380,14 +6384,19 @@ async function renderQAPanel() {
         else
             fetchBtn.removeAttribute('data-freshness');
     }
+    const sumParts = [];
+    if (errCount)
+        sumParts.push(`<span class="qa-sum-err">${errCount} ${errCount === 1 ? 'blocker' : 'blockers'}</span>`);
+    if (warnCount)
+        sumParts.push(`<span class="qa-sum-warn">${warnCount} ${warnCount === 1 ? 'warning' : 'warnings'}</span>`);
     const summary = level === 'ok'
         ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
-        : `${level === 'err' ? '✕' : '⚠'} ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`;
+        : sumParts.join('<span class="qa-sum-sep">·</span>');
     const chipsHtml = chipMode
         ? `<div class="qa-issue-chips">${issues.map(i => `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`).join('')}</div>`
         : '';
     const issuesHtml = (!chipMode && issues.length)
-        ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}">${i.text}</li>`).join('')}</ul>`
+        ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}"><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span></li>`).join('')}</ul>`
         : '';
     panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
     panel.style.display = '';
