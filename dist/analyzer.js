@@ -1920,7 +1920,11 @@ function getSourceActiveLine(f, source) {
 // value), so the user doesn't take those bets. DK Sportsbook has no FP props. (SS/TD side
 // availability is handled separately by ssUnderBookOffered/tdUnderBookOffered.)
 const PICKEM_UNDER_FORBIDDEN_PLATFORMS = new Set(['pick6', 'betr']);
-function isMoneylineUnderdog(f) {
+// Where this fighter sits on the moneyline: 'dog' | 'fav' | 'even' | 'unknown'.
+// 'even' (identical prices, e.g. -110/-110) is its own state because the pick-em books
+// still structurally pick ONE side as More/OVER-only from their internal pricing — a
+// dead-even sportsbook ML carries no information about which side that is.
+function moneylineRole(f) {
     // Prefer the already-merged moneyline on the fighter, fall back to the odds map.
     const own = f.moneyline ?? resolveMoneylineFromMap(f.name);
     // Resolve the opponent's moneyline up front — needed both as a fallback (own missing)
@@ -1935,18 +1939,26 @@ function isMoneylineUnderdog(f) {
     const oppHasMl = oppMl != null && Number.isFinite(oppMl);
     if (own != null && Number.isFinite(own)) {
         if (own > 0)
-            return true; // clear plus-money underdog
+            return 'dog'; // clear plus-money underdog
         // Near pick-em: both sides can be negative (e.g. Tracy Cortez -110 vs Wang Cong -114).
         // The dog is the LESS favored side = the higher (less negative) American price. The
         // own>0 test alone judged Tracy a favorite and leaked her unplaceable Pick6 FP UNDER.
-        if (oppHasMl)
-            return own > oppMl;
-        return false; // own negative, no opponent price to compare → treat as favorite
+        if (oppHasMl) {
+            if (own > oppMl)
+                return 'dog';
+            if (own < oppMl)
+                return 'fav';
+            return 'even'; // identical juice (e.g. -110/-110)
+        }
+        return 'fav'; // own negative, no opponent price to compare → treat as favorite
     }
     // Fallback: own moneyline missing — if opponent is a known favorite (negative), we're the dog.
     if (oppHasMl && oppMl < 0)
-        return true;
-    return false;
+        return 'dog';
+    return 'unknown';
+}
+function isMoneylineUnderdog(f) {
+    return moneylineRole(f) === 'dog';
 }
 // Pick6 (DraftKings Pick6) and Underdog Fantasy use the SAME FP scoring, so a fighter's
 // FP line should be ~equal on both books. When Pick6's line sits well ABOVE Underdog's,
@@ -1980,7 +1992,18 @@ function shouldSkipFpSideForFighter(f, source, direction, platformOverride) {
     // check it BEFORE the moneyline early-out below.
     if (direction === 'under' && platform === 'pick6' && pick6FpInflatedVsUnderdog(f))
         return true;
-    if (!isMoneylineUnderdog(f))
+    const role = moneylineRole(f);
+    // Dead-even moneyline (-110/-110): the sportsbook price cannot identify which side the
+    // pick-em book made More/OVER-only — Pick6/Betr still pick a structural "dog" from their
+    // OWN pricing (UFC 329: DK dead even, yet Pick6 offered Tracy Cortez over-only). A wrong
+    // under here is an unplaceable pick, so fail CLOSED unless the scraped Pick6 Less-button
+    // flag affirmatively confirms the under side exists.
+    if (role === 'even' &&
+        direction === 'under' &&
+        PICKEM_UNDER_FORBIDDEN_PLATFORMS.has(platform) &&
+        !(platform === 'pick6' && f.fp_under_available === true))
+        return true;
+    if (role !== 'dog')
         return false;
     if (direction === 'under' && PICKEM_UNDER_FORBIDDEN_PLATFORMS.has(platform))
         return true;
