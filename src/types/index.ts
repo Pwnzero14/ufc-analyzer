@@ -3,7 +3,7 @@ export interface Fighter {
   name: string;
   line_fp?: number | null;
   line_ss?: number | null;
-  line_ss_r1?: number | null;  // Round 1 significant strikes (PrizePicks + Underdog)
+  line_ss_r1?: number | null;  // Round 1 significant strikes (PrizePicks + Underdog + DK)
   line_ss_body?: number | null;  // Significant body strikes (PrizePicks + Underdog)
   line_ss_leg?: number | null;   // Significant leg strikes (PrizePicks + Underdog)
   line_td?: number | null;
@@ -15,6 +15,8 @@ export interface Fighter {
   // Side odds can be American (e.g., -110, +100) or payout multipliers (e.g., 0.66x, 1.34x)
   ss_over_odds?: number | null;
   ss_under_odds?: number | null;
+  ss_r1_over_odds?: number | null;  // DK "Round 1 Significant Strikes O/U" side odds
+  ss_r1_under_odds?: number | null;
   td_over_odds?: number | null;
   td_under_odds?: number | null;
   ft_over_odds?: number | null;

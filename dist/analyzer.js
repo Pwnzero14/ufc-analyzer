@@ -51,6 +51,7 @@ function createPlaceholderAnalyzerFighter(name, opponent) {
         lean_ft: null,
         lean_ctrl: null,
         line_dk_ss: null,
+        line_dk_ss_r1: null,
         line_dk_td: null,
         line_dk_ft: null,
         line_dk_ctrl: null,
@@ -1855,6 +1856,7 @@ function getSourceLineEntries(f, source) {
                 ? [
                     ['prizepicks', f.line_pp_ss_r1],
                     ['underdog', f.line_ud_ss_r1],
+                    ['draftkings_sportsbook', f.line_dk_ss_r1],
                 ]
                 : source === 'td'
                     ? [
@@ -4637,7 +4639,7 @@ function calcSSLean(name, db, line_ss, oppDB, dkLine, availableLines = [], money
         type: 'ss'
     };
 }
-// Round-1-only significant-strikes lean (PrizePicks + Underdog offer this prop).
+// Round-1-only significant-strikes lean (PrizePicks + Underdog + DK Sportsbook).
 // Deliberately conservative vs the full-fight SS lean: R1 is a single-round sample
 // with built-in early-finish risk, so confidence is capped lower and the weak ±0.5
 // tier collapses to a push — only corroborated signals (edge + hit-rate / form /
@@ -6048,6 +6050,10 @@ function computeDetailedEV(f, el) {
         leanOdds = isOver ? (f.ss_over_odds ?? null) : (f.ss_under_odds ?? null);
         oppOdds = isOver ? (f.ss_under_odds ?? null) : (f.ss_over_odds ?? null);
     }
+    else if (el._source === 'ss_r1') {
+        leanOdds = isOver ? (f.ss_r1_over_odds ?? null) : (f.ss_r1_under_odds ?? null);
+        oppOdds = isOver ? (f.ss_r1_under_odds ?? null) : (f.ss_r1_over_odds ?? null);
+    }
     else if (el._source === 'td') {
         leanOdds = isOver ? (f.td_over_odds ?? null) : (f.td_under_odds ?? null);
         oppOdds = isOver ? (f.td_under_odds ?? null) : (f.td_over_odds ?? null);
@@ -6083,6 +6089,15 @@ function computePerBookEV(f, el) {
                 source: 'DK',
                 leanOdds: isOver ? f.ss_over_odds : f.ss_under_odds,
                 oppOdds: isOver ? f.ss_under_odds : f.ss_over_odds,
+            });
+        }
+    }
+    else if (el._source === 'ss_r1') {
+        if (f.ss_r1_over_odds != null || f.ss_r1_under_odds != null) {
+            pairs.push({
+                source: 'DK',
+                leanOdds: isOver ? f.ss_r1_over_odds : f.ss_r1_under_odds,
+                oppOdds: isOver ? f.ss_r1_under_odds : f.ss_r1_over_odds,
             });
         }
     }
@@ -6791,19 +6806,24 @@ function renderBestPicks(container, renderSeq = 0) {
                 return f.line_betr_ss ?? f.line_p6_ss ?? f.line_ud_ss ?? f.line_pp_ss ?? f.line_dk_ss ?? null;
             }
             if (source === 'ss_r1') {
-                // R1 SS is offered only by PrizePicks and Underdog. When a specific book is
-                // requested (e.g. bestSideLineForPick walking all books), return null for any
-                // platform that doesn't carry the prop so no phantom candidates are created.
+                // R1 SS is offered by PrizePicks, Underdog, and DK Sportsbook (added ~07-09).
+                // When a specific book is requested (e.g. bestSideLineForPick walking all books),
+                // return null for any platform that doesn't carry the prop so no phantom
+                // candidates are created.
                 if (platform) {
                     if (platform === 'prizepicks')
                         return f.line_pp_ss_r1 ?? null;
                     if (platform === 'underdog')
                         return f.line_ud_ss_r1 ?? null;
+                    if (platform === 'draftkings_sportsbook')
+                        return f.line_dk_ss_r1 ?? null;
                     return null;
                 }
                 if (currentPlatform === 'underdog')
-                    return f.line_ud_ss_r1 ?? f.line_pp_ss_r1 ?? null;
-                return f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
+                    return f.line_ud_ss_r1 ?? f.line_pp_ss_r1 ?? f.line_dk_ss_r1 ?? null;
+                if (currentPlatform === 'draftkings_sportsbook')
+                    return f.line_dk_ss_r1 ?? f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
+                return f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null;
             }
             if (source === 'td') {
                 if (platform === 'pick6')
@@ -7001,9 +7021,10 @@ function renderBestPicks(container, renderSeq = 0) {
                     return false;
                 return true;
             }
-            // R1 SS (PrizePicks + Underdog pick-em) has no scraped side-odds — it can't be
-            // chalk-filtered or side-availability-gated the way SS/TD/FT are. Worthiness is
-            // enforced upstream by calcSSR1Lean's conservative confidence gating, so accept
+            // R1 SS pick-em sides (PrizePicks/Underdog) have no scraped side-odds, so the
+            // chalk/side-availability gates the other stats use don't apply. DK's R1 SS odds
+            // (ss_r1_over_odds/ss_r1_under_odds, added ~07-09) feed EV pricing only — worthiness
+            // stays enforced upstream by calcSSR1Lean's conservative confidence gating, so accept
             // any non-push R1 SS candidate that survived candidate collection.
             if (c._source === 'ss_r1')
                 return true;
@@ -14223,14 +14244,15 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
                 'betr';
     const historyHTML = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp');
     const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss');
-    const ssR1Line = f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
-    // R1 SS is offered by both PrizePicks and Underdog — label the panel by whichever
-    // platform(s) actually supplied a line (PP is shown first when both exist).
-    const ssR1Sources = [f.line_pp_ss_r1 != null ? 'PP' : null, f.line_ud_ss_r1 != null ? 'UD' : null].filter(Boolean);
+    const ssR1Line = f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null;
+    // R1 SS is offered by PrizePicks, Underdog, and DK — label the panel by whichever
+    // platform(s) actually supplied a line (PP is shown first when several exist).
+    const ssR1Sources = [f.line_pp_ss_r1 != null ? 'PP' : null, f.line_ud_ss_r1 != null ? 'UD' : null, f.line_dk_ss_r1 != null ? 'DK' : null].filter(Boolean);
     const ssR1Badge = ssR1Sources.length === 1 ? `${ssR1Sources[0]}-only` : ssR1Sources.join('+');
     const ssR1Meta = buildPanelMetaChips([
         ...(f.line_pp_ss_r1 != null ? [{ tag: 'PP', raw: f.line_pp_ss_r1 }] : []),
         ...(f.line_ud_ss_r1 != null ? [{ tag: 'UD', raw: f.line_ud_ss_r1 }] : []),
+        ...(f.line_dk_ss_r1 != null ? [{ tag: 'DK', raw: f.line_dk_ss_r1 }] : []),
     ]);
     const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
     // Body/Leg sig strikes (Underdog + PrizePicks only). History bars use per-fight body/leg
@@ -14267,8 +14289,8 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const oppCompareSsLine = oppSsLine;
     const oppCompareTdLine = oppTdLine;
     const oppCompareCtrlLine = platformStatLine(oppEntry, 'ctrl');
-    const oppCompareSsR1Line = oppEntry?.line_pp_ss_r1 ?? oppEntry?.line_ud_ss_r1 ?? null;
-    const oppSsR1Sources = [oppEntry?.line_pp_ss_r1 != null ? 'PP' : null, oppEntry?.line_ud_ss_r1 != null ? 'UD' : null].filter(Boolean);
+    const oppCompareSsR1Line = oppEntry?.line_pp_ss_r1 ?? oppEntry?.line_ud_ss_r1 ?? oppEntry?.line_dk_ss_r1 ?? null;
+    const oppSsR1Sources = [oppEntry?.line_pp_ss_r1 != null ? 'PP' : null, oppEntry?.line_ud_ss_r1 != null ? 'UD' : null, oppEntry?.line_dk_ss_r1 != null ? 'DK' : null].filter(Boolean);
     const oppSsR1Badge = oppSsR1Sources.length === 1 ? `${oppSsR1Sources[0]}-only` : oppSsR1Sources.join('+');
     const oppFPHistory = buildHistoryBars(oppFights, h => getFightFantasyValueForPlatform(h, historyPlatform), oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'fp');
     const oppSSHistory = buildHistoryBars(oppFights, h => h.sigStr, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ss');
@@ -14879,6 +14901,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
         ${lineCell('dk', 'ss', f.line_dk_ss)}
+        ${(f.line_dk_ss_r1 != null && showSource('dk')) ? `<div class="line-cell ss src-dk"><div class="line-platform"><span class="line-source-tag src-dk">DK</span><span>R1 SS</span></div><div class="line-value dk">${f.line_dk_ss_r1}</div></div>` : ''}
         ${lineCell('dk', 'td', f.line_dk_td)}
         ${lineCell('dk', 'ft', f.line_dk_ft)}
         ${lineCell('dk', 'ctrl', f.line_dk_ctrl)}
@@ -15074,7 +15097,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${buildPayoutEVPanel(f, lean, leanEvDetail, perBookEv)}
         </div>
         <div class="panel-pair">
-        ${buildSimilarOpponentPanel(f.name, db, oppEntry?.db || null, activeLine, platformStatLine(f, 'ss'), platformStatLine(f, 'td'), platformStatLine(f, 'ctrl'), f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null)}
+        ${buildSimilarOpponentPanel(f.name, db, oppEntry?.db || null, activeLine, platformStatLine(f, 'ss'), platformStatLine(f, 'td'), platformStatLine(f, 'ctrl'), f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null)}
         ${buildOpponentQualityPanel(db, activeLine, platformStatLine(f, 'ss'))}
         </div>
         ${buildLineTimelinePanel(f)}
@@ -15084,7 +15107,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : ''}
         ${(f.lean_ss_r1 && f.lean_ss_r1.lean !== 'push') ? `<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'})</div>
+          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})</div>
           <div class="lean-reason">${f.lean_ss_r1.reasons.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('')}</div>
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : ''}
@@ -15497,11 +15520,14 @@ function createMergedLineEntry(name) {
         line_pp_ft: null,
         line_pp_ctrl: null,
         line_dk_ss: null,
+        line_dk_ss_r1: null,
         line_dk_td: null,
         line_dk_ft: null,
         line_dk_ctrl: null,
         ss_over_odds: null,
         ss_under_odds: null,
+        ss_r1_over_odds: null,
+        ss_r1_under_odds: null,
         td_over_odds: null,
         td_under_odds: null,
         ft_over_odds: null,
@@ -15726,6 +15752,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             return;
         const entry = findOrCreateEntry(n);
         entry.line_dk_ss = f.line_ss ?? null;
+        entry.line_dk_ss_r1 = f.line_ss_r1 ?? null;
         entry.line_dk_td = plausibleTd(f.line_td);
         entry.line_dk_ft = f.line_ft ?? null;
         entry.line_dk_ctrl = f.line_ctrl ?? null;
@@ -15733,6 +15760,10 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             entry.ss_over_odds = f.ss_over_odds;
         if (f.ss_under_odds != null)
             entry.ss_under_odds = f.ss_under_odds;
+        if (f.ss_r1_over_odds != null)
+            entry.ss_r1_over_odds = f.ss_r1_over_odds;
+        if (f.ss_r1_under_odds != null)
+            entry.ss_r1_under_odds = f.ss_r1_under_odds;
         if (f.td_over_odds != null)
             entry.td_over_odds = f.td_over_odds;
         if (f.td_under_odds != null)
@@ -15991,7 +16022,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const tdLinesA = [f.line_p6_td, f.line_ud_td, f.line_pp_td, f.line_betr_td, f.line_dk_td].filter((value) => value != null);
         const ftLinesA = [f.line_p6_ft, f.line_ud_ft, f.line_pp_ft, f.line_betr_ft, f.line_dk_ft].filter((value) => value != null);
         const ctrlLinesA = [f.line_p6_ctrl, f.line_ud_ctrl, f.line_pp_ctrl, f.line_betr_ctrl, f.line_dk_ctrl].filter((value) => value != null);
-        const ssR1LinesA = [f.line_pp_ss_r1, f.line_ud_ss_r1].filter((value) => value != null);
+        const ssR1LinesA = [f.line_pp_ss_r1, f.line_ud_ss_r1, f.line_dk_ss_r1].filter((value) => value != null);
         const leanSSA = calcSSLean(f.name, dbA, ssLineA, dbB, f.line_dk_ss ?? null, ssLinesA, moneylineA);
         const leanSSR1A = calcSSR1Lean(f.name, dbA, ssR1LinesA, dbB, moneylineA);
         const leanTDA = calcTDLean(f.name, dbA, tdLineA, dbB, f.line_dk_td ?? null, tdLinesA, moneylineA);
@@ -16007,7 +16038,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             const tdLinesB = [opp.line_p6_td, opp.line_ud_td, opp.line_pp_td, opp.line_betr_td, opp.line_dk_td].filter((value) => value != null);
             const ftLinesB = [opp.line_p6_ft, opp.line_ud_ft, opp.line_pp_ft, opp.line_betr_ft, opp.line_dk_ft].filter((value) => value != null);
             const ctrlLinesB = [opp.line_p6_ctrl, opp.line_ud_ctrl, opp.line_pp_ctrl, opp.line_betr_ctrl, opp.line_dk_ctrl].filter((value) => value != null);
-            const ssR1LinesB = [opp.line_pp_ss_r1, opp.line_ud_ss_r1].filter((value) => value != null);
+            const ssR1LinesB = [opp.line_pp_ss_r1, opp.line_ud_ss_r1, opp.line_dk_ss_r1].filter((value) => value != null);
             const leanSSB = calcSSLean(opp.name, dbB, ssLineB, dbA, opp.line_dk_ss ?? null, ssLinesB, moneylineB);
             const leanSSR1B = calcSSR1Lean(opp.name, dbB, ssR1LinesB, dbA, moneylineB);
             const leanTDB = calcTDLean(opp.name, dbB, tdLineB, dbA, opp.line_dk_td ?? null, tdLinesB, moneylineB);

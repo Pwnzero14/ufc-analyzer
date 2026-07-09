@@ -12,6 +12,8 @@ export interface Fighter {
     capturedAt?: number;
     ss_over_odds?: number | null;
     ss_under_odds?: number | null;
+    ss_r1_over_odds?: number | null;
+    ss_r1_under_odds?: number | null;
     td_over_odds?: number | null;
     td_under_odds?: number | null;
     ft_over_odds?: number | null;
