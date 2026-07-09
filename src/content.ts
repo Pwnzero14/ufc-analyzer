@@ -191,15 +191,52 @@ function scrapePick6() {
       const allText = document.body.innerText || '';
       // Find all "NUMBER \n Significant Strikes" or "NUMBER \n Takedowns" patterns with surrounding name
       const lineBlocks = [...allText.matchAll(/([A-Z][a-z]+(?:\s+[A-Z][a-z'\-]+)+)\s*\n+([\d]+\.?\d*)\s*\n?((?:Fantasy|Fight)\s*(?:Points?|Score|Pts?\.?)|Significant Strikes|Takedown)/gi)];
+      // Body-wide innerText has no per-card scoping, so the More/Less side-availability
+      // buttons can't be tested against allText (any Less anywhere on the page would flag
+      // every fighter). Locate each fighter's own card instead: find the leaf element whose
+      // text is exactly the name and walk up until the container holds the More/Less
+      // buttons. Without this, the tertiary path captured lines with NO availability flags,
+      // and unplaceable Pick6 FP unders leaked whenever the moneyline couldn't identify the
+      // dog (UFC 329: Tracy Cortez at a dead-even -110/-110).
+      const cardTextByName = {};
+      const findCardText = (name) => {
+        if (name in cardTextByName) return cardTextByName[name];
+        let found = null;
+        const leaves = Array.from(document.querySelectorAll('div, span, p, h3, h4, a, button'))
+          .filter((el) => el.children.length === 0 && (el.innerText || '').trim() === name);
+        for (const el of leaves) {
+          let c = el;
+          for (let i = 0; i < 12 && c.parentElement; i++) {
+            c = c.parentElement;
+            const t = c.innerText || '';
+            if (t.length > 1500) break; // grew past a single card — try the next leaf
+            if (/\bMore\b/i.test(t) || /\bLess\b/i.test(t)) { found = t; break; }
+          }
+          if (found) break;
+        }
+        cardTextByName[name] = found;
+        return found;
+      };
       for (const m of lineBlocks) {
         const name = m[1].trim();
         const val = parseFloat(m[2]);
         const stat = m[3].toLowerCase();
         if (!name || name.length > 45 || isNaN(val)) continue;
         if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
-        if (stat.includes('fantasy') || stat.includes('fight score')) fighters[name].line_fp = val;
+        const isFp = stat.includes('fantasy') || stat.includes('fight score') || /fight\s*(?:points?|pts?)/.test(stat);
+        if (isFp) fighters[name].line_fp = val;
         else if (stat.includes('significant')) fighters[name].line_ss = val;
         else if (stat.includes('takedown')) fighters[name].line_td = val;
+        // Per-stat Less-button flag: Pick6 cards show one stat per tab, so the card's
+        // Less presence reflects the stat we just matched. Leave undefined when the
+        // card can't be located (unknown ≠ More-only).
+        const cardText = findCardText(name);
+        if (cardText != null) {
+          const less = /\bLess\b/i.test(cardText);
+          if (isFp) fighters[name].fp_under_available = less;
+          else if (stat.includes('significant')) fighters[name].ss_under_available = less;
+          else if (stat.includes('takedown')) fighters[name].td_under_available = less;
+        }
       }
     }
 
