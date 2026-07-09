@@ -6416,6 +6416,20 @@ function renderModelHealthWidget() {
         if (el)
             animateNumberText(el, value);
     };
+    const setTileStatus = (id, status) => {
+        const el = document.getElementById(id);
+        if (!el)
+            return;
+        el.classList.remove('mh-good', 'mh-warn', 'mh-bad', 'mh-info');
+        if (status)
+            el.classList.add(`mh-${status}`);
+    };
+    const setMeter = (id, pct) => {
+        const el = document.getElementById(id);
+        if (el)
+            el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    };
+    const BREAKEVEN = 52.4; // -110 pick-em breakeven; matches computeDetailedEV's assumed vig
     if (!leans.length) {
         setText('mhHitRate', '--%');
         setText('mhHitTrend', 'Waiting for model data');
@@ -6423,6 +6437,11 @@ function renderModelHealthWidget() {
         setText('mhTopEdgeTrend', 'No actionable edges');
         setText('mhCoverage', '0');
         setText('mhCoverageTrend', 'fighters with actionable leans');
+        setTileStatus('mhTileHit', null);
+        setTileStatus('mhTileEdge', null);
+        setTileStatus('mhTileCov', 'info');
+        setMeter('mhHitFill', 0);
+        setMeter('mhCoverageFill', 0);
         void renderLearningDiagnosticsWidget();
         return;
     }
@@ -6449,19 +6468,30 @@ function renderModelHealthWidget() {
             topEdge = { name: f.name, source: l._source, dir, ev };
         }
     }
+    // ── Tile 1: Calibrated Hit Rate — meter vs the −110 breakeven it must clear ──
+    const hitEdge = avgHit - BREAKEVEN;
     setNum('mhHitRate', `${avgHit}%`);
-    setText('mhHitTrend', avgHit >= 58 ? 'Calibrated edge stable' : avgHit >= 52 ? 'Moderate model edge' : 'Conservative edge profile');
+    setMeter('mhHitFill', avgHit);
+    setTileStatus('mhTileHit', hitEdge >= 3 ? 'good' : hitEdge >= -2 ? 'warn' : 'bad');
+    setText('mhHitTrend', `${hitEdge >= 0 ? '+' : ''}${hitEdge.toFixed(1)} pts vs 52.4% breakeven`);
+    // ── Tile 2: Top Edge — sign-colored (the best actionable EV on the slate) ──
     if (topEdge) {
         const sign = topEdge.ev >= 0 ? '+' : '';
         setNum('mhTopEdge', `${sign}${topEdge.ev}%`);
         setText('mhTopEdgeTrend', `${topEdge.name} · ${topEdge.source.toUpperCase()}-${topEdge.dir.toUpperCase()}`);
+        setTileStatus('mhTileEdge', topEdge.ev > 0 ? 'good' : topEdge.ev < 0 ? 'bad' : 'warn');
     }
     else {
         setText('mhTopEdge', '--');
         setText('mhTopEdgeTrend', 'No actionable edges');
+        setTileStatus('mhTileEdge', null);
     }
+    // ── Tile 3: Actionable Leans — coverage fill over the visible slate ──
+    const slateSize = allFighters.length || leans.length;
     setNum('mhCoverage', `${leans.length}`);
-    setText('mhCoverageTrend', 'fighters with actionable leans');
+    setMeter('mhCoverageFill', slateSize ? (leans.length / slateSize) * 100 : 0);
+    setTileStatus('mhTileCov', 'info');
+    setText('mhCoverageTrend', `of ${slateSize} fighters with leans`);
     void renderLearningDiagnosticsWidget();
 }
 async function renderLearningDiagnosticsWidget() {
