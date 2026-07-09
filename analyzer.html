@@ -25629,6 +25629,62 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .qa-sum-err  { color: #fc8181; font-weight: 700; }
 .qa-sum-warn { color: #f6d55c; font-weight: 700; }
 .qa-sum-sep  { color: var(--text-muted); opacity: 0.6; margin: 0 8px; }
+
+/* ── GLOW-UP 154: "Since your last visit" briefing → structured change-strip ──
+   Retires the oldest surface in the app (GLOW-UP 18, a flat all-gold strip with
+   everything as inline text). Moves off the full-gold border onto neutral glass
+   with a cyan info-spine, and turns the content into scannable pieces: time-ago
+   pill, biggest-mover delta as a signed green/red chip, and lean flips as
+   direction-colored chips (green OVER / red UNDER) — matching the chip + delta
+   language the rest of the board now speaks. Base (GLOW-UP 18) is non-important,
+   so these later rules win cleanly; old .vb-title/.vb-item rules go unused. ── */
+.visit-briefing {
+  margin: 10px 28px 0;
+  padding: 8px 16px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008)), var(--bg2);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.3);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-size: 11px; color: var(--text2);
+}
+.visit-briefing::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, rgba(44,212,208,0.7), rgba(86,195,255,0.5));
+  box-shadow: 0 0 10px rgba(44,212,208,0.3);
+  pointer-events: none;
+}
+.vb-brand {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3);
+}
+.vb-brand-ico { color: #2cd4d0; font-size: 12px; filter: drop-shadow(0 0 5px rgba(44,212,208,0.4)); }
+.vb-ago {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700;
+  padding: 1px 7px; border-radius: 999px; letter-spacing: 0.04em;
+  background: rgba(44,212,208,0.12); color: #7fe9e6; border: 1px solid rgba(44,212,208,0.25);
+}
+.vb-seg { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vb-seg::before {
+  content: ''; width: 1px; height: 16px; background: rgba(255,255,255,0.10); margin-right: 4px;
+}
+.vb-seg-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text2); font-weight: 600; }
+.vb-mover { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; }
+.vb-mover b { color: var(--text); font-weight: 600; }
+.vb-mover-stat { color: var(--text3); font-size: 9px; letter-spacing: 0.04em; }
+.vb-delta { font-weight: 700; font-size: 9.5px; padding: 1px 6px; border-radius: 999px; }
+.vb-delta.up   { color: #6ee7a8; background: rgba(0,232,122,0.12); border: 1px solid rgba(0,232,122,0.30); }
+.vb-delta.down { color: #ff8fa3; background: rgba(255,58,96,0.12);  border: 1px solid rgba(255,58,96,0.30); }
+.vb-flip { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 3px; }
+.vb-flip b { font-weight: 700; color: inherit; }
+.vb-flip.over  { color: #6ee7a8; background: rgba(0,232,122,0.10); border: 1px solid rgba(0,232,122,0.28); }
+.vb-flip.under { color: #ff8fa3; background: rgba(255,58,96,0.10);  border: 1px solid rgba(255,58,96,0.28); }
+.vb-flip-more { font-size: 9px; color: var(--text3); }
+.vb-close { margin-left: auto; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+.vb-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 </style>
 </head>
 <body>
