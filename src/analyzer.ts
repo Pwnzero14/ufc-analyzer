@@ -1094,6 +1094,17 @@ const UFCSTATS_NAME_ALIASES: Record<string, string> = {
   'abusupiyan magomedov': 'Abus Magomedov',
 };
 
+// A flat 24h TTL expires a whole card's cache in lockstep — every fighter written on one
+// visit goes stale together on the next, stampeding UFCStats (which then rate-limits, so
+// most fighters stick on "Fetching from UFCStats…"). Stagger expiry across an extra 0-8h
+// window, keyed deterministically off the fighter's name so a given fighter's deadline is
+// stable across reloads (a random offset per call would make the cache flap).
+function ufcstatsCacheTtlMs(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return 86400000 + (h % (8 * 60 * 60 * 1000));
+}
+
 async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
   const aliased = UFCSTATS_NAME_ALIASES[name.trim().toLowerCase()];
   if (aliased && aliased !== name) {
@@ -1103,7 +1114,7 @@ async function fetchFromUFCStats(name: string): Promise<UFCStatsData|null> {
   const cacheKey = `ufcstats_v51_${name.toLowerCase().replace(/\s+/g,'_')}`;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const cached = await storageGet<Record<string, UFCStatsData | undefined>>([cacheKey]);
-    if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < 86400000)) {
+    if (cached[cacheKey] && (Date.now() - cached[cacheKey].fetchedAt < ufcstatsCacheTtlMs(name))) {
       debugLog(`Cache hit: ${name}`);
       return cached[cacheKey];
     }
