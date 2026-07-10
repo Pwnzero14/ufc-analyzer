@@ -456,7 +456,8 @@ function scrapeUnderdog() {
                     // total-fight SS line.
                     lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(label) ? 'ss_r1' : 'ss';
                 }
-                else if (label.includes('takedown'))
+                // "Takedown Attempts" is a different prop (attempts, not landed) — not fetched.
+                else if (label.includes('takedown') && !label.includes('attempt'))
                     lineType = 'td';
                 if (!lineType)
                     continue;

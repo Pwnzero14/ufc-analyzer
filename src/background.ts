@@ -2036,7 +2036,10 @@ function parseUnderdogApiFighters(data: any): Array<{ name: string; line_fp: num
       // total-fight SS line. Detect round-specificity before the generic branch.
       lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(title) ? 'ss_r1' : 'ss';
     }
-    else if (title.includes('takedown') && !title.includes('def')) lineType = 'td';
+    // "Takedown Attempts" is a DIFFERENT prop from takedowns landed (attempts run 3.5-6.5
+    // vs landed 0.5-2.5) — deliberately not fetched; without the guard it clobbered
+    // line_td and spawned bogus TD unders (UFC 329: Basharat/Cortez/Saint-Denis).
+    else if (title.includes('takedown') && !title.includes('def') && !title.includes('attempt')) lineType = 'td';
     else if (title.includes('fight time') || title.includes('fighttime') || title.includes('fight lasts') || title.includes('fight duration')) lineType = 'ft';
     else if (title.includes('fantasy') || title.includes(' pts') || title === 'fantasy points' || title === '') lineType = 'fp';
     if (!lineType) continue;
@@ -2255,7 +2258,8 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     if (stat.includes('strike') && stat.includes('body')) lineType = 'ss_body';
     else if (stat.includes('strike') && stat.includes('leg')) lineType = 'ss_leg';
     else if (stat.includes('significant strike')) lineType = isRound1 ? 'ss_r1' : 'ss';
-    else if (stat.includes('takedown')) lineType = 'td';
+    // Guard vs "Takedown Attempts" (different prop; not fetched — see UD parser note).
+    else if (stat.includes('takedown') && !stat.includes('attempt')) lineType = 'td';
     // NOTE: 'rounds'/'total rounds' is a DISTINCT prop denominated in ROUNDS, not the
     // minutes-based "Fight Time (Mins)" line the FT model wants. It used to map here too
     // and would clobber the real Fight Time line via upsert (observed: Conor McGregor's
