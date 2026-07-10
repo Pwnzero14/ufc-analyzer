@@ -442,7 +442,8 @@ function scrapeUnderdog() {
           // total-fight SS line.
           lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(label) ? 'ss_r1' : 'ss';
         }
-        else if (label.includes('takedown')) lineType = 'td';
+        // "Takedown Attempts" is a different prop (attempts, not landed) — not fetched.
+        else if (label.includes('takedown') && !label.includes('attempt')) lineType = 'td';
         if (!lineType) continue;
         // Takedown lines are bounded (~0.5–6.5); reject SS/FP-magnitude values that
         // would otherwise land in line_td and surface as a bogus "TD UNDER 59.5".

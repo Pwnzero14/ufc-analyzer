@@ -45,7 +45,8 @@
         // Round-1-only variants ("Round 1 Significant Strikes") get their own
         // bucket so they don't overwrite the total-fight SS line.
         lineType = /\bround\b|\brd\.?\s*\d|\br\d\b/i.test(title) ? 'ss_r1' : 'ss';
-      } else if (title.includes('takedown') && !title.includes('def')) {
+      } else if (title.includes('takedown') && !title.includes('def') && !title.includes('attempt')) {
+        // "Takedown Attempts" is a different prop (attempts, not landed) — not fetched.
         lineType = 'td';
       } else if (
         title.includes('fantasy') ||
