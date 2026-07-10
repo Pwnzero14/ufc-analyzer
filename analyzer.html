@@ -25831,6 +25831,83 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .spine-section > div:nth-child(2) .spine-trend-label { color: #2cd4d0; }
 .spine-section > div:nth-child(3) .spine-trend-label { color: #d7dcf0; }
 .spine-section > div:nth-child(4) .spine-trend-label { color: #f0c040; }
+
+/* ── GLOW-UP 157: Line Movers strip — chip language pass ──
+   The last mid-vintage surface on the main board: flat mono rows become the
+   board's established language. Direction left-edge + hover wash on rows,
+   stat tags take stat-family colors (SS cyan / TD gold / FT purple), the
+   moved-platform list becomes brand-colored mini chips (P6 blue / UD purple /
+   PP teal / BT orange / DK amber), delta becomes a tinted pill, STEAM and RLM
+   badges get pill backgrounds. Base rules are non-important and earlier in the
+   sheet; these win by order + equal-or-higher specificity. ── */
+.movement-summary-row {
+  padding: 4px 8px;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.13s ease, transform 0.13s ease;
+}
+.movement-summary-row.rise { border-left-color: rgba(0, 232, 122, 0.35); }
+.movement-summary-row.drop { border-left-color: rgba(255, 58, 96, 0.35); }
+.movement-summary-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+  transform: translateX(2px);
+}
+.movement-summary-row:hover .movement-summary-fighter { color: var(--gold, #ffbe6b); }
+
+.movement-summary-stat { font-weight: 700; letter-spacing: 0.04em; }
+.movement-summary-stat.mvs-fp { color: #d7dcf0; }
+.movement-summary-stat.mvs-ss { color: #2cd4d0; }
+.movement-summary-stat.mvs-td { color: #f0c040; }
+.movement-summary-stat.mvs-ft { color: #927dff; }
+
+.movement-summary-delta {
+  min-width: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+}
+.movement-summary-delta.rise {
+  background: rgba(0, 232, 122, 0.10);
+  border: 1px solid rgba(0, 232, 122, 0.30);
+  color: #6ee7a8;
+}
+.movement-summary-delta.drop {
+  background: rgba(255, 58, 96, 0.10);
+  border: 1px solid rgba(255, 58, 96, 0.28);
+  color: #ff8fa3;
+}
+
+.movement-summary-platforms { display: inline-flex; gap: 3px; }
+.mvp-chip {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid;
+  line-height: 1.3;
+}
+.mvp-chip.mvp-p6   { color: #7cc8ff; border-color: rgba(86, 195, 255, 0.35);  background: rgba(86, 195, 255, 0.08); }
+.mvp-chip.mvp-ud   { color: #a7aeff; border-color: rgba(127, 136, 255, 0.38); background: rgba(127, 136, 255, 0.09); }
+.mvp-chip.mvp-pp   { color: #6fe2de; border-color: rgba(44, 212, 208, 0.35);  background: rgba(44, 212, 208, 0.08); }
+.mvp-chip.mvp-bt   { color: #ffb184; border-color: rgba(255, 138, 61, 0.38);  background: rgba(255, 138, 61, 0.09); }
+.mvp-chip.mvp-dk   { color: #ffd280; border-color: rgba(245, 158, 11, 0.38);  background: rgba(245, 158, 11, 0.09); }
+
+.movement-summary-steam {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 106, 61, 0.45);
+  background: rgba(255, 106, 61, 0.12);
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+}
+.rlm-tag { border-radius: 999px; padding: 1px 6px; }
+.rlm-tag.rlm-under { background: rgba(157, 107, 255, 0.10); }
+.rlm-tag.rlm-over  { background: rgba(78, 201, 255, 0.10); }
+
+.movement-summary-section-count { border: 1px solid currentColor; opacity: 0.9; }
 </style>
 </head>
 <body>

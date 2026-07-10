@@ -17144,13 +17144,14 @@ function renderLineMovementSummary() {
         const sparkHtml = sparkPoints.length >= 2
             ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.stat} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length - 1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
             : '';
-        return `<div class="movement-summary-row" data-jump="${e.name}" title="Open fighter card">
+        const platChips = e.platforms.map(p => `<span class="mvp-chip mvp-${p.toLowerCase()}" title="Moved on ${p}">${p}</span>`).join('');
+        return `<div class="movement-summary-row ${cls}" data-jump="${e.name}" title="Open fighter card">
       <span class="movement-summary-fighter">${prettyName(e.name)}</span>
-      <span class="movement-summary-stat">${e.stat}</span>
+      <span class="movement-summary-stat mvs-${e.stat.toLowerCase()}">${e.stat}</span>
       <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
       <span class="movement-summary-delta ${cls}">${arrow}${Math.abs(e.delta)}</span>
       ${sparkHtml}
-      <span class="movement-summary-platforms">${e.platforms.join(', ')}</span>
+      <span class="movement-summary-platforms">${platChips}</span>
       ${steamTag}${rlmTag}
     </div>`;
     };
