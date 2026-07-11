@@ -2016,7 +2016,9 @@ body {
 .fight-pair.fight-pair-no-spine .fight-spine-empty { border: none; background: transparent; }
 .fight-pair .fighter-row { margin-bottom: 0; min-width: 0; }
 .fight-pair .fighter-main {
-  grid-template-columns: minmax(160px, 1.1fr) minmax(0, 1.7fr) minmax(180px, 1.3fr) minmax(150px, 0.95fr) 22px;
+  /* GLOW-UP 159: name col min 160→192px so typical two-word names render
+     un-ellipsized; the chip rail (col 2) scrolls, so it absorbs the loss */
+  grid-template-columns: minmax(192px, 1.15fr) minmax(0, 1.65fr) minmax(180px, 1.3fr) minmax(150px, 0.95fr) 22px;
   padding: 10px 12px;
   gap: 8px;
 }
@@ -7732,12 +7734,13 @@ html { scroll-behavior: smooth; }
   backdrop-filter: blur(3px);
 }
 
-/* Platform badge: glass chip */
+/* Platform badge: glass chip.
+   GLOW-UP 160 fix: backdrop-filter removed from these chips — blur(3px)
+   behind a tiny chip is invisible on the flat card but fogs neighboring
+   text when the name line wraps and the chip overlaps it. */
 .best-pick-platform {
-  background: rgba(255,255,255,0.05) !important;
+  background: rgba(255,255,255,0.06) !important;
   border-color: rgba(255,255,255,0.1) !important;
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
   transition: background 0.15s, border-color 0.15s;
 }
 .best-pick-row:hover .best-pick-platform {
@@ -7745,17 +7748,14 @@ html { scroll-behavior: smooth; }
   border-color: rgba(255,255,255,0.16) !important;
 }
 
-/* Correlation badge: richer glass + glow + fix inherited transparent fill */
+/* Correlation badge: richer glass + glow + fix inherited transparent fill.
+   (backdrop-filter removed — see GLOW-UP 160 fix note above) */
 .best-pick-conflict {
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
   box-shadow: 0 0 8px rgba(248,198,74,0.15);
   -webkit-text-fill-color: rgba(248,198,74,0.9) !important;
   color: rgba(248,198,74,0.9) !important;
 }
 .best-pick-lineshop {
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
   box-shadow: 0 0 8px rgba(99,179,237,0.12);
 }
 
@@ -7764,10 +7764,14 @@ html { scroll-behavior: smooth; }
   color: var(--text2);
 }
 
-/* Stagger entrance: smoother slide with scale */
+/* Stagger entrance: smoother slide.
+   GLOW-UP 160 fix: scale() dropped from the entrance — a scale transform
+   rasterizes the row as a compositor texture, and a re-render landing
+   mid-animation can leave the row stuck displaying that blurry raster
+   until a hover forces a repaint ("fogged badge" bug). */
 @keyframes g103-pick-enter {
-  from { opacity: 0; transform: translateX(-12px) scale(0.98); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 .best-pick-row { animation: g103-pick-enter 0.3s ease both !important; }
 .best-pick-row:nth-child(2) { animation-delay: 0s !important; }
@@ -25908,6 +25912,122 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .rlm-tag.rlm-over  { background: rgba(78, 201, 255, 0.10); }
 
 .movement-summary-section-count { border: 1px solid currentColor; opacity: 0.9; }
+
+/* ── GLOW-UP 158: Best Picks rows — context, risk, and EV ──
+   Information pass, not polish: every pick now states WHO it's against (and
+   MAIN when it's the headliner), carries the fighter's ⚠ NEWS / ⚖ MISS risk
+   flag on the pick itself (audit rule 7 — was only visible back on the card),
+   and prices itself with the same calibrated EV the fighter rows use, shown
+   under the confidence meter. ── */
+.bp-vs {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.bp-vs .bp-main {
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--gold, #ffbe6b);
+  border: 1px solid rgba(248, 198, 74, 0.35);
+  background: rgba(248, 198, 74, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-left: 3px;
+  vertical-align: 1px;
+}
+.bp-flag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: help;
+}
+.bp-flag-news {
+  color: #221203;
+  background: linear-gradient(180deg, #ffc164, #f59a2e);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+}
+.bp-flag-miss {
+  color: #ffd9de;
+  background: rgba(255, 58, 96, 0.16);
+  border: 1px solid rgba(255, 58, 96, 0.45);
+}
+.best-pick-line-wrap .bp-ev {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text3);
+  text-align: right;
+  cursor: help;
+}
+.best-pick-line-wrap .bp-ev.pos { color: #6ee7a8; }
+.best-pick-line-wrap .bp-ev.neg { color: #ff8fa3; }
+
+/* ── GLOW-UP 159: fighter-card chip rail — honest overflow ──
+   Two fixes for the "looks broken" clip: (1) long fighter names ellipsize
+   inside their own column instead of hard-clipping under the line chips
+   (full name stays reachable via the existing title tooltip); (2) the
+   .platform-lines rail gets a scroll-driven edge fade — chips dissolve at
+   the clipped edge so hidden content reads as "more this way". The fade
+   is driven by scroll(self x), so when the rail does NOT overflow the
+   timeline is inactive and the mask stays fully opaque — no fade on
+   short rails. ── */
+.fighter-info { min-width: 0; }
+.fighter-info > div { min-width: 0; }
+.fighter-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.15; /* room for descenders now that overflow clips */
+}
+@property --pl-fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --pl-fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.platform-lines {
+  mask-image: linear-gradient(to right,
+    transparent 0,
+    #000 var(--pl-fade-l),
+    #000 calc(100% - var(--pl-fade-r)),
+    transparent 100%);
+  animation: pl-edge-fade linear both;
+  animation-timeline: scroll(self x);
+}
+@keyframes pl-edge-fade {
+  0%   { --pl-fade-l: 0px;  --pl-fade-r: 26px; }
+  12%  { --pl-fade-l: 16px; --pl-fade-r: 26px; }
+  88%  { --pl-fade-l: 16px; --pl-fade-r: 26px; }
+  100% { --pl-fade-l: 16px; --pl-fade-r: 0px; }
+}
+
+/* ── GLOW-UP 160: signal ≠ price note on Best Picks ──
+   A High/Med tier chip next to a red EV read as a contradiction. It isn't:
+   tier grades signal strength + sample depth, EV prices the calibrated hit
+   probability against the odds. When they split (tier ≥ Med, EV ≤ -3%),
+   an amber micro-note under the EV names the situation — good pick-em
+   lean, thin value — with the full explanation on its tooltip. ── */
+.best-pick-line-wrap .bp-ev-split {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffbe6b;
+  background: rgba(255,184,77,0.08);
+  border: 1px solid rgba(255,184,77,0.32);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-top: 2px;
+  text-align: center;
+  white-space: nowrap;
+  cursor: help;
+}
 </style>
 </head>
 <body>

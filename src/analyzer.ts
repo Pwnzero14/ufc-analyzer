@@ -477,9 +477,29 @@ function prettyName(name: string | null | undefined): string {
   return raw.split(' ').map(w => {
     const key = w.toLowerCase().replace(/[^a-z]/g, '');
     const mapped = PRETTY_SURNAMES[key];
-    if (!mapped) return w;
-    return w === w.toUpperCase() && w.length > 2 ? mapped.toUpperCase() : mapped;
+    if (mapped) return w === w.toUpperCase() && w.length > 2 ? mapped.toUpperCase() : mapped;
+    // normalizeName title-cases every word, mangling generational suffixes
+    // ("Iii") and Mc-surnames ("Mcgregor"). Repair those here, display-only.
+    if (/^(ii|iii|iv)$/i.test(w)) return w.toUpperCase();
+    // Mc only — Mac is ambiguous (Machida, Macedo) and would misfire.
+    if (/^Mc[a-z]/.test(w) && w.length > 3) return 'Mc' + w.charAt(2).toUpperCase() + w.slice(3);
+    return w;
   }).join(' ');
+}
+// First "—"-delimited clause of a reason text, but only counting em-dashes at
+// paren depth 0 — reason strings like "Proj FP (57.3 — avg 73.5 + opp allows
+// 81.2) is 42 pts BELOW the line" carry an em-dash INSIDE the parenthetical,
+// and a naive split('—') truncates them to the malformed "Proj FP (57.3".
+function reasonHeadline(text: string | null | undefined): string {
+  const t = (text ?? '').toString();
+  let depth = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === '—' && depth === 0) return t.slice(0, i).trim();
+  }
+  return t.trim();
 }
 let eventCountdownTimer: ReturnType<typeof setInterval>|null = null;
 let periodicRefreshTimer: ReturnType<typeof setInterval>|null = null;
@@ -5004,9 +5024,9 @@ function calcLean(
     : (availableLines.length > 1 ? `avg ${line}` : line_p6 ? `P6 ${line_p6}` : line_ud ? `UD ${line_ud}` : line_pp ? `PP ${line_pp}` : `BTR ${line_betr}`);
   const avgStr  = avgFP != null ? ` (avg ${avgFP.toFixed(1)})` : '';
   const verdict = lean === 'over'
-    ? `LEAN OVER ${lineStr}${avgStr} — ${reasons[0]?.text?.split('—')[0]?.trim() || 'over value identified'}`
+    ? `LEAN OVER ${lineStr}${avgStr} — ${reasonHeadline(reasons[0]?.text) || 'over value identified'}`
     : lean === 'under'
-    ? `LEAN UNDER ${lineStr}${avgStr} — ${reasons[0]?.text?.split('—')[0]?.trim() || 'under value identified'}`
+    ? `LEAN UNDER ${lineStr}${avgStr} — ${reasonHeadline(reasons[0]?.text) || 'under value identified'}`
     : `LEAN ${score >= 0 ? 'OVER' : 'UNDER'} ${lineStr}${avgStr} — edge not yet at strong threshold`;
 
   const ev = lean !== 'push' ? parseFloat(((conf / 100) * 0.1 - (1 - conf / 100) * 1).toFixed(2)) : 0;
@@ -7878,6 +7898,37 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       }
       const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source src-${el._source}">(${el._source === 'ss_r1' ? 'R1 SS' : el._source?.toUpperCase()} line)</span>` : '';
 
+      // Fight context: opponent + MAIN tag when this pick lives in the headliner.
+      const hp = findHeadlinerPair();
+      const normPick = (s: string): string => (normalizeName(s) || s).toLowerCase();
+      const isMainPick = !!hp && (normPick(f.name) === normPick(hp.f1) || normPick(f.name) === normPick(hp.f2));
+      const vsTag = f.opponent
+        ? ` <span class="bp-vs">vs ${prettyName(f.opponent)}${isMainPick ? ' <b class="bp-main">MAIN</b>' : ''}</span>`
+        : '';
+
+      // Risk flag: audit rule 7 — a picked fighter carrying news/weight-miss
+      // should say so ON the pick, not only back on the fighter card.
+      const wmPick = _weightMissSignals.get(f.name.toLowerCase());
+      const riskTag = wmPick
+        ? ` <span class="bp-flag bp-flag-miss" title="Missed weight${wmPick.lbsOver != null ? ` by ${wmPick.lbsOver} lb` : ''} — projections already adjusted, but volatility risk is elevated">⚖ MISS</span>`
+        : _newsAlertFighters.has(f.name.toLowerCase())
+        ? ` <span class="bp-flag bp-flag-news" title="Recent injury/withdrawal news on this fighter — check headlines before entering">⚠ NEWS</span>`
+        : '';
+
+      // Calibrated EV under the confidence meter — same evWinProb pipeline as
+      // the fighter rows, so board and picks can never disagree.
+      const evd = computeDetailedEV(f, el);
+      const evTag = evd
+        ? `<div class="bp-ev ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}" title="EV from ${Math.round(evd.prob * 100)}% win prob${evd.recalibrated ? ' (recalibrated ↻)' : ''} · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}">${evd.isAssumedVig ? '~' : ''}EV ${evd.ev > 0 ? '+' : ''}${evd.ev}%${evd.recalibrated ? ' ↻' : ''}</div>`
+        : '';
+      // Signal ≠ price: High/Med tier next to a red EV isn't a contradiction —
+      // tier grades signal strength + sample depth, EV prices the calibrated
+      // hit probability against the odds. Say so on the row instead of letting
+      // the two numbers silently fight each other.
+      const splitNote = evd && evd.ev <= -3 && tier.label !== 'Low'
+        ? `<div class="bp-ev-split" title="${tier.label.toUpperCase()} tier grades signal strength and sample depth; EV prices the calibrated ${Math.round(evd.prob * 100)}% hit probability against the ${evd.isAssumedVig ? 'assumed -110' : 'posted'} odds. Strong directional lean, but the price doesn't clear breakeven — fine as a pick-em leg, not a value play.">LEAN ✓ · VALUE ✗</div>`
+        : '';
+
       // Brighten the key numbers in the reason (projection + edge vs line)
       const reasonHtml = reason
         .replace(/\(proj ([\d.]+)\)/, '(proj <b class="bpr-key">$1</b>)')
@@ -7918,7 +7969,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${srcTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason">${reasonHtml}</div></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${srcTag}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div></div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label||''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -7927,6 +7978,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-line-wrap">
           <div class="best-pick-line">${line || '—'}</div>
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
+          ${evTag}${splitNote}
         </div>
       </div>`;
     }).join('');
@@ -10628,32 +10680,35 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   // Build calibration curve HTML
   const calibActiveBuckets = calibBuckets.filter(b => b.total > 0);
   const calibCurveHtml = calibActiveBuckets.length >= 2 ? (() => {
-    const maxBarH = 80;
+    const maxBarH = 96;
+    const BREAKEVEN_PCT = 52.4; // -110 pick-em breakeven — same goalpost the KPI meter uses
+    const beY = Math.round((BREAKEVEN_PCT / 100) * maxBarH);
     const barRows = calibBuckets.map(b => {
       if (b.total === 0) return '';
       const actualRate = Math.round((b.hits / b.total) * 100);
       const predicted = b.midpoint;
       const diff = actualRate - predicted;
       const diffSign = diff > 0 ? '+' : '';
-      const diffColor = Math.abs(diff) <= 5 ? 'var(--green)' : Math.abs(diff) <= 12 ? 'var(--amber)' : 'var(--red)';
-      // Bar heights: predicted (ghost) and actual (filled)
+      const diffCls = Math.abs(diff) <= 5 ? 'good' : Math.abs(diff) <= 12 ? 'warn' : 'bad';
       const predictedH = Math.round((predicted / 100) * maxBarH);
-      const actualH = Math.round((actualRate / 100) * maxBarH);
-      const actualColor = actualRate >= predicted - 3 ? 'var(--green)' : actualRate >= predicted - 12 ? 'var(--amber)' : 'var(--red)';
+      const actualH = Math.max(3, Math.round((actualRate / 100) * maxBarH));
+      const barCls = actualRate >= predicted - 3 ? 'good' : actualRate >= predicted - 12 ? 'warn' : 'bad';
       const lowN = b.total < 5;
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:36px">
-        <div style="font-size:8px;color:${diffColor};font-weight:700${lowN ? ';opacity:0.5' : ''}">${diffSign}${diff}%</div>
-        <div style="position:relative;width:100%;height:${maxBarH}px;display:flex;align-items:flex-end;justify-content:center">
-          <div style="position:absolute;bottom:0;width:60%;height:${predictedH}px;background:rgba(125,145,190,0.12);border:1px dashed rgba(125,145,190,0.3);border-radius:3px" title="Predicted: ${predicted}%"></div>
-          <div style="position:relative;width:50%;height:${actualH}px;background:${actualColor};opacity:${lowN ? 0.45 : 0.85};border-radius:4px 4px 2px 2px;box-shadow:0 0 10px ${actualColor};z-index:1" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
+      return `<div class="cal-col${lowN ? ' cal-low-n' : ''}">
+        <span class="cal-diff cal-diff-${diffCls}" title="Actual minus predicted for this bucket${lowN ? ' — thin sample, read lightly' : ''}">${diffSign}${diff}%</span>
+        <div class="cal-track" style="height:${maxBarH}px">
+          <i class="cal-be" style="bottom:${beY}px" title="52.4% breakeven (-110) — buckets above this line profit"></i>
+          <div class="cal-pred" style="height:${predictedH}px" title="Predicted: ${predicted}%"></div>
+          <div class="cal-actual cal-actual-${barCls}" style="height:${actualH}px" title="Actual: ${actualRate}% (${b.hits}/${b.total})"></div>
         </div>
-        <div style="font-size:9px;font-weight:700;color:var(--text)">${actualRate}%</div>
-        <div style="font-size:8px;color:var(--text-muted)">${b.rangeLabel}</div>
-        <div style="font-size:8px;color:var(--text-muted);opacity:0.6">n=${b.total}</div>
+        <span class="cal-rate">${actualRate}%</span>
+        <span class="cal-range">${b.rangeLabel}</span>
+        <span class="cal-n">n=${b.total}</span>
       </div>`;
     }).filter(Boolean).join('');
 
-    // Per-stat-type mini calibration rows
+    // Per-stat-type mini calibration rows — stat-family colors match the board
+    const STAT_CLS: Record<string, string> = { Fantasy: 'fp', SS: 'ss', TD: 'td', FightTime: 'ft' };
     const typeCalibHtml = CALIB_STAT_TYPES.map(pt => {
       const buckets = calibByType[pt];
       const active = buckets.filter(b => b.total > 0);
@@ -10663,35 +10718,38 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const totalN = active.reduce((s, b) => s + b.total, 0);
       const overallRate = totalN > 0 ? Math.round((totalHits / totalN) * 100) : 0;
       const dots = buckets.map(b => {
-        if (b.total === 0) return `<div style="width:8px;height:8px;border-radius:50%;background:var(--surface2);border:1px solid rgba(125,145,190,0.15)" title="${b.rangeLabel}: no data"></div>`;
+        if (b.total === 0) return `<i class="cal-dot cal-dot-empty" title="${b.rangeLabel}: no data"></i>`;
         const actual = Math.round((b.hits / b.total) * 100);
         const diff = Math.abs(actual - b.midpoint);
-        const col = diff <= 5 ? 'var(--green)' : diff <= 12 ? 'var(--amber)' : 'var(--red)';
-        return `<div style="width:8px;height:8px;border-radius:50%;background:${col};opacity:${b.total < 3 ? 0.4 : 0.85}" title="${b.rangeLabel}: ${actual}% actual (${b.hits}/${b.total})"></div>`;
+        const dotCls = diff <= 5 ? 'good' : diff <= 12 ? 'warn' : 'bad';
+        return `<i class="cal-dot cal-dot-${dotCls}${b.total < 3 ? ' cal-dot-thin' : ''}" title="${b.rangeLabel}: ${actual}% actual (${b.hits}/${b.total})"></i>`;
       }).join('');
-      const rateColor = overallRate >= 55 ? 'var(--green)' : overallRate >= 45 ? 'var(--amber)' : 'var(--red)';
-      return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-        <span style="font-size:10px;font-weight:700;min-width:18px;color:var(--text)">${label}</span>
-        <div style="display:flex;gap:3px;align-items:center">${dots}</div>
-        <span style="font-size:10px;color:${rateColor};margin-left:auto">${totalHits}/${totalN} (${overallRate}%)</span>
+      const rateCls = overallRate >= 55 ? 'good' : overallRate >= 45 ? 'warn' : 'bad';
+      return `<div class="cal-stat-row">
+        <span class="cal-stat-label cal-stat-${STAT_CLS[pt] || 'fp'}">${label}</span>
+        <div class="cal-dots">${dots}</div>
+        <span class="cal-stat-rate cal-rate-${rateCls}">${totalHits}/${totalN} · ${overallRate}%</span>
       </div>`;
     }).filter(Boolean).join('');
 
+    const scoreCls = calibScore == null ? '' : calibScore >= 85 ? 'good' : calibScore >= 70 ? 'warn' : 'bad';
     const scoreHtml = calibScore != null
-      ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <div style="padding:3px 10px;border-radius:999px;background:${calibScore >= 85 ? 'rgba(72,199,142,0.10)' : calibScore >= 70 ? 'rgba(240,192,64,0.10)' : 'rgba(255,100,100,0.10)'};border:1px solid ${calibScore >= 85 ? 'rgba(72,199,142,0.35)' : calibScore >= 70 ? 'rgba(240,192,64,0.35)' : 'rgba(255,100,100,0.35)'}">
-            <span style="font-size:14px;font-weight:800;color:${calibScore >= 85 ? 'var(--green)' : calibScore >= 70 ? 'var(--amber)' : 'var(--red)'}">${calibScore}</span>
-            <span style="font-size:10px;color:var(--text-muted);margin-left:3px">/ 100</span>
-          </div>
-          <span style="font-size:10px;color:var(--text-muted)">Calibration Score — ${calibScore >= 85 ? 'Excellent: confidence closely matches reality' : calibScore >= 70 ? 'Good: minor gaps between predicted and actual' : 'Needs work: confidence scores are off from reality'}</span>
+      ? `<div class="cal-head">
+          <span class="cal-score cal-score-${scoreCls}">${calibScore}<i>/100</i></span>
+          <span class="cal-verdict">${calibScore >= 85 ? 'Excellent — confidence closely matches reality' : calibScore >= 70 ? 'Good — minor gaps between predicted and actual' : 'Needs work — confidence scores are off from reality'}</span>
+          <span class="cal-samples" title="AI lean snapshot picks matched to settled archive results">📎 ${calibTotalSamples} graded picks</span>
         </div>`
       : '';
 
     return `${scoreHtml}
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px">Dashed = predicted confidence · Solid = actual hit rate · Green = well-calibrated</div>
-      <div style="display:flex;gap:2px;align-items:flex-end;padding:6px 0 0 0">${barRows}</div>
-      ${typeCalibHtml ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(125,145,190,0.1)">
-        <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Per-Stat Calibration</div>
+      <div class="cal-legend">
+        <span class="cal-key"><i class="cal-key-pred"></i>predicted</span>
+        <span class="cal-key"><i class="cal-key-actual"></i>actual hit rate</span>
+        <span class="cal-key"><i class="cal-key-be"></i>52.4% breakeven</span>
+      </div>
+      <div class="cal-chart">${barRows}</div>
+      ${typeCalibHtml ? `<div class="cal-stat-block">
+        <div class="cal-stat-head">Per-Stat Calibration</div>
         ${typeCalibHtml}
       </div>` : ''}`;
   })() : null;
@@ -16244,13 +16302,23 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
   const plausibleTd = (v: number | null | undefined): number | null =>
     (v != null && Number.isFinite(v) && v >= 0 && v < 20) ? v : null;
 
+  // Sig-strike lines are bounded too: no book posts a full-fight SS line below ~4
+  // (lowest real line seen: 5.5). A 1/2 is UI junk — a badge or multiplier the text-scan
+  // fallbacks grab (observed: Pick6 "SS OVER 1" displacing McGregor's real 53.5, which
+  // then topped Best Overs). Sanitizing at merge heals already-stored junk without a
+  // re-fetch, same as plausibleTd. Round-1/body/leg variants legitimately run lower.
+  const plausibleSs = (v: number | null | undefined): number | null =>
+    (v != null && Number.isFinite(v) && v >= 4 && v < 400) ? v : null;
+  const plausibleSsPart = (v: number | null | undefined): number | null =>
+    (v != null && Number.isFinite(v) && v >= 2 && v < 200) ? v : null;
+
   (p6Fighters || []).forEach((f) => {
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name);
     if (!n) return;
     if (!map[n]) map[n] = createMergedLineEntry(n);
     map[n].line_p6      = f.line_fp ?? f.line ?? null;
-    map[n].line_p6_ss   = f.line_ss ?? null;
+    map[n].line_p6_ss   = plausibleSs(f.line_ss);
     map[n].line_p6_td   = plausibleTd(f.line_td);
     map[n].line_p6_ft   = f.line_ft ?? null;
     map[n].line_p6_ctrl = f.line_ctrl ?? null;
@@ -16296,10 +16364,10 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
     entry.line_ud       = f.line_fp ?? f.line ?? null;
-    entry.line_ud_ss    = f.line_ss ?? null;
-    entry.line_ud_ss_r1 = f.line_ss_r1 ?? null;
-    entry.line_ud_ss_body = f.line_ss_body ?? null;
-    entry.line_ud_ss_leg  = f.line_ss_leg ?? null;
+    entry.line_ud_ss    = plausibleSs(f.line_ss);
+    entry.line_ud_ss_r1 = plausibleSsPart(f.line_ss_r1);
+    entry.line_ud_ss_body = plausibleSsPart(f.line_ss_body);
+    entry.line_ud_ss_leg  = plausibleSsPart(f.line_ss_leg);
     entry.line_ud_td   = plausibleTd(f.line_td);
     entry.line_ud_ft   = f.line_ft ?? null;
     entry.line_ud_ctrl = f.line_ctrl ?? null;
@@ -16325,7 +16393,7 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
     entry.line_betr      = f.line_fp ?? f.line ?? null;
-    entry.line_betr_ss   = f.line_ss ?? null;
+    entry.line_betr_ss   = plausibleSs(f.line_ss);
     entry.line_betr_td   = plausibleTd(f.line_td);
     entry.line_betr_ft   = f.line_ft ?? null;
     entry.line_betr_ctrl = f.line_ctrl ?? null;
@@ -16352,10 +16420,10 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
     entry.line_pp       = f.line_fp ?? f.line ?? null;
-    entry.line_pp_ss    = f.line_ss ?? null;
-    entry.line_pp_ss_r1 = f.line_ss_r1 ?? null;
-    entry.line_pp_ss_body = f.line_ss_body ?? null;
-    entry.line_pp_ss_leg  = f.line_ss_leg ?? null;
+    entry.line_pp_ss    = plausibleSs(f.line_ss);
+    entry.line_pp_ss_r1 = plausibleSsPart(f.line_ss_r1);
+    entry.line_pp_ss_body = plausibleSsPart(f.line_ss_body);
+    entry.line_pp_ss_leg  = plausibleSsPart(f.line_ss_leg);
     entry.line_pp_td    = plausibleTd(f.line_td);
     entry.line_pp_ft   = f.line_ft ?? null;
     entry.line_pp_ctrl = f.line_ctrl ?? null;
@@ -16366,8 +16434,8 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (!isValidFighterName(f.name)) return;
     const n = normalizeName(f.name); if (!n) return;
     const entry = findOrCreateEntry(n);
-    entry.line_dk_ss   = f.line_ss ?? null;
-    entry.line_dk_ss_r1 = f.line_ss_r1 ?? null;
+    entry.line_dk_ss   = plausibleSs(f.line_ss);
+    entry.line_dk_ss_r1 = plausibleSsPart(f.line_ss_r1);
     entry.line_dk_td   = plausibleTd(f.line_td);
     entry.line_dk_ft   = f.line_ft ?? null;
     entry.line_dk_ctrl = f.line_ctrl ?? null;
