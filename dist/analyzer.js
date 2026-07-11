@@ -7619,7 +7619,9 @@ function renderBestPicks(container, renderSeq = 0) {
                         }
                     }
                 }
-                const srcTag = el._source !== 'fp' ? ` <span class="best-pick-source src-${el._source}">(${el._source === 'ss_r1' ? 'R1 SS' : el._source?.toUpperCase()} line)</span>` : '';
+                // GLOW-UP 161: the old srcTag "(SS line)" next to the name duplicated
+                // the type chip's label in the same row — name line carries identity
+                // (name / risk / opponent), the meta chip carries the market.
                 // Fight context: opponent + MAIN tag when this pick lives in the headliner.
                 const hp = findHeadlinerPair();
                 const normPick = (s) => (normalizeName(s) || s).toLowerCase();
@@ -7685,9 +7687,9 @@ function renderBestPicks(container, renderSeq = 0) {
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${srcTag}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div></div>
         <div class="best-pick-meta">
-          <span class="best-pick-type ${typeClass}">${type.toUpperCase()}${el._label || ''}</span>
+          <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
           <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
         </div>
@@ -7699,8 +7701,10 @@ function renderBestPicks(container, renderSeq = 0) {
       </div>`;
             }).join('');
             const avgConf = confVals.length ? Math.round(confVals.reduce((a, b) => a + b, 0) / confVals.length) : null;
-            const summary = `<div class="best-picks-summary">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bps-avg">avg confidence <b>${avgConf}%</b></span>` : ''}</div>`;
-            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span><span class="best-picks-count">${fighters.length} picks</span></div>${rows}${summary}</div>`;
+            // GLOW-UP 161: tier tallies + avg confidence live in the section header
+            // (glanceable before scrolling) instead of a footer under the 8th row.
+            const headerStats = `<span class="bph-stats">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''}</span>`;
+            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span>${headerStats}<span class="best-picks-count">${fighters.length} picks</span></div>${rows}</div>`;
         }
         const html = `<div class="best-picks-grid">${buildSection(overs, 'over')}${buildSection(unders, 'under')}</div>`;
         container.innerHTML = html || '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';
