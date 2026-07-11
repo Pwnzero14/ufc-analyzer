@@ -232,12 +232,21 @@ function scrapePick6() {
                 if (!fighters[name])
                     fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent: null };
                 const isFp = stat.includes('fantasy') || stat.includes('fight score') || /fight\s*(?:points?|pts?)/.test(stat);
-                if (isFp)
-                    fighters[name].line_fp = val;
-                else if (stat.includes('significant'))
-                    fighters[name].line_ss = val;
-                else if (stat.includes('takedown'))
-                    fighters[name].line_td = val;
+                // Bound each stat like the structured paths do — the body-text scan happily grabs
+                // stray UI digits (badges/multipliers) sitting next to a stat label (observed:
+                // Pick6 "1" next to "Significant Strikes" stored as McGregor's SS line).
+                if (isFp) {
+                    if (val > 5 && val < 500)
+                        fighters[name].line_fp = val;
+                }
+                else if (stat.includes('significant')) {
+                    if (val >= 4 && val < 400)
+                        fighters[name].line_ss = val;
+                }
+                else if (stat.includes('takedown')) {
+                    if (val >= 0 && val < 20)
+                        fighters[name].line_td = val;
+                }
                 // Per-stat Less-button flag: Pick6 cards show one stat per tab, so the card's
                 // Less presence reflects the stat we just matched. Leave undefined when the
                 // card can't be located (unknown ≠ More-only).
