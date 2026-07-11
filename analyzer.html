@@ -26028,6 +26028,50 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   white-space: nowrap;
   cursor: help;
 }
+
+/* ── GLOW-UP 161: Best Picks board — hierarchy & stat-language pass ──
+   Three moves: (1) tier tallies + avg confidence promoted from a footer
+   under row 8 into the section header, glanceable before scrolling;
+   (2) the market label inside the type chip ("(SS line)") speaks the
+   board's stat-family color language — SS teal, TD gold, FT purple,
+   FP blue, CTRL orange — while OVER/UNDER keeps direction color;
+   (3) rank medallions color by conviction tier (gold HIGH, steel MED,
+   dim LOW) instead of by list position, so conviction reads straight
+   down the rank column. ── */
+.bph-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.bph-stats + .best-picks-count { margin-left: 0; }
+.bph-stats .bps-tally { font-size: 8px; }
+.bph-avg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text3);
+  cursor: help;
+}
+.best-pick-type .bpt-stat { font-style: normal; text-shadow: none; opacity: 0.95; }
+.best-pick-type.bpt-fp    .bpt-stat { color: rgba(86,195,255,0.9); }
+.best-pick-type.bpt-ss    .bpt-stat,
+.best-pick-type.bpt-ss_r1 .bpt-stat { color: rgba(44,212,208,0.9); }
+.best-pick-type.bpt-td    .bpt-stat { color: rgba(248,198,74,0.9); }
+.best-pick-type.bpt-ft    .bpt-stat { color: rgba(146,125,255,0.95); }
+.best-pick-type.bpt-ctrl  .bpt-stat { color: rgba(255,131,69,0.9); }
+.best-picks-section .best-pick-row .best-pick-rank {
+  font-weight: 700;
+  color: var(--text3);
+}
+.best-picks-section .best-pick-row.tier-high .best-pick-rank {
+  color: var(--gold);
+  text-shadow: 0 0 7px rgba(248,198,74,0.45);
+}
+.best-picks-section .best-pick-row.tier-med .best-pick-rank { color: #9fb6d9; }
+.best-picks-section .best-pick-row.tier-low .best-pick-rank { color: var(--text3); opacity: 0.55; }
 </style>
 </head>
 <body>
