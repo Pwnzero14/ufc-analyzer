@@ -20748,8 +20748,10 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   letter-spacing: -0.02em;
 }
 .best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .bp-avatar {
-  width: 38px !important;
-  height: 38px !important;
+  /* GLOW-UP 162 level 2: 38 -> 44px — hero carries a stat deck now, the
+     avatar scales with the card's weight */
+  width: 44px !important;
+  height: 44px !important;
   box-shadow: 0 0 0 2px rgba(248,198,74,0.55), 0 0 18px rgba(248,198,74,0.3), 0 4px 12px rgba(0,0,0,0.4) !important;
 }
 .best-picks-section .best-pick-row:has(.bp-avatar):nth-child(2) .best-pick-rank::before {
@@ -26072,6 +26074,158 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 .best-picks-section .best-pick-row.tier-med .best-pick-rank { color: #9fb6d9; }
 .best-picks-section .best-pick-row.tier-low .best-pick-rank { color: var(--text3); opacity: 0.55; }
+
+/* ── GLOW-UP 162: Best Picks level-up 1 — money-first EV ──
+   EV answers "is this worth money" but rendered at the same 8.5px whisper
+   whether +30% or -1%. Positive EV becomes a green pill; ev-hot rows
+   (>= +10%) get a brighter pill glow plus a green accent along the row's
+   money edge. Negative EV stays quiet — the LEAN/VALUE split note already
+   covers that side. ── */
+.best-pick-line-wrap .bp-ev.pos {
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(38,208,124,0.10);
+  border: 1px solid rgba(38,208,124,0.28);
+  color: #6ee7a8;
+}
+.best-pick-row.ev-hot .best-pick-line-wrap .bp-ev.pos {
+  background: rgba(38,208,124,0.16);
+  border-color: rgba(38,208,124,0.5);
+  color: #8ffcc0;
+  box-shadow: 0 0 10px rgba(38,208,124,0.22);
+  font-weight: 800;
+}
+.best-pick-row.ev-hot {
+  box-shadow: inset -3px 0 0 rgba(38,208,124,0.35), 0 2px 8px rgba(0,0,0,0.18);
+}
+.best-pick-row.ev-hot:hover {
+  box-shadow: inset -3px 0 0 rgba(38,208,124,0.5), 0 6px 20px rgba(0,0,0,0.30);
+}
+
+/* ── GLOW-UP 162: Best Picks level-up 2 — #1 hero stat deck ──
+   The hero row already had the glitter (gold name, 24px line, ringed
+   avatar); this adds information: LINE joined by labeled WIN% (the
+   calibrated probability every EV is priced from — previously invisible
+   everywhere) and EV, replacing the lone small EV tag on that row. ── */
+.bp-hero-stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.bp-hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bp-hs {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: help;
+  white-space: nowrap;
+}
+.bp-hs-label {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text3);
+}
+.bp-hs-val {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+}
+.bp-hs-val.pos { color: #6ee7a8; text-shadow: 0 0 8px rgba(38,208,124,0.35); }
+.bp-hs-val.neg { color: #ff8fa3; }
+
+/* ── GLOW-UP 162: Best Picks level-up 3 — factor chips ──
+   The lean's ranked reason stack (pos/neg/neutral) rendered as compact
+   ✓/✗ chips under the rationale — the "why" becomes scannable without
+   reading prose; each chip's full reason text lives on its tooltip. ── */
+.bp-factors {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.bp-factor {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  cursor: help;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.bp-factor-pos {
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.05);
+  border-color: rgba(38,208,124,0.22);
+}
+.bp-factor-neg {
+  color: #ff8fa3;
+  background: rgba(255,91,120,0.05);
+  border-color: rgba(255,91,120,0.22);
+}
+
+/* ── GLOW-UP 162: Best Picks level-up 4 — placeability exclusivity ──
+   Amber flag when a pick's side is placeable on exactly one book (dog FP
+   UNDER → UD only, Pick6 More-only cards, single-book stat lines): no
+   line-shopping, no fallback if the line moves or fills. Multi-book picks
+   stay quiet. ── */
+.bp-onlybook {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+  color: #ffd9a0;
+  background: rgba(255,170,60,0.09);
+  border: 1px solid rgba(255,170,60,0.30);
+}
+
+/* ── GLOW-UP 162: Best Picks level-up 5 — copy-to-slip ──
+   Hover-reveal ⧉ in the row's top-right corner copies a slip-ready line
+   ("Fighter OVER 1.5 TD @ Pick6 (vs Opponent)"); flashes ✓ on success.
+   Top-right so it never collides with the right-center jump chevron. ── */
+.bp-copy {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text3);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.best-pick-row:hover .bp-copy { opacity: 1; }
+.bp-copy:hover {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.4);
+  background: rgba(248,198,74,0.06);
+}
+.bp-copy.copied {
+  opacity: 1;
+  color: #6ee7a8;
+  border-color: rgba(38,208,124,0.5);
+  background: rgba(38,208,124,0.08);
+}
 </style>
 </head>
 <body>

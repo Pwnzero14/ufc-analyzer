@@ -7684,20 +7684,117 @@ function renderBestPicks(container, renderSeq = 0) {
                         }
                     }
                 }
-                return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}" data-jump="${f.name}" title="Open fighter card">
+                // GLOW-UP 162 (Best Picks level-up 1): EV magnitude classes — +EV picks
+                // read as money at a glance; ev-hot (>= +10%) gets the loud treatment.
+                const evClass = evd && evd.ev >= 10 ? ' ev-hot' : evd && evd.ev > 0 ? ' ev-pos' : '';
+                // GLOW-UP 162 (level-up 3): structured factor chips — the lean's ranked
+                // reason stack rendered as scannable ✓/✗ chips (label = keyword class,
+                // full reason text on hover) instead of dying unseen behind one prose line.
+                const factorLabel = (t) => {
+                    const s = t.toLowerCase();
+                    if (/archive|settled sample/.test(s))
+                        return 'ARCHIVE';
+                    if (/duration|market ~|round/.test(s))
+                        return 'DURATION';
+                    if (/opp allows|opponent/.test(s))
+                        return 'OPPONENT';
+                    if (/platform-aware|scoring profile|book/.test(s))
+                        return 'BOOKS';
+                    if (/consensus/.test(s))
+                        return 'CONSENSUS';
+                    if (/news|injur|withdraw/.test(s))
+                        return 'NEWS';
+                    if (/weight/.test(s))
+                        return 'WEIGHT';
+                    if (/cage/.test(s))
+                        return 'CAGE';
+                    if (/volatil|variance/.test(s))
+                        return 'VOLATILITY';
+                    if (/diverg|disagree|dissent/.test(s))
+                        return 'LINE SPLIT';
+                    if (/finish|\bko\b|\bsub\b/.test(s))
+                        return 'FINISH';
+                    if (/last \d|recent|trend|streak|form/.test(s))
+                        return 'FORM';
+                    if (/style|grappl|strik|wrestl/.test(s))
+                        return 'STYLE';
+                    if (/memory|recalibrat|calibrat/.test(s))
+                        return 'CALIBRATION';
+                    if (/proj|edges the line|above the line|below the line|\bavg\b/.test(s))
+                        return 'PROJECTION';
+                    return 'MODEL';
+                };
+                // GLOW-UP 162 (level-up 4): placeability exclusivity — the candidate
+                // pipeline already guarantees the displayed book takes this side; what
+                // it can't show is when that book is the ONLY one (dog FP UNDER → UD
+                // only, Pick6 More-only cards, single-book stat lines). One placeable
+                // book = no line-shopping and no fallback, so flag it on the row.
+                const placeableBooks = (() => {
+                    const dir = el.lean;
+                    if ((dir !== 'over' && dir !== 'under') || !el._source)
+                        return [];
+                    if (el._source === 'fp') {
+                        return FP_BOOKS_FOR_BEST_PICKS.filter(b => {
+                            if (lineForLeanSource(f, 'fp', b) == null)
+                                return false;
+                            if (shouldSkipFpSideForFighter(f, 'fp', dir, b))
+                                return false;
+                            if (dir === 'under' && b === 'pick6' && (f.fp_under_available ?? null) === false)
+                                return false;
+                            return true;
+                        });
+                    }
+                    const books = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
+                    return books.filter(b => {
+                        if (dir === 'under' && el._source === 'ss' && !ssUnderBookOffered(f, b))
+                            return false;
+                        if (dir === 'under' && el._source === 'td' && !tdUnderBookOffered(f, b))
+                            return false;
+                        return lineForLeanSource(f, el._source, b) != null;
+                    });
+                })();
+                const BOOK_ABBR = { pick6: 'P6', underdog: 'UD', prizepicks: 'PP', betr: 'BTR', draftkings_sportsbook: 'DK' };
+                const onlyBookTag = placeableBooks.length === 1
+                    ? `<span class="bp-onlybook" title="This side is only placeable on ${BOOK_ABBR[placeableBooks[0]]} for this fighter — no alternative book to shop or fall back to if the line moves or fills">⚑ ${BOOK_ABBR[placeableBooks[0]]} ONLY</span>`
+                    : '';
+                // GLOW-UP 162 (level-up 5): slip-ready copy text for this pick.
+                const STAT_LABEL = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL' };
+                const clipBook = displayPlatform ?? getSourceActivePlatformKey(f, el._source);
+                const BOOK_NAME = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
+                const clipText = `${prettyName(f.name)} ${(el.lean || '').toUpperCase()} ${line ?? ''} ${STAT_LABEL[el._source || 'fp'] || 'FP'}${clipBook ? ` @ ${BOOK_NAME[clipBook] || clipBook}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`;
+                const copyBtn = `<button class="bp-copy" data-clip="${clipText.replace(/"/g, '&quot;')}" title="Copy slip line: ${clipText.replace(/"/g, '&quot;')}">⧉</button>`;
+                const seenFactorLabels = new Set();
+                const factors = (el.reasons || []).filter(r => {
+                    const lbl = factorLabel(r.text || '');
+                    if (seenFactorLabels.has(lbl))
+                        return false;
+                    seenFactorLabels.add(lbl);
+                    return true;
+                }).slice(0, 4);
+                const factorChips = factors.length >= 2
+                    ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${factorLabel(r.text || '')}</span>`).join('')}</div>`
+                    : '';
+                return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div></div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}
         </div>
         <div class="best-pick-line-wrap">
-          <div class="best-pick-line">${line || '—'}</div>
+          ${i === 0 && evd ? `<div class="bp-hero-stats">
+            <div class="best-pick-line">${line || '—'}</div>
+            <div class="bp-hero-side">
+              <div class="bp-hs" title="Calibrated win probability for this pick — the number EV is priced from"><span class="bp-hs-label">WIN</span><b class="bp-hs-val">${Math.round(evd.prob * 100)}%</b></div>
+              <div class="bp-hs" title="EV from ${Math.round(evd.prob * 100)}% win prob · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}"><span class="bp-hs-label">EV</span><b class="bp-hs-val ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}">${evd.isAssumedVig ? '~' : ''}${evd.ev > 0 ? '+' : ''}${evd.ev}%</b></div>
+            </div>
+          </div>` : `<div class="best-pick-line">${line || '—'}</div>`}
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
-          ${evTag}${splitNote}
+          ${i === 0 && evd ? '' : evTag}${splitNote}
         </div>
+        ${copyBtn}
       </div>`;
             }).join('');
             const avgConf = confVals.length ? Math.round(confVals.reduce((a, b) => a + b, 0) / confVals.length) : null;
@@ -7725,6 +7822,19 @@ function renderBestPicks(container, renderSeq = 0) {
         // Click a pick to jump to that fighter's card
         container.querySelectorAll('.best-pick-row[data-jump]').forEach(el => {
             el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+        });
+        // GLOW-UP 162 (level-up 5): copy-to-slip — ⧉ button copies a slip-ready
+        // pick line; stopPropagation keeps the row's jump-to-card click intact.
+        container.querySelectorAll('.bp-copy').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const txt = btn.dataset['clip'] || '';
+                navigator.clipboard.writeText(txt).then(() => {
+                    btn.textContent = '✓';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = '⧉'; btn.classList.remove('copied'); }, 1200);
+                }).catch(() => { });
+            });
         });
         renderModelHealthWidget();
     })();
