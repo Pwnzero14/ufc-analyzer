@@ -47,6 +47,22 @@ function newestBackupPath() {
 http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
 
+  // Out-of-band view control: dev/preview-view.txt holds "viewName" or
+  // "viewName|scrollY" (e.g. "bestpicks|900"). The shim polls this and clicks
+  // the matching tab + scrolls from INSIDE the page — works even when the
+  // main thread is too busy for external (CDP) clicks to land.
+  if (url === '/dev/preview-view') {
+    try {
+      const v = fs.readFileSync(path.join(__dirname, 'preview-view.txt'), 'utf8').trim();
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(v);
+    } catch {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('');
+    }
+    return;
+  }
+
   if (url === '/dev/storage-backup.json') {
     const p = newestBackupPath();
     if (!p) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
