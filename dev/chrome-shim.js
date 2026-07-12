@@ -13,8 +13,16 @@
   let readyResolve;
   const ready = new Promise((r) => { readyResolve = r; });
 
-  fetch('/dev/storage-backup.json')
-    .then((r) => (r.ok ? r.json() : null))
+  // The pane opens the tab while the server is still booting — a one-shot
+  // fetch can race a dead port and silently leave storage empty. Retry.
+  const loadBackup = (attempt) =>
+    fetch('/dev/storage-backup.json')
+      .then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .catch((e) => {
+        if (attempt < 5) return new Promise((res) => setTimeout(res, 1500)).then(() => loadBackup(attempt + 1));
+        throw e;
+      });
+  loadBackup(1)
     .then((payload) => {
       const data = payload && payload.storage && typeof payload.storage === 'object'
         ? payload.storage
@@ -107,6 +115,41 @@
     },
     alarms: { create() {}, clear(_n, cb) { if (cb) cb(false); }, clearAll(cb) { if (cb) cb(true); }, onAlarm: noopEvent },
   };
+
+  // NOTE: an earlier "stability" hack here no-op'd long setIntervals and
+  // insta-rejected external fetches — it broke line-data attachment (the app
+  // polls storage readiness on an interval). Do NOT reintroduce it; the
+  // page-side auto-view clicker below already tolerates main-thread churn.
+  const _setInterval = window.setInterval.bind(window);
+  const _fetch = window.fetch.bind(window);
+
+  // Out-of-band view control (see preview-server.js): read the requested view
+  // + scroll once, then keep trying from inside the page until the tab exists
+  // and the click lands. Page-side queued tasks always run eventually, even
+  // when the main thread is too churned for external automation to land.
+  _fetch('/dev/preview-view')
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((raw) => {
+      const [view, scrollRaw] = String(raw || '').trim().split('|');
+      if (!view) return;
+      const scrollY = Number(scrollRaw);
+      let tries = 0;
+      const timer = _setInterval(() => {
+        tries++;
+        const btn = document.querySelector(`.tab-btn[data-view="${view}"]`);
+        if (btn) {
+          btn.click();
+          if (Number.isFinite(scrollY) && scrollY > 0) {
+            setTimeout(() => window.scrollTo(0, scrollY), 1200);
+          }
+          console.info(`[chrome-shim] auto-view: ${view}${Number.isFinite(scrollY) ? ' @' + scrollY : ''} (try ${tries})`);
+          clearInterval(timer);
+        } else if (tries > 60) {
+          clearInterval(timer);
+        }
+      }, 2500);
+    })
+    .catch(() => {});
 
   console.info('[chrome-shim] preview chrome API shim active');
 })();
