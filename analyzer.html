@@ -26226,6 +26226,204 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(38,208,124,0.5);
   background: rgba(38,208,124,0.08);
 }
+
+/* ── GLOW-UP 163: Slate Check level-up 1 — readiness verdict ──
+   One chip in the panel header that answers "can I pick yet" before the
+   eye reads any counts or issue rows: ✓ READY / ! CHECK SLATE / ✕ NOT
+   READY, colored by worst severity. ── */
+.qa-verdict {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: help;
+}
+.qa-verdict-ok {
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.10);
+  border: 1px solid rgba(38,208,124,0.35);
+  box-shadow: 0 0 10px rgba(38,208,124,0.15);
+}
+.qa-verdict-warn {
+  color: #ffd9a0;
+  background: rgba(255,170,60,0.10);
+  border: 1px solid rgba(255,170,60,0.38);
+  box-shadow: 0 0 10px rgba(255,170,60,0.15);
+}
+.qa-verdict-err {
+  color: #ffb3c0;
+  background: rgba(255,58,96,0.12);
+  border: 1px solid rgba(255,58,96,0.42);
+  box-shadow: 0 0 10px rgba(255,58,96,0.18);
+}
+
+/* ── GLOW-UP 163: Slate Check level-up 2 — inline fix actions ──
+   Issues whose fix is a single existing control carry the button on the
+   row (⚡ FETCH → AUTO-FETCH LINES, ✎ BETR → manual entry flow) instead of
+   making the user hunt the header for it. ── */
+.qa-fix {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text2);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.14);
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.qa-issues li.qa-issue-err .qa-fix:hover {
+  color: #ffd9de;
+  border-color: rgba(255,58,96,0.5);
+  background: rgba(255,58,96,0.10);
+  box-shadow: 0 0 8px rgba(255,58,96,0.2);
+}
+.qa-issues li.qa-issue-warn .qa-fix:hover {
+  color: #ffe9ad;
+  border-color: rgba(248,198,74,0.5);
+  background: rgba(248,198,74,0.08);
+  box-shadow: 0 0 8px rgba(248,198,74,0.2);
+}
+
+/* ── GLOW-UP 163: Slate Check level-up 3 — missing-fighter drilldown ──
+   "X: n of N without lines" rows expand on click to show WHICH fighters
+   (chips); a chip jumps to that fighter's card. The caret rotates when
+   open. Rows wrap so the chip list gets its own line. ── */
+.qa-issues li.qa-expandable { cursor: pointer; flex-wrap: wrap; }
+.qa-exp-caret {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text3);
+  transition: transform 0.15s ease, color 0.15s;
+}
+.qa-fix ~ .qa-exp-caret { margin-left: 8px; }
+.qa-issues li.qa-expandable:hover .qa-exp-caret { color: var(--text2); }
+.qa-issues li.qa-open .qa-exp-caret { transform: rotate(90deg); }
+.qa-missing-list {
+  display: none;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 0 2px 23px; /* align under the text, past the severity badge */
+}
+.qa-issues li.qa-open .qa-missing-list { display: flex; }
+.qa-missing-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text2);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.qa-missing-chip:hover {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.45);
+  background: rgba(248,198,74,0.07);
+}
+
+/* ── GLOW-UP 163: Slate Check level-up 4 — coverage strip ──
+   Always-visible per-book state: label · age · covered/total, tinted by
+   worst of freshness and coverage. DK is freshness-only (progressive
+   posting makes partial coverage normal there). A clean slate now still
+   reports its state instead of rendering nothing. ── */
+.qa-cov-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.qa-cov {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+}
+.qa-cov b {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.qa-cov-age { color: var(--text3); }
+.qa-cov-n { font-weight: 700; }
+.qa-cov i { font-style: normal; color: var(--text3); opacity: 0.8; }
+.qa-cov-ok {
+  border-color: rgba(38,208,124,0.28);
+  background: rgba(38,208,124,0.05);
+}
+.qa-cov-ok b, .qa-cov-ok .qa-cov-n { color: #6ee7a8; }
+.qa-cov-warn {
+  border-color: rgba(248,198,74,0.32);
+  background: rgba(248,198,74,0.05);
+}
+.qa-cov-warn b, .qa-cov-warn .qa-cov-n { color: #f4d58a; }
+.qa-cov-err {
+  border-color: rgba(255,58,96,0.35);
+  background: rgba(255,58,96,0.06);
+}
+.qa-cov-err b, .qa-cov-err .qa-cov-n { color: #ffb3bd; }
+.qa-cov-none {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.qa-cov-none b { color: var(--text3); }
+
+/* ── GLOW-UP 163: Slate Check level-up 5 — sticky mini-verdict ──
+   Toolbar pill mirroring the panel verdict (✓/!/✕ SLATE) so the slate
+   state stays readable from anywhere on the board; click scrolls back
+   to Slate Check. Hidden on archive/calibration views like the panel. ── */
+.qa-mini-verdict {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: box-shadow 0.15s, filter 0.15s;
+}
+.qa-mini-verdict:hover { filter: brightness(1.15); }
+.qa-mini-ok {
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.10);
+  border: 1px solid rgba(38,208,124,0.35);
+}
+.qa-mini-warn {
+  color: #ffd9a0;
+  background: rgba(255,170,60,0.10);
+  border: 1px solid rgba(255,170,60,0.38);
+}
+.qa-mini-err {
+  color: #ffb3c0;
+  background: rgba(255,58,96,0.12);
+  border: 1px solid rgba(255,58,96,0.42);
+  box-shadow: 0 0 8px rgba(255,58,96,0.15);
+}
 </style>
 </head>
 <body>
@@ -26424,6 +26622,9 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
       </div>
     </div>
   </div>
+  <!-- GLOW-UP 163 (level-up 5): sticky slate-state pill — visible from anywhere
+       on the board; renderQAPanel keeps it in sync, click scrolls to Slate Check -->
+  <button id="qaMiniVerdict" class="qa-mini-verdict" type="button" hidden></button>
   <div class="density-control">
     <button id="densityTrigger" class="density-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Display density options" title="Display density options">
       <span aria-hidden="true">⚙</span>
