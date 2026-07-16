@@ -6648,10 +6648,21 @@ async function renderQAPanel(): Promise<void> {
   const panel = document.getElementById('qaPanel');
   if (!panel) return;
 
+  // GLOW-UP 163 (level-up 5): sticky mini-verdict in the toolbar — kept in
+  // sync here so the slate state is readable from anywhere on the board.
+  const miniVerdict = document.getElementById('qaMiniVerdict') as HTMLButtonElement | null;
+  if (miniVerdict && !miniVerdict.dataset['wired']) {
+    miniVerdict.dataset['wired'] = '1';
+    miniVerdict.addEventListener('click', () => {
+      document.getElementById('qaPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   // Only show on the main fighter-card views — archive/calibration/etc. have their own context.
   const hideForView = currentView === 'archive' || currentView === 'calibration';
   if (!allFighters.length || hideForView) {
     panel.style.display = 'none';
+    if (miniVerdict) miniVerdict.hidden = true;
     return;
   }
 
@@ -6726,23 +6737,47 @@ async function renderQAPanel(): Promise<void> {
     if (plat === 'lines_draftkings_sportsbook') return f.line_dk_ss != null || f.line_dk_td != null || f.line_dk_ft != null;
     return false;
   };
-  const missingByPlatform = new Map<string, number>();
+  // GLOW-UP 163 (level-up 3): keep the NAMES, not just the count — the row
+  // expands to show which fighters are lineless, each chip jumping to the card.
+  const missingByPlatform = new Map<string, string[]>();
   for (const p of platformInfo) {
     // Skip platforms with no data at all — staleness will already flag them.
     if (p.ageMin == null) continue;
     // DK Sportsbook posts fighter props progressively across the week — partial
     // coverage is expected, not a data issue. Skip it from the missing-lines check.
     if (p.key === 'lines_draftkings_sportsbook') continue;
-    const missing = allFighters.filter(f => !hasPlatformLine(f, p.key)).length;
-    if (missing > 0 && missing < totalFighters) missingByPlatform.set(p.label, missing);
+    const missingNames = allFighters.filter(f => !hasPlatformLine(f, p.key)).map(f => f.name);
+    if (missingNames.length > 0 && missingNames.length < totalFighters) missingByPlatform.set(p.label, missingNames);
   }
+
+  // GLOW-UP 163 (level-up 4): coverage strip — per-book freshness + line
+  // coverage, always visible so even a clean slate reports its state.
+  const covChips = platformInfo.map(p => {
+    const isDk = p.key === 'lines_draftkings_sportsbook';
+    if (p.ageMin == null) {
+      return `<span class="qa-cov qa-cov-none" title="${p.label}: no captured lines${isDk ? ' — DK posts props progressively; often absent early in fight week' : ''}"><b>${p.label}</b><i>no data</i></span>`;
+    }
+    const covered = allFighters.filter(f => hasPlatformLine(f, p.key)).length;
+    const warnAt = p.manual ? 720 : 15;
+    const errAt  = p.manual ? 1440 : 60;
+    const freshCls: 'ok'|'warn'|'err' = p.ageMin >= errAt ? 'err' : p.ageMin >= warnAt ? 'warn' : 'ok';
+    // DK partial coverage is expected (progressive posting) — freshness only.
+    const covCls: 'ok'|'warn' = (isDk || covered >= totalFighters) ? 'ok' : 'warn';
+    const state = freshCls === 'err' ? 'err' : (freshCls === 'warn' || covCls === 'warn') ? 'warn' : 'ok';
+    const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin / 60)}h`;
+    return `<span class="qa-cov qa-cov-${state}" title="${p.label}: captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${covered}/${totalFighters}</span></span>`;
+  }).join('');
+  const covStrip = `<div class="qa-cov-strip">${covChips}</div>`;
 
   const manualBetr = manualPayload[STORAGE_BETR_MANUAL_KEY];
   const manualRowCount = manualBetr?.fighters?.length || 0;
   const betrPlatformLoaded = platformInfo.find(p => p.key === 'lines_betr')?.ageMin != null;
   const betrManualShort = betrPlatformLoaded && manualRowCount > 0 && manualRowCount < totalFighters;
 
-  type Issue = { level: 'err'|'warn'; text: string; chip: string };
+  // GLOW-UP 163 (level-up 2): `action` marks issues whose fix is a single
+  // existing button — the row carries the button instead of making the user
+  // hunt for it (fetch → AUTO-FETCH LINES, betr → BETR LINES manual entry).
+  type Issue = { level: 'err'|'warn'; text: string; chip: string; action?: 'fetch'|'betr'; fighters?: string[] };
   const issues: Issue[] = [];
 
   // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
@@ -6754,20 +6789,22 @@ async function renderQAPanel(): Promise<void> {
     const chip = staleErr.length === 1
       ? `${staleErr[0].label} ${staleErr[0].ageMin == null ? 'no data' : 'stale'}`
       : `${staleErr.length} books stale`;
-    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}`, chip });
+    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}`, chip, action: 'fetch' });
   }
   if (staleWarn.length) {
     const names = staleWarn.map(p => `${p.label} (${p.ageMin}m)`).join(', ');
     const chip = staleWarn.length === 1
       ? `${staleWarn[0].label} ${staleWarn[0].ageMin}m`
       : `${staleWarn.length} books aging`;
-    issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh`, chip });
+    issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh`, chip, action: 'fetch' });
   }
-  for (const [label, missing] of missingByPlatform) {
+  for (const [label, names] of missingByPlatform) {
     issues.push({
       level: 'warn',
-      text: `${label}: ${missing} of ${totalFighters} fighters without lines`,
-      chip: `${label} missing ${missing}`,
+      text: `${label}: ${names.length} of ${totalFighters} fighters without lines`,
+      chip: `${label} missing ${names.length}`,
+      action: label === 'BT' ? 'betr' : undefined,
+      fighters: names,
     });
   }
   if (betrManualShort) {
@@ -6775,6 +6812,7 @@ async function renderQAPanel(): Promise<void> {
       level: 'err',
       text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows`,
       chip: `Betr ${manualRowCount}/${totalFighters}`,
+      action: 'betr',
     });
   }
 
@@ -6810,22 +6848,71 @@ async function renderQAPanel(): Promise<void> {
         `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`
       ).join('')}</div>`
     : '';
+  const fixBtnHtml = (i: Issue): string => i.action
+    ? `<button class="qa-fix" data-fix="${i.action}" title="${i.action === 'fetch' ? 'Run AUTO-FETCH LINES for the auto-scraped books' : 'Open the BETR LINES manual entry flow'}">${i.action === 'fetch' ? '⚡ FETCH' : '✎ BETR'}</button>`
+    : '';
+  // GLOW-UP 163 (level-up 3): expandable rows — issues that know their
+  // fighters render a caret + a hidden chip list; a chip jumps to the card.
+  const caretHtml = (i: Issue): string => i.fighters?.length
+    ? `<span class="qa-exp-caret" aria-hidden="true">▸</span>`
+    : '';
+  const missingListHtml = (i: Issue): string => i.fighters?.length
+    ? `<div class="qa-missing-list">${i.fighters.map(n =>
+        `<button class="qa-missing-chip" data-name="${n.replace(/"/g, '&quot;')}" title="Open ${prettyName(n)}'s fighter card">${prettyName(n)}</button>`
+      ).join('')}</div>`
+    : '';
   const issuesHtml = (!chipMode && issues.length)
     ? `<ul class="qa-issues">${issues.map(i =>
-        `<li class="qa-issue-${i.level}"><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span></li>`
+        `<li class="qa-issue-${i.level}${i.fighters?.length ? ' qa-expandable' : ''}"${i.fighters?.length ? ' title="Click to show which fighters"' : ''}><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span>${fixBtnHtml(i)}${caretHtml(i)}${missingListHtml(i)}</li>`
       ).join('')}</ul>`
     : '';
 
   panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
   panel.style.display = '';
+  // GLOW-UP 163 (Slate Check level-up 1): readiness verdict — one chip that
+  // answers "can I pick yet" before the eye reads any counts or rows.
+  const verdict = level === 'ok'
+    ? `<span class="qa-verdict qa-verdict-ok" title="All platforms fresh, no missing lines — safe to build entries">✓ READY</span>`
+    : level === 'warn'
+    ? `<span class="qa-verdict qa-verdict-warn" title="${warnCount} warning${warnCount === 1 ? '' : 's'} — picks work, but review the gaps below before locking entries">! CHECK SLATE</span>`
+    : `<span class="qa-verdict qa-verdict-err" title="${errCount} blocker${errCount === 1 ? '' : 's'} — fix these before trusting the board">✕ NOT READY</span>`;
+  if (miniVerdict) {
+    miniVerdict.hidden = false;
+    miniVerdict.className = `qa-mini-verdict qa-mini-${level}`;
+    miniVerdict.textContent = level === 'ok' ? '✓ SLATE' : level === 'warn' ? '! SLATE' : '✕ SLATE';
+    miniVerdict.title = level === 'ok'
+      ? 'Slate Check: ready — click to review'
+      : `Slate Check: ${errCount ? `${errCount} blocker${errCount === 1 ? '' : 's'}` : ''}${errCount && warnCount ? ' · ' : ''}${warnCount ? `${warnCount} warning${warnCount === 1 ? '' : 's'}` : ''} — click to review`;
+  }
   panel.innerHTML = `
     <div class="qa-panel-header">
       <span class="qa-panel-title">Slate Check</span>
+      ${verdict}
     </div>
     <div class="qa-summary">${summary}</div>
+    ${covStrip}
     ${chipsHtml}
     ${issuesHtml}
   `;
+
+  // GLOW-UP 163 (level-up 2): wire the inline fix buttons to the existing
+  // header controls — same code paths, zero new behavior to maintain.
+  panel.querySelectorAll<HTMLButtonElement>('.qa-fix').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = btn.dataset['fix'] === 'betr' ? 'manualEntryBtn' : 'autoScrapeBtn';
+      document.getElementById(target)?.click();
+    });
+  });
+  panel.querySelectorAll<HTMLElement>('li.qa-expandable').forEach(li => {
+    li.addEventListener('click', () => li.classList.toggle('qa-open'));
+  });
+  panel.querySelectorAll<HTMLButtonElement>('.qa-missing-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      jumpToFighterCard(chip.dataset['name'] || '');
+    });
+  });
 }
 
 function renderModelHealthWidget(): void {
@@ -19244,6 +19331,9 @@ function initAnalyzerCore(): void {
       if (container) container.style.display = 'block';
     }
     renderFighters();
+    // GLOW-UP 163: sync Slate Check panel + sticky mini-verdict visibility
+    // immediately on view switch (was lagging until the next heartbeat).
+    void renderQAPanel();
     syncDataTabsTrigger();
   });
   bindDataTabsTrigger();
