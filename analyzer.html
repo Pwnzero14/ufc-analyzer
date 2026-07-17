@@ -26612,6 +26612,81 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(38,208,124,0.12);
   box-shadow: 0 0 8px rgba(38,208,124,0.2);
 }
+
+/* ── GLOW-UP 165: Slate Check level-up 5 — Go/No-Go final form ──
+   A clean (or fully acknowledged) slate collapses the checklist into a
+   green GO bar with launch actions into Best Picks / Parlay Lab; the
+   coverage strip + acked note ride in a dim sub-row. The expanded
+   checklist only renders while something needs the user. ── */
+.qa-panel.qa-go {
+  border-color: rgba(38,208,124,0.35) !important;
+  box-shadow: 0 0 18px rgba(38,208,124,0.10), inset 0 1px 0 rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px;
+}
+.qa-go-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.qa-go-badge {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: #05130c;
+  background: linear-gradient(180deg, #6ee7a8, #2fbf7a);
+  box-shadow: 0 0 14px rgba(38,208,124,0.4), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.qa-go-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a9f5cd;
+  text-shadow: 0 0 12px rgba(38,208,124,0.35);
+}
+.qa-go-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.qa-go-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 7px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #8ffcc0;
+  background: rgba(38,208,124,0.08);
+  border: 1px solid rgba(38,208,124,0.38);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.qa-go-btn:hover {
+  background: rgba(38,208,124,0.16);
+  box-shadow: 0 0 12px rgba(38,208,124,0.25);
+  transform: translateY(-1px);
+}
+.qa-go-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.qa-go-sub .qa-acked-row {
+  border: none;
+  padding: 0;
+  margin-left: auto;
+}
 </style>
 </head>
 <body>

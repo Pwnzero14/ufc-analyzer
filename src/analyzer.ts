@@ -7056,8 +7056,11 @@ async function renderQAPanel(): Promise<void> {
   const betrScore = (betrManualShort && !acked.has('betr-short'))
     ? manualRowCount / (totalFighters || 1)
     : betrPlatformLoaded ? 1 : 0;
+  // DK is excluded from freshness like it is from coverage — its progressive
+  // posting is informational, and counting it pushed the sum past 100 (the
+  // clamp then showed a saturated "100%" next to NOT READY).
   const readiness = Math.min(100, Math.round(
-    autoPlatforms.reduce((s, p) => s + freshScore(p) * 12, 0) +
+    autoPlatforms.filter(p => p.key !== 'lines_draftkings_sportsbook').reduce((s, p) => s + freshScore(p) * 12, 0) +
     covScore('P6', 'lines_pick6') * 11 +
     covScore('UD', 'lines_underdog') * 11 +
     covScore('PP', 'lines_prizepicks') * 11 +
@@ -7100,7 +7103,27 @@ async function renderQAPanel(): Promise<void> {
       ? 'Slate Check: ready — click to review'
       : `Slate Check: ${errCount ? `${errCount} blocker${errCount === 1 ? '' : 's'}` : ''}${errCount && warnCount ? ' · ' : ''}${warnCount ? `${warnCount} warning${warnCount === 1 ? '' : 's'}` : ''} — click to review`;
   }
-  panel.innerHTML = `
+  // GLOW-UP 165 (level-up 5): Go/No-Go final form — a clean (or fully
+  // acknowledged) slate collapses the checklist into a green GO bar that
+  // hands off into the pick workflow; the expanded checklist only exists
+  // while something needs the user.
+  if (level === 'ok') {
+    const bpCount = document.getElementById('tabCountBestPicks')?.textContent?.trim() || '';
+    panel.className = 'qa-panel qa-ok qa-go';
+    panel.innerHTML = `
+      <div class="qa-go-bar">
+        <span class="qa-go-badge">GO</span>
+        <span class="qa-go-title">Slate ready · ${readiness}%</span>
+        ${tlock}
+        <div class="qa-go-actions">
+          <button class="qa-go-btn" data-goview="bestpicks" title="Open AI Best Picks">⚡ Best Picks${bpCount && bpCount !== '—' ? ` · ${bpCount}` : ''} →</button>
+          <button class="qa-go-btn" data-goview="parlaylab" title="Open Parlay Lab">🔗 Parlay Lab →</button>
+        </div>
+      </div>
+      <div class="qa-go-sub">${covStrip}${ackedHtml}</div>
+    `;
+  } else {
+    panel.innerHTML = `
     <div class="qa-panel-header">
       <span class="qa-panel-title">Slate Check</span>
       ${tlock}
@@ -7113,6 +7136,17 @@ async function renderQAPanel(): Promise<void> {
     ${chipsHtml}
     ${issuesHtml}${ackedHtml}
   `;
+  }
+
+  // GO bar launch buttons → activate the real view tabs so all existing
+  // tab-switch logic (render, visibility, QA re-sync) runs unchanged.
+  panel.querySelectorAll<HTMLButtonElement>('.qa-go-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const view = btn.dataset['goview'];
+      if (view) document.querySelector<HTMLElement>(`.tab-btn[data-view="${view}"]`)?.click();
+    });
+  });
 
   // GLOW-UP 163 (level-up 2): wire the inline fix buttons to the existing
   // header controls — same code paths, zero new behavior to maintain.
