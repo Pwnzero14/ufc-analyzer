@@ -26486,6 +26486,132 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   transition: color 0.15s, border-color 0.15s;
 }
 .qa-ack-undo:hover { color: var(--gold); border-color: rgba(248,198,74,0.4); }
+
+/* ── GLOW-UP 165: Slate Check level-up 1 — readiness score ──
+   Weighted 0–100 (freshness 36 · coverage 44 · Betr entry 20, acked gaps
+   waived) rendered as a slim bar under the summary; the verdict chip and
+   sticky pill carry the number. Binary verdict → measurable progress. ── */
+.qa-readiness {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+  cursor: help;
+}
+.qa-readiness i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+.qa-readiness-ok i {
+  background: linear-gradient(90deg, rgba(38,208,124,0.55), #48c78e);
+  box-shadow: 0 0 8px rgba(38,208,124,0.35);
+}
+.qa-readiness-warn i {
+  background: linear-gradient(90deg, rgba(248,198,74,0.5), #f6b73c);
+  box-shadow: 0 0 8px rgba(248,198,74,0.3);
+}
+.qa-readiness-err i {
+  background: linear-gradient(90deg, rgba(255,58,96,0.5), #ff5b78);
+  box-shadow: 0 0 8px rgba(255,58,96,0.3);
+}
+
+/* ── GLOW-UP 165: Slate Check level-up 2 — time-to-lock ──
+   ⏱ T-minus countdown chip next to the title; goes hot inside 24h
+   ("fight day"), when aging lines escalate warning → blocker in JS.
+   Header switches to flex-start + auto-margin verdict so the countdown
+   sits with the title instead of floating center. ── */
+.qa-panel-header { justify-content: flex-start !important; }
+.qa-panel-header .qa-verdict { margin-left: auto; }
+.qa-tlock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: help;
+  color: var(--text3);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.qa-tlock-hot {
+  color: #ffd9a0;
+  background: rgba(255,170,60,0.10);
+  border-color: rgba(255,170,60,0.40);
+  box-shadow: 0 0 8px rgba(255,170,60,0.18);
+}
+
+/* ── GLOW-UP 165: Slate Check level-up 3 — convergence deltas ──
+   Coverage chips mark movement since the last observed counts (per event,
+   qa_cov_prev_v1): ▲n filling in, ▼n pulled. The strip now answers "is
+   this slate trending toward ready?" at a glance. ── */
+.qa-cov-delta {
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.qa-cov-delta.up   { color: #6ee7a8; text-shadow: 0 0 6px rgba(38,208,124,0.4); }
+.qa-cov-delta.down { color: #ff8fa3; text-shadow: 0 0 6px rgba(255,91,120,0.4); }
+
+/* ── GLOW-UP 165: Slate Check level-up 4 — NEXT directive ──
+   One line naming THE action that moves readiness most, in the Learning
+   Drilldown's directive voice, action button inline (⚡ FETCH / ✎ BETR /
+   ✓ ACK ALL). Green label when the slate is ready. ── */
+.qa-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qa-next-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--gold);
+  background: rgba(248,198,74,0.12);
+  border: 1px solid rgba(248,198,74,0.40);
+  flex-shrink: 0;
+}
+.qa-next-ok .qa-next-label {
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.10);
+  border-color: rgba(38,208,124,0.38);
+}
+.qa-next-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.02em;
+  min-width: 0;
+}
+.qa-next .qa-fix, .qa-next .qa-ack-all { margin-left: 4px; }
+.qa-ack-all {
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.06);
+  border: 1px solid rgba(38,208,124,0.30);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.qa-ack-all:hover {
+  background: rgba(38,208,124,0.12);
+  box-shadow: 0 0 8px rgba(38,208,124,0.2);
+}
 </style>
 </head>
 <body>

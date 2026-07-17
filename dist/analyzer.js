@@ -6462,7 +6462,7 @@ async function renderQAPanel() {
     const totalFighters = allFighters.length;
     const [linesPayload, manualPayload] = await Promise.all([
         storageGet([...STORAGE_LINE_KEYS]),
-        storageGet([STORAGE_BETR_MANUAL_KEY, 'qa_acked_v1']),
+        storageGet([STORAGE_BETR_MANUAL_KEY, 'qa_acked_v1', 'qa_cov_prev_v1']),
     ]);
     const platformInfo = [
         { key: 'lines_pick6', label: 'P6', capturedAt: 0, ageMin: null, manual: false },
@@ -6544,6 +6544,38 @@ async function renderQAPanel() {
         if (missingNames.length > 0 && missingNames.length < totalFighters)
             missingByPlatform.set(p.label, missingNames);
     }
+    // GLOW-UP 165 (level-up 3): convergence deltas — remember the last observed
+    // coverage counts (per event) and mark movement on the chips (▲ filling in,
+    // ▼ pulled), so the strip answers "is this slate trending toward ready?".
+    const covNow = {};
+    for (const p of platformInfo) {
+        if (p.ageMin == null)
+            continue;
+        covNow[p.label] = allFighters.filter(f => hasPlatformLine(f, p.key)).length;
+    }
+    const covPrevRaw = manualPayload['qa_cov_prev_v1'];
+    const covStored = covPrevRaw?.event === upcomingEventName ? covPrevRaw : undefined;
+    const covPrev = { ...(covStored?.prev || {}) };
+    const covCurr = { ...(covStored?.curr || {}) };
+    let covChanged = !covStored;
+    for (const [label, n] of Object.entries(covNow)) {
+        if (covCurr[label] !== n) {
+            if (covCurr[label] != null)
+                covPrev[label] = covCurr[label];
+            covCurr[label] = n;
+            covChanged = true;
+        }
+    }
+    if (covChanged)
+        void storageSet({ qa_cov_prev_v1: { event: upcomingEventName, prev: covPrev, curr: covCurr } });
+    const covDelta = (label) => {
+        const prev = covPrev[label];
+        const now = covNow[label];
+        if (prev == null || now == null || prev === now)
+            return '';
+        const d = now - prev;
+        return `<span class="qa-cov-delta ${d > 0 ? 'up' : 'down'}" title="${label} coverage moved ${prev}→${now} since the last check">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
+    };
     // GLOW-UP 163 (level-up 4): coverage strip — per-book freshness + line
     // coverage, always visible so even a clean slate reports its state.
     const covChips = platformInfo.map(p => {
@@ -6551,7 +6583,7 @@ async function renderQAPanel() {
         if (p.ageMin == null) {
             return `<span class="qa-cov qa-cov-none" title="${p.label}: no captured lines${isDk ? ' — DK posts props progressively; often absent early in fight week' : ''}"><b>${p.label}</b><i>no data</i></span>`;
         }
-        const covered = allFighters.filter(f => hasPlatformLine(f, p.key)).length;
+        const covered = covNow[p.label] ?? 0;
         const warnAt = p.manual ? 720 : 15;
         const errAt = p.manual ? 1440 : 60;
         const freshCls = p.ageMin >= errAt ? 'err' : p.ageMin >= warnAt ? 'warn' : 'ok';
@@ -6559,7 +6591,7 @@ async function renderQAPanel() {
         const covCls = (isDk || covered >= totalFighters) ? 'ok' : 'warn';
         const state = freshCls === 'err' ? 'err' : (freshCls === 'warn' || covCls === 'warn') ? 'warn' : 'ok';
         const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin / 60)}h`;
-        return `<span class="qa-cov qa-cov-${state}" title="${p.label}: captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${covered}/${totalFighters}</span></span>`;
+        return `<span class="qa-cov qa-cov-${state}" title="${p.label}: captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${covered}/${totalFighters}</span>${covDelta(p.label)}</span>`;
     }).join('');
     const covStrip = `<div class="qa-cov-strip">${covChips}</div>`;
     const manualBetr = manualPayload[STORAGE_BETR_MANUAL_KEY];
@@ -6576,6 +6608,35 @@ async function renderQAPanel() {
     const ackedRaw = manualPayload['qa_acked_v1'];
     const acked = new Set(ackedRaw?.event === upcomingEventName ? (ackedRaw.keys || []) : []);
     const issues = [];
+    // GLOW-UP 165 (level-up 2): time-to-lock awareness — the slate's urgency
+    // depends on how far out the event is. Within 24h ("fight day") aging lines
+    // escalate from warning to blocker: stale lines inside the entry window are
+    // entry-threatening, not cosmetic.
+    // Event timestamps are frequently date-only (local midnight). No card starts
+    // at midnight — assume a 7pm start so the countdown and fight-day escalation
+    // track the real entry window instead of firing a day early.
+    let effEventTs = upcomingEventTs;
+    if (effEventTs > 0) {
+        const evD = new Date(effEventTs);
+        if (evD.getHours() === 0 && evD.getMinutes() === 0)
+            effEventTs += 19 * 3600e3;
+    }
+    const msToEvent = effEventTs > 0 ? effEventTs - Date.now() : NaN;
+    const fightDay = Number.isFinite(msToEvent) && msToEvent > -12 * 3600e3 && msToEvent < 24 * 3600e3;
+    const tMinus = (() => {
+        if (!Number.isFinite(msToEvent))
+            return '';
+        if (msToEvent <= 0)
+            return '';
+        const h = Math.floor(msToEvent / 3600e3);
+        const d = Math.floor(h / 24);
+        return d >= 1 ? `T-${d}d ${h % 24}h` : h >= 1 ? `T-${h}h ${Math.floor((msToEvent % 3600e3) / 60000)}m` : `T-${Math.floor(msToEvent / 60000)}m`;
+    })();
+    const tlock = Number.isFinite(msToEvent)
+        ? (msToEvent <= 0
+            ? `<span class="qa-tlock qa-tlock-hot" title="${upcomingEventName || 'Event'} has started — lines are locked">● LOCKED</span>`
+            : `<span class="qa-tlock${fightDay ? ' qa-tlock-hot' : ''}" title="Time until ${upcomingEventName || 'the event'}${fightDay ? ' — FIGHT DAY: aging lines now count as blockers' : ' — slate must be READY before lock'}">⏱ ${tMinus}</span>`)
+        : '';
     // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
     const autoPlatforms = platformInfo.filter(p => !p.manual);
     const staleErr = autoPlatforms.filter(p => p.ageMin == null || p.ageMin >= 60);
@@ -6592,7 +6653,14 @@ async function renderQAPanel() {
         const chip = staleWarn.length === 1
             ? `${staleWarn[0].label} ${staleWarn[0].ageMin}m`
             : `${staleWarn.length} books aging`;
-        issues.push({ level: 'warn', text: `Lines aging: ${names} — consider refresh`, chip, action: 'fetch' });
+        issues.push({
+            level: fightDay ? 'err' : 'warn',
+            text: fightDay
+                ? `Lines aging: ${names} — FIGHT DAY: refresh before entering`
+                : `Lines aging: ${names} — consider refresh`,
+            chip,
+            action: 'fetch',
+        });
     }
     for (const [label, names] of missingByPlatform) {
         issues.push({
@@ -6669,17 +6737,57 @@ async function renderQAPanel() {
         : '';
     panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
     panel.style.display = '';
+    // GLOW-UP 165 (Slate Check level-up 1): weighted readiness score 0–100 —
+    // freshness of the auto-scraped books (36) + per-book line coverage (44) +
+    // Betr manual entry completeness (20). Acked known gaps waive their penalty
+    // so the score agrees with the verdict's semantics.
+    const freshScore = (p) => p.ageMin == null ? 0 : p.ageMin >= 60 ? 0 : p.ageMin >= 15 ? 0.6 : 1;
+    const covScore = (label, key) => {
+        if (acked.has(`missing:${label}`))
+            return 1;
+        const info = platformInfo.find(x => x.label === label);
+        if (!info || info.ageMin == null)
+            return 0;
+        return allFighters.filter(f => hasPlatformLine(f, key)).length / (totalFighters || 1);
+    };
+    const betrScore = (betrManualShort && !acked.has('betr-short'))
+        ? manualRowCount / (totalFighters || 1)
+        : betrPlatformLoaded ? 1 : 0;
+    const readiness = Math.min(100, Math.round(autoPlatforms.reduce((s, p) => s + freshScore(p) * 12, 0) +
+        covScore('P6', 'lines_pick6') * 11 +
+        covScore('UD', 'lines_underdog') * 11 +
+        covScore('PP', 'lines_prizepicks') * 11 +
+        covScore('BT', 'lines_betr') * 11 +
+        betrScore * 20));
+    const readinessBar = `<div class="qa-readiness qa-readiness-${level}" title="Slate readiness: ${readiness}% — freshness 36 · coverage 44 · Betr entry 20 (acked gaps don't count against it)"><i style="width:${readiness}%"></i></div>`;
+    // GLOW-UP 165 (level-up 4): single next-step directive — the checklist names
+    // THE one action that moves readiness most, in the Learning Drilldown's
+    // directive voice, with the action button on the line itself.
+    const staleBlocker = activeIssues.find(i => i.level === 'err' && i.action === 'fetch');
+    const betrBlocker = activeIssues.find(i => i.ackKey === 'betr-short');
+    const missingWarns = activeIssues.filter(i => i.ackKey?.startsWith('missing:'));
+    const agingWarn = activeIssues.find(i => i.level === 'warn' && i.action === 'fetch');
+    const nextRow = (text, btn = '') => `<div class="qa-next"><span class="qa-next-label">NEXT</span><span class="qa-next-text">${text}</span>${btn}</div>`;
+    const nextHtml = staleBlocker
+        ? nextRow('Run AUTO-FETCH — stale or missing books are blocking the slate', `<button class="qa-fix" data-fix="fetch">⚡ FETCH</button>`)
+        : betrBlocker
+            ? nextRow(`Enter the ${totalFighters - manualRowCount} missing Betr row${totalFighters - manualRowCount === 1 ? '' : 's'} — or ACK if they can't be entered yet`, `<button class="qa-fix" data-fix="betr">✎ BETR</button>`)
+            : missingWarns.length
+                ? nextRow(`Wait for props to post — or acknowledge the ${missingWarns.length} known gap${missingWarns.length === 1 ? '' : 's'} to clear the slate`, `<button class="qa-ack-all" title="Acknowledge all known coverage gaps for this event">✓ ACK ALL</button>`)
+                : agingWarn
+                    ? nextRow(fightDay ? 'Fight day — refresh lines before entering' : 'Lines aging — refresh when convenient', `<button class="qa-fix" data-fix="fetch">⚡ FETCH</button>`)
+                    : `<div class="qa-next qa-next-ok"><span class="qa-next-label">NEXT</span><span class="qa-next-text">Slate ready — build your entries from Best Picks</span></div>`;
     // GLOW-UP 163 (Slate Check level-up 1): readiness verdict — one chip that
     // answers "can I pick yet" before the eye reads any counts or rows.
     const verdict = level === 'ok'
-        ? `<span class="qa-verdict qa-verdict-ok" title="All platforms fresh, no missing lines — safe to build entries">✓ READY</span>`
+        ? `<span class="qa-verdict qa-verdict-ok" title="All platforms fresh, no missing lines — safe to build entries">✓ READY · ${readiness}%</span>`
         : level === 'warn'
-            ? `<span class="qa-verdict qa-verdict-warn" title="${warnCount} warning${warnCount === 1 ? '' : 's'} — picks work, but review the gaps below before locking entries">! CHECK SLATE</span>`
-            : `<span class="qa-verdict qa-verdict-err" title="${errCount} blocker${errCount === 1 ? '' : 's'} — fix these before trusting the board">✕ NOT READY</span>`;
+            ? `<span class="qa-verdict qa-verdict-warn" title="${warnCount} warning${warnCount === 1 ? '' : 's'} — picks work, but review the gaps below before locking entries">! CHECK SLATE · ${readiness}%</span>`
+            : `<span class="qa-verdict qa-verdict-err" title="${errCount} blocker${errCount === 1 ? '' : 's'} — fix these before trusting the board">✕ NOT READY · ${readiness}%</span>`;
     if (miniVerdict) {
         miniVerdict.hidden = false;
         miniVerdict.className = `qa-mini-verdict qa-mini-${level}`;
-        miniVerdict.textContent = level === 'ok' ? '✓ SLATE' : level === 'warn' ? '! SLATE' : '✕ SLATE';
+        miniVerdict.textContent = `${level === 'ok' ? '✓' : level === 'warn' ? '!' : '✕'} SLATE ${readiness}%`;
         miniVerdict.title = level === 'ok'
             ? 'Slate Check: ready — click to review'
             : `Slate Check: ${errCount ? `${errCount} blocker${errCount === 1 ? '' : 's'}` : ''}${errCount && warnCount ? ' · ' : ''}${warnCount ? `${warnCount} warning${warnCount === 1 ? '' : 's'}` : ''} — click to review`;
@@ -6687,9 +6795,12 @@ async function renderQAPanel() {
     panel.innerHTML = `
     <div class="qa-panel-header">
       <span class="qa-panel-title">Slate Check</span>
+      ${tlock}
       ${verdict}
     </div>
     <div class="qa-summary">${summary}</div>
+    ${readinessBar}
+    ${nextHtml}
     ${covStrip}
     ${chipsHtml}
     ${issuesHtml}${ackedHtml}
@@ -6728,6 +6839,17 @@ async function renderQAPanel() {
     document.getElementById('qaAckUndo')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [] } });
+        void renderQAPanel();
+    });
+    // GLOW-UP 165 (level-up 4): ACK ALL — acknowledge every ack-able coverage
+    // gap at once from the NEXT directive line.
+    panel.querySelector('.qa-ack-all')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        for (const i of issues) {
+            if (i.ackKey?.startsWith('missing:'))
+                acked.add(i.ackKey);
+        }
+        await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [...acked] } });
         void renderQAPanel();
     });
 }
