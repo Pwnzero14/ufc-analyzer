@@ -26424,6 +26424,68 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(255,58,96,0.42);
   box-shadow: 0 0 8px rgba(255,58,96,0.15);
 }
+
+/* ── GLOW-UP 164: Slate Check — acknowledged known gaps ──
+   ✓ ACK on ack-able rows (missing-lines + Betr-short; staleness stays
+   un-ackable) mutes the issue for the current event: out of counts and
+   verdict, collapsed into a dim one-liner with restore. Acks live in
+   qa_acked_v1 scoped by event name → self-reset when the slate flips. ── */
+.qa-ack {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.qa-fix ~ .qa-ack { margin-left: 6px; }
+.qa-ack ~ .qa-exp-caret { margin-left: 8px; }
+.qa-ack:hover {
+  color: #6ee7a8;
+  border-color: rgba(38,208,124,0.45);
+  background: rgba(38,208,124,0.07);
+}
+.qa-acked-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255,255,255,0.10);
+  opacity: 0.75;
+}
+.qa-acked-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.03em;
+  min-width: 0;
+}
+.qa-ack-undo {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text3);
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: color 0.15s, border-color 0.15s;
+}
+.qa-ack-undo:hover { color: var(--gold); border-color: rgba(248,198,74,0.4); }
 </style>
 </head>
 <body>
