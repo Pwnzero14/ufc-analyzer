@@ -14767,6 +14767,9 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     ]);
     const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
     const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td');
+    // Knockdowns (PrizePicks-only prop) — panel only renders when a KD line exists.
+    const kdLine = f.line_pp_kd ?? null;
+    const kdHistoryHTML = buildHistoryBars(fights, h => h.kd, kdLine, null, kdLine, null, 'td');
     const ftHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.timeSecs)) ? Number(h.timeSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ft');
     const ctrlHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.ctrlSecs)) ? Number(h.ctrlSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ctrl', ctrlLine);
     const oppCompareFpLine = oppFpLine;
@@ -14791,6 +14794,8 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const oppBodyHistory = buildHistoryBars(oppFights, h => h.sigStrBody, oppCompareBodyLine, oppCompareBodyLine, null, null, 'ss');
     const oppLegHistory = buildHistoryBars(oppFights, h => h.sigStrLeg, oppCompareLegLine, oppCompareLegLine, null, null, 'ss');
     const oppTDHistory = buildHistoryBars(oppFights, h => h.td, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'td');
+    const oppCompareKdLine = oppEntry?.line_pp_kd ?? null;
+    const oppKDHistory = buildHistoryBars(oppFights, h => h.kd, oppCompareKdLine, null, oppCompareKdLine, null, 'td');
     const oppCTRLHistory = buildHistoryBars(oppFights, h => Number.isFinite(Number(h.ctrlSecs)) ? Number(h.ctrlSecs) / 60 : null, oppCompareFpLine, oppCompareSsLine, oppCompareTdLine, null, 'ctrl', oppCompareCtrlLine);
     const leanReasons = lean.reasons || [];
     const proReasons = leanReasons.filter((r) => r.icon === 'pos');
@@ -15510,6 +15515,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     ])}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp TDs Scored vs ${f.name}${oppCompareTdLine != null ? ` · ${oppName} TD line ${oppCompareTdLine}` : ''}</div>${oppFights.length ? oppTDHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
+        ${(kdLine != null || oppCompareKdLine != null) ? `<div class="stat-pair">
+        <div class="detail-panel"><div class="detail-panel-title">Knockdowns History${kdLine != null ? ` vs Line ${kdLine}` : ''}${kdLine != null && f.kd_under_available !== true ? ' <span class="panel-confidence low" title="PrizePicks More-only (demon/goblin) — display only, not Best Picks eligible">MORE-only</span>' : ''}</div>${kdHistoryHTML}${kdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([{ tag: 'PP', raw: kdLine }])}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp KDs Scored vs ${f.name}${oppCompareKdLine != null ? ` · ${oppName} KD line ${oppCompareKdLine}` : ''}</div>${oppFights.length ? oppKDHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
+        </div>` : ''}
         <div class="stat-pair">
         <div class="detail-panel"><div class="detail-panel-title">Control Time History${ctrlLine != null ? ` vs Line ${formatMinutesAsClock(ctrlLine)}` : ''}${panelBadge(ctrlConf)}${f.line_p6_ctrl != null && f.ctrl_under_available === false ? ' <span class="panel-confidence low" title="Pick6 only offers OVER on this CTRL line — UNDER is unplaceable">OVER-only</span>' : ''}</div>${ctrlHistoryHTML}${ctrlLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
         { tag: 'P6', raw: f.line_p6_ctrl }, { tag: 'UD', raw: f.line_ud_ctrl }, { tag: 'PP', raw: f.line_pp_ctrl }, { tag: 'BT', raw: f.line_betr_ctrl },
