@@ -41,6 +41,8 @@ function createPlaceholderAnalyzerFighter(name, opponent) {
         line_pp_td: null,
         line_pp_ft: null,
         line_pp_ctrl: null,
+        line_pp_kd: null,
+        kd_under_available: null,
         moneyline: null,
         opponent,
         db: { loaded: false },
@@ -50,6 +52,7 @@ function createPlaceholderAnalyzerFighter(name, opponent) {
         lean_td: null,
         lean_ft: null,
         lean_ctrl: null,
+        lean_kd: null,
         line_dk_ss: null,
         line_dk_ss_r1: null,
         line_dk_td: null,
@@ -1396,8 +1399,8 @@ async function loadBayesianPriors() {
     _bayesianPriors = out;
 }
 function getHistoricalPriorForSource(source) {
-    // ss_r1 has no measured Bayesian prior (R1 SS props aren't archived/settled) — fall back.
-    if (!source || source === 'ctrl' || source === 'ss_r1')
+    // ss_r1/kd have no measured Bayesian prior yet (too few archived samples) — fall back.
+    if (!source || source === 'ctrl' || source === 'ss_r1' || source === 'kd')
         return 0.55;
     return _bayesianPriors[source] ?? 0.55;
 }
@@ -1883,21 +1886,25 @@ function getSourceLineEntries(f, source) {
                     ['underdog', f.line_ud_ss_r1],
                     ['draftkings_sportsbook', f.line_dk_ss_r1],
                 ]
-                : source === 'td'
+                : source === 'kd'
                     ? [
-                        ['pick6', f.line_p6_td],
-                        ['underdog', f.line_ud_td],
-                        ['prizepicks', f.line_pp_td],
-                        ['betr', f.line_betr_td],
-                        ['draftkings_sportsbook', f.line_dk_td],
+                        ['prizepicks', f.line_pp_kd],
                     ]
-                    : [
-                        ['pick6', f.line_p6_ft],
-                        ['underdog', f.line_ud_ft],
-                        ['prizepicks', f.line_pp_ft],
-                        ['betr', f.line_betr_ft],
-                        ['draftkings_sportsbook', f.line_dk_ft],
-                    ];
+                    : source === 'td'
+                        ? [
+                            ['pick6', f.line_p6_td],
+                            ['underdog', f.line_ud_td],
+                            ['prizepicks', f.line_pp_td],
+                            ['betr', f.line_betr_td],
+                            ['draftkings_sportsbook', f.line_dk_td],
+                        ]
+                        : [
+                            ['pick6', f.line_p6_ft],
+                            ['underdog', f.line_ud_ft],
+                            ['prizepicks', f.line_pp_ft],
+                            ['betr', f.line_betr_ft],
+                            ['draftkings_sportsbook', f.line_dk_ft],
+                        ];
     return pairs
         .map(([platform, value]) => {
         if (value == null)
@@ -4867,6 +4874,122 @@ function calcSSR1Lean(name, db, availableLines = [], oppDB, moneyline = null) {
         type: 'ss_r1',
     };
 }
+// Knockdowns lean (PrizePicks-only, line typically 0.5 → OVER = at least one KD).
+// KDs are rare, high-variance events, so this is the MOST conservative lean source:
+// hit-rate driven (how often the fighter's per-fight KD count beat the line),
+// corroborated by how often the OPPONENT has been knocked down. Only fighters whose
+// PP card offers BOTH More and Less (kd_under_available === true, i.e. a standard
+// projection, not a demon/goblin) are Best-Picks eligible — gated in isCandidateUsable.
+function calcKDLean(name, db, line_kd, oppDB) {
+    if (line_kd == null || !db || !db.loaded)
+        return null;
+    const history = (db.history || []).filter(h => h.kd != null);
+    if (history.length < 5)
+        return null; // rare stat — demand a real sample
+    const avgKd = history.reduce((s, h) => s + (h.kd || 0), 0) / history.length;
+    const hits = history.filter(h => (h.kd || 0) > line_kd).length;
+    const rate = hits / history.length;
+    const rateAdj = shrunkHitRate(hits, history.length);
+    const extremeClean = (rate === 0 || rate === 1) && history.length >= 10;
+    const reasons = [];
+    let score = 0;
+    // Hit rate IS the signal for a mostly-zero count stat. Note the asymmetric ladder:
+    // clearing a 0.5 KD line in 50%+ of fights is elite power; most fighters sit near 0,
+    // so the under thresholds are much closer to the floor.
+    if (rate === 1 && history.length >= 10) {
+        score += 3.0;
+        reasons.push({ icon: 'pos', text: `Scored a knockdown in ALL ${history.length} tracked fights — structurally clean over` });
+    }
+    else if (rateAdj >= 0.55) {
+        score += 1.8;
+        reasons.push({ icon: 'pos', text: `KD in ${hits}/${history.length} fights (${Math.round(rate * 100)}%) — elite drop rate vs ${line_kd} line` });
+    }
+    else if (rateAdj >= 0.45) {
+        score += 0.8;
+        reasons.push({ icon: 'pos', text: `KD in ${hits}/${history.length} fights — above-average drop rate` });
+    }
+    else if (rate === 0 && history.length >= 10) {
+        score -= 3.0;
+        reasons.push({ icon: 'neg', text: `No knockdown in ${history.length} tracked fights (0/${history.length}) — structurally clean under` });
+    }
+    else if (rateAdj <= 0.16) {
+        score -= 1.8;
+        reasons.push({ icon: 'neg', text: `KD in only ${hits}/${history.length} fights (${Math.round(rate * 100)}%) — rarely drops opponents` });
+    }
+    else if (rateAdj <= 0.30) {
+        score -= 0.8;
+        reasons.push({ icon: 'neg', text: `KD in ${hits}/${history.length} fights — under tendency` });
+    }
+    else {
+        reasons.push({ icon: 'neu', text: `KD in ${hits}/${history.length} fights — no strong tendency vs ${line_kd} line` });
+    }
+    // Opponent durability: how often the opponent has been dropped (their own fight
+    // history's oppStats.kd = knockdowns scored against them).
+    const oppDropped = (oppDB?.history ?? [])
+        .map(h => h.oppStats?.kd)
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+    if (oppDropped.length >= 5) {
+        const oppDropRate = oppDropped.filter(v => v > line_kd).length / oppDropped.length;
+        if (oppDropRate >= 0.4) {
+            score += 0.8;
+            reasons.push({ icon: 'pos', text: `Opponent has been dropped in ${Math.round(oppDropRate * 100)}% of tracked fights — vulnerable chin` });
+        }
+        else if (oppDropRate <= 0.1) {
+            score -= 0.8;
+            reasons.push({ icon: 'neg', text: `Opponent almost never gets dropped (${Math.round(oppDropRate * 100)}% of fights) — durable` });
+        }
+    }
+    if (db.style === 'striker') {
+        score += 0.3;
+        reasons.push({ icon: 'pos', text: `Striker — more KD-capable output` });
+    }
+    else if (db.style === 'grappler') {
+        score -= 0.3;
+        reasons.push({ icon: 'neg', text: `Grappler — fewer power-strike exchanges` });
+    }
+    // Conservative caps — a knockdown is a single moment of variance; only a structurally
+    // clean record earns the higher ceiling.
+    const cap = extremeClean ? 82 : 76;
+    let lean, conf;
+    if (score >= 2.8) {
+        lean = 'over';
+        conf = Math.min(cap, 60 + score * 3);
+    }
+    else if (score >= 1.6) {
+        lean = 'over';
+        conf = Math.min(68, 52 + score * 4.5);
+    }
+    else if (score <= -2.8) {
+        lean = 'under';
+        conf = Math.min(cap, 60 + Math.abs(score) * 3);
+    }
+    else if (score <= -1.6) {
+        lean = 'under';
+        conf = Math.min(68, 52 + Math.abs(score) * 4.5);
+    }
+    else {
+        lean = 'push';
+        conf = 50;
+    }
+    const headline = reasons.find(r => r.icon !== 'neu')?.text ?? reasons[0]?.text ?? '';
+    const verdict = lean === 'over'
+        ? `KD OVER ${line_kd} (avg ${avgKd.toFixed(2)}/fight) — ${headline}`
+        : lean === 'under'
+            ? `KD UNDER ${line_kd} (avg ${avgKd.toFixed(2)}/fight) — ${headline}`
+            : `KD NO LEAN at ${line_kd} (avg ${avgKd.toFixed(2)}/fight)`;
+    void name;
+    return {
+        lean,
+        conf: Math.round(conf),
+        confidenceGrade: getConfidenceGrade(Math.round(conf)),
+        score: parseFloat(score.toFixed(2)),
+        reasons,
+        verdict,
+        avg: parseFloat(avgKd.toFixed(2)),
+        line: line_kd,
+        type: 'kd',
+    };
+}
 function calcTDLean(name, db, line_td, oppDB, dkLine, availableLines = [], moneyline = null) {
     if (!line_td || !db || !db.loaded)
         return null;
@@ -5877,6 +6000,8 @@ function _computeEffectiveLean(f) {
         return { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
     if (f.lean_ss_r1?.lean && f.lean_ss_r1.lean !== 'none' && f.lean_ss_r1.lean !== 'push')
         return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
+    if (f.lean_kd?.lean && f.lean_kd.lean !== 'none' && f.lean_kd.lean !== 'push')
+        return { ...f.lean_kd, _source: 'kd', _label: ' (KD)' };
     return { ...(f.lean || { lean: 'none', conf: 0, reasons: [], verdict: '' }), _source: 'fp', _label: '' };
 }
 // Severity-tiered weight-miss treatment:
@@ -7012,6 +7137,13 @@ function renderBestPicks(container, renderSeq = 0) {
                     return f.line_dk_ss_r1 ?? f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? null;
                 return f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null;
             }
+            if (source === 'kd') {
+                // Knockdowns are PrizePicks-only — null for every other book so no phantom
+                // candidates get created when a specific platform is requested.
+                if (platform)
+                    return platform === 'prizepicks' ? (f.line_pp_kd ?? null) : null;
+                return f.line_pp_kd ?? null;
+            }
             if (source === 'td') {
                 if (platform === 'pick6')
                     return f.line_p6_td ?? null;
@@ -7121,6 +7253,10 @@ function renderBestPicks(container, renderSeq = 0) {
                 return 1.5;
             if (source === 'ss' || source === 'td')
                 return 1.2;
+            // KD: bounded, hit-rate-driven like R1 SS, but a knockdown is a single moment of
+            // variance — keep the bonus modest so KD picks must earn their slot on confidence.
+            if (source === 'kd')
+                return 1.0;
             return 0;
         };
         // Per-book FP lean: PrizePicks uses a different scoring formula, so its line
@@ -7215,6 +7351,12 @@ function renderBestPicks(container, renderSeq = 0) {
             // any non-push R1 SS candidate that survived candidate collection.
             if (c._source === 'ss_r1')
                 return true;
+            // Knockdowns (PrizePicks-only): eligible for Best Picks ONLY when PP offers BOTH
+            // More and Less (a standard projection). More-only demon/goblin KD cards carry
+            // non-standard payouts, so neither direction is a normal pick-em play there —
+            // per product rule, they're display-only.
+            if (c._source === 'kd')
+                return f.kd_under_available === true;
             const dir = c.lean;
             const sideOdds = sideOddsFor(f, c._source, dir);
             const platform = c._platform ?? getSourceActivePlatformKey(f, c._source);
@@ -7291,6 +7433,9 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push' && lineForLeanSource(f, 'ft') != null) {
                 candidates.push({ ...f.lean_ft, _source: 'ft', _label: ' (FT line)' });
+            }
+            if (f.lean_kd?.lean && f.lean_kd.lean !== 'none' && f.lean_kd.lean !== 'push' && lineForLeanSource(f, 'kd') != null) {
+                candidates.push({ ...f.lean_kd, _source: 'kd', _label: ' (KD line)' });
             }
             return candidates.filter(c => isCandidateUsable(f, c));
         };
@@ -7472,7 +7617,7 @@ function renderBestPicks(container, renderSeq = 0) {
             const line = lineForLeanSource(f, el._source, el._platform);
             const samples = db?.history?.length || 0;
             const conf = getAdjustedBestPickConfidence(f);
-            const statLean = el._source === 'ss' || el._source === 'ss_r1' || el._source === 'td' || el._source === 'ft';
+            const statLean = el._source === 'ss' || el._source === 'ss_r1' || el._source === 'td' || el._source === 'ft' || el._source === 'kd';
             const highConfReq = statLean ? 78 : 72;
             const highSampleReq = statLean ? 8 : 7;
             const medConfReq = statLean ? 64 : 58;
@@ -15236,6 +15381,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div></div>` : ''}
         ${(f.line_pp_ss_body != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Body</span></div><div class="line-value pp">${f.line_pp_ss_body}</div></div>` : ''}
         ${(f.line_pp_ss_leg != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Leg</span></div><div class="line-value pp">${f.line_pp_ss_leg}</div></div>` : ''}
+        ${(f.line_pp_kd != null && showSource('pp')) ? `<div class="line-cell ss src-pp" title="Knockdowns O/U (PrizePicks). ${f.kd_under_available === true ? 'More + Less offered — Best Picks eligible.' : 'More-only (demon/goblin) — display only, not Best Picks eligible.'}"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>KD${f.kd_under_available === true ? '' : ' ↑'}</span></div><div class="line-value pp">${f.line_pp_kd}</div></div>` : ''}
         ${lineCell('pp', 'td', f.line_pp_td)}
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
@@ -15858,6 +16004,8 @@ function createMergedLineEntry(name) {
         line_pp_td: null,
         line_pp_ft: null,
         line_pp_ctrl: null,
+        line_pp_kd: null,
+        kd_under_available: null,
         line_dk_ss: null,
         line_dk_ss_r1: null,
         line_dk_td: null,
@@ -15929,6 +16077,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
     // re-fetch, same as plausibleTd. Round-1/body/leg variants legitimately run lower.
     const plausibleSs = (v) => (v != null && Number.isFinite(v) && v >= 4 && v < 400) ? v : null;
     const plausibleSsPart = (v) => (v != null && Number.isFinite(v) && v >= 2 && v < 200) ? v : null;
+    // Knockdown lines are tightly bounded (0.5, occasionally 1.5).
+    const plausibleKd = (v) => (v != null && Number.isFinite(v) && v > 0 && v < 5) ? v : null;
     (p6Fighters || []).forEach((f) => {
         if (!isValidFighterName(f.name))
             return;
@@ -16087,6 +16237,9 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         entry.line_pp_td = plausibleTd(f.line_td);
         entry.line_pp_ft = f.line_ft ?? null;
         entry.line_pp_ctrl = f.line_ctrl ?? null;
+        entry.line_pp_kd = plausibleKd(f.line_kd);
+        if (f.kd_under_available != null)
+            entry.kd_under_available = f.kd_under_available;
         if (f.opponent)
             entry.opponent = normalizeName(f.opponent);
     });
@@ -16374,7 +16527,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const leanTDA = calcTDLean(f.name, dbA, tdLineA, dbB, f.line_dk_td ?? null, tdLinesA, moneylineA);
         const leanFTA = calcFTLean(f.name, dbA, ftLineA, dbB, f.line_dk_ft ?? null, ftLinesA, moneylineA);
         const leanCTRLA = calcCTRLLean(f.name, dbA, ctrlLineA, dbB, f.line_dk_ctrl ?? null, ctrlLinesA, moneylineA, f.ctrl_under_available ?? null);
-        updateFighterLeans(f.name, leanSSA, leanTDA, leanFTA, leanCTRLA, leanSSR1A);
+        const leanKDA = calcKDLean(f.name, dbA, f.line_pp_kd ?? null, dbB);
+        updateFighterLeans(f.name, leanSSA, leanTDA, leanFTA, leanCTRLA, leanSSR1A, leanKDA);
         if (opp) {
             const ssLineB = opp.line_p6_ss ?? opp.line_ud_ss ?? opp.line_pp_ss ?? opp.line_betr_ss ?? opp.line_dk_ss ?? null;
             const tdLineB = opp.line_p6_td ?? opp.line_ud_td ?? opp.line_pp_td ?? opp.line_betr_td ?? opp.line_dk_td ?? null;
@@ -16390,7 +16544,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             const leanTDB = calcTDLean(opp.name, dbB, tdLineB, dbA, opp.line_dk_td ?? null, tdLinesB, moneylineB);
             const leanFTB = calcFTLean(opp.name, dbB, ftLineB, dbA, opp.line_dk_ft ?? null, ftLinesB, moneylineB);
             const leanCTRLB = calcCTRLLean(opp.name, dbB, ctrlLineB, dbA, opp.line_dk_ctrl ?? null, ctrlLinesB, moneylineB, opp.ctrl_under_available ?? null);
-            updateFighterLeans(opp.name, leanSSB, leanTDB, leanFTB, leanCTRLB, leanSSR1B);
+            const leanKDB = calcKDLean(opp.name, dbB, opp.line_pp_kd ?? null, dbA);
+            updateFighterLeans(opp.name, leanSSB, leanTDB, leanFTB, leanCTRLB, leanSSR1B, leanKDB);
         }
         paired.add(f.name);
         if (opp)
@@ -16533,7 +16688,7 @@ function applyLean(f, db, lean) {
         allFighters[idx].lean = lean || createEmptyLean();
     }
 }
-function updateFighterLeans(name, lean_ss, lean_td, lean_ft, lean_ctrl = null, lean_ss_r1 = null) {
+function updateFighterLeans(name, lean_ss, lean_td, lean_ft, lean_ctrl = null, lean_ss_r1 = null, lean_kd = null) {
     const idx = allFighters.findIndex((x) => x.name === name);
     if (idx >= 0) {
         if (lean_ss)
@@ -16546,6 +16701,8 @@ function updateFighterLeans(name, lean_ss, lean_td, lean_ft, lean_ctrl = null, l
             allFighters[idx].lean_ft = lean_ft;
         if (lean_ctrl)
             allFighters[idx].lean_ctrl = lean_ctrl;
+        if (lean_kd)
+            allFighters[idx].lean_kd = lean_kd;
     }
 }
 function updatePlatformBar(data) {

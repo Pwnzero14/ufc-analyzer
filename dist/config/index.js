@@ -234,7 +234,10 @@ export const NAME_ALIASES = {
 // v7 (2026-07-07): DK "Time of Finish" 1-minute finish distribution becomes the
 //   preferred source for the FT prior + expected-duration (actual within-round shape
 //   instead of uniform); round ladder is the fallback.
-export const MODEL_VERSION = 7;
+// v8 (2026-07-17): Knockdowns (KD) lean source — PrizePicks-only prop, hit-rate-driven
+//   (per-fight KD count vs line) + opponent dropped-rate corroboration. Best Picks
+//   eligible only when PP offers BOTH sides (standard projection, not demon/goblin).
+export const MODEL_VERSION = 8;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

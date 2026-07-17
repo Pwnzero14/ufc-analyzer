@@ -8,6 +8,11 @@ export interface Fighter {
   line_ss_leg?: number | null;   // Significant leg strikes (PrizePicks + Underdog)
   line_td?: number | null;
   line_ft?: number | null;
+  // Knockdowns O/U (PrizePicks-only, typically 0.5). kd_under_available records whether
+  // the Less side exists: PP standard projections offer More+Less; demon/goblin KD
+  // variants are More-only. Best Picks only considers fighters with BOTH sides.
+  line_kd?: number | null;
+  kd_under_available?: boolean | null;
   // Control time line, stored in minutes for parity with FT (UFCStats shows mm:ss)
   line_ctrl?: number | null;
   opponent?: string | null;

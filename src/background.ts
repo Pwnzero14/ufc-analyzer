@@ -990,6 +990,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
                 + applyResult(nameVariants, archiveEvent, 'ss_body', f.ssBody)
                 + applyResult(nameVariants, archiveEvent, 'ss_leg', f.ssLeg)
                 + applyResult(nameVariants, archiveEvent, 'TD', f.td)
+                + applyResult(nameVariants, archiveEvent, 'KD', f.kd)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
                 + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
                 + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins)
@@ -1095,6 +1096,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
                   + applyResult([archiveName], archiveEvent, 'ss_body', f.ssBody)
                   + applyResult([archiveName], archiveEvent, 'ss_leg', f.ssLeg)
                   + applyResult([archiveName], archiveEvent, 'TD', f.td)
+                  + applyResult([archiveName], archiveEvent, 'KD', f.kd)
                   + applyResult([archiveName], archiveEvent, 'Fantasy', fp)
                   + applyResult([archiveName], archiveEvent, 'Fantasy_PP', fpPP)
                   + applyResult([archiveName], archiveEvent, 'FightTime', f.fightTimeMins)
@@ -1192,6 +1194,7 @@ function toArchivePropTypeFromLineKey(lineKey: string, platform?: string): strin
   if (key === 'line_ss') return 'SS';
   if (key === 'line_ss_r1') return 'SS_R1';
   if (key === 'line_td') return 'TD';
+  if (key === 'line_kd') return 'KD';
   if (key.includes('control')) return 'Control';
   if (key.includes('fighttime') || key.includes('fight_time')) return 'FightTime';
   return key.replace(/^line_/, '').replace(/_/g, ' ');
@@ -1493,6 +1496,8 @@ function mergeFighters(
       if (fighter.line_ss_body != null) merged.line_ss_body = fighter.line_ss_body;
       if (fighter.line_ss_leg != null) merged.line_ss_leg = fighter.line_ss_leg;
       if (fighter.line_td != null) merged.line_td = fighter.line_td;
+      if (fighter.line_kd != null) merged.line_kd = fighter.line_kd;
+      if (fighter.kd_under_available != null) merged.kd_under_available = fighter.kd_under_available;
       if (fighter.line_ft != null) {
         const ftLine = normalizeFightTimeLineToMinutes(fighter.line_ft);
         if (ftLine != null) merged.line_ft = ftLine;
@@ -2193,8 +2198,8 @@ async function fetchUnderdogFromBackground(): Promise<UnderdogCoverage> {
   return getUnderdogStatCoverage(mergedFighters);
 }
 
-function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> {
-  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; opponent: string | null }> = {};
+function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; line_kd: number | null; kd_under_available: boolean | null; opponent: string | null }> {
+  const fighters: Record<string, { name: string; line_fp: number | null; line_ss: number | null; line_ss_r1: number | null; line_ss_body: number | null; line_ss_leg: number | null; line_td: number | null; line_ft: number | null; line_kd: number | null; kd_under_available: boolean | null; opponent: string | null }> = {};
   const projections = Array.isArray(data?.data) ? data.data : [];
   const included = Array.isArray(data?.included) ? data.included : [];
 
@@ -2215,8 +2220,8 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     }
   }
 
-  const upsert = (name: string, type: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft', value: number, opponent: string | null = null) => {
-    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_ss_body: null, line_ss_leg: null, line_td: null, line_ft: null, opponent };
+  const upsert = (name: string, type: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft'|'kd', value: number, opponent: string | null = null) => {
+    if (!fighters[name]) fighters[name] = { name, line_fp: null, line_ss: null, line_ss_r1: null, line_ss_body: null, line_ss_leg: null, line_td: null, line_ft: null, line_kd: null, kd_under_available: null, opponent };
     const normalized = type === 'ft' ? normalizeFightTimeLineToMinutes(value) : value;
     // For SS and TD, keep the highest value seen — standard total-fight lines are always
     // greater than any round-specific duplicate that may slip through. (ss_r1 is its own
@@ -2239,12 +2244,16 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     const leagueName = String(leagueById.get(leagueRelId) || '').toLowerCase();
     if (!/\bmma\b|\bufc\b/.test(leagueName)) continue;
 
-    // Only keep standard base lines — skip demon (boosted) and goblin (easier) variants.
-    // If odds_type is present and not "standard", it's a special-mode line.
     const oddsType = String(attrs.odds_type || attrs.projection_type || '').toLowerCase();
-    if (oddsType && oddsType !== 'standard') continue;
-
+    const isStandard = !oddsType || oddsType === 'standard';
     const stat = String(attrs.stat_type || '').toLowerCase();
+    const isKd = stat.includes('knockdown');
+    // Only keep standard base lines — skip demon (boosted) and goblin (easier) variants.
+    // EXCEPT Knockdowns: PP posts many KD cards as demons (More-only, non-standard payout)
+    // and only some fighters get the standard both-sides card. We capture ALL KD lines so
+    // the card can display them, and record odds_type as the both-sides signal —
+    // standard = More+Less offered, demon/goblin = More-only (Best Picks gates on it).
+    if (!isStandard && !isKd) continue;
     // PrizePicks "(Combo)" props sum BOTH fighters' totals into one line (e.g.
     // "Significant Strikes (Combo)" ≈ fighterA SS + fighterB SS), so they're not an
     // individual fighter's line. Without this skip the combo's higher value matches
@@ -2252,7 +2261,7 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     // upsert (observed: Bo Nickal SS captured as 49.5 = 28.5 + Daukaus 20.5).
     if (stat.includes('combo')) continue;
     const isRound1 = /\brd\s*1\b|\bround\s*1\b|\br1\b|\b1st\s*round\b/.test(stat);
-    let lineType: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft'|null = null;
+    let lineType: 'fp'|'ss'|'ss_r1'|'ss_body'|'ss_leg'|'td'|'ft'|'kd'|null = null;
 
     // Body/Leg strike props get their own buckets (checked before the generic SS branch).
     if (stat.includes('strike') && stat.includes('body')) lineType = 'ss_body';
@@ -2266,11 +2275,14 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     // real 24.99-min line overwritten by his "Total Rounds" 2.5 → 12.5). Excluded so the
     // minutes-denominated line always wins.
     else if (stat.includes('fight time') || stat.includes('fighttime') || stat.includes('fight duration')) lineType = 'ft';
+    else if (isKd) lineType = 'kd';
     else if (stat.includes('fantasy score') || stat.includes('fantasy points')) lineType = 'fp';
     if (!lineType) continue;
 
     const line = parseFloat(String(attrs.line_score ?? ''));
     if (!Number.isFinite(line) || line < 0) continue;
+    // Knockdown lines are tightly bounded (0.5, occasionally 1.5) — reject anything else.
+    if (lineType === 'kd' && line >= 5) continue;
 
     const playerRelId = p.relationships?.new_player?.data?.id
       || p.relationships?.player?.data?.id
@@ -2290,10 +2302,20 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
     const opponentRaw = String(player?.attributes?.opponent || '').trim();
     const opponent = opponentRaw && opponentRaw.split(' ').length >= 2 ? opponentRaw : null;
 
-    upsert(name, lineType, line, opponent);
+    if (lineType === 'kd') {
+      // A fighter can have BOTH a standard KD card (More+Less) and demon/goblin variants.
+      // The standard card's line wins; the flag records whether Less exists at all.
+      const cur = fighters[name];
+      if (!cur || cur.line_kd == null || (isStandard && cur.kd_under_available !== true)) {
+        upsert(name, 'kd', line, opponent);
+        fighters[name].kd_under_available = isStandard;
+      }
+    } else {
+      upsert(name, lineType, line, opponent);
+    }
   }
 
-  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null);
+  return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null || f.line_kd != null);
 }
 
 async function fetchPrizePicksFromBackground(): Promise<UnderdogCoverage> {
