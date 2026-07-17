@@ -6337,7 +6337,7 @@ async function renderQAPanel() {
     const totalFighters = allFighters.length;
     const [linesPayload, manualPayload] = await Promise.all([
         storageGet([...STORAGE_LINE_KEYS]),
-        storageGet([STORAGE_BETR_MANUAL_KEY]),
+        storageGet([STORAGE_BETR_MANUAL_KEY, 'qa_acked_v1']),
     ]);
     const platformInfo = [
         { key: 'lines_pick6', label: 'P6', capturedAt: 0, ageMin: null, manual: false },
@@ -6441,6 +6441,15 @@ async function renderQAPanel() {
     const manualRowCount = manualBetr?.fighters?.length || 0;
     const betrPlatformLoaded = platformInfo.find(p => p.key === 'lines_betr')?.ageMin != null;
     const betrManualShort = betrPlatformLoaded && manualRowCount > 0 && manualRowCount < totalFighters;
+    // GLOW-UP 163 (level-up 2): `action` marks issues whose fix is a single
+    // existing button — the row carries the button instead of making the user
+    // hunt for it (fetch → AUTO-FETCH LINES, betr → BETR LINES manual entry).
+    // GLOW-UP 164: acknowledged known gaps — issues with an ackKey can be muted
+    // for the CURRENT event (short-notice fights whose props post late are the
+    // recurring case). Scoped to upcomingEventName so acks self-reset on flip.
+    // Staleness rows are deliberately NOT ack-able — they're time-driven.
+    const ackedRaw = manualPayload['qa_acked_v1'];
+    const acked = new Set(ackedRaw?.event === upcomingEventName ? (ackedRaw.keys || []) : []);
     const issues = [];
     // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
     const autoPlatforms = platformInfo.filter(p => !p.manual);
@@ -6467,6 +6476,7 @@ async function renderQAPanel() {
             chip: `${label} missing ${names.length}`,
             action: label === 'BT' ? 'betr' : undefined,
             fighters: names,
+            ackKey: `missing:${label}`,
         });
     }
     if (betrManualShort) {
@@ -6475,16 +6485,21 @@ async function renderQAPanel() {
             text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows`,
             chip: `Betr ${manualRowCount}/${totalFighters}`,
             action: 'betr',
+            ackKey: 'betr-short',
         });
     }
     // Blockers before warnings — implicit grouping without needing section headers.
     issues.sort((a, b) => (a.level === b.level ? 0 : a.level === 'err' ? -1 : 1));
-    const errCount = issues.filter(i => i.level === 'err').length;
-    const warnCount = issues.filter(i => i.level === 'warn').length;
+    // GLOW-UP 164: acknowledged issues drop out of counts, verdict, and rows —
+    // they collapse into a muted one-liner with a restore control below.
+    const activeIssues = issues.filter(i => !(i.ackKey && acked.has(i.ackKey)));
+    const ackedIssues = issues.filter(i => i.ackKey && acked.has(i.ackKey));
+    const errCount = activeIssues.filter(i => i.level === 'err').length;
+    const warnCount = activeIssues.filter(i => i.level === 'warn').length;
     const hasErr = errCount > 0;
     const hasWarn = warnCount > 0;
     const level = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
-    const chipMode = issues.length > 0 && issues.length <= 3;
+    const chipMode = activeIssues.length > 0 && activeIssues.length <= 3;
     const fetchBtn = document.getElementById('autoScrapeBtn');
     if (fetchBtn) {
         const freshness = staleErr.length > 0 ? 'stale'
@@ -6505,7 +6520,7 @@ async function renderQAPanel() {
         ? `✓ Ready to pick · all platforms fresh · ${totalFighters} fighters loaded`
         : sumParts.join('<span class="qa-sum-sep">·</span>');
     const chipsHtml = chipMode
-        ? `<div class="qa-issue-chips">${issues.map(i => `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`).join('')}</div>`
+        ? `<div class="qa-issue-chips">${activeIssues.map(i => `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`).join('')}</div>`
         : '';
     const fixBtnHtml = (i) => i.action
         ? `<button class="qa-fix" data-fix="${i.action}" title="${i.action === 'fetch' ? 'Run AUTO-FETCH LINES for the auto-scraped books' : 'Open the BETR LINES manual entry flow'}">${i.action === 'fetch' ? '⚡ FETCH' : '✎ BETR'}</button>`
@@ -6518,8 +6533,14 @@ async function renderQAPanel() {
     const missingListHtml = (i) => i.fighters?.length
         ? `<div class="qa-missing-list">${i.fighters.map(n => `<button class="qa-missing-chip" data-name="${n.replace(/"/g, '&quot;')}" title="Open ${prettyName(n)}'s fighter card">${prettyName(n)}</button>`).join('')}</div>`
         : '';
-    const issuesHtml = (!chipMode && issues.length)
-        ? `<ul class="qa-issues">${issues.map(i => `<li class="qa-issue-${i.level}${i.fighters?.length ? ' qa-expandable' : ''}"${i.fighters?.length ? ' title="Click to show which fighters"' : ''}><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span>${fixBtnHtml(i)}${caretHtml(i)}${missingListHtml(i)}</li>`).join('')}</ul>`
+    const ackBtnHtml = (i) => i.ackKey
+        ? `<button class="qa-ack" data-ack="${i.ackKey}" title="Acknowledge as a known gap (e.g. short-notice fight whose props post late) — mutes this issue for the current event; resets automatically when the slate flips">✓ ACK</button>`
+        : '';
+    const issuesHtml = (!chipMode && activeIssues.length)
+        ? `<ul class="qa-issues">${activeIssues.map(i => `<li class="qa-issue-${i.level}${i.fighters?.length ? ' qa-expandable' : ''}"${i.fighters?.length ? ' title="Click to show which fighters"' : ''}><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span>${fixBtnHtml(i)}${ackBtnHtml(i)}${caretHtml(i)}${missingListHtml(i)}</li>`).join('')}</ul>`
+        : '';
+    const ackedHtml = ackedIssues.length
+        ? `<div class="qa-acked-row"><span class="qa-acked-note">✓ ${ackedIssues.length} acknowledged known gap${ackedIssues.length === 1 ? '' : 's'} · ${ackedIssues.map(i => i.chip).join(' · ')}</span><button id="qaAckUndo" class="qa-ack-undo" title="Restore acknowledged issues to the checklist">restore</button></div>`
         : '';
     panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
     panel.style.display = '';
@@ -6546,7 +6567,7 @@ async function renderQAPanel() {
     <div class="qa-summary">${summary}</div>
     ${covStrip}
     ${chipsHtml}
-    ${issuesHtml}
+    ${issuesHtml}${ackedHtml}
   `;
     // GLOW-UP 163 (level-up 2): wire the inline fix buttons to the existing
     // header controls — same code paths, zero new behavior to maintain.
@@ -6565,6 +6586,24 @@ async function renderQAPanel() {
             e.stopPropagation();
             jumpToFighterCard(chip.dataset['name'] || '');
         });
+    });
+    // GLOW-UP 164: ack / restore — per-event UI state in qa_acked_v1 (never
+    // touches line stores); event mismatch on read = automatic reset on flip.
+    panel.querySelectorAll('.qa-ack').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const key = btn.dataset['ack'];
+            if (!key)
+                return;
+            acked.add(key);
+            await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [...acked] } });
+            void renderQAPanel();
+        });
+    });
+    document.getElementById('qaAckUndo')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [] } });
+        void renderQAPanel();
     });
 }
 function renderModelHealthWidget() {

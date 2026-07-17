@@ -6670,7 +6670,7 @@ async function renderQAPanel(): Promise<void> {
 
   const [linesPayload, manualPayload] = await Promise.all([
     storageGet<Record<string, any>>([...STORAGE_LINE_KEYS]),
-    storageGet<Record<string, any>>([STORAGE_BETR_MANUAL_KEY]),
+    storageGet<Record<string, any>>([STORAGE_BETR_MANUAL_KEY, 'qa_acked_v1']),
   ]);
 
   // `manual: true` means the platform has no auto-scrape — staleness is informational only,
@@ -6777,7 +6777,14 @@ async function renderQAPanel(): Promise<void> {
   // GLOW-UP 163 (level-up 2): `action` marks issues whose fix is a single
   // existing button — the row carries the button instead of making the user
   // hunt for it (fetch → AUTO-FETCH LINES, betr → BETR LINES manual entry).
-  type Issue = { level: 'err'|'warn'; text: string; chip: string; action?: 'fetch'|'betr'; fighters?: string[] };
+  // GLOW-UP 164: acknowledged known gaps — issues with an ackKey can be muted
+  // for the CURRENT event (short-notice fights whose props post late are the
+  // recurring case). Scoped to upcomingEventName so acks self-reset on flip.
+  // Staleness rows are deliberately NOT ack-able — they're time-driven.
+  const ackedRaw = manualPayload['qa_acked_v1'] as { event?: string; keys?: string[] } | undefined;
+  const acked = new Set<string>(ackedRaw?.event === upcomingEventName ? (ackedRaw.keys || []) : []);
+
+  type Issue = { level: 'err'|'warn'; text: string; chip: string; action?: 'fetch'|'betr'; fighters?: string[]; ackKey?: string };
   const issues: Issue[] = [];
 
   // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
@@ -6805,6 +6812,7 @@ async function renderQAPanel(): Promise<void> {
       chip: `${label} missing ${names.length}`,
       action: label === 'BT' ? 'betr' : undefined,
       fighters: names,
+      ackKey: `missing:${label}`,
     });
   }
   if (betrManualShort) {
@@ -6813,18 +6821,24 @@ async function renderQAPanel(): Promise<void> {
       text: `Betr manual entries: ${manualRowCount} of ${totalFighters} — missing ${totalFighters - manualRowCount} rows`,
       chip: `Betr ${manualRowCount}/${totalFighters}`,
       action: 'betr',
+      ackKey: 'betr-short',
     });
   }
 
   // Blockers before warnings — implicit grouping without needing section headers.
   issues.sort((a, b) => (a.level === b.level ? 0 : a.level === 'err' ? -1 : 1));
 
-  const errCount = issues.filter(i => i.level === 'err').length;
-  const warnCount = issues.filter(i => i.level === 'warn').length;
+  // GLOW-UP 164: acknowledged issues drop out of counts, verdict, and rows —
+  // they collapse into a muted one-liner with a restore control below.
+  const activeIssues = issues.filter(i => !(i.ackKey && acked.has(i.ackKey)));
+  const ackedIssues = issues.filter(i => i.ackKey && acked.has(i.ackKey));
+
+  const errCount = activeIssues.filter(i => i.level === 'err').length;
+  const warnCount = activeIssues.filter(i => i.level === 'warn').length;
   const hasErr = errCount > 0;
   const hasWarn = warnCount > 0;
   const level: 'ok'|'warn'|'err' = hasErr ? 'err' : hasWarn ? 'warn' : 'ok';
-  const chipMode = issues.length > 0 && issues.length <= 3;
+  const chipMode = activeIssues.length > 0 && activeIssues.length <= 3;
 
   const fetchBtn = document.getElementById('autoScrapeBtn');
   if (fetchBtn) {
@@ -6844,7 +6858,7 @@ async function renderQAPanel(): Promise<void> {
     : sumParts.join('<span class="qa-sum-sep">·</span>');
 
   const chipsHtml = chipMode
-    ? `<div class="qa-issue-chips">${issues.map(i =>
+    ? `<div class="qa-issue-chips">${activeIssues.map(i =>
         `<span class="qa-issue-chip qa-issue-${i.level}" title="${i.text.replace(/"/g, '&quot;')}">${i.chip}</span>`
       ).join('')}</div>`
     : '';
@@ -6861,10 +6875,16 @@ async function renderQAPanel(): Promise<void> {
         `<button class="qa-missing-chip" data-name="${n.replace(/"/g, '&quot;')}" title="Open ${prettyName(n)}'s fighter card">${prettyName(n)}</button>`
       ).join('')}</div>`
     : '';
-  const issuesHtml = (!chipMode && issues.length)
-    ? `<ul class="qa-issues">${issues.map(i =>
-        `<li class="qa-issue-${i.level}${i.fighters?.length ? ' qa-expandable' : ''}"${i.fighters?.length ? ' title="Click to show which fighters"' : ''}><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span>${fixBtnHtml(i)}${caretHtml(i)}${missingListHtml(i)}</li>`
+  const ackBtnHtml = (i: Issue): string => i.ackKey
+    ? `<button class="qa-ack" data-ack="${i.ackKey}" title="Acknowledge as a known gap (e.g. short-notice fight whose props post late) — mutes this issue for the current event; resets automatically when the slate flips">✓ ACK</button>`
+    : '';
+  const issuesHtml = (!chipMode && activeIssues.length)
+    ? `<ul class="qa-issues">${activeIssues.map(i =>
+        `<li class="qa-issue-${i.level}${i.fighters?.length ? ' qa-expandable' : ''}"${i.fighters?.length ? ' title="Click to show which fighters"' : ''}><span class="qa-issue-icon" aria-hidden="true">${i.level === 'err' ? '✕' : '!'}</span><span class="qa-issue-text">${i.text}</span>${fixBtnHtml(i)}${ackBtnHtml(i)}${caretHtml(i)}${missingListHtml(i)}</li>`
       ).join('')}</ul>`
+    : '';
+  const ackedHtml = ackedIssues.length
+    ? `<div class="qa-acked-row"><span class="qa-acked-note">✓ ${ackedIssues.length} acknowledged known gap${ackedIssues.length === 1 ? '' : 's'} · ${ackedIssues.map(i => i.chip).join(' · ')}</span><button id="qaAckUndo" class="qa-ack-undo" title="Restore acknowledged issues to the checklist">restore</button></div>`
     : '';
 
   panel.className = `qa-panel qa-${level}${(level === 'ok' || chipMode) ? ' qa-compact' : ''}`;
@@ -6892,7 +6912,7 @@ async function renderQAPanel(): Promise<void> {
     <div class="qa-summary">${summary}</div>
     ${covStrip}
     ${chipsHtml}
-    ${issuesHtml}
+    ${issuesHtml}${ackedHtml}
   `;
 
   // GLOW-UP 163 (level-up 2): wire the inline fix buttons to the existing
@@ -6912,6 +6932,23 @@ async function renderQAPanel(): Promise<void> {
       e.stopPropagation();
       jumpToFighterCard(chip.dataset['name'] || '');
     });
+  });
+  // GLOW-UP 164: ack / restore — per-event UI state in qa_acked_v1 (never
+  // touches line stores); event mismatch on read = automatic reset on flip.
+  panel.querySelectorAll<HTMLButtonElement>('.qa-ack').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const key = btn.dataset['ack'];
+      if (!key) return;
+      acked.add(key);
+      await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [...acked] } });
+      void renderQAPanel();
+    });
+  });
+  document.getElementById('qaAckUndo')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await storageSet({ qa_acked_v1: { event: upcomingEventName, keys: [] } });
+    void renderQAPanel();
   });
 }
 
