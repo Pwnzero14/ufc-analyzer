@@ -7,6 +7,8 @@ export interface Fighter {
     line_ss_leg?: number | null;
     line_td?: number | null;
     line_ft?: number | null;
+    line_kd?: number | null;
+    kd_under_available?: boolean | null;
     line_ctrl?: number | null;
     opponent?: string | null;
     capturedAt?: number;
