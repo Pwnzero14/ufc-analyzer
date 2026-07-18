@@ -26894,6 +26894,166 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(248,198,74,0.35);
 }
 .bp-filter-empty .bpc-reset:hover { background: rgba(248,198,74,0.12); }
+
+/* ── GLOW-UP 168: Best Picks level-up 2 — My Slate tray ──
+   Checkable picks (the + / ✓ button beside ⧉) collect into a tray docked
+   to the viewport bottom, grouped by book — Entry Mode lite. Checked rows
+   get a gold left seam so slate membership reads from the board too. ── */
+.bp-slate-toggle {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  z-index: 2;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text3);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.best-pick-row:hover .bp-slate-toggle { opacity: 1; }
+.bp-slate-toggle:hover {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.4);
+  background: rgba(248,198,74,0.06);
+}
+.bp-slate-toggle.on {
+  opacity: 1;
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.5);
+  background: rgba(248,198,74,0.09);
+}
+.best-pick-row.in-slate {
+  box-shadow: inset 3px 0 0 rgba(248,198,74,0.45);
+}
+.bp-slate-tray {
+  position: sticky;
+  bottom: 10px;
+  z-index: 30;
+  margin-top: 12px;
+  border: 1px solid rgba(248,198,74,0.28);
+  border-radius: 10px;
+  background: rgba(18,16,12,0.96);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+.bps-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.bps-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+}
+.bps-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text2);
+}
+.bps-books {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.bps-tally-book {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--text3);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.bps-clear {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #ff8fa3;
+  background: rgba(255,91,120,0.05);
+  border: 1px solid rgba(255,91,120,0.25);
+}
+.bps-clear:hover { background: rgba(255,91,120,0.12); }
+.bps-chevron {
+  font-size: 8px;
+  color: var(--text3);
+}
+.bps-body {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 4px 12px 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.bps-group { min-width: 220px; flex: 1; }
+.bps-group-head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--text2);
+  padding: 7px 0 4px;
+}
+.bps-group-head i {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text3);
+  margin-left: 4px;
+}
+.bps-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text);
+}
+.bps-entry:hover { background: rgba(255,255,255,0.03); }
+.bps-dir { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 800; letter-spacing: 0.06em; }
+.bps-dir.ov { color: #6ee7a8; }
+.bps-dir.un { color: #ff8fa3; }
+.bps-line { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+.bps-stat {
+  font-style: normal;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text3);
+  margin-left: 2px;
+}
+.bps-vs { font-size: 10px; color: var(--text3); }
+.bps-remove {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.bps-remove:hover { color: #ff8fa3; background: rgba(255,91,120,0.08); }
 </style>
 </head>
 <body>
