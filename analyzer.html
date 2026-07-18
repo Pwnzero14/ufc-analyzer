@@ -26687,6 +26687,124 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   padding: 0;
   margin-left: auto;
 }
+
+/* ── GLOW-UP 166: stat head-to-head level-up 1 — row hygiene ──
+   Opponent names run through prettyName (Mc/III casing repair) and every
+   history row carries a dim year tag ('25) so the age of each data point
+   reads without a hover. Full date stays on the tag's tooltip. ── */
+.hist-yr {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text3);
+  opacity: 0.75;
+  cursor: default;
+}
+
+/* (GLOW-UP 166 level-up 2 — repeat-opponent grouping — was tried and
+   reverted by request: each meeting renders as its own row so every
+   fight's number stays visible in place.) */
+
+/* ── GLOW-UP 166: stat head-to-head level-up 3 — recency treatment ──
+   L5 chip in the panel meta (hit rate over the last 5 fights, only when
+   the career sample is bigger) + rows 3+ years old dim to 62% so ancient
+   data points stop reading as loud as recent ones. Hover restores. ── */
+.hm-l5 { margin-left: 4px; }
+.history-bar-row.hist-old { opacity: 0.62; transition: opacity 0.15s; }
+.history-bar-row.hist-old:hover { opacity: 1; }
+
+/* ── GLOW-UP 166: stat head-to-head level-up 4 — line sensitivity ──
+   Same history, every book's line: hit rate recomputed per book. Green
+   chip = cleared most often (softest line for OVER), red = least often
+   (softest for UNDER). Only rendered when 2+ distinct book lines exist. ── */
+.hist-sens {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 6px;
+  cursor: help;
+}
+.hs-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  opacity: 0.8;
+}
+.hs-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: var(--text2);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.hs-chip b { font-weight: 800; font-size: 7.5px; letter-spacing: 0.04em; color: var(--text3); }
+.hs-chip i { font-style: normal; font-weight: 700; }
+.hs-chip.hs-hi {
+  color: #8ffcc0;
+  background: rgba(38,208,124,0.07);
+  border-color: rgba(38,208,124,0.30);
+}
+.hs-chip.hs-hi b { color: rgba(110,231,168,0.8); }
+.hs-chip.hs-lo {
+  color: #ffb3c0;
+  background: rgba(255,58,96,0.06);
+  border-color: rgba(255,58,96,0.28);
+}
+.hs-chip.hs-lo b { color: rgba(255,143,163,0.8); }
+
+/* ── GLOW-UP 166: stat head-to-head level-up 5 — verdict synthesis ──
+   One line fusing the pair: fighter's hit rate at his line + how often
+   this opponent's past foes cleared the same line. Direction called only
+   when both agree (OVER/UNDER EDGE), otherwise MIXED stays neutral. ── */
+.hist-synth {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5px 0 2px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  color: var(--text3);
+  cursor: help;
+}
+.sy-label {
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+}
+.sy-part b { color: var(--text); font-weight: 700; }
+.sy-sep { opacity: 0.5; }
+.sy-verdict {
+  margin-left: auto;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.hist-synth-over {
+  border-color: rgba(38,208,124,0.30);
+  background: rgba(38,208,124,0.04);
+}
+.hist-synth-over .sy-verdict { color: #6ee7a8; text-shadow: 0 0 8px rgba(38,208,124,0.3); }
+.hist-synth-under {
+  border-color: rgba(255,91,120,0.30);
+  background: rgba(255,58,96,0.04);
+}
+.hist-synth-under .sy-verdict { color: #ff8fa3; text-shadow: 0 0 8px rgba(255,91,120,0.3); }
+.hist-synth-mixed .sy-verdict { color: var(--text3); }
 </style>
 </head>
 <body>
