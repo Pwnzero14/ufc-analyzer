@@ -348,6 +348,27 @@ let bestPicksSortMode: BestPicksSortMode = 'model';
 let bestPicksStatFilter: BestPicksStatFilter = 'all';
 let bestPicksEvOnly = false;
 
+// GLOW-UP 168 (Best Picks level-up 2): My Slate tray — checkable picks
+// collected into a docked tray grouped by book (Entry Mode lite). Session-
+// scoped for now; per-event persistence is level 4's job. Keyed by
+// fighter|direction|source so the same fighter can carry two stat picks.
+interface BestPicksSlatePick {
+  name: string;
+  pretty: string;
+  dir: string;          // 'OVER' | 'UNDER'
+  source: string;       // lean source key ('fp' | 'ss' | ...)
+  statLabel: string;    // display label ('FP' | 'R1 SS' | ...)
+  line: number | null;
+  book: string | null;  // SourcePlatformKey of the displayed/placeable book
+  bookLabel: string;
+  clip: string;         // slip-ready text (same as the ⧉ copy payload)
+  opponent: string | null;
+}
+const bestPicksSlate = new Map<string, BestPicksSlatePick>();
+let bestPicksSlateOpen = false;
+const BP_SLATE_BOOK_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook', 'unbooked'];
+const BP_SLATE_BOOK_ABBR: Record<string, string> = { pick6: 'P6', underdog: 'UD', prizepicks: 'PP', betr: 'BTR', draftkings_sportsbook: 'DK', unbooked: '—' };
+
 // Display-only name prettifier — restores apostrophes the fantasy platforms strip
 // (e.g. "Sean Omalley" -> "Sean O'Malley"). Lookups, keys, and storage keep the raw name.
 const PRETTY_SURNAMES: Record<string, string> = {
@@ -8298,6 +8319,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     </span>
   </div>`;
 
+  // GLOW-UP 168: per-render pick payloads for the slate toggle — built while
+  // rows render (all display values in scope), consumed by the click handler.
+  const slateRowData = new Map<string, BestPicksSlatePick>();
+
   function buildSection(fighters: AnalyzerFighter[], type: 'over'|'under'): string {
     if (!fighters.length) return '';
     const title = type === 'over' ? 'Best Overs' : 'Best Unders';
@@ -8478,6 +8503,24 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const clipText = `${prettyName(f.name)} ${(el.lean || '').toUpperCase()} ${line ?? ''} ${STAT_LABEL[el._source || 'fp'] || 'FP'}${clipBook ? ` @ ${BOOK_NAME[clipBook] || clipBook}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`;
       const copyBtn = `<button class="bp-copy" data-clip="${clipText.replace(/"/g, '&quot;')}" title="Copy slip line: ${clipText.replace(/"/g, '&quot;')}">⧉</button>`;
 
+      // GLOW-UP 168: slate toggle — + adds this pick to My Slate, ✓ removes.
+      // Sits left of the ⧉ copy button; stays visible (not hover-only) once on.
+      const slateKey = `${f.name}|${el.lean}|${el._source || 'fp'}`;
+      slateRowData.set(slateKey, {
+        name: f.name,
+        pretty: prettyName(f.name),
+        dir: (el.lean || '').toUpperCase(),
+        source: el._source || 'fp',
+        statLabel: STAT_LABEL[el._source || 'fp'] || 'FP',
+        line: line ?? null,
+        book: clipBook ?? null,
+        bookLabel: clipBook ? (BOOK_NAME[clipBook] || clipBook) : 'No book',
+        clip: clipText,
+        opponent: f.opponent ? prettyName(f.opponent) : null,
+      });
+      const inSlate = bestPicksSlate.has(slateKey);
+      const slateBtn = `<button class="bp-slate-toggle${inSlate ? ' on' : ''}" data-slate-key="${slateKey.replace(/"/g, '&quot;')}" title="${inSlate ? 'Remove from My Slate' : 'Add to My Slate'}">${inSlate ? '✓' : '+'}</button>`;
+
       const seenFactorLabels = new Set<string>();
       const factors = (el.reasons || []).filter(r => {
         const lbl = factorLabel(r.text || '');
@@ -8488,7 +8531,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const factorChips = factors.length >= 2
         ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${factorLabel(r.text || '')}</span>`).join('')}</div>`
         : '';
-      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}" data-jump="${f.name}" title="Open fighter card">
+      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}" data-jump="${f.name}" title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
         <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
@@ -8508,7 +8551,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
           ${i === 0 && evd ? '' : evTag}${splitNote}
         </div>
-        ${copyBtn}
+        ${slateBtn}${copyBtn}
       </div>`;
     }).join('');
     const avgConf = confVals.length ? Math.round(confVals.reduce((a, b) => a + b, 0) / confVals.length) : null;
@@ -8535,8 +8578,46 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     : hasAnyPicks
     ? '<div class="bp-filter-empty">No picks match the current view — <button class="bpc-reset">reset filters</button></div>'
     : '';
+  // GLOW-UP 168: My Slate tray — docked under the grid, sticky to the
+  // viewport bottom while the columns scroll. Collapsed = one-line summary
+  // (count + per-book tallies); open = picks grouped by book. The tray
+  // ignores the 167 filters on purpose: once checked, a pick stays visible
+  // here even when the view above hides its row.
+  const buildSlateTray = (): string => {
+    if (!bestPicksSlate.size) return '';
+    const groups = new Map<string, BestPicksSlatePick[]>();
+    for (const p of bestPicksSlate.values()) {
+      const k = p.book || 'unbooked';
+      const list = groups.get(k) || [];
+      list.push(p);
+      groups.set(k, list);
+    }
+    const presentBooks = BP_SLATE_BOOK_ORDER.filter(b => groups.has(b));
+    const bookTallies = presentBooks.map(b => `<span class="bps-tally-book plat-${b}">${BP_SLATE_BOOK_ABBR[b]} ${groups.get(b)!.length}</span>`).join('');
+    const groupsHtml = presentBooks.map(b => {
+      const list = groups.get(b)!;
+      const entries = list.map(p => {
+        const key = `${p.name}|${p.dir.toLowerCase()}|${p.source}`;
+        return `<div class="bps-entry">
+          <span class="bps-entry-main">${p.pretty} <b class="bps-dir ${p.dir === 'OVER' ? 'ov' : 'un'}">${p.dir}</b> <span class="bps-line">${p.line ?? '—'}</span> <i class="bps-stat">${p.statLabel}</i>${p.opponent ? `<span class="bps-vs"> vs ${p.opponent}</span>` : ''}</span>
+          <button class="bps-remove" data-slate-key="${key.replace(/"/g, '&quot;')}" title="Remove from My Slate">✕</button>
+        </div>`;
+      }).join('');
+      return `<div class="bps-group"><div class="bps-group-head plat-${b}">${list[0].bookLabel} <i>${list.length} leg${list.length === 1 ? '' : 's'}</i></div>${entries}</div>`;
+    }).join('');
+    return `<div class="bp-slate-tray${bestPicksSlateOpen ? ' open' : ''}">
+      <div class="bps-head" data-slate-head="1" title="${bestPicksSlateOpen ? 'Collapse' : 'Expand'} My Slate">
+        <span class="bps-title">MY SLATE</span>
+        <span class="bps-count">${bestPicksSlate.size} pick${bestPicksSlate.size === 1 ? '' : 's'}</span>
+        <span class="bps-books">${bookTallies}</span>
+        <button class="bps-clear" data-slate-clear="1" title="Remove every pick from My Slate">CLEAR</button>
+        <span class="bps-chevron">${bestPicksSlateOpen ? '▼' : '▲'}</span>
+      </div>
+      ${bestPicksSlateOpen ? `<div class="bps-body">${groupsHtml}</div>` : ''}
+    </div>`;
+  };
   container.innerHTML = hasAnyPicks
-    ? bpControlsHtml + gridHtml
+    ? bpControlsHtml + gridHtml + buildSlateTray()
     : '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';
 
   // Hydrate Best Picks avatars from the cached headshot pipeline
@@ -8583,6 +8664,46 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       bestPicksSortMode = 'model';
       bestPicksStatFilter = 'all';
       bestPicksEvOnly = false;
+      bpRerender();
+    });
+  });
+
+  // GLOW-UP 168: slate handlers — toggle on rows, remove/clear/collapse in
+  // the tray. Adding the first pick auto-opens the tray so it's discovered.
+  container.querySelectorAll<HTMLElement>('.bp-slate-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = btn.dataset['slateKey'] || '';
+      if (bestPicksSlate.has(key)) {
+        bestPicksSlate.delete(key);
+      } else {
+        const d = slateRowData.get(key);
+        if (!d) return;
+        if (!bestPicksSlate.size) bestPicksSlateOpen = true;
+        bestPicksSlate.set(key, d);
+      }
+      bpRerender();
+    });
+  });
+  container.querySelectorAll<HTMLElement>('.bps-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bestPicksSlate.delete(btn.dataset['slateKey'] || '');
+      bpRerender();
+    });
+  });
+  container.querySelectorAll<HTMLElement>('[data-slate-clear]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bestPicksSlate.clear();
+      bestPicksSlateOpen = false;
+      bpRerender();
+    });
+  });
+  container.querySelectorAll<HTMLElement>('[data-slate-head]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-slate-clear]')) return;
+      bestPicksSlateOpen = !bestPicksSlateOpen;
       bpRerender();
     });
   });
