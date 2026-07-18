@@ -14721,7 +14721,10 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const ss = totalSeconds % 60;
         return `${mm}:${String(ss).padStart(2, '0')}`;
     }
-    function buildHistoryBars(fights, valFn, lineFP, lineSS, lineTD, lineFT, labelFn, lineCTRL = null) {
+    function buildHistoryBars(fights, valFn, lineFP, lineSS, lineTD, lineFT, labelFn, lineCTRL = null, 
+    // GLOW-UP 166 (level-up 4): when provided, the panel renders a line-
+    // sensitivity strip — history hit rate recomputed at EVERY book's line.
+    bookLines = null) {
         if (!fights?.length)
             return db.loaded
                 ? '<div class="history-empty">No fight history found on UFCStats</div>'
@@ -14752,9 +14755,20 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
             const rate = overs / values.length;
             const chipCls = rate >= 0.6 ? 'over' : rate <= 0.4 ? 'under' : 'mixed';
             const ratePct = Math.round(rate * 100);
-            metaHTML = `<div class="hist-meta"><span class="hm-rate ${chipCls}">${overs}/${values.length} over line</span><span class="hm-track" title="${ratePct}% of fights cleared the line"><i style="width:${ratePct}%"></i></span><span class="hm-avg">avg ${fmtVal(avg)}</span></div>`;
+            // GLOW-UP 166 (level-up 3): L5 split — recency vs career. Values are
+            // newest-first, so the first five are the last five fights. Only shown
+            // when the career sample is bigger than 5 (otherwise it IS the rate).
+            let l5HTML = '';
+            if (values.length > 5) {
+                const l5Overs = values.slice(0, 5).filter(v => v > line).length;
+                const l5Cls = l5Overs / 5 >= 0.6 ? 'over' : l5Overs / 5 <= 0.4 ? 'under' : 'mixed';
+                l5HTML = `<span class="hm-rate hm-l5 ${l5Cls}" title="Hit rate over the 5 most recent fights — when this disagrees with the career rate, the profile is shifting">L5 ${l5Overs}/5</span>`;
+            }
+            metaHTML = `<div class="hist-meta"><span class="hm-rate ${chipCls}">${overs}/${values.length} over line</span>${l5HTML}<span class="hm-track" title="${ratePct}% of fights cleared the line"><i style="width:${ratePct}%"></i></span><span class="hm-avg">avg ${fmtVal(avg)}</span></div>`;
         }
-        const rowsHTML = recentRows.map((h) => {
+        // (Rematch grouping was tried and reverted by request — every meeting
+        // renders as its own row so each fight's number stays visible in place.)
+        const rowHtml = (h) => {
             const val = valFn(h);
             if (val == null)
                 return '';
@@ -14774,16 +14788,39 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
             const deltaText = delta == null ? '' : (labelFn === 'ft' || labelFn === 'ctrl')
                 ? `${delta < 0 ? '-' : '+'}${formatMinutesAsClock(Math.abs(delta))}`
                 : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`;
-            return `<div class="history-bar-row has-tip" data-ht-opp="${escAttr(h.opp || '?')}" data-ht-res="${resCls}" data-ht-restext="${escAttr(resText)}" data-ht-date="${escAttr(h.date || '')}" data-ht-val="${escAttr(displayVal)}" data-ht-line="${line != null && line > 0 ? escAttr(fmtVal(line)) : ''}" data-ht-delta="${escAttr(deltaText)}" data-ht-over="${isOver ? '1' : '0'}">
-        <div class="history-opp">${resCls ? `<span class="hist-res ${resCls}"></span>` : ''}${h.opp || '?'}</div>
+            // GLOW-UP 166 (H2H level-up 1): display-name repair + year tag — every
+            // data point says WHEN it's from without a hover.
+            const oppName = prettyName(h.opp || '?');
+            const yr = (h.date || '').match(/(\d{4})/)?.[1] || '';
+            // GLOW-UP 166 (level-up 3): rows 3+ years old dim — ancient data points
+            // shouldn't read as loud as last year's (hover restores full brightness).
+            const oldRow = yr !== '' && (new Date().getFullYear() - Number(yr)) >= 3;
+            return `<div class="history-bar-row has-tip${oldRow ? ' hist-old' : ''}" data-ht-opp="${escAttr(oppName)}" data-ht-res="${resCls}" data-ht-restext="${escAttr(resText)}" data-ht-date="${escAttr(h.date || '')}" data-ht-val="${escAttr(displayVal)}" data-ht-line="${line != null && line > 0 ? escAttr(fmtVal(line)) : ''}" data-ht-delta="${escAttr(deltaText)}" data-ht-over="${isOver ? '1' : '0'}">
+        <div class="history-opp">${resCls ? `<span class="hist-res ${resCls}"></span>` : ''}${oppName}</div>
         <div class="history-bar-wrap">
           <div class="history-bar-fill ${isOver ? 'over-line' : 'under-line'}" data-fill-width="${pct}%" style="width:0%"></div>
           ${linePct != null ? `<div class="line-marker" style="left:${linePct}%"></div>` : ''}
         </div>
+        <span class="hist-yr" title="${escAttr(h.date || '')}">${yr ? `'${yr.slice(2)}` : ''}</span>
         <div class="history-bar-val">${displayVal}</div>
       </div>`;
-        }).join('');
-        return metaHTML + rowsHTML;
+        };
+        const rowsHTML = recentRows.map(h => rowHtml(h)).join('');
+        // GLOW-UP 166 (level-up 4): line-sensitivity strip — same history, every
+        // book's line. Highest hit count tints green (softest line for overs),
+        // lowest tints red (softest for unders). Needs 2+ distinct lines to say
+        // anything a single meta row doesn't.
+        let sensHTML = '';
+        if (bookLines && bookLines.length >= 2 && values.length >= 3) {
+            const uniqLines = new Set(bookLines.map(b => b.line));
+            if (uniqLines.size >= 2) {
+                const rates = bookLines.map(b => ({ ...b, overs: values.filter(v => v > b.line).length }));
+                const maxR = Math.max(...rates.map(r => r.overs));
+                const minR = Math.min(...rates.map(r => r.overs));
+                sensHTML = `<div class="hist-sens" title="History hit rate recomputed at each book's current line — green = cleared most often (softest for OVER), red = least often (softest for UNDER)"><span class="hs-label">@ line</span>${rates.map(r => `<span class="hs-chip${maxR !== minR && r.overs === maxR ? ' hs-hi' : ''}${maxR !== minR && r.overs === minR ? ' hs-lo' : ''}"><b>${r.tag}</b> ${fmtVal(r.line)} <i>${r.overs}/${values.length}</i></span>`).join('')}</div>`;
+            }
+        }
+        return metaHTML + sensHTML + rowsHTML;
     }
     const fights = db.history || [];
     const oppFights = db.oppHistory || [];
@@ -14883,8 +14920,20 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         currentPlatform === 'underdog' ? 'underdog' :
             currentPlatform === 'prizepicks' ? 'prizepicks' :
                 'betr';
-    const historyHTML = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp');
-    const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss');
+    // GLOW-UP 166 (level-up 4): per-book lines for the sensitivity strip —
+    // fighter's OWN panels only (opp/R1/body/leg variants would inherit the
+    // wrong books, so they don't get one).
+    const sensBooks = (stat) => {
+        const defs = stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
+            : stat === 'ss' ? [['P6', f.line_p6_ss], ['UD', f.line_ud_ss], ['PP', f.line_pp_ss], ['BT', f.line_betr_ss], ['DK', f.line_dk_ss]]
+                : stat === 'td' ? [['P6', f.line_p6_td], ['UD', f.line_ud_td], ['PP', f.line_pp_td], ['BT', f.line_betr_td], ['DK', f.line_dk_td]]
+                    : [['P6', f.line_p6_ft], ['UD', f.line_ud_ft], ['PP', f.line_pp_ft], ['BT', f.line_betr_ft], ['DK', f.line_dk_ft]];
+        return defs
+            .filter((d) => typeof d[1] === 'number' && d[1] > 0)
+            .map(([tag, line]) => ({ tag, line }));
+    };
+    const historyHTML = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp', null, sensBooks('fp'));
+    const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss', null, sensBooks('ss'));
     const ssR1Line = f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null;
     // R1 SS is offered by PrizePicks, Underdog, and DK — label the panel by whichever
     // platform(s) actually supplied a line (PP is shown first when several exist).
@@ -14923,11 +14972,11 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ...(f.line_pp_ss_leg != null ? [{ tag: 'PP', raw: f.line_pp_ss_leg }] : []),
     ]);
     const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
-    const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td');
+    const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td', null, sensBooks('td'));
     // Knockdowns (PrizePicks-only prop) — panel only renders when a KD line exists.
     const kdLine = f.line_pp_kd ?? null;
     const kdHistoryHTML = buildHistoryBars(fights, h => h.kd, kdLine, null, kdLine, null, 'td');
-    const ftHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.timeSecs)) ? Number(h.timeSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ft');
+    const ftHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.timeSecs)) ? Number(h.timeSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ft', null, sensBooks('ft'));
     const ctrlHistoryHTML = buildHistoryBars(fights, h => Number.isFinite(Number(h.ctrlSecs)) ? Number(h.ctrlSecs) / 60 : null, activeLine, ssLine, tdLine, ftLine, 'ctrl', ctrlLine);
     const oppCompareFpLine = oppFpLine;
     const oppCompareSsLine = oppSsLine;
@@ -15639,15 +15688,35 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     </div>
     <div class="fighter-detail"></div>`;
     // Lazy: defer building the detail panel HTML until the row is expanded.
+    // GLOW-UP 166 (level-up 5): verdict synthesis — the fighter's own hit rate
+    // at HIS line fused with how often THIS opponent's past foes cleared that
+    // same line. Purely descriptive of the two histories; a direction is only
+    // called when both agree (both ≥60% over → OVER EDGE, both ≤40% → UNDER).
+    const oppAllowsFights = oppEntry?.db?.oppHistory || [];
+    const synthFor = (line, statVal) => {
+        if (line == null || line <= 0)
+            return '';
+        const own = (db.history || []).map(statVal).filter((v) => typeof v === 'number' && Number.isFinite(v));
+        const allows = oppAllowsFights.map(statVal).filter((v) => typeof v === 'number' && Number.isFinite(v));
+        if (own.length < 3 || allows.length < 3)
+            return '';
+        const oOv = own.filter(v => v > line).length;
+        const aOv = allows.filter(v => v > line).length;
+        const oR = oOv / own.length;
+        const aR = aOv / allows.length;
+        const dir = oR >= 0.6 && aR >= 0.6 ? 'over' : oR <= 0.4 && aR <= 0.4 ? 'under' : 'mixed';
+        const label = dir === 'over' ? '▲ OVER EDGE' : dir === 'under' ? '▼ UNDER EDGE' : '≈ MIXED';
+        return `<div class="hist-synth hist-synth-${dir}" title="Both halves of the matchup measured at this line (${line}): ${prettyName(f.name)} cleared it in ${oOv}/${own.length} career fights; ${prettyName(oppName || 'the opponent')}'s past foes cleared it ${aOv}/${allows.length} times against him. A direction is only called when both agree."><span class="sy-label">SYNTH</span><span class="sy-part">history <b>${oOv}/${own.length}</b></span><span class="sy-sep">·</span><span class="sy-part">opp allows <b>${aOv}/${allows.length}</b></span><span class="sy-verdict">${label}</span></div>`;
+    };
     // The closure captures all per-row state (db, oppEntry, history strings, etc).
     _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
         <div class="detail-section-head">📊 Stat Head-to-Head — ${prettyName(f.name)} vs ${prettyName(oppName || 'Opponent')}</div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${activeLine ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([{ tag: platformKeyShort(getSourceActivePlatformKey(f, 'fp')), raw: activeLine }])}</div>` : ''}</div>
+        <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${synthFor(activeLine, h => getFightFantasyValueForPlatform(h, historyPlatform))}${activeLine ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([{ tag: platformKeyShort(getSourceActivePlatformKey(f, 'fp')), raw: activeLine }])}</div>` : ''}</div>
         <div class="detail-panel"><div class="detail-panel-title">⚔️ Opp FP Scored vs ${f.name}${oppCompareFpLine != null ? ` · ${oppName} line ${oppCompareFpLine}` : ''}</div>${oppFights.length ? oppFPHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>
         </div>
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        <div class="detail-panel"><div class="detail-panel-title">Sig Strikes History${ssLine != null ? ` vs Line ${ssLine}` : ''}</div>${ssHistoryHTML}${synthFor(ssLine, h => h.sigStr)}${ssLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
         { tag: 'P6', raw: f.line_p6_ss }, { tag: 'UD', raw: f.line_ud_ss }, { tag: 'PP', raw: f.line_pp_ss }, { tag: 'BT', raw: f.line_betr_ss },
         ...(f.line_dk_ss != null ? [{ tag: 'DK', raw: f.line_dk_ss }] : []),
     ])}</div>` : ''}</div>
@@ -15666,7 +15735,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${oppCompareLegLine != null ? `<div class="detail-panel"><div class="detail-panel-title">⚔️ Opp Leg SS Scored vs ${f.name} · ${oppName} Leg line ${oppCompareLegLine} <span class="panel-confidence low">${oppLegBadge}</span></div>${oppFights.length ? oppLegHistory : '<div class="history-empty">Clear cache &amp; reload to fetch</div>'}</div>` : ''}
         ${(legLine != null || oppCompareLegLine != null) ? `</div>` : ''}
         <div class="stat-pair">
-        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine != null ? ` vs Line ${tdLine}` : ''}${trendChip(tdTrend, `TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${tdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
+        <div class="detail-panel"><div class="detail-panel-title">Takedowns History${tdLine != null ? ` vs Line ${tdLine}` : ''}${trendChip(tdTrend, `TD ${_twLabel} avg: ${tdTrend.recentAvg} · Career: ${tdTrend.careerAvg}`)}</div>${tdHistoryHTML}${synthFor(tdLine, h => h.td)}${tdLine != null ? `<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([
         { tag: 'P6', raw: f.line_p6_td }, { tag: 'UD', raw: f.line_ud_td }, { tag: 'PP', raw: f.line_pp_td }, { tag: 'BT', raw: f.line_betr_td },
         ...(f.line_dk_td != null ? [{ tag: 'DK', raw: f.line_dk_td }] : []),
     ])}</div>` : ''}</div>
