@@ -189,6 +189,9 @@ let lastReloadFireTs = 0;
 let dataReloadTrailingTimer = null;
 let lastLoadedLinesSig = '';
 let bestPicksRenderSeq = 0;
+let bestPicksSortMode = 'model';
+let bestPicksStatFilter = 'all';
+let bestPicksEvOnly = false;
 // Display-only name prettifier — restores apostrophes the fantasy platforms strip
 // (e.g. "Sean Omalley" -> "Sean O'Malley"). Lookups, keys, and storage keep the raw name.
 const PRETTY_SURNAMES = {
@@ -7990,6 +7993,67 @@ function renderBestPicks(container, renderSeq = 0) {
             if (f.opponent && underNames.has(f.opponent.toLowerCase()))
                 conflictFighters.add(f.name);
         }
+        // ── GLOW-UP 167 (Best Picks level-up 1): command strip ──
+        // View-only sort/filter applied AFTER the pipeline is done: candidate
+        // generation, dedupe, FT exclusivity, snapshot persistence, and conflict
+        // flags all see the full columns — this transform only changes what gets
+        // drawn. Ranks and the #1 hero deck follow the current view order, so
+        // "sort by EV" literally re-crowns the hero.
+        const bpViewMetric = (f, dir) => {
+            const el = getBestPickLeanForDir(f, dir) || getBestPickLean(f);
+            const evd = computeDetailedEV(f, el);
+            return { src: el._source || 'fp', ev: evd ? evd.ev : null, conf: Number(el.conf) || 0 };
+        };
+        const overMetrics = new Map(overs.map(f => [f.name, bpViewMetric(f, 'over')]));
+        const underMetrics = new Map(unders.map(f => [f.name, bpViewMetric(f, 'under')]));
+        const bpApplyView = (list, metrics) => {
+            let out = list.filter(f => {
+                const m = metrics.get(f.name);
+                if (!m)
+                    return true;
+                if (bestPicksStatFilter !== 'all' && m.src !== bestPicksStatFilter)
+                    return false;
+                if (bestPicksEvOnly && !(m.ev != null && m.ev > 0))
+                    return false;
+                return true;
+            });
+            if (bestPicksSortMode === 'ev') {
+                out = [...out].sort((a, b) => (metrics.get(b.name)?.ev ?? -Infinity) - (metrics.get(a.name)?.ev ?? -Infinity));
+            }
+            else if (bestPicksSortMode === 'conf') {
+                out = [...out].sort((a, b) => (metrics.get(b.name)?.conf ?? 0) - (metrics.get(a.name)?.conf ?? 0));
+            }
+            return out;
+        };
+        const displayOvers = bpApplyView(overs, overMetrics);
+        const displayUnders = bpApplyView(unders, underMetrics);
+        // Stat-family chips are built from what's actually on the board (with
+        // counts), so a card with no KD lines never shows a dead KD chip.
+        const BP_SRC_CHIP = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', kd: 'KD', ctrl: 'CTRL' };
+        const bpSrcCounts = new Map();
+        for (const m of overMetrics.values())
+            bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
+        for (const m of underMetrics.values())
+            bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
+        const bpEvPosCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.ev != null && m.ev > 0).length;
+        const bpChipsHtml = Object.keys(BP_SRC_CHIP)
+            .filter(s => (bpSrcCounts.get(s) || 0) > 0)
+            .map(s => `<button class="bpc-chip${bestPicksStatFilter === s ? ' on' : ''}" data-bp-stat="${s}" title="Show only ${BP_SRC_CHIP[s]} picks (click again for all)">${BP_SRC_CHIP[s]} <i>${bpSrcCounts.get(s)}</i></button>`)
+            .join('');
+        const bpControlsHtml = `<div class="bp-controls">
+    <span class="bpc-group">
+      <span class="bpc-label">SORT</span>
+      <button class="bpc-btn${bestPicksSortMode === 'model' ? ' on' : ''}" data-bp-sort="model" title="The model's own pick order — score, tier, and correlation demotions">MODEL</button>
+      <button class="bpc-btn${bestPicksSortMode === 'ev' ? ' on' : ''}" data-bp-sort="ev" title="Highest calibrated EV first — money order, not signal order">EV</button>
+      <button class="bpc-btn${bestPicksSortMode === 'conf' ? ' on' : ''}" data-bp-sort="conf" title="Highest model confidence first">CONF%</button>
+    </span>
+    <span class="bpc-group">
+      <span class="bpc-label">SHOW</span>
+      <button class="bpc-chip${bestPicksStatFilter === 'all' ? ' on' : ''}" data-bp-stat="all" title="All stat families">ALL <i>${overs.length + unders.length}</i></button>
+      ${bpChipsHtml}
+      <button class="bpc-chip bpc-ev${bestPicksEvOnly ? ' on' : ''}" data-bp-evonly="1" title="Only picks whose calibrated EV clears breakeven">+EV <i>${bpEvPosCount}</i></button>
+    </span>
+  </div>`;
         function buildSection(fighters, type) {
             if (!fighters.length)
                 return '';
@@ -8224,8 +8288,18 @@ function renderBestPicks(container, renderSeq = 0) {
             const headerStats = `<span class="bph-stats">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''}</span>`;
             return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span>${headerStats}<span class="best-picks-count">${fighters.length} picks</span></div>${rows}</div>`;
         }
-        const html = `<div class="best-picks-grid">${buildSection(overs, 'over')}${buildSection(unders, 'under')}</div>`;
-        container.innerHTML = html || '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';
+        // GLOW-UP 167: controls render whenever the board has picks; the grid draws
+        // the filtered view. A filter that empties the view gets its own message
+        // (with reset) instead of the "no leans yet" cold-start fallback.
+        const hasAnyPicks = overs.length + unders.length > 0;
+        const gridHtml = displayOvers.length + displayUnders.length > 0
+            ? `<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>`
+            : hasAnyPicks
+                ? '<div class="bp-filter-empty">No picks match the current view — <button class="bpc-reset">reset filters</button></div>'
+                : '';
+        container.innerHTML = hasAnyPicks
+            ? bpControlsHtml + gridHtml
+            : '<div class="inline-empty-msg">No leans calculated yet — wait for UFCStats to finish loading</div>';
         // Hydrate Best Picks avatars from the cached headshot pipeline
         container.querySelectorAll('.bp-avatar-img[data-name]').forEach(img => {
             const nm = img.dataset['name'] || '';
@@ -8243,6 +8317,39 @@ function renderBestPicks(container, renderSeq = 0) {
         // Click a pick to jump to that fighter's card
         container.querySelectorAll('.best-pick-row[data-jump]').forEach(el => {
             el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+        });
+        // GLOW-UP 167: command strip handlers — every change bumps the render seq
+        // and re-renders (same in-flight-guard path the view switcher uses).
+        // Clicking the active stat chip again returns to ALL.
+        const bpRerender = () => { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); };
+        container.querySelectorAll('[data-bp-sort]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const v = btn.dataset['bpSort'];
+                if (v && v !== bestPicksSortMode) {
+                    bestPicksSortMode = v;
+                    bpRerender();
+                }
+            });
+        });
+        container.querySelectorAll('[data-bp-stat]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const v = btn.dataset['bpStat'];
+                if (!v)
+                    return;
+                bestPicksStatFilter = (bestPicksStatFilter === v ? 'all' : v);
+                bpRerender();
+            });
+        });
+        container.querySelectorAll('[data-bp-evonly]').forEach(btn => {
+            btn.addEventListener('click', () => { bestPicksEvOnly = !bestPicksEvOnly; bpRerender(); });
+        });
+        container.querySelectorAll('.bpc-reset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                bestPicksSortMode = 'model';
+                bestPicksStatFilter = 'all';
+                bestPicksEvOnly = false;
+                bpRerender();
+            });
         });
         // GLOW-UP 162 (level-up 5): copy-to-slip — ⧉ button copies a slip-ready
         // pick line; stopPropagation keeps the row's jump-to-card click intact.
