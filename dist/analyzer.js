@@ -8898,6 +8898,9 @@ async function persistAiLeanSnapshot(fighters) {
     }
 }
 const parlaySelectedLegs = new Set(); // "fighter|stat|dir" keys
+let parlayPoolSort = 'conf';
+let parlayPoolStat = 'all';
+let parlayPoolDir = 'all';
 function parlayLegKey(fighter, stat, dir) {
     return `${fighter}|${stat}|${dir}`;
 }
@@ -9385,6 +9388,14 @@ function renderParlayLab(container) {
         addLeg(f.lean_ft, 'ft');
     }
     availableLegs.sort((a, b) => b.leg.confidence - a.leg.confidence);
+    // GLOW-UP 177: per-leg EV via the same computeDetailedEV pipeline the board
+    // uses, so the pool's EV sort can never disagree with Best Picks. Synthesize
+    // a minimal EffectiveLean from the leg's direction/stat/confidence.
+    const parlayLegEv = new Map();
+    for (const a of availableLegs) {
+        const el = { lean: a.leg.direction, _source: a.leg.stat, conf: a.leg.confidence };
+        parlayLegEv.set(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction), computeDetailedEV(a.fighter, el)?.ev ?? null);
+    }
     // Determine which are selected (keep the fighter ref for render-time
     // platform-key lookups on slip rows)
     const selectedLegs = [];
@@ -9424,7 +9435,46 @@ function renderParlayLab(container) {
         }
         return null;
     };
-    const poolRows = availableLegs.map(a => {
+    // GLOW-UP 177: apply the command-strip view (filter then sort) to the pool
+    // only — selection, conflict checks, health, suggestions all still see the
+    // full availableLegs, so hiding a leg here never changes the math.
+    const evOf = (a) => parlayLegEv.get(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)) ?? null;
+    const tierRank = (t) => (t === 'High' ? 0 : t === 'Med' ? 1 : 2);
+    let displayLegs = availableLegs.filter(a => (parlayPoolStat === 'all' || a.leg.stat === parlayPoolStat)
+        && (parlayPoolDir === 'all' || a.leg.direction === parlayPoolDir));
+    if (parlayPoolSort === 'ev') {
+        displayLegs = [...displayLegs].sort((a, b) => (evOf(b) ?? -Infinity) - (evOf(a) ?? -Infinity));
+    }
+    else if (parlayPoolSort === 'tier') {
+        displayLegs = [...displayLegs].sort((a, b) => tierRank(a.leg.tier) - tierRank(b.leg.tier) || b.leg.confidence - a.leg.confidence);
+    } // 'conf' keeps the base confidence-desc order
+    // Stat-family chips built from the pool (only families actually present).
+    const PL_STAT_LABEL = { fp: 'FP', ss: 'SS', td: 'TD', ft: 'FT' };
+    const plStatCounts = new Map();
+    for (const a of availableLegs)
+        plStatCounts.set(a.leg.stat, (plStatCounts.get(a.leg.stat) || 0) + 1);
+    const plStatChips = Object.keys(PL_STAT_LABEL)
+        .filter(s => (plStatCounts.get(s) || 0) > 0)
+        .map(s => `<button class="plq-chip${parlayPoolStat === s ? ' on' : ''}" data-plq-stat="${s}" title="Show only ${PL_STAT_LABEL[s]} legs (click again for all)">${PL_STAT_LABEL[s]} <i>${plStatCounts.get(s)}</i></button>`)
+        .join('');
+    const parlayPoolControls = `<div class="plq-controls">
+    <span class="plq-group">
+      <span class="plq-label">SORT</span>
+      <button class="plq-btn${parlayPoolSort === 'conf' ? ' on' : ''}" data-plq-sort="conf" title="Highest model confidence first">CONF</button>
+      <button class="plq-btn${parlayPoolSort === 'ev' ? ' on' : ''}" data-plq-sort="ev" title="Highest calibrated EV first — same pipeline as Best Picks">EV</button>
+      <button class="plq-btn${parlayPoolSort === 'tier' ? ' on' : ''}" data-plq-sort="tier" title="High → Med → Low tier, then confidence">TIER</button>
+    </span>
+    <span class="plq-group">
+      <span class="plq-label">SHOW</span>
+      <button class="plq-chip${parlayPoolStat === 'all' ? ' on' : ''}" data-plq-stat="all" title="All stat families">ALL <i>${availableLegs.length}</i></button>
+      ${plStatChips}
+    </span>
+    <span class="plq-group">
+      <button class="plq-chip${parlayPoolDir === 'over' ? ' on' : ''}" data-plq-dir="over" title="Only OVER legs">OVER</button>
+      <button class="plq-chip${parlayPoolDir === 'under' ? ' on' : ''}" data-plq-dir="under" title="Only UNDER legs">UNDER</button>
+    </span>
+  </div>`;
+    const poolRows = displayLegs.map(a => {
         const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
         const sel = parlaySelectedLegs.has(key);
         const conflict = sel ? null : conflictsWithSlip(a.leg);
@@ -9602,8 +9652,9 @@ function renderParlayLab(container) {
     </div>
     <div class="parlay-lab-cols">
       <div class="parlay-pool">
-        <div class="parlay-pool-title">AVAILABLE LEGS <span class="parlay-count-pill">${availableLegs.length}</span></div>
-        ${poolRows || '<div class="parlay-slip-empty">No leans calculated yet</div>'}
+        <div class="parlay-pool-title">AVAILABLE LEGS <span class="parlay-count-pill">${displayLegs.length !== availableLegs.length ? `${displayLegs.length}/${availableLegs.length}` : availableLegs.length}</span></div>
+        ${availableLegs.length ? parlayPoolControls : ''}
+        ${poolRows || (availableLegs.length ? '<div class="parlay-slip-empty">No legs match the current filter — <button class="plq-reset">reset</button></div>' : '<div class="parlay-slip-empty">No leans calculated yet</div>')}
       </div>
       <div>
         <div class="parlay-builder">
@@ -9640,6 +9691,43 @@ function renderParlayLab(container) {
             if (!key)
                 return;
             parlaySelectedLegs.delete(key);
+            renderParlayLab(container);
+        });
+    });
+    // GLOW-UP 177: command-strip handlers — re-render on any view change.
+    // Clicking the active stat/direction chip toggles back to ALL.
+    container.querySelectorAll('[data-plq-sort]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const v = btn.dataset['plqSort'];
+            if (v && v !== parlayPoolSort) {
+                parlayPoolSort = v;
+                renderParlayLab(container);
+            }
+        });
+    });
+    container.querySelectorAll('[data-plq-stat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const v = btn.dataset['plqStat'];
+            if (!v)
+                return;
+            parlayPoolStat = (parlayPoolStat === v ? 'all' : v);
+            renderParlayLab(container);
+        });
+    });
+    container.querySelectorAll('[data-plq-dir]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const v = btn.dataset['plqDir'];
+            if (!v)
+                return;
+            parlayPoolDir = (parlayPoolDir === v ? 'all' : v);
+            renderParlayLab(container);
+        });
+    });
+    container.querySelectorAll('.plq-reset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            parlayPoolSort = 'conf';
+            parlayPoolStat = 'all';
+            parlayPoolDir = 'all';
             renderParlayLab(container);
         });
     });
