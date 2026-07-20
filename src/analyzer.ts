@@ -9785,11 +9785,23 @@ function renderParlayLab(container: HTMLElement): void {
     </div>`;
   }).join('');
 
+  // GLOW-UP 178: slip-ready clip text for a parlay leg — same shape as the
+  // Best Picks ⧉ payload so a leg copied here reads identically to one copied
+  // from the board.
+  const PL_STAT_CLIP: Record<string, string> = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL', kd: 'KD' };
+  const PL_BOOK_NAME: Record<string, string> = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
+  const parlayLegClip = (l: ParlayLeg, lf: AnalyzerFighter): string => {
+    const pk = getSourceActivePlatformKey(lf, l.stat);
+    const oppOk = l.opponent && l.opponent !== '?';
+    return `${prettyName(l.fighter)} ${l.direction.toUpperCase()} ${l.line} ${PL_STAT_CLIP[l.stat] || l.stat.toUpperCase()}${pk ? ` @ ${PL_BOOK_NAME[pk] || pk}` : ''}${oppOk ? ` (vs ${prettyName(l.opponent)})` : ''}`;
+  };
+
   const slipRows = selectedPairs.length > 0
     ? selectedPairs.map(({ leg: l, fighter: lf }) => {
         const key = parlayLegKey(l.fighter, l.stat, l.direction);
         const pk = getSourceActivePlatformKey(lf, l.stat);
         const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>` : '';
+        const clip = parlayLegClip(l, lf);
         return `<div class="parlay-slip-leg">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
           <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
@@ -9797,9 +9809,28 @@ function renderParlayLab(container: HTMLElement): void {
           <span class="parlay-leg-stat src-${l.stat}">${l.stat === 'ss_r1' ? 'R1 SS' : l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
           ${platChip}
+          <button class="parlay-slip-copy" data-parlay-clip="${clip.replace(/"/g, '&quot;')}" title="Copy slip line: ${clip.replace(/"/g, '&quot;')}">⧉</button>
         </div>`;
       }).join('')
     : '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
+
+  // GLOW-UP 178: whole-slip export — every selected leg as slip-ready lines,
+  // grouped in book order (matches the Best Picks tray COPY ALL behavior).
+  const PL_BOOK_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
+  const parlaySlipClipAll = (): string => {
+    const withBook = selectedPairs.map(({ leg: l, fighter: lf }) => ({
+      book: getSourceActivePlatformKey(lf, l.stat) || 'zzz',
+      text: parlayLegClip(l, lf),
+    }));
+    withBook.sort((a, b) => {
+      const ai = PL_BOOK_ORDER.indexOf(a.book); const bi = PL_BOOK_ORDER.indexOf(b.book);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    });
+    return withBook.map(x => x.text).join('\n');
+  };
+  const copySlipBtn = selectedPairs.length
+    ? `<button class="parlay-copy-slip" data-parlay-copyslip="1" title="Copy all ${selectedPairs.length} leg${selectedPairs.length === 1 ? '' : 's'} as slip-ready lines">⧉ COPY SLIP</button>`
+    : '';
 
   // Slip intelligence: calibrated per-leg probabilities (same recalibration the
   // board's confidence chips use, clamped 35-85 so one hot leg can't print
@@ -9955,7 +9986,7 @@ function renderParlayLab(container: HTMLElement): void {
       </div>
       <div>
         <div class="parlay-builder">
-          <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}</div>
+          <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}${copySlipBtn}</div>
           <div class="parlay-slip">${slipRows}</div>
           ${slipSummaryHtml}
           ${healthHtml}
@@ -10020,6 +10051,30 @@ function renderParlayLab(container: HTMLElement): void {
     btn.addEventListener('click', () => {
       parlayPoolSort = 'conf'; parlayPoolStat = 'all'; parlayPoolDir = 'all';
       renderParlayLab(container);
+    });
+  });
+
+  // GLOW-UP 178: slip export — per-leg ⧉ and whole-slip COPY SLIP. Flash-
+  // confirm ✓ in place; no re-render, so stopPropagation keeps the leg's
+  // row interactions (remove) intact.
+  const parlayFlashCopy = (btn: HTMLElement, text: string, okLabel: string): void => {
+    const original = btn.textContent || '';
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = okLabel;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+    }).catch(() => { /* clipboard denied — leave as-is */ });
+  };
+  container.querySelectorAll<HTMLElement>('.parlay-slip-copy').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      parlayFlashCopy(btn, btn.dataset['parlayClip'] || '', '✓');
+    });
+  });
+  container.querySelectorAll<HTMLElement>('[data-parlay-copyslip]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      parlayFlashCopy(btn, parlaySlipClipAll(), '✓ COPIED');
     });
   });
 
