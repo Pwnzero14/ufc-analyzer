@@ -10979,6 +10979,54 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     const flat = events.flatMap(e => e.legs);
     const settled = flat.filter(l => l.outcome !== 'pending').length;
     const hits = flat.filter(l => l.outcome === 'hit').length;
+
+    // ── GLOW-UP 175 (level 4): selection diagnostics ──────────────────────
+    // Split each placed event's suggested slate (latest snapshot) into the
+    // picks you TOOK vs the ones you SKIPPED, grade both cohorts with the
+    // shared resolver, and measure the gap — are you picking the right
+    // picks off the board? Match key: fighter + direction + stat source.
+    const selection = ((): { html: string } => {
+      type Cohort = { settled: number; hits: number; confSum: number; confN: number };
+      const taken: Cohort = { settled: 0, hits: 0, confSum: 0, confN: 0 };
+      const skipped: Cohort = { settled: 0, hits: 0, confSum: 0, confN: 0 };
+      for (const e of events) {
+        const evDk = eventDedupeKey(e.evKey);
+        const snap = latestSnapByDk.get(evDk);
+        if (!snap?.picks?.length) continue;
+        const placedKeys = new Set(e.legs.map(l =>
+          `${normalizeName(l.rec.name)?.toLowerCase() || l.rec.name.toLowerCase()}|${l.rec.dir.toLowerCase()}|${l.rec.source}`));
+        for (const p of snap.picks) {
+          const lean = String((p as { lean?: string })?.lean || '');
+          if (lean !== 'over' && lean !== 'under') continue;
+          const fighter = String((p as { fighter?: string })?.fighter || '');
+          const source = String((p as { source?: string })?.source || 'fp');
+          const res = resolveVsArchive(evDk, fighter, boardPropTypesFor(source, String((p as { platform?: string })?.platform || '')), (p as { line?: number | null })?.line ?? null, lean);
+          if (res.outcome === 'pending') continue;
+          const key = `${normalizeName(fighter)?.toLowerCase() || fighter.toLowerCase()}|${lean}|${source}`;
+          const cohort = placedKeys.has(key) ? taken : skipped;
+          cohort.settled++;
+          if (res.outcome === 'hit') cohort.hits++;
+          const conf = Number((p as { confidence?: number })?.confidence);
+          if (Number.isFinite(conf) && conf > 0) { cohort.confSum += conf; cohort.confN++; }
+        }
+      }
+      if (!taken.settled || !skipped.settled) return { html: '' };
+      const takenRate = taken.hits / taken.settled;
+      const skippedRate = skipped.hits / skipped.settled;
+      const alphaPts = Math.round((takenRate - skippedRate) * 100);
+      const alphaChip = alphaPts >= 0
+        ? `<span class="plg-alpha pos" title="Your taken picks hit ${Math.round(takenRate * 100)}% vs ${Math.round(skippedRate * 100)}% for the board picks you passed on — your selection is adding ${alphaPts}pts over blind-following the board">ALPHA +${alphaPts}pts</span>`
+        : `<span class="plg-alpha neg" title="Your taken picks hit ${Math.round(takenRate * 100)}% vs ${Math.round(skippedRate * 100)}% for the board picks you passed on — the picks you skip are outhitting the ones you take by ${-alphaPts}pts">ALPHA ${alphaPts}pts</span>`;
+      const confNote = taken.confN && skipped.confN
+        ? `<span class="plg-sel-conf" title="Average model confidence of the suggestions you take vs the ones you skip — a large gap here means you're selecting on confidence, a small one means you're selecting on something else">conf taken ${Math.round(taken.confSum / taken.confN)}% · skipped ${Math.round(skipped.confSum / skipped.confN)}%</span>`
+        : '';
+      return { html: `<div class="plg-selection">
+        <span class="plg-sel-label">SELECTION</span>
+        <span class="plg-sel-cohort">TAKEN <b>${taken.hits}/${taken.settled}</b> (${Math.round(takenRate * 100)}%)</span>
+        <span class="plg-sel-cohort">SKIPPED <b>${skipped.hits}/${skipped.settled}</b> (${Math.round(skippedRate * 100)}%)</span>
+        ${alphaChip}${confNote}
+      </div>` };
+    })();
     if (!events.length) {
       return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0, updates: [] };
     }
@@ -11017,7 +11065,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
     }).join('');
-    return { html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
+    return { html: selection.html + html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
   })();
 
   // GLOW-UP 174: write freshly settled outcomes back onto the placed records

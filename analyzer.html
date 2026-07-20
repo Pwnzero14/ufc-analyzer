@@ -27244,6 +27244,53 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   cursor: help;
   margin-left: 4px;
 }
+
+/* ── GLOW-UP 175: Placed Ledger level 4 — selection diagnostics ──
+   One strip above the events: TAKEN vs SKIPPED cohort records and the
+   ALPHA gap — appears only once both cohorts have settled samples. ── */
+.plg-selection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 7px 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.02);
+}
+.plg-sel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--text3);
+}
+.plg-sel-cohort {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+}
+.plg-sel-cohort b { color: var(--text); font-weight: 800; }
+.plg-alpha {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: help;
+}
+.plg-alpha.pos { color: #6ee7a8; background: rgba(38,208,124,0.08); border: 1px solid rgba(38,208,124,0.35); }
+.plg-alpha.neg { color: #ff8fa3; background: rgba(255,91,120,0.08); border: 1px solid rgba(255,91,120,0.35); }
+.plg-sel-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text3);
+  cursor: help;
+}
 .plg-leg {
   display: flex;
   align-items: center;
