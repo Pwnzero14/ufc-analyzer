@@ -27169,6 +27169,36 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(38,208,124,0.07);
   border: 1px solid rgba(38,208,124,0.30);
 }
+
+/* ── GLOW-UP 171: Best Picks level-up 5 — slip export ──
+   The ⧉ button's final form: per-book ⧉ COPY n in each tray group head,
+   ⧉ COPY ALL in the tray header. Copies slip-ready clip lines (one per
+   leg, book order); flash-confirms ✓ COPIED in green like the row ⧉. ── */
+.bps-copy-group, .bps-copy-all {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.bps-copy-group { margin-left: 8px; }
+.bps-copy-group:hover, .bps-copy-all:hover {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.4);
+  background: rgba(248,198,74,0.06);
+}
+.bps-copy-group.copied, .bps-copy-all.copied {
+  color: #6ee7a8;
+  border-color: rgba(38,208,124,0.5);
+  background: rgba(38,208,124,0.08);
+}
 </style>
 </head>
 <body>
