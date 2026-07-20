@@ -27054,6 +27054,59 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-radius: 3px;
 }
 .bps-remove:hover { color: #ff8fa3; background: rgba(255,91,120,0.08); }
+
+/* ── GLOW-UP 169: Best Picks level-up 3 — same-fight linkage ──
+   Violet family (distinct from green/red direction and gold slate):
+   ↔ SAME FIGHT / ⇄ DUAL tags on linked rows, hover glow on the paired
+   row in the other column (outline, so ev-hot box-shadows survive),
+   and ⚠ shared-fight warnings inside the My Slate tray. ── */
+.bp-samefight {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  cursor: help;
+  vertical-align: 1px;
+  color: #b3a6ff;
+  background: rgba(140,120,255,0.07);
+  border: 1px solid rgba(140,120,255,0.28);
+}
+.bp-samefight.bp-dual {
+  color: #d0b3ff;
+  border-style: dashed;
+}
+.best-pick-row.fight-glow {
+  outline: 1px solid rgba(160,140,255,0.55);
+  outline-offset: -1px;
+  background: rgba(140,120,255,0.05);
+}
+.best-pick-row.fight-glow .bp-samefight {
+  color: #e0d5ff;
+  border-color: rgba(160,140,255,0.6);
+  background: rgba(140,120,255,0.14);
+}
+.bps-corr {
+  font-size: 9px;
+  cursor: help;
+  color: #ffd9a0;
+  margin-left: 2px;
+}
+.bps-warn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+  color: #ffd9a0;
+  background: rgba(255,170,60,0.08);
+  border: 1px solid rgba(255,170,60,0.28);
+}
 </style>
 </head>
 <body>
