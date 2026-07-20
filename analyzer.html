@@ -27107,6 +27107,68 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(255,170,60,0.08);
   border: 1px solid rgba(255,170,60,0.28);
 }
+
+/* ── GLOW-UP 170: Best Picks level-up 4 — placed tracking ──
+   Green family = money down: ● PLACED chip on board rows, green left
+   seam (outranks the gold slate seam), ○ PLACE / ● PLACED toggle in the
+   tray, placed tally in the tray header. Placed legs lose their ✕ so
+   removal is a deliberate two-step (un-place first). ── */
+.bp-placed {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.08);
+  border: 1px solid rgba(38,208,124,0.35);
+}
+.best-pick-row.placed {
+  box-shadow: inset 3px 0 0 rgba(38,208,124,0.55);
+}
+.best-pick-row.placed.in-slate {
+  box-shadow: inset 3px 0 0 rgba(38,208,124,0.55);
+}
+.bps-place {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.bps-place:hover {
+  color: #6ee7a8;
+  border-color: rgba(38,208,124,0.4);
+}
+.bps-place.on {
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.08);
+  border-color: rgba(38,208,124,0.45);
+}
+.bps-entry.is-placed .bps-entry-main { opacity: 0.75; }
+.bps-placed-tally {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+  color: #6ee7a8;
+  background: rgba(38,208,124,0.07);
+  border: 1px solid rgba(38,208,124,0.30);
+}
 </style>
 </head>
 <body>

@@ -372,6 +372,36 @@ let bestPicksSlateOpen = false;
 const BP_SLATE_BOOK_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook', 'unbooked'];
 const BP_SLATE_BOOK_ABBR: Record<string, string> = { pick6: 'P6', underdog: 'UD', prizepicks: 'PP', betr: 'BTR', draftkings_sportsbook: 'DK', unbooked: '—' };
 
+// GLOW-UP 170 (Best Picks level-up 4): placed tracking.
+// Legs the user actually entered, persisted per event in chrome.storage so
+// they survive reloads (unlike the session-scoped slate queue). This records
+// what was TAKEN; best_picks_snapshots_v1 already records what was SUGGESTED
+// — the learning engine joins the two against results later.
+interface BestPicksPlacedRecord extends BestPicksSlatePick { placedAt: number; }
+const STORAGE_BEST_PICKS_PLACED_KEY = 'best_picks_placed_v1' as const;
+const bestPicksPlaced = new Map<string, BestPicksPlacedRecord>();
+const bestPicksEventKey = (): string =>
+  ((upcomingEventName || inferredEventNameFromLines || '').trim() || 'Unknown Event').toLowerCase();
+async function persistBestPicksPlaced(): Promise<void> {
+  try {
+    const payload = await storageGet<Record<string, unknown>>([STORAGE_BEST_PICKS_PLACED_KEY]);
+    const raw = payload[STORAGE_BEST_PICKS_PLACED_KEY];
+    const all: Record<string, Record<string, BestPicksPlacedRecord>> =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? { ...(raw as Record<string, Record<string, BestPicksPlacedRecord>>) }
+        : {};
+    all[bestPicksEventKey()] = Object.fromEntries(bestPicksPlaced);
+    // Cap stored events at 20, dropping the ones with the oldest activity.
+    const evKeys = Object.keys(all);
+    if (evKeys.length > 20) {
+      const newest = (ev: string): number => Math.max(0, ...Object.values(all[ev] || {}).map(r => Number(r?.placedAt) || 0));
+      evKeys.sort((a, b) => newest(a) - newest(b));
+      for (const k of evKeys.slice(0, evKeys.length - 20)) delete all[k];
+    }
+    await storageSet({ [STORAGE_BEST_PICKS_PLACED_KEY]: all });
+  } catch { /* placed tracking is best-effort — never block the render */ }
+}
+
 // Display-only name prettifier — restores apostrophes the fantasy platforms strip
 // (e.g. "Sean Omalley" -> "Sean O'Malley"). Lookups, keys, and storage keep the raw name.
 const PRETTY_SURNAMES: Record<string, string> = {
@@ -7563,8 +7593,25 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return;
   }
 
-  const archivePayload = await storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY]);
+  const archivePayload = await storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY]);
   if (mySeq !== bestPicksRenderSeq) return; // a newer render started while we awaited storage — bail
+
+  // GLOW-UP 170: hydrate placed records for the current event — storage is
+  // the source of truth, rebuilt every render so a second analyzer tab or a
+  // reload can never show stale placed state.
+  {
+    const evKey = bestPicksEventKey();
+    const placedRaw = archivePayload[STORAGE_BEST_PICKS_PLACED_KEY];
+    const evMap = placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)
+      ? ((placedRaw as Record<string, unknown>)[evKey] as Record<string, BestPicksPlacedRecord> | undefined)
+      : undefined;
+    bestPicksPlaced.clear();
+    if (evMap && typeof evMap === 'object') {
+      for (const [k, v] of Object.entries(evMap)) {
+        if (v && typeof v === 'object') bestPicksPlaced.set(k, v);
+      }
+    }
+  }
   const archiveRowsRaw = archivePayload[STORAGE_PROP_ARCHIVE_KEY];
   const archiveRows = Array.isArray(archiveRowsRaw) ? (archiveRowsRaw as PropArchiveRecord[]) : [];
   const londonTs = Date.parse(UFC_LONDON_CUTOFF_ISO);
@@ -8557,6 +8604,13 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const inSlate = bestPicksSlate.has(slateKey);
       const slateBtn = `<button class="bp-slate-toggle${inSlate ? ' on' : ''}" data-slate-key="${slateKey.replace(/"/g, '&quot;')}" title="${inSlate ? 'Remove from My Slate' : 'Add to My Slate'}">${inSlate ? '✓' : '+'}</button>`;
 
+      // GLOW-UP 170: placed badge — persisted per event, so it survives
+      // reloads even though the slate queue itself is session-scoped.
+      const isPlaced = bestPicksPlaced.has(slateKey);
+      const placedTag = isPlaced
+        ? `<span class="bp-placed" title="You marked this leg placed for this event — recorded for actual-vs-suggested tracking">● PLACED</span>`
+        : '';
+
       const seenFactorLabels = new Set<string>();
       const factors = (el.reasons || []).filter(r => {
         const lbl = factorLabel(r.text || '');
@@ -8567,14 +8621,14 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const factorChips = factors.length >= 2
         ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${factorLabel(r.text || '')}</span>`).join('')}</div>`
         : '';
-      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
+      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
         <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}${placedTag}
         </div>
         <div class="best-pick-line-wrap">
           ${i === 0 && evd ? `<div class="bp-hero-stats">
@@ -8620,9 +8674,14 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // ignores the 167 filters on purpose: once checked, a pick stays visible
   // here even when the view above hides its row.
   const buildSlateTray = (): string => {
-    if (!bestPicksSlate.size) return '';
+    // GLOW-UP 170: the tray shows the union of the session slate queue and
+    // the event's persisted placed legs — after a reload the queue is empty
+    // but placed legs still surface here (marked ●, un-place to drop them).
+    const trayUnion = new Map<string, BestPicksSlatePick>(bestPicksSlate);
+    for (const [k, r] of bestPicksPlaced) { if (!trayUnion.has(k)) trayUnion.set(k, r); }
+    if (!trayUnion.size) return '';
     const groups = new Map<string, BestPicksSlatePick[]>();
-    for (const p of bestPicksSlate.values()) {
+    for (const p of trayUnion.values()) {
       const k = p.book || 'unbooked';
       const list = groups.get(k) || [];
       list.push(p);
@@ -8634,7 +8693,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const slateFightKeyOf = (p: BestPicksSlatePick): string =>
       p.opponentRaw ? [p.name.toLowerCase(), p.opponentRaw.toLowerCase()].sort().join('|') : '';
     const slateFightCounts = new Map<string, number>();
-    for (const p of bestPicksSlate.values()) {
+    for (const p of trayUnion.values()) {
       const k = slateFightKeyOf(p);
       if (k) slateFightCounts.set(k, (slateFightCounts.get(k) || 0) + 1);
     }
@@ -8652,9 +8711,13 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         const corrWarn = fk && (slateFightCounts.get(fk) || 0) > 1
           ? ` <span class="bps-corr" title="Another checked leg comes from this same fight — correlated legs on one slip">⚠</span>`
           : '';
-        return `<div class="bps-entry">
+        // GLOW-UP 170: ○ PLACE ↔ ● PLACED toggle per leg; a placed leg loses
+        // its ✕ (un-place first) so removal is always a deliberate two-step.
+        const placed = bestPicksPlaced.has(key);
+        const placeBtn = `<button class="bps-place${placed ? ' on' : ''}" data-place-key="${key.replace(/"/g, '&quot;')}" title="${placed ? 'Un-mark — removes this leg from the event’s placed record' : 'Mark placed — persists for this event and feeds actual-vs-suggested tracking'}">${placed ? '● PLACED' : '○ PLACE'}</button>`;
+        return `<div class="bps-entry${placed ? ' is-placed' : ''}">
           <span class="bps-entry-main">${p.pretty} <b class="bps-dir ${p.dir === 'OVER' ? 'ov' : 'un'}">${p.dir}</b> <span class="bps-line">${p.line ?? '—'}</span> <i class="bps-stat">${p.statLabel}</i>${p.opponent ? `<span class="bps-vs"> vs ${p.opponent}</span>` : ''}${corrWarn}</span>
-          <button class="bps-remove" data-slate-key="${key.replace(/"/g, '&quot;')}" title="Remove from My Slate">✕</button>
+          ${placeBtn}${placed ? '' : `<button class="bps-remove" data-slate-key="${key.replace(/"/g, '&quot;')}" title="Remove from My Slate">✕</button>`}
         </div>`;
       }).join('');
       return `<div class="bps-group"><div class="bps-group-head plat-${b}">${list[0].bookLabel} <i>${list.length} leg${list.length === 1 ? '' : 's'}</i></div>${entries}</div>`;
@@ -8662,10 +8725,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return `<div class="bp-slate-tray${bestPicksSlateOpen ? ' open' : ''}">
       <div class="bps-head" data-slate-head="1" title="${bestPicksSlateOpen ? 'Collapse' : 'Expand'} My Slate">
         <span class="bps-title">MY SLATE</span>
-        <span class="bps-count">${bestPicksSlate.size} pick${bestPicksSlate.size === 1 ? '' : 's'}</span>
+        <span class="bps-count">${trayUnion.size} leg${trayUnion.size === 1 ? '' : 's'}</span>
+        ${bestPicksPlaced.size ? `<span class="bps-placed-tally" title="Legs marked placed for this event — persisted across reloads">● ${bestPicksPlaced.size} placed</span>` : ''}
         <span class="bps-books">${bookTallies}</span>
         ${sharedWarn}
-        <button class="bps-clear" data-slate-clear="1" title="Remove every pick from My Slate">CLEAR</button>
+        <button class="bps-clear" data-slate-clear="1" title="Empty the queued picks — placed records stay">CLEAR</button>
         <span class="bps-chevron">${bestPicksSlateOpen ? '▼' : '▲'}</span>
       </div>
       ${bestPicksSlateOpen ? `<div class="bps-body">${groupsHtml}</div>` : ''}
@@ -8759,6 +8823,23 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       e.stopPropagation();
       bestPicksSlate.delete(btn.dataset['slateKey'] || '');
       bpRerender();
+    });
+  });
+  // GLOW-UP 170: place toggle — mutate, persist, THEN re-render: the
+  // re-render re-hydrates placed state from storage, so rendering before
+  // the write lands would resurrect the pre-toggle state.
+  container.querySelectorAll<HTMLElement>('.bps-place').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = btn.dataset['placeKey'] || '';
+      if (bestPicksPlaced.has(key)) {
+        bestPicksPlaced.delete(key);
+      } else {
+        const d = bestPicksSlate.get(key) || slateRowData.get(key);
+        if (!d) return;
+        bestPicksPlaced.set(key, { ...d, placedAt: Date.now() });
+      }
+      void persistBestPicksPlaced().then(() => bpRerender());
     });
   });
   container.querySelectorAll<HTMLElement>('[data-slate-clear]').forEach(btn => {
