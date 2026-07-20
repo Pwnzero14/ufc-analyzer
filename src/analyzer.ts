@@ -8673,12 +8673,17 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // (count + per-book tallies); open = picks grouped by book. The tray
   // ignores the 167 filters on purpose: once checked, a pick stays visible
   // here even when the view above hides its row.
+  // GLOW-UP 170: the tray shows the union of the session slate queue and
+  // the event's persisted placed legs — after a reload the queue is empty
+  // but placed legs still surface here (marked ●, un-place to drop them).
+  // Shared with the 171 slip-export handlers, which need the same view.
+  const trayUnionNow = (): Map<string, BestPicksSlatePick> => {
+    const u = new Map<string, BestPicksSlatePick>(bestPicksSlate);
+    for (const [k, r] of bestPicksPlaced) { if (!u.has(k)) u.set(k, r); }
+    return u;
+  };
   const buildSlateTray = (): string => {
-    // GLOW-UP 170: the tray shows the union of the session slate queue and
-    // the event's persisted placed legs — after a reload the queue is empty
-    // but placed legs still surface here (marked ●, un-place to drop them).
-    const trayUnion = new Map<string, BestPicksSlatePick>(bestPicksSlate);
-    for (const [k, r] of bestPicksPlaced) { if (!trayUnion.has(k)) trayUnion.set(k, r); }
+    const trayUnion = trayUnionNow();
     if (!trayUnion.size) return '';
     const groups = new Map<string, BestPicksSlatePick[]>();
     for (const p of trayUnion.values()) {
@@ -8720,7 +8725,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
           ${placeBtn}${placed ? '' : `<button class="bps-remove" data-slate-key="${key.replace(/"/g, '&quot;')}" title="Remove from My Slate">✕</button>`}
         </div>`;
       }).join('');
-      return `<div class="bps-group"><div class="bps-group-head plat-${b}">${list[0].bookLabel} <i>${list.length} leg${list.length === 1 ? '' : 's'}</i></div>${entries}</div>`;
+      // GLOW-UP 171: per-book slip export — one click copies every leg in
+      // this group as slip-ready lines (the ⧉ clip format, one per row).
+      const groupCopyBtn = `<button class="bps-copy-group" data-copy-book="${b}" title="Copy all ${list.length} ${list[0].bookLabel} leg${list.length === 1 ? '' : 's'} as slip-ready lines">⧉ COPY ${list.length}</button>`;
+      return `<div class="bps-group"><div class="bps-group-head plat-${b}">${list[0].bookLabel} <i>${list.length} leg${list.length === 1 ? '' : 's'}</i>${groupCopyBtn}</div>${entries}</div>`;
     }).join('');
     return `<div class="bp-slate-tray${bestPicksSlateOpen ? ' open' : ''}">
       <div class="bps-head" data-slate-head="1" title="${bestPicksSlateOpen ? 'Collapse' : 'Expand'} My Slate">
@@ -8729,6 +8737,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         ${bestPicksPlaced.size ? `<span class="bps-placed-tally" title="Legs marked placed for this event — persisted across reloads">● ${bestPicksPlaced.size} placed</span>` : ''}
         <span class="bps-books">${bookTallies}</span>
         ${sharedWarn}
+        <button class="bps-copy-all" data-slate-copyall="1" title="Copy every leg in the tray as slip-ready lines, grouped in book order">⧉ COPY ALL</button>
         <button class="bps-clear" data-slate-clear="1" title="Empty the queued picks — placed records stay">CLEAR</button>
         <span class="bps-chevron">${bestPicksSlateOpen ? '▼' : '▲'}</span>
       </div>
@@ -8852,9 +8861,37 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   });
   container.querySelectorAll<HTMLElement>('[data-slate-head]').forEach(el => {
     el.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-slate-clear]')) return;
+      if ((e.target as HTMLElement).closest('[data-slate-clear],[data-slate-copyall]')) return;
       bestPicksSlateOpen = !bestPicksSlateOpen;
       bpRerender();
+    });
+  });
+
+  // GLOW-UP 171: slip export — per-book group copy + tray-wide COPY ALL.
+  // Same flash-confirm pattern as the row ⧉; no re-render needed, so the
+  // button restores itself after the flash.
+  const copySlipLegs = (btn: HTMLElement, legs: BestPicksSlatePick[]): void => {
+    if (!legs.length) return;
+    const original = btn.textContent || '';
+    const ordered = [...legs].sort((a, b) =>
+      BP_SLATE_BOOK_ORDER.indexOf(a.book || 'unbooked') - BP_SLATE_BOOK_ORDER.indexOf(b.book || 'unbooked'));
+    navigator.clipboard.writeText(ordered.map(p => p.clip).join('\n')).then(() => {
+      btn.textContent = '✓ COPIED';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+    }).catch(() => { /* clipboard denied — leave the button as-is */ });
+  };
+  container.querySelectorAll<HTMLElement>('.bps-copy-group').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const book = btn.dataset['copyBook'] || '';
+      copySlipLegs(btn, [...trayUnionNow().values()].filter(p => (p.book || 'unbooked') === book));
+    });
+  });
+  container.querySelectorAll<HTMLElement>('.bps-copy-all').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copySlipLegs(btn, [...trayUnionNow().values()]);
     });
   });
 
