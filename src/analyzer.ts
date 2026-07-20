@@ -7607,6 +7607,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // GLOW-UP 170: hydrate placed records for the current event — storage is
   // the source of truth, rebuilt every render so a second analyzer tab or a
   // reload can never show stale placed state.
+  // GLOW-UP 176: same payload also feeds personal calibration — your settled
+  // record per stat-family + direction across ALL stored events (persisted
+  // outcomes only, so no archive re-resolve on the Best Picks render path).
+  const bpPersonalRecord = new Map<string, { hits: number; total: number }>();
   {
     const evKey = bestPicksEventKey();
     const placedRaw = archivePayload[STORAGE_BEST_PICKS_PLACED_KEY];
@@ -7617,6 +7621,19 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     if (evMap && typeof evMap === 'object') {
       for (const [k, v] of Object.entries(evMap)) {
         if (v && typeof v === 'object') bestPicksPlaced.set(k, v);
+      }
+    }
+    if (placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)) {
+      for (const evLegs of Object.values(placedRaw as Record<string, unknown>)) {
+        if (!evLegs || typeof evLegs !== 'object') continue;
+        for (const rec of Object.values(evLegs as Record<string, BestPicksPlacedRecord>)) {
+          if (!rec || typeof rec !== 'object' || (rec.outcome !== 'hit' && rec.outcome !== 'miss')) continue;
+          const k = `${rec.source}|${String(rec.dir || '').toLowerCase()}`;
+          const cur = bpPersonalRecord.get(k) || { hits: 0, total: 0 };
+          cur.total++;
+          if (rec.outcome === 'hit') cur.hits++;
+          bpPersonalRecord.set(k, cur);
+        }
       }
     }
   }
@@ -8619,6 +8636,16 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         ? `<span class="bp-placed" title="You marked this leg placed for this event — recorded for actual-vs-suggested tracking">● PLACED</span>`
         : '';
 
+      // GLOW-UP 176: personal calibration chip — your settled record on this
+      // stat family + direction from the Placed Ledger. Informational only
+      // (house rule: never mutates model confidence); needs 2+ settled legs
+      // so a single lucky hit doesn't masquerade as a track record.
+      const youRec = bpPersonalRecord.get(`${el._source || 'fp'}|${el.lean}`);
+      const youStatLbl = STAT_LABEL[el._source || 'fp'] || 'FP';
+      const youTag = youRec && youRec.total >= 2
+        ? `<span class="bp-you ${youRec.hits * 2 >= youRec.total ? 'good' : 'bad'}" title="Your settled record on ${youStatLbl} ${(el.lean || '').toUpperCase()} legs you placed across past events (from My Placed Ledger) — informational only, does not affect model confidence">YOU ${youRec.hits}/${youRec.total}</span>`
+        : '';
+
       const seenFactorLabels = new Set<string>();
       const factors = (el.reasons || []).filter(r => {
         const lbl = factorLabel(r.text || '');
@@ -8636,7 +8663,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}${placedTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
           ${i === 0 && evd ? `<div class="bp-hero-stats">
