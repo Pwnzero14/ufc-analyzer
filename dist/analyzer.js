@@ -223,6 +223,37 @@ function aggregatePlacedPersonalRecord(placedRaw) {
     }
     return rec;
 }
+// GLOW-UP 181 (Parlay Lab level 5): placed parlays. A built slip the user
+// actually entered, persisted per event — the multi-leg analog of
+// best_picks_placed_v1. Resolved in the Data view's Parlay Ledger.
+const STORAGE_PARLAY_PLACED_KEY = 'parlay_placed_v1';
+async function persistPlacedParlay(legs) {
+    try {
+        const payload = await storageGet([STORAGE_PARLAY_PLACED_KEY]);
+        const raw = payload[STORAGE_PARLAY_PLACED_KEY];
+        const all = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {};
+        const evKey = bestPicksEventKey();
+        const list = Array.isArray(all[evKey]) ? [...all[evKey]] : [];
+        const sigOf = (ls) => ls.map(l => `${l.fighter.toLowerCase()}|${l.stat}|${String(l.dir).toLowerCase()}`).sort().join(',');
+        const sig = sigOf(legs);
+        if (list.some(p => sigOf(p.legs || []) === sig))
+            return 'dup';
+        list.unshift({ id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, placedAt: Date.now(), legs });
+        all[evKey] = list.slice(0, 30);
+        const evKeys = Object.keys(all);
+        if (evKeys.length > 20) {
+            const newest = (ev) => Math.max(0, ...(all[ev] || []).map(p => Number(p.placedAt) || 0));
+            evKeys.sort((a, b) => newest(a) - newest(b));
+            for (const k of evKeys.slice(0, evKeys.length - 20))
+                delete all[k];
+        }
+        await storageSet({ [STORAGE_PARLAY_PLACED_KEY]: all });
+        return 'placed';
+    }
+    catch {
+        return 'err';
+    }
+}
 // GLOW-UP 180: module-level cache so the synchronous Parlay Lab render can
 // read the personal record without a storage round-trip; refreshed async
 // and signature-gated so it re-renders exactly once when the data changes.
@@ -9588,6 +9619,11 @@ function renderParlayLab(container) {
     const copySlipBtn = selectedPairs.length
         ? `<button class="parlay-copy-slip" data-parlay-copyslip="1" title="Copy all ${selectedPairs.length} leg${selectedPairs.length === 1 ? '' : 's'} as slip-ready lines">⧉ COPY SLIP</button>`
         : '';
+    // GLOW-UP 181: place the whole slip into the Parlay Ledger (Data view).
+    // Needs 2+ legs — a parlay by definition.
+    const placeParlayBtn = selectedPairs.length >= 2
+        ? `<button class="parlay-place-slip" data-parlay-place="1" title="Save this slip to your Parlay Ledger (Data view) for this event — records what you actually entered, graded against results after the event">● PLACE PARLAY</button>`
+        : '';
     // Slip intelligence: calibrated per-leg probabilities (same recalibration the
     // board's confidence chips use, clamped 35-85 so one hot leg can't print
     // silly numbers), their product as combined hit probability, the weakest leg,
@@ -9745,7 +9781,7 @@ function renderParlayLab(container) {
       </div>
       <div>
         <div class="parlay-builder">
-          <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}${copySlipBtn}</div>
+          <div class="parlay-builder-title">YOUR PARLAY${selectedLegs.length ? ` <span class="parlay-count-pill">${selectedLegs.length}</span>` : ''}${copySlipBtn}${placeParlayBtn}</div>
           <div class="parlay-slip">${slipRows}</div>
           ${slipSummaryHtml}
           ${healthHtml}
@@ -9839,6 +9875,33 @@ function renderParlayLab(container) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             parlayFlashCopy(btn, parlaySlipClipAll(), '✓ COPIED');
+        });
+    });
+    // GLOW-UP 181: place the slip into the Parlay Ledger (persisted per event).
+    container.querySelectorAll('[data-parlay-place]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const legs = selectedPairs.map(({ leg: l, fighter: lf }) => {
+                const pk = getSourceActivePlatformKey(lf, l.stat);
+                return {
+                    fighter: l.fighter,
+                    opponent: (l.opponent && l.opponent !== '?') ? l.opponent : null,
+                    dir: l.direction.toUpperCase(),
+                    stat: l.stat,
+                    statLabel: PL_STAT_CLIP[l.stat] || l.stat.toUpperCase(),
+                    line: l.line,
+                    book: pk || null,
+                    bookLabel: pk ? (PL_BOOK_NAME[pk] || pk) : 'No book',
+                };
+            });
+            const original = btn.textContent || '';
+            btn.classList.add('placed');
+            void persistPlacedParlay(legs).then((res) => {
+                btn.textContent = res === 'placed' ? '✓ PLACED' : res === 'dup' ? '✓ ALREADY PLACED' : '✕ FAILED';
+                if (res === 'placed')
+                    showToast('✓ Parlay saved to your Parlay Ledger (Data view)');
+                setTimeout(() => { btn.textContent = original; btn.classList.remove('placed'); }, 1600);
+            });
         });
     });
     container.querySelectorAll('.parlay-suggest-card').forEach(card => {
@@ -10750,7 +10813,7 @@ async function renderArchivePanel(container) {
             .catch(() => { });
     }
     const [result, linesPayload] = await Promise.all([
-        storageGet([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY, STORAGE_BEST_PICKS_SNAPSHOT_KEY]),
+        storageGet([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY, STORAGE_BEST_PICKS_SNAPSHOT_KEY, STORAGE_PARLAY_PLACED_KEY]),
         storageGet(STORAGE_LINE_KEYS),
     ]);
     const allRowsRaw = result[STORAGE_PROP_ARCHIVE_KEY];
@@ -10779,51 +10842,52 @@ async function renderArchivePanel(container) {
         const b = m[2].trim().split(/\s+/).pop().toLowerCase();
         return [a, b].sort().join('|');
     }
+    // Placed source key → archive PropType candidates. FP is book-aware:
+    // PrizePicks scores differently, so it archives as Fantasy_PP. Hoisted to
+    // panel scope (GLOW-UP 181) so the Parlay Ledger resolves legs identically.
+    const propTypesFor = (source, book) => {
+        if (source === 'fp')
+            return book === 'prizepicks' ? ['Fantasy_PP', 'Fantasy'] : ['Fantasy', 'Fantasy_PP'];
+        if (source === 'ss')
+            return ['SS'];
+        if (source === 'ss_r1')
+            return ['SS_R1'];
+        if (source === 'td')
+            return ['TD'];
+        if (source === 'ft')
+            return ['FightTime'];
+        if (source === 'ctrl')
+            return ['Control'];
+        if (source === 'kd')
+            return ['KD'];
+        return [];
+    };
+    // Shared date-guarded resolver — used by the placed ledger, the board
+    // baseline, and the parlay ledger so nothing can be graded differently.
+    const resolveVsArchive = (evDk, fighterRaw, candidates, line, dir) => {
+        if (!candidates.length || line == null || !Number.isFinite(Number(line)))
+            return { outcome: 'pending', actual: null };
+        const fighterNorm = normalizeName(fighterRaw)?.toLowerCase() || fighterRaw.toLowerCase();
+        const match = allRows.find(r => {
+            const ts = Date.parse(r.date);
+            return eventDedupeKey(r.event || '') === evDk
+                && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
+                && candidates.includes(String(r.propType))
+                && Number.isFinite(Number(r.result))
+                && Number.isFinite(ts)
+                && ts <= nowTs;
+        });
+        if (!match)
+            return { outcome: 'pending', actual: null };
+        const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
+        const hit = dir === 'over' ? actual > Number(line) : actual < Number(line);
+        return { outcome: hit ? 'hit' : 'miss', actual };
+    };
     const placedLedgerData = (() => {
         const placedRaw = result[STORAGE_BEST_PICKS_PLACED_KEY];
         const placedAll = placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)
             ? placedRaw
             : {};
-        // Placed source key → archive PropType candidates. FP is book-aware:
-        // PrizePicks scores differently, so it archives as Fantasy_PP.
-        const propTypesFor = (source, book) => {
-            if (source === 'fp')
-                return book === 'prizepicks' ? ['Fantasy_PP', 'Fantasy'] : ['Fantasy', 'Fantasy_PP'];
-            if (source === 'ss')
-                return ['SS'];
-            if (source === 'ss_r1')
-                return ['SS_R1'];
-            if (source === 'td')
-                return ['TD'];
-            if (source === 'ft')
-                return ['FightTime'];
-            if (source === 'ctrl')
-                return ['Control'];
-            if (source === 'kd')
-                return ['KD'];
-            return [];
-        };
-        // Shared date-guarded resolver — used for both your legs and the board's
-        // suggested picks so the two sides can never be graded differently.
-        const resolveVsArchive = (evDk, fighterRaw, candidates, line, dir) => {
-            if (!candidates.length || line == null || !Number.isFinite(Number(line)))
-                return { outcome: 'pending', actual: null };
-            const fighterNorm = normalizeName(fighterRaw)?.toLowerCase() || fighterRaw.toLowerCase();
-            const match = allRows.find(r => {
-                const ts = Date.parse(r.date);
-                return eventDedupeKey(r.event || '') === evDk
-                    && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
-                    && candidates.includes(String(r.propType))
-                    && Number.isFinite(Number(r.result))
-                    && Number.isFinite(ts)
-                    && ts <= nowTs;
-            });
-            if (!match)
-                return { outcome: 'pending', actual: null };
-            const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
-            const hit = dir === 'over' ? actual > Number(line) : actual < Number(line);
-            return { outcome: hit ? 'hit' : 'miss', actual };
-        };
         // GLOW-UP 173 (level 2): the board's side of the comparison — latest
         // snapshot per event (closing board) from best_picks_snapshots_v1,
         // resolved through the same resolver. Compared only on events where
@@ -11018,6 +11082,57 @@ async function renderArchivePanel(container) {
             : '';
         return `<span style="font-size:10px;color:var(--text-muted)">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${you}${board}</span>`;
     })();
+    // ── GLOW-UP 181: Parlay Ledger ─────────────────────────────────────────
+    // Placed slips (parlay_placed_v1) resolved leg-by-leg through the same
+    // resolver; a slip CASHES only if every leg hits (partial pick'em payouts
+    // are noted but not modeled here — this is the all-or-nothing view).
+    const parlayLedgerData = (() => {
+        const raw = result[STORAGE_PARLAY_PLACED_KEY];
+        const all = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+        const evs = Object.entries(all)
+            .map(([evKey, list]) => ({ evKey, list: Array.isArray(list) ? list : [] }))
+            .filter(e => e.list.length);
+        if (!evs.length) {
+            return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed parlays yet — build a slip in Parlay Lab and hit ● PLACE PARLAY</div>', count: 0, cashed: 0, settled: 0 };
+        }
+        evs.sort((a, b) => Math.max(0, ...b.list.map(p => p.placedAt || 0)) - Math.max(0, ...a.list.map(p => p.placedAt || 0)));
+        let count = 0, cashed = 0, settledSlips = 0;
+        const html = evs.map(e => {
+            const evDk = eventDedupeKey(e.evKey);
+            const cards = e.list.map(p => {
+                count++;
+                const legs = (p.legs || []).map(l => {
+                    const dir = l.dir === 'OVER' ? 'over' : 'under';
+                    const res = resolveVsArchive(evDk, l.fighter, propTypesFor(l.stat, l.book), l.line, dir);
+                    return { l, outcome: res.outcome };
+                });
+                const settledN = legs.filter(x => x.outcome !== 'pending').length;
+                const hitN = legs.filter(x => x.outcome === 'hit').length;
+                const anyPending = legs.some(x => x.outcome === 'pending');
+                const anyMiss = legs.some(x => x.outcome === 'miss');
+                if (!anyPending) {
+                    settledSlips++;
+                    if (!anyMiss)
+                        cashed++;
+                }
+                const statusChip = anyPending
+                    ? `<span class="plg-status pending" title="${legs.length - settledN} leg(s) not settled yet">○ ${settledN}/${legs.length} SETTLED</span>`
+                    : anyMiss
+                        ? `<span class="plg-status miss" title="${legs.length - hitN} leg(s) missed — the full slip busts (in-app partial pick'em payouts may still apply)">✗ BUST ${hitN}/${legs.length}</span>`
+                        : `<span class="plg-status hit" title="All ${legs.length} legs hit — slip cashes">✓ CASH ${hitN}/${legs.length}</span>`;
+                const legRows = legs.map(x => {
+                    const st = x.outcome === 'hit' ? '<span class="plp-mini hit">✓</span>' : x.outcome === 'miss' ? '<span class="plp-mini miss">✗</span>' : '<span class="plp-mini pending">○</span>';
+                    return `<span class="plp-leg">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat">${x.l.statLabel}</i></span>`;
+                }).join('');
+                return `<div class="plp-parlay"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${statusChip}</div><div class="plp-legs">${legRows}</div></div>`;
+            }).join('');
+            return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
+        }).join('');
+        return { html, count, cashed, settled: settledSlips };
+    })();
+    const parlayLedgerSummary = parlayLedgerData.count
+        ? `<span style="font-size:10px;color:var(--text-muted)">${parlayLedgerData.count} parlay${parlayLedgerData.count === 1 ? '' : 's'} · ${parlayLedgerData.settled ? `${parlayLedgerData.cashed}/${parlayLedgerData.settled} cashed` : 'none settled yet'}</span>`
+        : `<span style="font-size:10px;color:var(--text-muted)">no placed parlays yet</span>`;
     // ── Per-event breakdown ────────────────────────────────────────────────
     // key = dedup key, value includes display name, date, and counts
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -12121,6 +12236,7 @@ async function renderArchivePanel(container) {
     ${cSec('ai-accuracy', '', '', 'AI Pick Accuracy by Stat Type', `<span style="font-size:10px;color:var(--text-muted)">lean direction correct (over + under)</span>`, statSummaryHtml, 'margin-bottom:12px')}
     ${cSec('entry-clv', '', '', 'Your CLV (entry → close)', `<span style="font-size:10px;color:var(--text-muted)">avg Δ from entry line · positive = you beat the close</span>`, entryClvHtml, 'margin-bottom:12px')}
     ${cSec('placed-ledger', '', '', 'My Placed Ledger', placedLedgerSummary, placedLedgerData.html, 'margin-bottom:12px')}
+    ${cSec('parlay-ledger', '', '', 'My Parlay Ledger', parlayLedgerSummary, parlayLedgerData.html, 'margin-bottom:12px')}
     <div class="best-picks-grid">
       ${cSec('fp-hitrate', 'over', 'takes', 'Fantasy Line Hit Rate (Current Roster)', `${fantasyHits}/${fantasyTotal} · ${fantasyHitRate}%`, topFantasyHtml)}
     </div>
