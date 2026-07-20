@@ -363,6 +363,9 @@ interface BestPicksSlatePick {
   bookLabel: string;
   clip: string;         // slip-ready text (same as the ⧉ copy payload)
   opponent: string | null;
+  // GLOW-UP 169: raw (un-prettified) opponent name so slate fight-key
+  // matching can't be broken by display-only apostrophe restoration.
+  opponentRaw: string | null;
 }
 const bestPicksSlate = new Map<string, BestPicksSlatePick>();
 let bestPicksSlateOpen = false;
@@ -8293,6 +8296,22 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   const displayOvers = bpApplyView(overs, overMetrics);
   const displayUnders = bpApplyView(unders, underMetrics);
 
+  // ── GLOW-UP 169 (Best Picks level-up 3): same-fight cross-column linkage ──
+  // A fight whose picks land in BOTH columns is one event feeding two rows:
+  // either the opponent pair (A over / B under — the coherent "A outworks B"
+  // shape, still one fight's worth of variance) or the same fighter dual-
+  // listed on two stats. Computed on the DISPLAY lists so tags never point
+  // at rows the 167 filters hid.
+  const bpFightKey = (f: AnalyzerFighter): string => {
+    const opp = f.opponent ? f.opponent.toLowerCase() : '';
+    return opp ? [f.name.toLowerCase(), opp].sort().join('|') : '';
+  };
+  const overFightMap = new Map<string, string[]>();
+  for (const f of displayOvers) { const fk = bpFightKey(f); if (fk) overFightMap.set(fk, [...(overFightMap.get(fk) || []), f.name.toLowerCase()]); }
+  const underFightMap = new Map<string, string[]>();
+  for (const f of displayUnders) { const fk = bpFightKey(f); if (fk) underFightMap.set(fk, [...(underFightMap.get(fk) || []), f.name.toLowerCase()]); }
+  const linkedFightKeys = new Set([...overFightMap.keys()].filter(k => underFightMap.has(k)));
+
   // Stat-family chips are built from what's actually on the board (with
   // counts), so a card with no KD lines never shows a dead KD chip.
   const BP_SRC_CHIP: Record<string, string> = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', kd: 'KD', ctrl: 'CTRL' };
@@ -8420,6 +8439,22 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">↔ corr</span>`
         : '';
 
+      // GLOW-UP 169: same-fight tag + fight key for hover cross-highlight.
+      // ⇄ DUAL = this fighter appears in the other column on another stat;
+      // ↔ SAME FIGHT = the opponent holds the other column's row.
+      const rowFightKey = bpFightKey(f);
+      let sameFightTag = '';
+      let fightAttr = '';
+      if (rowFightKey && linkedFightKeys.has(rowFightKey)) {
+        const otherColNames = (type === 'over' ? underFightMap.get(rowFightKey) : overFightMap.get(rowFightKey)) || [];
+        const otherColLabel = type === 'over' ? 'Unders' : 'Overs';
+        const isDual = otherColNames.includes(f.name.toLowerCase());
+        sameFightTag = isDual
+          ? ` <span class="bp-samefight bp-dual" title="This fighter also appears in the ${otherColLabel} column on a different stat — one fight feeding two rows; hover to highlight the paired row">⇄ DUAL</span>`
+          : ` <span class="bp-samefight" title="The other side of this fight is picked in the ${otherColLabel} column — coherent pair, but still one fight's worth of variance; hover to highlight the paired row">↔ SAME FIGHT</span>`;
+        fightAttr = ` data-fightkey="${rowFightKey.replace(/"/g, '&quot;')}"`;
+      }
+
       // Lineshop badge: only meaningful for FP picks now — SS/TD/FT/CTRL
       // displayed line is already the best-side across all books.
       const src = el._source;
@@ -8517,6 +8552,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         bookLabel: clipBook ? (BOOK_NAME[clipBook] || clipBook) : 'No book',
         clip: clipText,
         opponent: f.opponent ? prettyName(f.opponent) : null,
+        opponentRaw: f.opponent || null,
       });
       const inSlate = bestPicksSlate.has(slateKey);
       const slateBtn = `<button class="bp-slate-toggle${inSlate ? ' on' : ''}" data-slate-key="${slateKey.replace(/"/g, '&quot;')}" title="${inSlate ? 'Remove from My Slate' : 'Add to My Slate'}">${inSlate ? '✓' : '+'}</button>`;
@@ -8531,10 +8567,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const factorChips = factors.length >= 2
         ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${factorLabel(r.text || '')}</span>`).join('')}</div>`
         : '';
-      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}" data-jump="${f.name}" title="Open fighter card">
+      return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -8592,14 +8628,32 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       list.push(p);
       groups.set(k, list);
     }
+    // GLOW-UP 169: shared-fight detection inside the slate — two checked
+    // legs from one fight is concentrated variance the user should see
+    // before building an entry. Keyed on raw names (see opponentRaw).
+    const slateFightKeyOf = (p: BestPicksSlatePick): string =>
+      p.opponentRaw ? [p.name.toLowerCase(), p.opponentRaw.toLowerCase()].sort().join('|') : '';
+    const slateFightCounts = new Map<string, number>();
+    for (const p of bestPicksSlate.values()) {
+      const k = slateFightKeyOf(p);
+      if (k) slateFightCounts.set(k, (slateFightCounts.get(k) || 0) + 1);
+    }
+    const sharedFightCount = [...slateFightCounts.values()].filter(c => c > 1).length;
+    const sharedWarn = sharedFightCount > 0
+      ? `<span class="bps-warn" title="Legs marked ⚠ below come from the same fight — one result swings multiple legs at once">⚠ ${sharedFightCount} shared fight${sharedFightCount === 1 ? '' : 's'}</span>`
+      : '';
     const presentBooks = BP_SLATE_BOOK_ORDER.filter(b => groups.has(b));
     const bookTallies = presentBooks.map(b => `<span class="bps-tally-book plat-${b}">${BP_SLATE_BOOK_ABBR[b]} ${groups.get(b)!.length}</span>`).join('');
     const groupsHtml = presentBooks.map(b => {
       const list = groups.get(b)!;
       const entries = list.map(p => {
         const key = `${p.name}|${p.dir.toLowerCase()}|${p.source}`;
+        const fk = slateFightKeyOf(p);
+        const corrWarn = fk && (slateFightCounts.get(fk) || 0) > 1
+          ? ` <span class="bps-corr" title="Another checked leg comes from this same fight — correlated legs on one slip">⚠</span>`
+          : '';
         return `<div class="bps-entry">
-          <span class="bps-entry-main">${p.pretty} <b class="bps-dir ${p.dir === 'OVER' ? 'ov' : 'un'}">${p.dir}</b> <span class="bps-line">${p.line ?? '—'}</span> <i class="bps-stat">${p.statLabel}</i>${p.opponent ? `<span class="bps-vs"> vs ${p.opponent}</span>` : ''}</span>
+          <span class="bps-entry-main">${p.pretty} <b class="bps-dir ${p.dir === 'OVER' ? 'ov' : 'un'}">${p.dir}</b> <span class="bps-line">${p.line ?? '—'}</span> <i class="bps-stat">${p.statLabel}</i>${p.opponent ? `<span class="bps-vs"> vs ${p.opponent}</span>` : ''}${corrWarn}</span>
           <button class="bps-remove" data-slate-key="${key.replace(/"/g, '&quot;')}" title="Remove from My Slate">✕</button>
         </div>`;
       }).join('');
@@ -8610,6 +8664,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <span class="bps-title">MY SLATE</span>
         <span class="bps-count">${bestPicksSlate.size} pick${bestPicksSlate.size === 1 ? '' : 's'}</span>
         <span class="bps-books">${bookTallies}</span>
+        ${sharedWarn}
         <button class="bps-clear" data-slate-clear="1" title="Remove every pick from My Slate">CLEAR</button>
         <span class="bps-chevron">${bestPicksSlateOpen ? '▼' : '▲'}</span>
       </div>
@@ -8636,6 +8691,20 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // Click a pick to jump to that fighter's card
   container.querySelectorAll<HTMLElement>('.best-pick-row[data-jump]').forEach(el => {
     el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+  });
+
+  // GLOW-UP 169: hovering a linked row lights up its same-fight counterpart
+  // in the other column — the ↔/⇄ tag says a pair exists, the glow says WHERE.
+  container.querySelectorAll<HTMLElement>('.best-pick-row[data-fightkey]').forEach(row => {
+    const fk = row.dataset['fightkey'] || '';
+    row.addEventListener('mouseenter', () => {
+      container.querySelectorAll<HTMLElement>(`.best-pick-row[data-fightkey="${CSS.escape(fk)}"]`).forEach(r => {
+        if (r !== row) r.classList.add('fight-glow');
+      });
+    });
+    row.addEventListener('mouseleave', () => {
+      container.querySelectorAll<HTMLElement>('.best-pick-row.fight-glow').forEach(r => r.classList.remove('fight-glow'));
+    });
   });
 
   // GLOW-UP 167: command strip handlers — every change bumps the render seq
