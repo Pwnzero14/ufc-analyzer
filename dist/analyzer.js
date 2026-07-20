@@ -10523,7 +10523,7 @@ async function renderArchivePanel(container) {
             .catch(() => { });
     }
     const [result, linesPayload] = await Promise.all([
-        storageGet([STORAGE_PROP_ARCHIVE_KEY]),
+        storageGet([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY]),
         storageGet(STORAGE_LINE_KEYS),
     ]);
     const allRowsRaw = result[STORAGE_PROP_ARCHIVE_KEY];
@@ -10552,6 +10552,95 @@ async function renderArchivePanel(container) {
         const b = m[2].trim().split(/\s+/).pop().toLowerCase();
         return [a, b].sort().join('|');
     }
+    // ── GLOW-UP 172 (Placed → Learning level 1): Placed Ledger ─────────────
+    // Every leg the user marked ● PLACED (best_picks_placed_v1, keyed per
+    // event), live-joined against the archive: ✓ HIT / ✗ MISS with the actual
+    // number once the prop settles, ○ PENDING until then. Read-only join —
+    // persistence of outcomes is level 3's job.
+    const placedLedgerData = (() => {
+        const placedRaw = result[STORAGE_BEST_PICKS_PLACED_KEY];
+        const placedAll = placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)
+            ? placedRaw
+            : {};
+        // Placed source key → archive PropType candidates. FP is book-aware:
+        // PrizePicks scores differently, so it archives as Fantasy_PP.
+        const propTypesFor = (source, book) => {
+            if (source === 'fp')
+                return book === 'prizepicks' ? ['Fantasy_PP', 'Fantasy'] : ['Fantasy', 'Fantasy_PP'];
+            if (source === 'ss')
+                return ['SS'];
+            if (source === 'ss_r1')
+                return ['SS_R1'];
+            if (source === 'td')
+                return ['TD'];
+            if (source === 'ft')
+                return ['FightTime'];
+            if (source === 'ctrl')
+                return ['Control'];
+            if (source === 'kd')
+                return ['KD'];
+            return [];
+        };
+        const events = [];
+        for (const [evKey, legsMap] of Object.entries(placedAll)) {
+            const legsList = Object.values(legsMap || {}).filter(r => r && typeof r === 'object');
+            if (!legsList.length)
+                continue;
+            const evDk = eventDedupeKey(evKey);
+            const legs = legsList.map(rec => {
+                const fighterNorm = normalizeName(rec.name)?.toLowerCase() || rec.name.toLowerCase();
+                const candidates = propTypesFor(rec.source, rec.book);
+                const match = candidates.length
+                    ? allRows.find(r => eventDedupeKey(r.event || '') === evDk
+                        && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
+                        && candidates.includes(String(r.propType))
+                        && Number.isFinite(Number(r.result)))
+                    : undefined;
+                if (!match || rec.line == null || !Number.isFinite(Number(rec.line))) {
+                    return { rec, outcome: 'pending', actual: null };
+                }
+                const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
+                const hit = rec.dir === 'OVER' ? actual > Number(rec.line) : actual < Number(rec.line);
+                return { rec, outcome: hit ? 'hit' : 'miss', actual };
+            });
+            events.push({ evKey, newest: Math.max(0, ...legsList.map(r => Number(r.placedAt) || 0)), legs });
+        }
+        events.sort((a, b) => b.newest - a.newest);
+        const flat = events.flatMap(e => e.legs);
+        const settled = flat.filter(l => l.outcome !== 'pending').length;
+        const hits = flat.filter(l => l.outcome === 'hit').length;
+        if (!events.length) {
+            return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0 };
+        }
+        const html = events.map(e => {
+            const evSettled = e.legs.filter(l => l.outcome !== 'pending').length;
+            const evHits = e.legs.filter(l => l.outcome === 'hit').length;
+            const evSummary = evSettled
+                ? `<span class="plg-ev-record ${evHits * 2 >= evSettled ? 'good' : 'bad'}">${evHits}/${evSettled} hit</span>`
+                : `<span class="plg-ev-record">all pending</span>`;
+            const rows = e.legs.map(l => {
+                const r = l.rec;
+                const unit = r.source === 'ft' ? 'm' : '';
+                const status = l.outcome === 'hit'
+                    ? `<span class="plg-status hit" title="Settled: actual ${l.actual}${unit} vs line ${r.line} — your ${r.dir} hit">✓ HIT</span>`
+                    : l.outcome === 'miss'
+                        ? `<span class="plg-status miss" title="Settled: actual ${l.actual}${unit} vs line ${r.line} — your ${r.dir} missed">✗ MISS</span>`
+                        : `<span class="plg-status pending" title="No settled archive result for this prop yet">○ PENDING</span>`;
+                const actualHtml = l.actual != null
+                    ? `<span class="plg-actual">actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
+                    : '';
+                return `<div class="plg-leg">
+          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span></span>
+          ${actualHtml}${status}
+        </div>`;
+            }).join('');
+            return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
+        }).join('');
+        return { html, settled, hits, total: flat.length };
+    })();
+    const placedLedgerSummary = placedLedgerData.total
+        ? `<span style="font-size:10px;color:var(--text-muted)">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${placedLedgerData.settled ? `${placedLedgerData.hits}/${placedLedgerData.settled} settled hit` : 'none settled yet'}</span>`
+        : `<span style="font-size:10px;color:var(--text-muted)">no placed legs yet</span>`;
     // ── Per-event breakdown ────────────────────────────────────────────────
     // key = dedup key, value includes display name, date, and counts
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -11654,6 +11743,7 @@ async function renderArchivePanel(container) {
     ${cSec('events', '', '', 'Per-Event Results', `${resolvedRows.length} resolved`, eventHtml, 'margin-bottom:12px')}
     ${cSec('ai-accuracy', '', '', 'AI Pick Accuracy by Stat Type', `<span style="font-size:10px;color:var(--text-muted)">lean direction correct (over + under)</span>`, statSummaryHtml, 'margin-bottom:12px')}
     ${cSec('entry-clv', '', '', 'Your CLV (entry → close)', `<span style="font-size:10px;color:var(--text-muted)">avg Δ from entry line · positive = you beat the close</span>`, entryClvHtml, 'margin-bottom:12px')}
+    ${cSec('placed-ledger', '', '', 'My Placed Ledger', placedLedgerSummary, placedLedgerData.html, 'margin-bottom:12px')}
     <div class="best-picks-grid">
       ${cSec('fp-hitrate', 'over', 'takes', 'Fantasy Line Hit Rate (Current Roster)', `${fantasyHits}/${fantasyTotal} · ${fantasyHitRate}%`, topFantasyHtml)}
     </div>

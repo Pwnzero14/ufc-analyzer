@@ -27199,6 +27199,77 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(38,208,124,0.5);
   background: rgba(38,208,124,0.08);
 }
+
+/* ── GLOW-UP 172: Placed Ledger (Placed → Learning level 1) ──
+   Data-view section: every ● PLACED leg grouped by event, joined against
+   the archive — ✓ HIT / ✗ MISS with the actual number, ○ PENDING while
+   unsettled. Reuses the tray's dir/line/stat text styles (bps-*). ── */
+.plg-event { margin-bottom: 10px; }
+.plg-ev-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.plg-ev-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text2);
+  flex: 1;
+}
+.plg-ev-record {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  color: var(--text3);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.plg-ev-record.good { color: #6ee7a8; border-color: rgba(38,208,124,0.30); background: rgba(38,208,124,0.05); }
+.plg-ev-record.bad  { color: #ff8fa3; border-color: rgba(255,91,120,0.30); background: rgba(255,91,120,0.05); }
+.plg-leg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text);
+}
+.plg-leg:hover { background: rgba(255,255,255,0.03); }
+.plg-leg-main { flex: 1; }
+.plg-book {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text3);
+}
+.plg-actual {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.plg-actual b { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+.plg-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: help;
+}
+.plg-status.hit  { color: #6ee7a8; background: rgba(38,208,124,0.08); border: 1px solid rgba(38,208,124,0.35); }
+.plg-status.miss { color: #ff8fa3; background: rgba(255,91,120,0.08); border: 1px solid rgba(255,91,120,0.35); }
+.plg-status.pending { color: var(--text3); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.10); }
 </style>
 </head>
 <body>
