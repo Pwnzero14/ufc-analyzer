@@ -27350,6 +27350,72 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .plg-status.hit  { color: #6ee7a8; background: rgba(38,208,124,0.08); border: 1px solid rgba(38,208,124,0.35); }
 .plg-status.miss { color: #ff8fa3; background: rgba(255,91,120,0.08); border: 1px solid rgba(255,91,120,0.35); }
 .plg-status.pending { color: var(--text3); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.10); }
+
+/* ── GLOW-UP 177: Parlay Lab level 1 — pool command strip ──
+   Sort (CONF/EV/TIER) + stat-family chips + OVER/UNDER filter above the
+   AVAILABLE LEGS pool. Same gold-active vocabulary as the Best Picks 167
+   strip, sized down for the narrower pool column. ── */
+.plq-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 2px 0 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.02);
+}
+.plq-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.plq-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text3);
+  margin-right: 1px;
+}
+.plq-btn, .plq-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.plq-btn:hover, .plq-chip:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+.plq-btn.on, .plq-chip.on {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.45);
+  background: rgba(248,198,74,0.07);
+}
+.plq-chip i {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 7px;
+  opacity: 0.55;
+  margin-left: 1px;
+}
+.plq-reset {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  margin-left: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--gold);
+  background: rgba(248,198,74,0.06);
+  border: 1px solid rgba(248,198,74,0.35);
+}
+.plq-reset:hover { background: rgba(248,198,74,0.12); }
 </style>
 </head>
 <body>
