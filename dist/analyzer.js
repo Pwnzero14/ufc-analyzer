@@ -10552,11 +10552,6 @@ async function renderArchivePanel(container) {
         const b = m[2].trim().split(/\s+/).pop().toLowerCase();
         return [a, b].sort().join('|');
     }
-    // ── GLOW-UP 172 (Placed → Learning level 1): Placed Ledger ─────────────
-    // Every leg the user marked ● PLACED (best_picks_placed_v1, keyed per
-    // event), live-joined against the archive: ✓ HIT / ✗ MISS with the actual
-    // number once the prop settles, ○ PENDING until then. Read-only join —
-    // persistence of outcomes is level 3's job.
     const placedLedgerData = (() => {
         const placedRaw = result[STORAGE_BEST_PICKS_PLACED_KEY];
         const placedAll = placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)
@@ -10639,24 +10634,33 @@ async function renderArchivePanel(container) {
             return { settled, hits };
         };
         const events = [];
+        // GLOW-UP 174: legs that just settled get their outcome queued for
+        // write-back so history survives archive pruning; legs with a persisted
+        // outcome skip the archive lookup entirely (storage wins over recompute).
+        const updates = [];
         for (const [evKey, legsMap] of Object.entries(placedAll)) {
-            const legsList = Object.values(legsMap || {}).filter(r => r && typeof r === 'object');
-            if (!legsList.length)
+            const legEntries = Object.entries(legsMap || {}).filter(([, r]) => r && typeof r === 'object');
+            if (!legEntries.length)
                 continue;
             const evDk = eventDedupeKey(evKey);
-            const legs = legsList.map(rec => {
+            const legs = legEntries.map(([legKey, rec]) => {
+                if (rec.outcome === 'hit' || rec.outcome === 'miss') {
+                    return { rec, outcome: rec.outcome, actual: rec.actual ?? null };
+                }
                 const dir = rec.dir === 'OVER' ? 'over' : 'under';
                 const res = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, dir);
+                if (res.outcome !== 'pending')
+                    updates.push({ evKey, legKey, outcome: res.outcome, actual: res.actual });
                 return { rec, outcome: res.outcome, actual: res.actual };
             });
-            events.push({ evKey, newest: Math.max(0, ...legsList.map(r => Number(r.placedAt) || 0)), legs });
+            events.push({ evKey, newest: Math.max(0, ...legEntries.map(([, r]) => Number(r.placedAt) || 0)), legs });
         }
         events.sort((a, b) => b.newest - a.newest);
         const flat = events.flatMap(e => e.legs);
         const settled = flat.filter(l => l.outcome !== 'pending').length;
         const hits = flat.filter(l => l.outcome === 'hit').length;
         if (!events.length) {
-            return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0 };
+            return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0, updates: [] };
         }
         let boardSettledTotal = 0, boardHitsTotal = 0;
         const html = events.map(e => {
@@ -10693,8 +10697,34 @@ async function renderArchivePanel(container) {
             }).join('');
             return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
         }).join('');
-        return { html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal };
+        return { html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
     })();
+    // GLOW-UP 174: write freshly settled outcomes back onto the placed records
+    // — read-modify-write of the full store, fire-and-forget (a failed write
+    // just means the same legs re-resolve from the archive next render).
+    if (placedLedgerData.updates.length) {
+        void (async () => {
+            try {
+                const payload = await storageGet([STORAGE_BEST_PICKS_PLACED_KEY]);
+                const raw = payload[STORAGE_BEST_PICKS_PLACED_KEY];
+                const all = raw && typeof raw === 'object' && !Array.isArray(raw)
+                    ? { ...raw }
+                    : {};
+                let changed = false;
+                const now = Date.now();
+                for (const u of placedLedgerData.updates) {
+                    const ev = all[u.evKey];
+                    if (!ev || !ev[u.legKey] || ev[u.legKey].outcome)
+                        continue;
+                    ev[u.legKey] = { ...ev[u.legKey], outcome: u.outcome, actual: u.actual, resolvedAt: now };
+                    changed = true;
+                }
+                if (changed)
+                    await storageSet({ [STORAGE_BEST_PICKS_PLACED_KEY]: all });
+            }
+            catch { /* best-effort — archive re-resolve covers a failed write */ }
+        })();
+    }
     // GLOW-UP 173: all-time roll-up in the section header — your settled hit
     // rate vs the board's, scoped to events where you actually placed legs.
     const placedLedgerSummary = (() => {
