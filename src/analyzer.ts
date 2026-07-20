@@ -10902,12 +10902,20 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const legs: LedgerLeg[] = legsList.map(rec => {
         const fighterNorm = normalizeName(rec.name)?.toLowerCase() || rec.name.toLowerCase();
         const candidates = propTypesFor(rec.source, rec.book);
+        // Settled = finite result AND the row's date is in the past — the
+        // archive holds rows for the UPCOMING event too, and some carry a
+        // result value; without the date guard those grade prematurely
+        // (same ts <= nowTs guard the Learning widget and Per-Event use).
         const match = candidates.length
-          ? allRows.find(r =>
-              eventDedupeKey(r.event || '') === evDk
-              && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
-              && candidates.includes(String(r.propType))
-              && Number.isFinite(Number(r.result)))
+          ? allRows.find(r => {
+              const ts = Date.parse(r.date);
+              return eventDedupeKey(r.event || '') === evDk
+                && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
+                && candidates.includes(String(r.propType))
+                && Number.isFinite(Number(r.result))
+                && Number.isFinite(ts)
+                && ts <= nowTs;
+            })
           : undefined;
         if (!match || rec.line == null || !Number.isFinite(Number(rec.line))) {
           return { rec, outcome: 'pending' as const, actual: null };
