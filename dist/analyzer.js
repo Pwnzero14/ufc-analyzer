@@ -199,6 +199,52 @@ const BP_SLATE_BOOK_ABBR = { pick6: 'P6', underdog: 'UD', prizepicks: 'PP', betr
 const STORAGE_BEST_PICKS_PLACED_KEY = 'best_picks_placed_v1';
 const bestPicksPlaced = new Map();
 const bestPicksEventKey = () => ((upcomingEventName || inferredEventNameFromLines || '').trim() || 'Unknown Event').toLowerCase();
+// GLOW-UP 176/180: aggregate settled placed legs into a personal record
+// keyed `source|direction` (e.g. "ft|under"). Shared by the Best Picks
+// calibration chips (176) and the Parlay Lab ones (180) so the two views
+// can never compute a different personal hit rate.
+function aggregatePlacedPersonalRecord(placedRaw) {
+    const rec = new Map();
+    if (!placedRaw || typeof placedRaw !== 'object' || Array.isArray(placedRaw))
+        return rec;
+    for (const evLegs of Object.values(placedRaw)) {
+        if (!evLegs || typeof evLegs !== 'object')
+            continue;
+        for (const r of Object.values(evLegs)) {
+            if (!r || typeof r !== 'object' || (r.outcome !== 'hit' && r.outcome !== 'miss'))
+                continue;
+            const k = `${r.source}|${String(r.dir || '').toLowerCase()}`;
+            const cur = rec.get(k) || { hits: 0, total: 0 };
+            cur.total++;
+            if (r.outcome === 'hit')
+                cur.hits++;
+            rec.set(k, cur);
+        }
+    }
+    return rec;
+}
+// GLOW-UP 180: module-level cache so the synchronous Parlay Lab render can
+// read the personal record without a storage round-trip; refreshed async
+// and signature-gated so it re-renders exactly once when the data changes.
+const placedPersonalRecord = new Map();
+let placedPersonalRecordSig = '';
+async function refreshPlacedPersonalRecord() {
+    try {
+        const payload = await storageGet([STORAGE_BEST_PICKS_PLACED_KEY]);
+        const rec = aggregatePlacedPersonalRecord(payload[STORAGE_BEST_PICKS_PLACED_KEY]);
+        const sig = [...rec.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => `${k}:${v.hits}/${v.total}`).join(',');
+        if (sig === placedPersonalRecordSig)
+            return false;
+        placedPersonalRecordSig = sig;
+        placedPersonalRecord.clear();
+        for (const [k, v] of rec)
+            placedPersonalRecord.set(k, v);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 async function persistBestPicksPlaced() {
     try {
         const payload = await storageGet([STORAGE_BEST_PICKS_PLACED_KEY]);
@@ -7269,22 +7315,8 @@ function renderBestPicks(container, renderSeq = 0) {
                         bestPicksPlaced.set(k, v);
                 }
             }
-            if (placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)) {
-                for (const evLegs of Object.values(placedRaw)) {
-                    if (!evLegs || typeof evLegs !== 'object')
-                        continue;
-                    for (const rec of Object.values(evLegs)) {
-                        if (!rec || typeof rec !== 'object' || (rec.outcome !== 'hit' && rec.outcome !== 'miss'))
-                            continue;
-                        const k = `${rec.source}|${String(rec.dir || '').toLowerCase()}`;
-                        const cur = bpPersonalRecord.get(k) || { hits: 0, total: 0 };
-                        cur.total++;
-                        if (rec.outcome === 'hit')
-                            cur.hits++;
-                        bpPersonalRecord.set(k, cur);
-                    }
-                }
-            }
+            for (const [k, v] of aggregatePlacedPersonalRecord(placedRaw))
+                bpPersonalRecord.set(k, v);
         }
         const archiveRowsRaw = archivePayload[STORAGE_PROP_ARCHIVE_KEY];
         const archiveRows = Array.isArray(archiveRowsRaw) ? archiveRowsRaw : [];
@@ -9355,6 +9387,22 @@ function renderParlayLab(container) {
         container.innerHTML = '<div class="inline-empty-msg">No fighters match selected source filters</div>';
         return;
     }
+    // GLOW-UP 180: refresh the personal-record cache (async, storage-backed);
+    // re-render once if it actually changed, so calibration chips appear even
+    // when Parlay Lab is the first view opened. Signature-gated → no loop.
+    void refreshPlacedPersonalRecord().then((changed) => {
+        if (changed && currentView === 'parlaylab')
+            renderParlayLab(container);
+    });
+    // YOU n/m chip for a leg's stat + direction — informational only (house
+    // rule: never mutates model confidence); needs 2+ settled legs.
+    const parlayYouTag = (stat, dir) => {
+        const r = placedPersonalRecord.get(`${stat}|${dir}`);
+        if (!r || r.total < 2)
+            return '';
+        const lbl = stat === 'ss_r1' ? 'R1 SS' : stat.toUpperCase();
+        return `<span class="bp-you ${r.hits * 2 >= r.total ? 'good' : 'bad'}" title="Your settled record on ${lbl} ${dir.toUpperCase()} legs you placed (from My Placed Ledger) — informational only, does not affect model confidence or health">YOU ${r.hits}/${r.total}</span>`;
+    };
     // Build available legs
     const availableLegs = [];
     for (const f of visibleFighters) {
@@ -9490,6 +9538,7 @@ function renderParlayLab(container) {
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
       ${platChip}
+      ${parlayYouTag(a.leg.stat, a.leg.direction)}
       <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
     </div>`;
     }).join('');
@@ -9516,6 +9565,7 @@ function renderParlayLab(container) {
           <span class="parlay-leg-stat src-${l.stat}">${l.stat === 'ss_r1' ? 'R1 SS' : l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
           ${platChip}
+          ${parlayYouTag(l.stat, l.direction)}
           <button class="parlay-slip-copy" data-parlay-clip="${clip.replace(/"/g, '&quot;')}" title="Copy slip line: ${clip.replace(/"/g, '&quot;')}">⧉</button>
         </div>`;
         }).join('')
