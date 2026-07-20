@@ -9871,6 +9871,7 @@ function renderParlayLab(container: HTMLElement): void {
     const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m): m is string => !!m) || null;
 
     let payoutHtml = '';
+    let bestBookHtml = '';
     if (!slipContradiction) {
       const evRows: { label: string; mult: number; ev: number }[] = [];
       for (const key of Object.keys(PICKEM_PAYOUTS)) {
@@ -9883,13 +9884,19 @@ function renderParlayLab(container: HTMLElement): void {
       }
       evRows.sort((a, b) => b.ev - a.ev);
       if (evRows.length) {
-        payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs (Gaussian copula)' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them.">${evRows.map((r) => `<span class="pss-ev ${r.ev >= 0 ? 'pos' : 'neg'}">${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
+        // GLOW-UP 179: the best-EV book is the headline — the number that
+        // decides WHERE to place. The full per-book list stays as a trailing
+        // strip with the winner marked, so the ranking is still legible.
+        const best = evRows[0];
+        bestBookHtml = `<span class="pss-bestbook ${best.ev >= 0 ? 'pos' : 'neg'}" title="Highest-EV book for this ${n}-leg slip at ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs' : ' (independent)'}. Where this slip prices best — verify multipliers in-app, promos and boosts change them.">BEST BOOK <b class="pss-bb-name">${best.label}</b> <span class="pss-bb-mult">${best.mult}x</span> <b class="pss-bb-ev">${best.ev >= 0 ? '+' : ''}${best.ev}%</b></span>`;
+        payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs (Gaussian copula)' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them.">${evRows.map((r, idx) => `<span class="pss-ev ${idx === 0 ? 'best ' : ''}${r.ev >= 0 ? 'pos' : 'neg'}">${idx === 0 ? '★ ' : ''}${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
       }
     }
 
     slipSummaryHtml = `<div class="parlay-slip-summary">
       <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
       <span class="pss-item" title="${anyCorr ? 'Joint P(all hit) — correlation-adjusted for same-fight legs via a duration copula, not the independent product' : 'Product of independent leg probabilities'} (clamped 35-85)">COMBINED <b>~${combined}%</b></span>
+      ${bestBookHtml}
       <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
       ${maxPosCorr >= 0.5 ? `<span class="pss-corr" title="Same-fight legs here are strongly positively correlated — they mostly hit or miss together, so this slip is closer to ONE bet than ${selectedLegs.length}. The combined % and EV account for it, but you are not diversifying.">🔗 ~1 BET (correlated)</span>` : anyCorr ? `<span class="pss-corr" title="Same-fight legs are correlated — the combined % and EV are the joint probability, not the independent product.">🔗 corr-adjusted</span>` : ''}
       ${payoutHtml}
