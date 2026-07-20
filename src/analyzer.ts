@@ -10835,7 +10835,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   }
 
   const [result, linesPayload] = await Promise.all([
-    storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY]),
+    storageGet<Record<string, unknown>>([STORAGE_PROP_ARCHIVE_KEY, STORAGE_BEST_PICKS_PLACED_KEY, STORAGE_BEST_PICKS_SNAPSHOT_KEY]),
     storageGet<Record<string, unknown>>(STORAGE_LINE_KEYS as unknown as string[]),
   ]);
   const allRowsRaw = result[STORAGE_PROP_ARCHIVE_KEY];
@@ -10875,7 +10875,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   // event), live-joined against the archive: ✓ HIT / ✗ MISS with the actual
   // number once the prop settles, ○ PENDING until then. Read-only join —
   // persistence of outcomes is level 3's job.
-  const placedLedgerData = ((): { html: string; settled: number; hits: number; total: number } => {
+  const placedLedgerData = ((): { html: string; settled: number; hits: number; total: number; boardSettled: number; boardHits: number } => {
     const placedRaw = result[STORAGE_BEST_PICKS_PLACED_KEY];
     const placedAll: Record<string, Record<string, { name: string; pretty: string; dir: string; source: string; statLabel: string; line: number | null; book: string | null; bookLabel: string; opponent: string | null; placedAt: number }>> =
       placedRaw && typeof placedRaw === 'object' && !Array.isArray(placedRaw)
@@ -10893,6 +10893,57 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       if (source === 'kd') return ['KD'];
       return [];
     };
+    // Shared date-guarded resolver — used for both your legs and the board's
+    // suggested picks so the two sides can never be graded differently.
+    const resolveVsArchive = (evDk: string, fighterRaw: string, candidates: string[], line: number | null, dir: 'over' | 'under'): { outcome: 'hit' | 'miss' | 'pending'; actual: number | null } => {
+      if (!candidates.length || line == null || !Number.isFinite(Number(line))) return { outcome: 'pending', actual: null };
+      const fighterNorm = normalizeName(fighterRaw)?.toLowerCase() || fighterRaw.toLowerCase();
+      const match = allRows.find(r => {
+        const ts = Date.parse(r.date);
+        return eventDedupeKey(r.event || '') === evDk
+          && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
+          && candidates.includes(String(r.propType))
+          && Number.isFinite(Number(r.result))
+          && Number.isFinite(ts)
+          && ts <= nowTs;
+      });
+      if (!match) return { outcome: 'pending', actual: null };
+      const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
+      const hit = dir === 'over' ? actual > Number(line) : actual < Number(line);
+      return { outcome: hit ? 'hit' : 'miss', actual };
+    };
+
+    // GLOW-UP 173 (level 2): the board's side of the comparison — latest
+    // snapshot per event (closing board) from best_picks_snapshots_v1,
+    // resolved through the same resolver. Compared only on events where
+    // the user placed something, so the baseline is apples-to-apples.
+    const snapsRaw = result[STORAGE_BEST_PICKS_SNAPSHOT_KEY];
+    const snaps = Array.isArray(snapsRaw) ? (snapsRaw as Array<{ event?: string; date?: string; picks?: Array<{ fighter?: string; lean?: string; line?: number | null; source?: string; platform?: string }> }>) : [];
+    const latestSnapByDk = new Map<string, typeof snaps[number]>();
+    for (const s of snaps) {
+      const dk = eventDedupeKey(String(s?.event || ''));
+      if (!dk) continue;
+      const prev = latestSnapByDk.get(dk);
+      if (!prev || Date.parse(String(s?.date || '')) > Date.parse(String(prev?.date || ''))) latestSnapByDk.set(dk, s);
+    }
+    const boardPropTypesFor = (source: string, platformLabel: string): string[] => {
+      if (source === 'fp') return /prizepicks|(^|\s)PP\b/i.test(platformLabel) ? ['Fantasy_PP', 'Fantasy'] : ['Fantasy', 'Fantasy_PP'];
+      return propTypesFor(source, null);
+    };
+    const boardStatsFor = (evDk: string): { settled: number; hits: number } => {
+      const snap = latestSnapByDk.get(evDk);
+      let settled = 0, hits = 0;
+      for (const p of (snap?.picks || [])) {
+        const lean = String(p?.lean || '');
+        if (lean !== 'over' && lean !== 'under') continue;
+        const res = resolveVsArchive(evDk, String(p?.fighter || ''), boardPropTypesFor(String(p?.source || 'fp'), String(p?.platform || '')), p?.line ?? null, lean);
+        if (res.outcome === 'pending') continue;
+        settled++;
+        if (res.outcome === 'hit') hits++;
+      }
+      return { settled, hits };
+    };
+
     type LedgerLeg = { rec: typeof placedAll[string][string]; outcome: 'hit' | 'miss' | 'pending'; actual: number | null };
     const events: { evKey: string; newest: number; legs: LedgerLeg[] }[] = [];
     for (const [evKey, legsMap] of Object.entries(placedAll)) {
@@ -10900,29 +10951,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       if (!legsList.length) continue;
       const evDk = eventDedupeKey(evKey);
       const legs: LedgerLeg[] = legsList.map(rec => {
-        const fighterNorm = normalizeName(rec.name)?.toLowerCase() || rec.name.toLowerCase();
-        const candidates = propTypesFor(rec.source, rec.book);
-        // Settled = finite result AND the row's date is in the past — the
-        // archive holds rows for the UPCOMING event too, and some carry a
-        // result value; without the date guard those grade prematurely
-        // (same ts <= nowTs guard the Learning widget and Per-Event use).
-        const match = candidates.length
-          ? allRows.find(r => {
-              const ts = Date.parse(r.date);
-              return eventDedupeKey(r.event || '') === evDk
-                && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
-                && candidates.includes(String(r.propType))
-                && Number.isFinite(Number(r.result))
-                && Number.isFinite(ts)
-                && ts <= nowTs;
-            })
-          : undefined;
-        if (!match || rec.line == null || !Number.isFinite(Number(rec.line))) {
-          return { rec, outcome: 'pending' as const, actual: null };
-        }
-        const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
-        const hit = rec.dir === 'OVER' ? actual > Number(rec.line) : actual < Number(rec.line);
-        return { rec, outcome: hit ? 'hit' as const : 'miss' as const, actual };
+        const dir = rec.dir === 'OVER' ? 'over' as const : 'under' as const;
+        const res = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, dir);
+        return { rec, outcome: res.outcome, actual: res.actual };
       });
       events.push({ evKey, newest: Math.max(0, ...legsList.map(r => Number(r.placedAt) || 0)), legs });
     }
@@ -10931,14 +10962,25 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     const settled = flat.filter(l => l.outcome !== 'pending').length;
     const hits = flat.filter(l => l.outcome === 'hit').length;
     if (!events.length) {
-      return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0 };
+      return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0 };
     }
+    let boardSettledTotal = 0, boardHitsTotal = 0;
     const html = events.map(e => {
       const evSettled = e.legs.filter(l => l.outcome !== 'pending').length;
       const evHits = e.legs.filter(l => l.outcome === 'hit').length;
+      // GLOW-UP 173: board baseline for this event — only meaningful once
+      // something settled on either side.
+      const board = boardStatsFor(eventDedupeKey(e.evKey));
+      boardSettledTotal += board.settled;
+      boardHitsTotal += board.hits;
+      const youRate = evSettled ? evHits / evSettled : null;
+      const boardRate = board.settled ? board.hits / board.settled : null;
+      const boardChip = board.settled
+        ? `<span class="plg-ev-record board" title="The board's full suggested slate for this event (latest snapshot), graded by the same resolver: ${board.hits}/${board.settled} hit">BOARD ${board.hits}/${board.settled}</span>`
+        : '';
       const evSummary = evSettled
-        ? `<span class="plg-ev-record ${evHits * 2 >= evSettled ? 'good' : 'bad'}">${evHits}/${evSettled} hit</span>`
-        : `<span class="plg-ev-record">all pending</span>`;
+        ? `<span class="plg-ev-record ${youRate != null && (boardRate == null || youRate >= boardRate) ? 'good' : 'bad'}" title="Your placed legs for this event: ${evHits}/${evSettled} hit${boardRate != null ? ` · board baseline ${Math.round(boardRate * 100)}%` : ''}">YOU ${evHits}/${evSettled}</span>${boardChip}`
+        : `<span class="plg-ev-record">all pending</span>${boardChip}`;
       const rows = e.legs.map(l => {
         const r = l.rec;
         const unit = r.source === 'ft' ? 'm' : '';
@@ -10957,11 +10999,20 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
     }).join('');
-    return { html, settled, hits, total: flat.length };
+    return { html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal };
   })();
-  const placedLedgerSummary = placedLedgerData.total
-    ? `<span style="font-size:10px;color:var(--text-muted)">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${placedLedgerData.settled ? `${placedLedgerData.hits}/${placedLedgerData.settled} settled hit` : 'none settled yet'}</span>`
-    : `<span style="font-size:10px;color:var(--text-muted)">no placed legs yet</span>`;
+  // GLOW-UP 173: all-time roll-up in the section header — your settled hit
+  // rate vs the board's, scoped to events where you actually placed legs.
+  const placedLedgerSummary = ((): string => {
+    if (!placedLedgerData.total) return `<span style="font-size:10px;color:var(--text-muted)">no placed legs yet</span>`;
+    const you = placedLedgerData.settled
+      ? `YOU ${placedLedgerData.hits}/${placedLedgerData.settled} (${Math.round((placedLedgerData.hits / placedLedgerData.settled) * 100)}%)`
+      : 'none settled yet';
+    const board = placedLedgerData.boardSettled
+      ? ` · BOARD ${placedLedgerData.boardHits}/${placedLedgerData.boardSettled} (${Math.round((placedLedgerData.boardHits / placedLedgerData.boardSettled) * 100)}%)`
+      : '';
+    return `<span style="font-size:10px;color:var(--text-muted)">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${you}${board}</span>`;
+  })();
 
   // ── Per-event breakdown ────────────────────────────────────────────────
   // key = dedup key, value includes display name, date, and counts
