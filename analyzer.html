@@ -27467,6 +27467,34 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(38,208,124,0.5);
   background: rgba(38,208,124,0.08);
 }
+
+/* ── GLOW-UP 179: Parlay Lab level 3 — best-book headline ──
+   The highest-EV book is promoted from the trailing payout strip into a
+   headline chip; the winner in the full strip gets a ★ and a gold ring. ── */
+.pss-bestbook {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  cursor: help;
+  color: var(--gold);
+  background: rgba(248,198,74,0.09);
+  border: 1px solid rgba(248,198,74,0.40);
+}
+.pss-bestbook .pss-bb-name { color: var(--text); font-weight: 800; }
+.pss-bestbook .pss-bb-mult { color: var(--text2); }
+.pss-bestbook .pss-bb-ev { font-weight: 800; }
+.pss-bestbook.pos .pss-bb-ev { color: #6ee7a8; }
+.pss-bestbook.neg { color: #e0a97f; background: rgba(220,150,80,0.08); border-color: rgba(220,150,80,0.35); }
+.pss-bestbook.neg .pss-bb-ev { color: #ff8fa3; }
+.pss-ev.best {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.45) !important;
+  background: rgba(248,198,74,0.08) !important;
+}
 </style>
 </head>
 <body>
