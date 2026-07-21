@@ -5421,6 +5421,11 @@ body::before {
    :has() scopes it to the DATA views and self-clears when the rail is gone, so
    there's no class to remember to strip on view switch. */
 #cardContainer:has(> .data-subnav) { padding-bottom: 60vh; }
+/* The fighter column header sticks to this same offset and labels columns
+   (FIGHTER / LINES / AVG FP / LEAN) that the DATA views don't render — it was
+   already meaningless there, and the rail would sit on top of it. Scoped from
+   body because the header is an EARLIER sibling than #cardContainer. */
+body:has(#cardContainer > .data-subnav) .fighter-header-row { display: none; }
 @media (max-width: 1100px) {
   .data-subnav { top: 54px; }
 }
