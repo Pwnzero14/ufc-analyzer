@@ -10418,6 +10418,76 @@ async function loadLineHistory() {
 function getLineHistoryForFighter(name, stat) {
     return _lineHistory.series[lineHistoryKey(name, stat)] || [];
 }
+// ── CHIP MICRO-SPARKLINE ──────────────────────────────────────────────────
+// A ~9px strip inside a platform line chip showing how that ONE book's line has
+// moved across recent snapshots. The Line Movers strip stays the summary view
+// and buildLineTimelinePanel stays the full chart — this puts the shape of the
+// move next to the number you actually read.
+const CHIP_SPARK_W = 44;
+const CHIP_SPARK_H = 12;
+const CHIP_SPARK_TAIL = 7; // viewBox units held at the current value
+function buildChipSparkline(name, stat, platform) {
+    const history = getLineHistoryForFighter(name, stat);
+    if (history.length < 2)
+        return '';
+    const vals = [];
+    for (const pt of history) {
+        const v = pt.v[platform];
+        if (v != null && Number.isFinite(v))
+            vals.push({ t: pt.t, v });
+    }
+    if (vals.length < 2)
+        return '';
+    const first = vals[0].v;
+    const last = vals[vals.length - 1].v;
+    // Same plausibility gate the movement badge uses — a corrupt baseline should
+    // draw nothing rather than a convincing-looking lie.
+    const delta = sanitizeDelta(stat, parseFloat((last - first).toFixed(1)));
+    if (delta == null)
+        return '';
+    const dirClass = delta > 0 ? 'spark-up' : delta < 0 ? 'spark-down' : 'spark-flat';
+    const moves = vals.reduce((c, p, i) => (i > 0 && p.v !== vals[i - 1].v ? c + 1 : c), 0);
+    const tMin = vals[0].t;
+    const tMax = vals[vals.length - 1].t;
+    const spanH = Math.max(1, Math.round((tMax - tMin) / 3600000));
+    const platLabel = platform === 'betr' ? 'BT' : platform.toUpperCase();
+    const tip = moves === 0
+        ? `${platLabel} ${stat.toUpperCase()} held at ${last} across ${vals.length} snapshots (~${spanH}h)`
+        : `${platLabel} ${stat.toUpperCase()} ${first} → ${last} (${delta > 0 ? '+' : ''}${delta}) · ${moves} move${moves === 1 ? '' : 's'} over ~${spanH}h`;
+    const w = CHIP_SPARK_W, h = CHIP_SPARK_H, pad = 1.5;
+    const tRange = (tMax - tMin) || 1;
+    const seriesVals = vals.map(p => p.v);
+    const vMin = Math.min(...seriesVals);
+    const vMax = Math.max(...seriesVals);
+    const vRange = vMax - vMin;
+    let body;
+    if (vRange === 0) {
+        const y = (h / 2).toFixed(1);
+        body = `<line x1="${pad}" y1="${y}" x2="${(w - pad).toFixed(1)}" y2="${y}" stroke-dasharray="3,2.5"/>`;
+    }
+    else {
+        // Reserve a tail so the CURRENT value always sits on a visible plateau.
+        // Without it the newest snapshot lands flush on the right edge and a move
+        // reads as a bare spike with no level to read it against.
+        const plotW = w - pad * 2 - CHIP_SPARK_TAIL;
+        const pts = vals.map(p => ({
+            x: pad + ((p.t - tMin) / tRange) * plotW,
+            y: pad + (h - pad * 2) - ((p.v - vMin) / vRange) * (h - pad * 2),
+        }));
+        // Step path — a posted line holds its value until the book moves it.
+        let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+        for (let i = 1; i < pts.length; i++) {
+            d += ` L${pts[i].x.toFixed(1)},${pts[i - 1].y.toFixed(1)} L${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`;
+        }
+        const lastY = pts[pts.length - 1].y.toFixed(1);
+        d += ` L${(w - pad).toFixed(1)},${lastY}`;
+        // No head marker: the x axis is stretched by preserveAspectRatio="none", which
+        // non-scaling-stroke fixes for the stroke but not for a filled shape — a dot
+        // came out an ellipse. The plateau tail already marks the current level.
+        body = `<path d="${d}" fill="none"/>`;
+    }
+    return `<svg class="line-spark ${dirClass}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"><title>${tip}</title>${body}</svg>`;
+}
 function snapshotLineHistory() {
     if (allFighters.length === 0)
         return;
@@ -15670,7 +15740,8 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
             ? `<div class="best-shop-badge" title="Best line for ${leanDir?.toUpperCase()} on ${sourceLabel}: ${value} vs other books">best</div>`
             : '';
         const lineClass = isBest ? ' best-line' : isWorst ? ' worst-line' : '';
-        return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${bestBadge}</div>`;
+        const sparkHtml = buildChipSparkline(f.name, stat, source);
+        return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${sparkHtml}${bestBadge}</div>`;
     };
     function platformStatLine(entry, stat) {
         if (!entry)

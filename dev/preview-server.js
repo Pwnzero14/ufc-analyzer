@@ -66,6 +66,25 @@ http.createServer((req, res) => {
   if (url === '/dev/storage-backup.json') {
     const p = newestBackupPath();
     if (!p) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
+    // Optional dev/preview-overlay.json shallow-merges over the backup's
+    // top-level storage keys. Lets a UI change that depends on a key the newest
+    // backup happens to lack (line_history_v1, say) be inspected without
+    // doctoring the user's real backup files, which are irreplaceable.
+    const overlayPath = path.join(__dirname, 'preview-overlay.json');
+    if (fs.existsSync(overlayPath)) {
+      try {
+        const base = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const overlay = JSON.parse(fs.readFileSync(overlayPath, 'utf8'));
+        // Backups wrap the flat key→value map in a `storage` envelope.
+        if (base && base.storage) base.storage = Object.assign({}, base.storage, overlay);
+        else Object.assign(base, overlay);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(base));
+        return;
+      } catch (e) {
+        console.warn('[preview] overlay merge failed, serving backup as-is:', e.message);
+      }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     fs.createReadStream(p).pipe(res);
     return;
