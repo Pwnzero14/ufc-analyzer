@@ -22,3 +22,4 @@ ufc-auto-backup-*.json
 ufc-storage-backup-*.json
 
 dev/preview-view.txt
+dev/preview-overlay.json

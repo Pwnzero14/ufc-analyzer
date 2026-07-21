@@ -485,6 +485,23 @@ body {
 .line-movement { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; margin-left: 3px; vertical-align: middle; line-height: 1; cursor: default; }
 .line-movement.mv-up   { color: var(--green); }
 .line-movement.mv-down { color: var(--red); }
+/* Micro-sparkline of this book's recent snapshots, inside the line chip */
+.line-spark {
+  display: block; width: 100%; height: 8px;
+  margin-top: 2px; overflow: visible;
+}
+.line-spark path,
+.line-spark line {
+  stroke: currentColor; opacity: 0.72;
+  stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round;
+  /* x is stretched by preserveAspectRatio="none" — keep the stroke honest */
+  vector-effect: non-scaling-stroke;
+}
+.line-spark.spark-up   { color: var(--green); }
+.line-spark.spark-down { color: var(--red); }
+.line-spark.spark-flat { color: var(--text3); opacity: 0.55; }
+.line-cell:hover .line-spark path,
+.line-cell:hover .line-spark line { opacity: 1; }
 .line-value-empty {
   color: var(--text3);
   font-family: 'JetBrains Mono', monospace;
@@ -2656,7 +2673,9 @@ body {
   display: flex;
   gap: 4px;
   flex-wrap: nowrap;
-  align-items: center;
+  /* stretch, not center: only chips with snapshot history carry a sparkline, and
+     centering unequal heights left the rail ragged */
+  align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
