@@ -10446,46 +10446,44 @@ function buildChipSparkline(name, stat, platform) {
     if (delta == null)
         return '';
     const dirClass = delta > 0 ? 'spark-up' : delta < 0 ? 'spark-down' : 'spark-flat';
-    const moves = vals.reduce((c, p, i) => (i > 0 && p.v !== vals[i - 1].v ? c + 1 : c), 0);
     const tMin = vals[0].t;
     const tMax = vals[vals.length - 1].t;
-    const spanH = Math.max(1, Math.round((tMax - tMin) / 3600000));
-    const platLabel = platform === 'betr' ? 'BT' : platform.toUpperCase();
-    const tip = moves === 0
-        ? `${platLabel} ${stat.toUpperCase()} held at ${last} across ${vals.length} snapshots (~${spanH}h)`
-        : `${platLabel} ${stat.toUpperCase()} ${first} → ${last} (${delta > 0 ? '+' : ''}${delta}) · ${moves} move${moves === 1 ? '' : 's'} over ~${spanH}h`;
     const w = CHIP_SPARK_W, h = CHIP_SPARK_H, pad = 1.5;
     const tRange = (tMax - tMin) || 1;
     const seriesVals = vals.map(p => p.v);
     const vMin = Math.min(...seriesVals);
     const vMax = Math.max(...seriesVals);
     const vRange = vMax - vMin;
-    let body;
-    if (vRange === 0) {
-        const y = (h / 2).toFixed(1);
-        body = `<line x1="${pad}" y1="${y}" x2="${(w - pad).toFixed(1)}" y2="${y}" stroke-dasharray="3,2.5"/>`;
+    // A book that has never moved draws nothing. A flat dashed rule sat a few
+    // pixels above the rail's own scrollbar and read as a rendering artifact
+    // rather than data — and "hasn't moved" is the default state, so it earns no
+    // ink. Note a round trip (30 → 31 → 30) still draws: it moved, delta is just 0.
+    if (vRange === 0)
+        return '';
+    // vRange > 0 guarantees at least one consecutive difference, so moves >= 1.
+    const moves = vals.reduce((c, p, i) => (i > 0 && p.v !== vals[i - 1].v ? c + 1 : c), 0);
+    const spanH = Math.max(1, Math.round((tMax - tMin) / 3600000));
+    const platLabel = platform === 'betr' ? 'BT' : platform.toUpperCase();
+    const tip = `${platLabel} ${stat.toUpperCase()} ${first} → ${last} (${delta > 0 ? '+' : ''}${delta}) · ${moves} move${moves === 1 ? '' : 's'} over ~${spanH}h`;
+    // Reserve a tail so the CURRENT value always sits on a visible plateau.
+    // Without it the newest snapshot lands flush on the right edge and a move
+    // reads as a bare spike with no level to read it against.
+    const plotW = w - pad * 2 - CHIP_SPARK_TAIL;
+    const pts = vals.map(p => ({
+        x: pad + ((p.t - tMin) / tRange) * plotW,
+        y: pad + (h - pad * 2) - ((p.v - vMin) / vRange) * (h - pad * 2),
+    }));
+    // Step path — a posted line holds its value until the book moves it.
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) {
+        d += ` L${pts[i].x.toFixed(1)},${pts[i - 1].y.toFixed(1)} L${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`;
     }
-    else {
-        // Reserve a tail so the CURRENT value always sits on a visible plateau.
-        // Without it the newest snapshot lands flush on the right edge and a move
-        // reads as a bare spike with no level to read it against.
-        const plotW = w - pad * 2 - CHIP_SPARK_TAIL;
-        const pts = vals.map(p => ({
-            x: pad + ((p.t - tMin) / tRange) * plotW,
-            y: pad + (h - pad * 2) - ((p.v - vMin) / vRange) * (h - pad * 2),
-        }));
-        // Step path — a posted line holds its value until the book moves it.
-        let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
-        for (let i = 1; i < pts.length; i++) {
-            d += ` L${pts[i].x.toFixed(1)},${pts[i - 1].y.toFixed(1)} L${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`;
-        }
-        const lastY = pts[pts.length - 1].y.toFixed(1);
-        d += ` L${(w - pad).toFixed(1)},${lastY}`;
-        // No head marker: the x axis is stretched by preserveAspectRatio="none", which
-        // non-scaling-stroke fixes for the stroke but not for a filled shape — a dot
-        // came out an ellipse. The plateau tail already marks the current level.
-        body = `<path d="${d}" fill="none"/>`;
-    }
+    const lastY = pts[pts.length - 1].y.toFixed(1);
+    d += ` L${(w - pad).toFixed(1)},${lastY}`;
+    // No head marker: the x axis is stretched by preserveAspectRatio="none", which
+    // non-scaling-stroke fixes for the stroke but not for a filled shape — a dot
+    // came out an ellipse. The plateau tail already marks the current level.
+    const body = `<path d="${d}" fill="none"/>`;
     return `<svg class="line-spark ${dirClass}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"><title>${tip}</title>${body}</svg>`;
 }
 function snapshotLineHistory() {
