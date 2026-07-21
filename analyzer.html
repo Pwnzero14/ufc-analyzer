@@ -5361,6 +5361,70 @@ body::before {
   .fighter-header-row { top: 54px; }
 }
 
+/* ── DATA VIEW SUB-NAV ──────────────────────────────────────────────────
+   Jump rail for the Archive (14 sections) and Calibration (5) accordions.
+   Sits in the same sticky stack as .fighter-header-row, which the DATA views
+   hide, so 88px is free. */
+.data-subnav {
+  position: sticky; top: 88px; z-index: 48;
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 7px 10px;
+  background: rgba(9,13,24,0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  border: 1px solid var(--border2); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.38);
+}
+.dsn-rail {
+  display: flex; align-items: center; gap: 14px;
+  flex: 1; min-width: 0; overflow-x: auto;
+  scrollbar-width: thin; scrollbar-color: rgba(150,150,170,0.25) transparent;
+}
+.dsn-rail::-webkit-scrollbar { height: 4px; }
+.dsn-rail::-webkit-scrollbar-thumb { background: rgba(150,150,170,0.25); border-radius: 2px; }
+.dsn-group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.dsn-group + .dsn-group { border-left: 1px solid var(--border2); padding-left: 14px; }
+.dsn-group-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--text3); margin-right: 2px; white-space: nowrap;
+}
+.dsn-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text2); white-space: nowrap;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 9px; cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.dsn-chip:hover { color: var(--text); border-color: var(--border3); background: var(--bg4); }
+.dsn-chip.active {
+  color: var(--gold); border-color: rgba(248,198,74,0.55);
+  background: rgba(248,198,74,0.10);
+}
+/* Dimmed = section rendered its empty state, so the rail doubles as a coverage
+   map. Still clickable — you may want to see WHY it's empty. */
+.dsn-chip.dsn-empty { opacity: 0.4; }
+.dsn-chip.dsn-empty:hover { opacity: 0.75; }
+.dsn-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.dsn-action {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--text3); background: transparent;
+  border: 1px solid var(--border2); border-radius: 4px;
+  padding: 3px 7px; cursor: pointer;
+  transition: color 0.14s, border-color 0.14s;
+}
+.dsn-action:hover { color: var(--text); border-color: var(--border3); }
+/* Trailing scroll room so the LAST section can still travel up to the rail —
+   without it the page stops scrolling first and that chip could never activate.
+   :has() scopes it to the DATA views and self-clears when the rail is gone, so
+   there's no class to remember to strip on view switch. */
+#cardContainer:has(> .data-subnav) { padding-bottom: 60vh; }
+@media (max-width: 1100px) {
+  .data-subnav { top: 54px; }
+}
+
 /* Fighter avatar medallions */
 .fighter-avatar {
   position: relative; width: 34px; height: 34px; flex-shrink: 0;
