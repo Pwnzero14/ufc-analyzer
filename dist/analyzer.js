@@ -9938,6 +9938,143 @@ function renderParlayLab(container) {
 let _archiveAutoSettleFired = false;
 let _archiveBiasSortKey = 'avgEdge';
 const _archiveCollapsedSections = new Set();
+// ── DATA VIEW SUB-NAV ─────────────────────────────────────────────────────
+// Archive stacks 14 accordions and Calibration 5, both reached through a
+// two-item dropdown — so finding one meant scrolling blind past the rest.
+// The rail is DERIVED from the DOM after render rather than threaded through
+// both panels' markup, so a section added later joins it for free.
+const DATA_SECTION_GROUPS = {
+    predictions: 'Forecast', learning: 'Forecast',
+    events: 'Results', 'ai-accuracy': 'Results', grading: 'Results',
+    'placed-ledger': 'My Bets', 'parlay-ledger': 'My Bets', 'entry-clv': 'My Bets',
+    'fp-hitrate': 'Hit Rates', 'ss-hitrate': 'Hit Rates', 'td-hitrate': 'Hit Rates',
+    calibration: 'Model', backtest: 'Model', bias: 'Model',
+    'cal-curve': 'Calibration', 'cal-diagnosis': 'Calibration', 'cal-trend': 'Calibration',
+    'cal-recal': 'Calibration', 'cal-bias': 'Calibration',
+};
+// Short rail labels — the section headers themselves are sentence-length by
+// design ("Fantasy Line Hit Rate (Current Roster)") and won't fit a chip.
+const DATA_SECTION_LABELS = {
+    predictions: 'Predictions', learning: 'Learning',
+    events: 'Per-Event', 'ai-accuracy': 'AI Accuracy', grading: 'Grading',
+    'placed-ledger': 'Placed', 'parlay-ledger': 'Parlays', 'entry-clv': 'CLV',
+    'fp-hitrate': 'FP', 'ss-hitrate': 'SS', 'td-hitrate': 'TD',
+    calibration: 'Calibration', backtest: 'Backtest', bias: 'Platform Bias',
+    'cal-curve': 'Curve', 'cal-diagnosis': 'Diagnosis', 'cal-trend': 'Trend',
+    'cal-recal': 'Recalibration', 'cal-bias': 'Line Bias',
+};
+// header (54) + sticky filter bar (34). Matches .fighter-header-row's top.
+const DATA_SUBNAV_STICKY_TOP = 88;
+// Held so each rebuild can detach the previous listener instead of stacking one
+// per archive re-render.
+let _dataSubNavScrollHandler = null;
+function buildDataSubNav(container) {
+    container.querySelector('.data-subnav')?.remove();
+    const sections = Array.from(container.querySelectorAll('.best-picks-section[data-section-id]'));
+    if (sections.length < 3)
+        return; // a short view navigates fine by scrolling
+    const groups = new Map();
+    for (const sec of sections) {
+        const id = sec.dataset.sectionId || '';
+        if (!id)
+            continue;
+        const label = DATA_SECTION_LABELS[id] || (sec.querySelector('.best-picks-title')?.textContent || id).trim();
+        // Sections render a shared empty-state block when they have nothing to show;
+        // dimming those turns the rail into a coverage map, not just a jump list.
+        const empty = !!sec.querySelector('.archive-empty-state');
+        const group = DATA_SECTION_GROUPS[id] || 'Other';
+        if (!groups.has(group))
+            groups.set(group, []);
+        groups.get(group).push({ id, label, empty });
+    }
+    const nav = document.createElement('div');
+    nav.className = 'data-subnav';
+    nav.innerHTML = `
+    <div class="dsn-rail">
+      ${Array.from(groups.entries()).map(([group, items]) => `
+        <div class="dsn-group">
+          <span class="dsn-group-label">${group}</span>
+          ${items.map(i => `<button class="dsn-chip${i.empty ? ' dsn-empty' : ''}" data-target="${i.id}" type="button" title="${i.empty ? 'No data in this section yet' : `Jump to ${i.label}`}">${i.label}</button>`).join('')}
+        </div>`).join('')}
+    </div>
+    <div class="dsn-actions">
+      <button class="dsn-action" data-dsn-action="expand" type="button" title="Expand every section">⊞ ALL</button>
+      <button class="dsn-action" data-dsn-action="collapse" type="button" title="Collapse every section">⊟ NONE</button>
+    </div>`;
+    container.prepend(nav);
+    const sectionById = (id) => sections.find(s => s.dataset.sectionId === id) || null;
+    // Expanding via the header's own click keeps the slide animation and the
+    // _archiveCollapsedSections bookkeeping in one place.
+    const expand = (sec) => {
+        if (sec.classList.contains('collapsed'))
+            sec.querySelector('.best-picks-header')?.click();
+    };
+    nav.querySelectorAll('.dsn-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const sec = sectionById(chip.dataset.target || '');
+            if (!sec)
+                return;
+            expand(sec);
+            const top = sec.getBoundingClientRect().top + window.scrollY - (DATA_SUBNAV_STICKY_TOP + nav.offsetHeight + 8);
+            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        });
+    });
+    nav.querySelectorAll('.dsn-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const wantCollapsed = btn.dataset.dsnAction === 'collapse';
+            sections.forEach(sec => {
+                if (sec.classList.contains('collapsed') !== wantCollapsed) {
+                    sec.querySelector('.best-picks-header')?.click();
+                }
+            });
+        });
+    });
+    // ── Scroll-spy ──────────────────────────────────────────────────────────
+    // Computed straight from geometry on each frame rather than accumulated from
+    // IntersectionObserver entries: sections here are thousands of px tall, so a
+    // visible-set went stale (it reported "backtest" while sitting on "events"),
+    // and every archive re-render leaked another live observer.
+    // Semantics: the last section whose top has passed under the rail is the one
+    // you are reading.
+    if (_dataSubNavScrollHandler)
+        window.removeEventListener('scroll', _dataSubNavScrollHandler);
+    const anchor = DATA_SUBNAV_STICKY_TOP + nav.offsetHeight + 12;
+    const chips = Array.from(nav.querySelectorAll('.dsn-chip'));
+    let scheduled = false;
+    // Active = the last section whose top has passed under the rail, i.e. the one
+    // you are reading. Two alternatives were measured and rejected: an
+    // IntersectionObserver visible-set went stale on these very tall sections
+    // (reported "backtest" while sitting on "events"), and "section filling the
+    // most screen" let a tall section win from anywhere on the page (6/14 vs
+    // 12/14). The last section is reachable because the container reserves
+    // trailing scroll room — see #cardContainer:has(> .data-subnav) in the CSS.
+    const updateSpy = () => {
+        scheduled = false;
+        if (!nav.isConnected)
+            return;
+        let activeId = sections[0]?.dataset.sectionId || '';
+        let bestTop = -Infinity;
+        for (const sec of sections) {
+            const top = sec.getBoundingClientRect().top;
+            // Strict > keeps the first of a side-by-side pair (ss/td hit rates share
+            // a .best-picks-grid row, so their tops are identical).
+            if (top - anchor <= 0 && top > bestTop) {
+                bestTop = top;
+                activeId = sec.dataset.sectionId || activeId;
+            }
+        }
+        for (const chip of chips)
+            chip.classList.toggle('active', chip.dataset.target === activeId);
+    };
+    _dataSubNavScrollHandler = () => {
+        if (scheduled)
+            return;
+        scheduled = true;
+        requestAnimationFrame(updateSpy);
+    };
+    window.addEventListener('scroll', _dataSubNavScrollHandler, { passive: true });
+    updateSpy();
+}
 // ── Cached backtest results (computed once per renderArchivePanel call) ────
 let _cachedBacktestResults = null;
 function computeBacktestFromHistory() {
@@ -12546,6 +12683,7 @@ async function renderArchivePanel(container) {
             }
         });
     });
+    buildDataSubNav(container);
     // ── Animate archive bars (grade bars, etc.) on scroll into view ──────
     if (typeof IntersectionObserver !== 'undefined') {
         const archiveBarObserver = new IntersectionObserver((entries) => {
@@ -13434,6 +13572,7 @@ async function renderCalibrationPanel(container) {
             }
         });
     });
+    buildDataSubNav(container);
 }
 // Coalesce multiple renderFighters() calls in the same frame into a single
 // render. Many code paths (mergeAndEnrich, line-move handlers, sort/filter,
