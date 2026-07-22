@@ -7309,6 +7309,25 @@ function normalizeArchivePlatformLabel(label) {
         return 'draftkings_sportsbook';
     return null;
 }
+// ── BOOK COLORS ───────────────────────────────────────────────────────────
+// One palette for every place multiple books are plotted together (line
+// timeline sparklines, archive platform-bias charts). There were THREE
+// contradictory sets before GLOW-UP 185 — Pick6 was blue in the chip rail, teal
+// in the archive dashboard and cyan in the timeline; Underdog was purple in one
+// and GREEN in two others, colliding with green=direction.
+//
+// Book color is identity, and only valid where no stat axis competes: on the
+// fighter board the stat owns the hue and a book is named by its text tag.
+// KEEP IN SYNC with the --book-* custom properties in analyzer.html.
+// Keys match the line-history platform keys ('betr', not 'btr') — those come
+// straight from Object.keys(point.v) in line_history_v1.
+const BOOK_COLORS = {
+    p6: '#4a9eff',
+    ud: '#b98bff',
+    pp: '#ff7ac8',
+    betr: '#ff9f45',
+    dk: '#7de0ff',
+};
 // ── STRUCTURED LEAN FACTORS ───────────────────────────────────────────────
 // Classifies a lean reason's prose into one scannable keyword. Hoisted out of
 // renderBestPicks (GLOW-UP 162) so the fighter-card stat panels classify with
@@ -13469,7 +13488,10 @@ async function renderCalibrationPanel(container) {
     const PLAT_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
     const STAT_ORDER = ['Fantasy', 'SS', 'TD', 'FightTime'];
     const STAT_SHORT = { Fantasy: 'FP', SS: 'SS', TD: 'TD', FightTime: 'FT' };
-    const PLAT_COLORS = { pick6: '#00e8c6', underdog: '#48c78e', prizepicks: '#c084fc', betr: '#ff8c42', draftkings_sportsbook: '#64b5f6' };
+    const PLAT_COLORS = {
+        pick6: BOOK_COLORS.p6, underdog: BOOK_COLORS.ud, prizepicks: BOOK_COLORS.pp,
+        betr: BOOK_COLORS.betr, draftkings_sportsbook: BOOK_COLORS.dk,
+    };
     // Per-platform overall stats
     const platOverall = new Map();
     for (const b of biasEntries) {
@@ -15500,7 +15522,7 @@ function buildLineTimelinePanel(f) {
         { label: 'SS', stat: 'ss', platLines: [['p6', f.line_p6_ss], ['ud', f.line_ud_ss], ['pp', f.line_pp_ss], ['betr', f.line_betr_ss], ['dk', f.line_dk_ss]] },
         { label: 'TD', stat: 'td', platLines: [['p6', f.line_p6_td], ['ud', f.line_ud_td], ['pp', f.line_pp_td], ['betr', f.line_betr_td], ['dk', f.line_dk_td]] },
     ];
-    const platColors = { p6: '#00d4ff', ud: '#00e87a', pp: '#a855f7', betr: '#f8c64a', dk: '#4a9eff' };
+    const platColors = BOOK_COLORS;
     const platLabels = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
     let chartsHtml = '';
     let hasAny = false;
