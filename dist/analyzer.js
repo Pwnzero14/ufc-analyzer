@@ -7328,6 +7328,33 @@ const BOOK_COLORS = {
     betr: '#ff9f45',
     dk: '#7de0ff',
 };
+/** GLOW-UP 188: does a pick's own projection sit on the far side of its line
+ *  from the lean it supports?
+ *
+ *  Not a model error. The projection-vs-line term is capped at ±2.5 in a score
+ *  that also weighs hit rate, opponent-allowed, style, venue and archive — so
+ *  history and matchup can legitimately outvote the projection. But the row
+ *  renders "SS UNDER 28.5 (proj 43.0)", putting the side directly beside a
+ *  number arguing the other way, and nothing said so. Surfaced on the row for
+ *  the same reason LEAN ✓ · VALUE ✗ exists: two numbers that disagree should
+ *  say they disagree rather than let the reader assume one justifies the other.
+ *
+ *  Parses the DISPLAYED reason on purpose — the claim being checked is that the
+ *  row as shown is self-consistent. */
+function projOpposesLean(reason, side, displayedLine) {
+    if (displayedLine == null || (side !== 'over' && side !== 'under'))
+        return null;
+    const m = reason.match(/^(?:R1 SS|SS|TD|FT|FP|CTRL)\s+(?:OVER|UNDER)\s+[\d.]+m?\s+\((?:proj|avg)\s+([\d.]+)m?\)/i);
+    if (!m)
+        return null;
+    const proj = parseFloat(m[1]);
+    if (!Number.isFinite(proj))
+        return null;
+    const opposes = side === 'over' ? proj < displayedLine : proj > displayedLine;
+    if (!opposes)
+        return null;
+    return { proj, gap: Math.abs(proj - displayedLine), implies: proj > displayedLine ? 'OVER' : 'UNDER' };
+}
 // Stat labels for an EffectiveLean's _source. The "Lean Analysis" panel renders
 // getEffectiveLean(), which is whichever stat is that fighter's strongest signal
 // — so its title was wrong whenever that wasn't FP. Mid-week, with no FP lines
@@ -8423,6 +8450,10 @@ function renderBestPicks(container, renderSeq = 0) {
                 // tier grades signal strength + sample depth, EV prices the calibrated
                 // hit probability against the odds. Say so on the row instead of letting
                 // the two numbers silently fight each other.
+                const projConflict = projOpposesLean(reason, el.lean, line);
+                const projTag = projConflict
+                    ? `<div class="bp-proj-split" title="This pick's own projection (${projConflict.proj}) sits ${projConflict.gap.toFixed(1)} on the ${projConflict.implies} side of the ${line} line — the projection argues ${projConflict.implies}, the pick is ${(el.lean || '').toUpperCase()}. Not necessarily wrong: projection-vs-line contributes at most ±2.5 to the lean score, so hit-rate, opponent and matchup terms can outvote it. Worth checking manually before entering.">⚠ PROJ SAYS ${projConflict.implies}</div>`
+                    : '';
                 const splitNote = evd && evd.ev <= -3 && tier.label !== 'Low'
                     ? `<div class="bp-ev-split" title="${tier.label.toUpperCase()} tier grades signal strength and sample depth; EV prices the calibrated ${Math.round(evd.prob * 100)}% hit probability against the ${evd.isAssumedVig ? 'assumed -110' : 'posted'} odds. Strong directional lean, but the price doesn't clear breakeven — fine as a pick-em leg, not a value play.">LEAN ✓ · VALUE ✗</div>`
                     : '';
@@ -8579,7 +8610,7 @@ function renderBestPicks(container, renderSeq = 0) {
             </div>
           </div>` : `<div class="best-pick-line">${line || '—'}</div>`}
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
-          ${evd ? '' : evTag}${splitNote}
+          ${evd ? '' : evTag}${splitNote}${projTag}
         </div>
         ${slateBtn}${copyBtn}
       </div>`;
