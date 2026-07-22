@@ -32,6 +32,36 @@
   --text-muted: #5c6d92;
   --amber:      #f8c64a;
   --accent:     #56c3ff;
+
+  /* ── SEMANTIC COLOR MAPPING (GLOW-UP 185) ───────────────────────────────
+     The app encodes three independent things in color. Keep them separate:
+
+     1. DIRECTION — green = over/up/good, red = under/down/bad. Never reuse
+        these two hues for identity of any kind.
+     2. STAT FAMILY — owns the color language on the fighter board. Established
+        by GLOW-UP 161 on the Best Picks type chips.
+     3. BOOK — identity only, and ONLY in multi-book charts where no stat axis
+        competes (line timeline, archive bias). On the board a book is named by
+        its text tag, not its hue.
+
+     Stat and book previously shared literal values (FP == P6 blue, SS == PP
+     teal, TD == Betr gold) AND landed on the same element — .line-cell carries
+     both `${stat}` and `src-${source}` — so a chip's color was decided by
+     cascade order rather than meaning. Stat wins on the board now. */
+  --stat-fp:   #56c3ff;
+  --stat-ss:   #2cd4d0;
+  --stat-td:   #f8c64a;
+  --stat-ft:   #927dff;
+  --stat-ctrl: #ff8345;
+
+  /* Deliberately offset from the --stat-* hues so a chart series never reads as
+     a stat, and clear of green/red so it never reads as direction.
+     KEEP IN SYNC with BOOK_COLORS in src/analyzer.ts. */
+  --book-p6:   #4a9eff;
+  --book-ud:   #b98bff;
+  --book-pp:   #ff7ac8;
+  --book-betr: #ff9f45;
+  --book-dk:   #7de0ff;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -460,14 +490,15 @@ body {
   background: var(--bg3); border: 1px solid var(--border);
   border-radius: 4px;
 }
-.line-cell.fp { border-color: rgba(86,195,255,0.35); }
+.line-cell.fp { border-color: color-mix(in srgb, var(--stat-fp) 35%, transparent); }
 .line-cell.ss {
-  background: rgba(44,212,208,0.08);
-  border-color: rgba(44,212,208,0.45);
-  box-shadow: inset 0 0 0 1px rgba(44,212,208,0.12);
+  background: color-mix(in srgb, var(--stat-ss) 8%, transparent);
+  border-color: color-mix(in srgb, var(--stat-ss) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--stat-ss) 12%, transparent);
 }
-.line-cell.td { border-color: rgba(248,198,74,0.36); }
-.line-cell.ft { border-color: rgba(146,125,255,0.42); }
+.line-cell.td { border-color: color-mix(in srgb, var(--stat-td) 36%, transparent); }
+.line-cell.ft { border-color: color-mix(in srgb, var(--stat-ft) 42%, transparent); }
+.line-cell.ctrl { border-color: color-mix(in srgb, var(--stat-ctrl) 36%, transparent); }
 .line-platform {
   font-family: 'JetBrains Mono', monospace;
   font-size: 7px; text-transform: uppercase;
@@ -11289,25 +11320,26 @@ html { scroll-behavior: smooth; }
 
 /* --- Stat-type color washes --- */
 .line-cell.fp {
-  background: linear-gradient(165deg, rgba(86,195,255,0.08), rgba(86,195,255,0.02) 60%, transparent);
-  border-color: rgba(86,195,255,0.22);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--stat-fp) 8%, transparent), color-mix(in srgb, var(--stat-fp) 2%, transparent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--stat-fp) 22%, transparent);
 }
 .line-cell.ss {
-  background: linear-gradient(165deg, rgba(44,212,208,0.10), rgba(44,212,208,0.03) 60%, transparent);
-  border-color: rgba(44,212,208,0.28);
-  box-shadow: inset 0 0 0 1px rgba(44,212,208,0.06);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--stat-ss) 10%, transparent), color-mix(in srgb, var(--stat-ss) 3%, transparent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--stat-ss) 28%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--stat-ss) 6%, transparent);
 }
 .line-cell.td {
-  background: linear-gradient(165deg, rgba(248,198,74,0.07), rgba(248,198,74,0.02) 60%, transparent);
-  border-color: rgba(248,198,74,0.22);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--stat-td) 7%, transparent), color-mix(in srgb, var(--stat-td) 2%, transparent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--stat-td) 22%, transparent);
 }
+/* was rgba(127,136,255) — purple, contradicting the orange bpt-ctrl chip */
 .line-cell.ctrl {
-  background: linear-gradient(165deg, rgba(127,136,255,0.07), rgba(127,136,255,0.02) 60%, transparent);
-  border-color: rgba(127,136,255,0.22);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--stat-ctrl) 7%, transparent), color-mix(in srgb, var(--stat-ctrl) 2%, transparent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--stat-ctrl) 22%, transparent);
 }
 .line-cell.ft {
-  background: linear-gradient(165deg, rgba(146,125,255,0.07), rgba(146,125,255,0.02) 60%, transparent);
-  border-color: rgba(146,125,255,0.22);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--stat-ft) 7%, transparent), color-mix(in srgb, var(--stat-ft) 2%, transparent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--stat-ft) 22%, transparent);
 }
 
 /* --- Platform label glow --- */
@@ -26170,12 +26202,12 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   cursor: help;
 }
 .best-pick-type .bpt-stat { font-style: normal; text-shadow: none; opacity: 0.95; }
-.best-pick-type.bpt-fp    .bpt-stat { color: rgba(86,195,255,0.9); }
+.best-pick-type.bpt-fp    .bpt-stat { color: var(--stat-fp); }
 .best-pick-type.bpt-ss    .bpt-stat,
-.best-pick-type.bpt-ss_r1 .bpt-stat { color: rgba(44,212,208,0.9); }
-.best-pick-type.bpt-td    .bpt-stat { color: rgba(248,198,74,0.9); }
-.best-pick-type.bpt-ft    .bpt-stat { color: rgba(146,125,255,0.95); }
-.best-pick-type.bpt-ctrl  .bpt-stat { color: rgba(255,131,69,0.9); }
+.best-pick-type.bpt-ss_r1 .bpt-stat { color: var(--stat-ss); }
+.best-pick-type.bpt-td    .bpt-stat { color: var(--stat-td); }
+.best-pick-type.bpt-ft    .bpt-stat { color: var(--stat-ft); }
+.best-pick-type.bpt-ctrl  .bpt-stat { color: var(--stat-ctrl); }
 .best-picks-section .best-pick-row .best-pick-rank {
   font-weight: 700;
   color: var(--text3);
@@ -27699,6 +27731,63 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .plp-mini.hit { color: #6ee7a8; }
 .plp-mini.miss { color: #ff8fa3; }
 .plp-mini.pending { color: var(--text3); }
+
+/* ══ GLOW-UP 185: STAT OWNS COLOR ON THE BOARD ═══════════════════════════
+   .line-cell carries BOTH `${stat}` and `src-${source}`, and the two palettes
+   used the same literals (FP == P6 blue, SS == PP teal, TD == Betr gold), so a
+   chip's hue was decided by cascade order rather than by meaning — a blue chip
+   could mean "FP" or "Pick6". Stat wins here; the book is still named by its
+   text tag, and keeps its hue only in multi-book charts where no stat competes.
+
+   Deliberately a late override block rather than edits to the ~20 scattered
+   src-* rules: one place to read, one place to revert. */
+/* One variable carries the chip's meaning; every visual below reads from it.
+   The GLOW-UP 106 block above paints the whole chip per-book with !important
+   (background gradient + 3px left border + inner glow), so these must be
+   !important too — same specificity, later in the file. */
+.platform-lines > .line-cell.fp   { --chip: var(--stat-fp); }
+.platform-lines > .line-cell.ss   { --chip: var(--stat-ss); }
+.platform-lines > .line-cell.td   { --chip: var(--stat-td); }
+.platform-lines > .line-cell.ft   { --chip: var(--stat-ft); }
+.platform-lines > .line-cell.ctrl { --chip: var(--stat-ctrl); }
+
+.platform-lines > .line-cell[class*="src-"] {
+  border-left: 3px solid color-mix(in srgb, var(--chip) 70%, transparent) !important;
+  border-color: color-mix(in srgb, var(--chip) 35%, transparent) !important;
+  border-left-color: color-mix(in srgb, var(--chip) 70%, transparent) !important;
+  background: linear-gradient(135deg,
+      color-mix(in srgb, var(--chip) 14%, transparent),
+      color-mix(in srgb, var(--chip) 4%, transparent) 70%, var(--bg3)) !important;
+  box-shadow: inset 2px 0 8px color-mix(in srgb, var(--chip) 10%, transparent),
+              0 2px 8px rgba(0,0,0,0.2) !important;
+}
+.platform-lines > .line-cell[class*="src-"]:hover {
+  border-color: color-mix(in srgb, var(--chip) 55%, transparent) !important;
+  border-left-color: color-mix(in srgb, var(--chip) 90%, transparent) !important;
+  box-shadow: inset 2px 0 12px color-mix(in srgb, var(--chip) 18%, transparent),
+              0 8px 24px rgba(0,0,0,0.4), 0 0 22px color-mix(in srgb, var(--chip) 22%, transparent) !important;
+}
+/* The number is the stat's value, so it takes the stat's hue — not the book's.
+   Overrides .line-value.p6/.ud/.betr/.pp/.dk, including the !important on .dk. */
+.platform-lines > .line-cell[class*="src-"] > .line-value {
+  color: var(--chip) !important;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--chip) 25%, transparent);
+}
+.platform-lines > .line-cell[class*="src-"]:hover > .line-value {
+  text-shadow: 0 0 18px color-mix(in srgb, var(--chip) 45%, transparent);
+}
+/* best/worst line keep their direction colors — that axis outranks stat identity */
+.platform-lines > .line-cell.best-line  { border-color: rgba(0,232,122,0.55) !important; }
+.platform-lines > .line-cell.worst-line { border-color: rgba(255,91,120,0.45) !important; }
+
+/* Book identity survives as a neutral pill — readable, but no longer competing
+   with the stat hue for meaning. */
+.platform-lines .line-source-tag[class*="src-"] {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--text2) !important;
+  text-shadow: none !important;
+}
+.line-cell:hover .line-source-tag[class*="src-"] { color: var(--text) !important; }
 </style>
 </head>
 <body>
