@@ -27732,6 +27732,19 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .plp-mini.miss { color: #ff8fa3; }
 .plp-mini.pending { color: var(--text3); }
 
+/* GLOW-UP 188 — the pick's own projection argues the other way. Red rather than
+   the amber of LEAN ✓ · VALUE ✗: that one is a known trade-off (signal vs
+   price), this one is the row disagreeing with itself and wants a manual look. */
+.best-pick-line-wrap .bp-proj-split {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px; font-weight: 800; letter-spacing: 0.06em;
+  color: #ff8fa3;
+  background: rgba(255,91,120,0.08);
+  border: 1px solid rgba(255,91,120,0.34);
+  border-radius: 3px; padding: 1px 4px; margin-top: 2px;
+  text-align: center; white-space: nowrap; cursor: help;
+}
+
 /* ══ GLOW-UP 187: Best Picks five-level pass ═════════════════════════════ */
 /* L5 — model-ranked vs price. "BEST" is a model ranking; say how many actually
    clear breakeven so the header isn't read as an endorsement of all of them. */
