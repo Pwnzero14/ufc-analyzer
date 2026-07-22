@@ -710,8 +710,16 @@ body {
   font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--text3); margin-bottom: 10px;
   display: flex; align-items: center; gap: 6px;
+  /* Titles carrying an inline chip (Style Matchup, FT Lean's verdict badge) used
+     to overflow their panel in the narrow 3-up grid — nowrap plus a text item
+     that can't shrink past its longest word left the chip painting over the
+     neighbouring panel. Wrapping drops the chip to its own line instead. */
+  flex-wrap: wrap; row-gap: 4px;
+  /* room for the absolutely-positioned ::before tick (3px + 6px gap) */
+  position: relative; padding-left: 9px;
 }
-.detail-panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+/* min-width lets the hairline survive on a wrapped line without forcing one */
+.detail-panel-title::after { content: ''; flex: 1; min-width: 16px; height: 1px; background: var(--border); }
 
 /* History bars */
 .history-bar-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
@@ -5454,12 +5462,20 @@ body:has(#cardContainer > .data-subnav) .fighter-header-row { display: none; }
 body.compact-view .fighter-avatar { width: 26px; height: 26px; }
 body.compact-view .fighter-avatar-flag { font-size: 12px; }
 
-/* Detail panel titles: gold tick + gradient hairline */
+/* Detail panel titles: gold tick + gradient hairline.
+   The tick is absolute, not a flex item: once the title could wrap (so inline
+   chips stop overflowing the panel), a flex tick got stranded alone on line 1
+   with the text wrapping beneath it — flex wraps rather than shrinks. Out of
+   flow, wrapping can only ever move a chip. .detail-panel-title carries the
+   matching padding-left. */
 .detail-panel-title::before {
   content: ''; width: 3px; height: 10px; border-radius: 2px;
   background: linear-gradient(180deg, var(--gold), var(--gold2));
   box-shadow: 0 0 6px rgba(248,198,74,0.4);
   flex-shrink: 0;
+  /* 0.6em, not 50%: on a title that wraps the tick should hug the FIRST line,
+     not float in the middle of the block. em tracks each panel's title size. */
+  position: absolute; left: 0; top: 0.6em; transform: translateY(-50%);
 }
 .detail-panel-title::after {
   background: linear-gradient(90deg, var(--border2), transparent);
@@ -15648,7 +15664,7 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 .line-timeline-panel .detail-panel-title::before {
   content: '';
   position: absolute;
-  left: 0; top: 50%;
+  left: 0; top: 0.6em;
   transform: translateY(-50%);
   width: 4px;
   height: 14px;
@@ -22890,13 +22906,21 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   margin-bottom: 16px !important;
-  padding-left: 2px;
+  /* clears this panel's wider 4px absolute tick — was 2px, which let the tick
+     sit under the first glyphs of the title */
+  padding-left: 12px;
   position: relative;
 }
+/* Was content:'📈' with margin-right, written as if this pseudo were an inline
+   item — but the earlier rule (search .line-timeline-panel .detail-panel-title
+   ::before) already makes it an ABSOLUTE 4x14px gold tick at left:0, and equal
+   specificity meant only `content` got overridden. Result: an emoji crammed
+   into a 4px absolutely-positioned box, painting over "LI" in the title. Every
+   other panel marks its title with the tick, and this panel's own earlier pass
+   deliberately hid its emoji ("Title: hide emoji, use CSS accent"), so keep
+   the tick and drop the emoji. */
 .line-timeline-panel > .detail-panel-title::before {
-  content: '📈';
-  -webkit-text-fill-color: initial;
-  margin-right: 8px;
+  content: '';
 }
 .line-timeline-panel > .detail-panel-title::after {
   content: '';
@@ -26252,12 +26276,14 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.07);
 }
-.bp-factor-pos {
+/* -sup / -opp, not -pos / -neg: the chip states whether a reason argues FOR or
+   AGAINST the lean, which is not the same as its raw directional icon. */
+.bp-factor-sup {
   color: #6ee7a8;
   background: rgba(38,208,124,0.05);
   border-color: rgba(38,208,124,0.22);
 }
-.bp-factor-neg {
+.bp-factor-opp {
   color: #ff8fa3;
   background: rgba(255,91,120,0.05);
   border-color: rgba(255,91,120,0.22);
@@ -26279,8 +26305,8 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.07);
 }
-.lean-factor-pos { color: #6ee7a8; background: rgba(38,208,124,0.05); border-color: rgba(38,208,124,0.22); }
-.lean-factor-neg { color: #ff8fa3; background: rgba(255,91,120,0.05); border-color: rgba(255,91,120,0.22); }
+.lean-factor-sup { color: #6ee7a8; background: rgba(38,208,124,0.05); border-color: rgba(38,208,124,0.22); }
+.lean-factor-opp { color: #ff8fa3; background: rgba(255,91,120,0.05); border-color: rgba(255,91,120,0.22); }
 /* Prose rationale, folded. Native <details> — these panels are re-rendered
    constantly and this needs no handler re-binding. */
 .lean-prose > summary {
