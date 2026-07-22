@@ -7309,6 +7309,74 @@ function normalizeArchivePlatformLabel(label) {
         return 'draftkings_sportsbook';
     return null;
 }
+// ── STRUCTURED LEAN FACTORS ───────────────────────────────────────────────
+// Classifies a lean reason's prose into one scannable keyword. Hoisted out of
+// renderBestPicks (GLOW-UP 162) so the fighter-card stat panels classify with
+// the SAME map — two copies would drift and the same reason would read as
+// different factors in different places.
+function leanFactorLabel(text) {
+    const s = (text || '').toLowerCase();
+    if (/archive|settled sample/.test(s))
+        return 'ARCHIVE';
+    if (/duration|market ~|round/.test(s))
+        return 'DURATION';
+    if (/opp allows|opponent/.test(s))
+        return 'OPPONENT';
+    if (/platform-aware|scoring profile|book/.test(s))
+        return 'BOOKS';
+    if (/consensus/.test(s))
+        return 'CONSENSUS';
+    if (/news|injur|withdraw/.test(s))
+        return 'NEWS';
+    if (/weight/.test(s))
+        return 'WEIGHT';
+    if (/cage/.test(s))
+        return 'CAGE';
+    if (/volatil|variance/.test(s))
+        return 'VOLATILITY';
+    if (/diverg|disagree|dissent/.test(s))
+        return 'LINE SPLIT';
+    if (/finish|\bko\b|\bsub\b/.test(s))
+        return 'FINISH';
+    if (/last \d|recent|trend|streak|form/.test(s))
+        return 'FORM';
+    if (/style|grappl|strik|wrestl/.test(s))
+        return 'STYLE';
+    if (/memory|recalibrat|calibrat/.test(s))
+        return 'CALIBRATION';
+    if (/proj|edges the line|above the line|below the line|\bavg\b/.test(s))
+        return 'PROJECTION';
+    return 'MODEL';
+}
+/** First `max` reasons, one per distinct factor label — the ranked stack already
+ *  puts the strongest first, so dedupe keeps the best instance of each. */
+function pickDistinctFactors(reasons, max) {
+    const seen = new Set();
+    return (reasons || []).filter(r => {
+        const lbl = leanFactorLabel(r.text || '');
+        if (seen.has(lbl))
+            return false;
+        seen.add(lbl);
+        return true;
+    }).slice(0, max);
+}
+/** ✓/✗ factor chips + the full prose rationale folded behind a native <details>.
+ *  <details> deliberately over a JS accordion: renderFighters() rebuilds these
+ *  rows constantly and there are no handlers to re-bind after each render. */
+function buildLeanFactorBlock(reasons, chipClass = 'lean-factor') {
+    const all = reasons || [];
+    if (!all.length)
+        return '';
+    const factors = pickDistinctFactors(all, 5);
+    const proseRows = all.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('');
+    // One factor is not a summary — show the prose plainly instead of hiding a
+    // single line behind a disclosure that costs a click to read.
+    if (factors.length < 2)
+        return `<div class="lean-reason">${proseRows}</div>`;
+    const chips = factors.map(r => `<span class="${chipClass} ${chipClass}-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${leanFactorLabel(r.text || '')}</span>`).join('');
+    return `<div class="lean-factors">${chips}</div>
+    <details class="lean-prose"><summary>Full rationale · ${all.length} point${all.length === 1 ? '' : 's'}</summary><div class="lean-reason">${proseRows}</div></details>`;
+}
 function renderBestPicks(container, renderSeq = 0) {
     return (async () => {
         const mySeq = renderSeq;
@@ -8343,40 +8411,8 @@ function renderBestPicks(container, renderSeq = 0) {
                 // GLOW-UP 162 (level-up 3): structured factor chips — the lean's ranked
                 // reason stack rendered as scannable ✓/✗ chips (label = keyword class,
                 // full reason text on hover) instead of dying unseen behind one prose line.
-                const factorLabel = (t) => {
-                    const s = t.toLowerCase();
-                    if (/archive|settled sample/.test(s))
-                        return 'ARCHIVE';
-                    if (/duration|market ~|round/.test(s))
-                        return 'DURATION';
-                    if (/opp allows|opponent/.test(s))
-                        return 'OPPONENT';
-                    if (/platform-aware|scoring profile|book/.test(s))
-                        return 'BOOKS';
-                    if (/consensus/.test(s))
-                        return 'CONSENSUS';
-                    if (/news|injur|withdraw/.test(s))
-                        return 'NEWS';
-                    if (/weight/.test(s))
-                        return 'WEIGHT';
-                    if (/cage/.test(s))
-                        return 'CAGE';
-                    if (/volatil|variance/.test(s))
-                        return 'VOLATILITY';
-                    if (/diverg|disagree|dissent/.test(s))
-                        return 'LINE SPLIT';
-                    if (/finish|\bko\b|\bsub\b/.test(s))
-                        return 'FINISH';
-                    if (/last \d|recent|trend|streak|form/.test(s))
-                        return 'FORM';
-                    if (/style|grappl|strik|wrestl/.test(s))
-                        return 'STYLE';
-                    if (/memory|recalibrat|calibrat/.test(s))
-                        return 'CALIBRATION';
-                    if (/proj|edges the line|above the line|below the line|\bavg\b/.test(s))
-                        return 'PROJECTION';
-                    return 'MODEL';
-                };
+                // Classifier now lives at module scope as leanFactorLabel (GLOW-UP 184) so
+                // the fighter-card stat panels label identically.
                 // GLOW-UP 162 (level-up 4): placeability exclusivity — the candidate
                 // pipeline already guarantees the displayed book takes this side; what
                 // it can't show is when that book is the ONLY one (dog FP UNDER → UD
@@ -8449,16 +8485,9 @@ function renderBestPicks(container, renderSeq = 0) {
                 const youTag = youRec && youRec.total >= 2
                     ? `<span class="bp-you ${youRec.hits * 2 >= youRec.total ? 'good' : 'bad'}" title="Your settled record on ${youStatLbl} ${(el.lean || '').toUpperCase()} legs you placed across past events (from My Placed Ledger) — informational only, does not affect model confidence">YOU ${youRec.hits}/${youRec.total}</span>`
                     : '';
-                const seenFactorLabels = new Set();
-                const factors = (el.reasons || []).filter(r => {
-                    const lbl = factorLabel(r.text || '');
-                    if (seenFactorLabels.has(lbl))
-                        return false;
-                    seenFactorLabels.add(lbl);
-                    return true;
-                }).slice(0, 4);
+                const factors = pickDistinctFactors(el.reasons, 4);
                 const factorChips = factors.length >= 2
-                    ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${factorLabel(r.text || '')}</span>`).join('')}</div>`
+                    ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${leanFactorLabel(r.text || '')}</span>`).join('')}</div>`
                     : '';
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
@@ -17013,22 +17042,22 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${buildLineTimelinePanel(f)}
         ${f.lean_ss ? `<div class="detail-panel">
           <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'})</div>
-          <div class="lean-reason">${f.lean_ss.reasons.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('')}</div>
+          ${buildLeanFactorBlock(f.lean_ss.reasons)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : ''}
         ${(f.lean_ss_r1 && f.lean_ss_r1.lean !== 'push') ? `<div class="detail-panel">
           <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})</div>
-          <div class="lean-reason">${f.lean_ss_r1.reasons.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('')}</div>
+          ${buildLeanFactorBlock(f.lean_ss_r1.reasons)}
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : ''}
         ${f.lean_td ? `<div class="detail-panel">
           <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'})</div>
-          <div class="lean-reason">${f.lean_td.reasons.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('')}</div>
+          ${buildLeanFactorBlock(f.lean_td.reasons)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : ''}
         ${f.lean_ft ? `<div class="detail-panel">
           <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}</div>
-          <div class="lean-reason">${f.lean_ft.reasons.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('')}</div>
+          ${buildLeanFactorBlock(f.lean_ft.reasons)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>` : ''}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}

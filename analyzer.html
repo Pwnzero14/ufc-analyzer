@@ -26263,6 +26263,38 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(255,91,120,0.22);
 }
 
+/* ── GLOW-UP 184: structured lean factors on the fighter-card stat panels ──
+   Same ✓/✗ language as .bp-factor on the Best Picks board, one size up because
+   a detail panel has room the board row doesn't. */
+.lean-factors {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.lean-factor {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 3px;
+  white-space: nowrap; cursor: help;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.lean-factor-pos { color: #6ee7a8; background: rgba(38,208,124,0.05); border-color: rgba(38,208,124,0.22); }
+.lean-factor-neg { color: #ff8fa3; background: rgba(255,91,120,0.05); border-color: rgba(255,91,120,0.22); }
+/* Prose rationale, folded. Native <details> — these panels are re-rendered
+   constantly and this needs no handler re-binding. */
+.lean-prose > summary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text3); cursor: pointer; list-style: none;
+  padding: 2px 0; user-select: none;
+}
+.lean-prose > summary::-webkit-details-marker { display: none; }
+.lean-prose > summary::before { content: '▸ '; display: inline-block; transition: transform 0.15s; }
+.lean-prose[open] > summary::before { content: '▾ '; }
+.lean-prose > summary:hover { color: var(--text2); }
+.lean-prose[open] > summary { margin-bottom: 4px; }
+
 /* ── GLOW-UP 162: Best Picks level-up 4 — placeability exclusivity ──
    Amber flag when a pick's side is placeable on exactly one book (dog FP
    UNDER → UD only, Pick6 More-only cards, single-book stat lines): no
