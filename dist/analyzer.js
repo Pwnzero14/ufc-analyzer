@@ -7348,6 +7348,30 @@ function leanFactorLabel(text) {
         return 'PROJECTION';
     return 'MODEL';
 }
+/** Does this reason argue FOR or AGAINST the lean it belongs to?
+ *
+ *  LeanReason.icon is DIRECTIONAL, not judgemental: 'pos' means "pushes the
+ *  number up", 'neg' means "pushes it down" — which is why the FP panel builds
+ *  its UNDER drivers out of riskReasons ("risks against OVER are pros for
+ *  UNDER"). Rendering the raw icon as ✓/✗ therefore inverts every UNDER pick:
+ *  the reasons driving it all show as ✗. Resolve against the direction instead. */
+function factorPolarity(icon, leanDir) {
+    if (icon !== 'pos' && icon !== 'neg')
+        return 'neu';
+    if (leanDir === 'over')
+        return icon === 'pos' ? 'sup' : 'opp';
+    if (leanDir === 'under')
+        return icon === 'neg' ? 'sup' : 'opp';
+    return 'neu'; // push / no lean — nothing to be for or against
+}
+/** One ✓/✗ factor chip, polarity resolved against the lean direction. */
+function factorChipHtml(r, leanDir, cls) {
+    const pol = factorPolarity(r.icon, leanDir);
+    const glyph = pol === 'sup' ? '✓' : pol === 'opp' ? '✗' : '·';
+    const dirWord = pol === 'sup' ? 'Supports' : pol === 'opp' ? 'Argues against' : 'Context for';
+    const tip = `${dirWord} this lean — ${(r.text || '')}`.replace(/"/g, '&quot;');
+    return `<span class="${cls} ${cls}-${pol}" title="${tip}">${glyph} ${leanFactorLabel(r.text || '')}</span>`;
+}
 /** First `max` reasons, one per distinct factor label — the ranked stack already
  *  puts the strongest first, so dedupe keeps the best instance of each. */
 function pickDistinctFactors(reasons, max) {
@@ -7363,17 +7387,19 @@ function pickDistinctFactors(reasons, max) {
 /** ✓/✗ factor chips + the full prose rationale folded behind a native <details>.
  *  <details> deliberately over a JS accordion: renderFighters() rebuilds these
  *  rows constantly and there are no handlers to re-bind after each render. */
-function buildLeanFactorBlock(reasons, chipClass = 'lean-factor') {
+function buildLeanFactorBlock(reasons, leanDir, chipClass = 'lean-factor') {
     const all = reasons || [];
     if (!all.length)
         return '';
     const factors = pickDistinctFactors(all, 5);
+    // Prose keeps the DIRECTIONAL arrows (↑ up / ↓ down) — that's what the raw
+    // reason text describes. Only the chips speak in for/against terms.
     const proseRows = all.map(r => `<div class="lean-point"><span class="lean-point-icon ${r.icon === 'pos' ? 'pos' : r.icon === 'neg' ? 'neg' : ''}">${r.icon === 'pos' ? '↑' : r.icon === 'neg' ? '↓' : '→'}</span><span>${r.text}</span></div>`).join('');
     // One factor is not a summary — show the prose plainly instead of hiding a
     // single line behind a disclosure that costs a click to read.
     if (factors.length < 2)
         return `<div class="lean-reason">${proseRows}</div>`;
-    const chips = factors.map(r => `<span class="${chipClass} ${chipClass}-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${leanFactorLabel(r.text || '')}</span>`).join('');
+    const chips = factors.map(r => factorChipHtml(r, leanDir, chipClass)).join('');
     return `<div class="lean-factors">${chips}</div>
     <details class="lean-prose"><summary>Full rationale · ${all.length} point${all.length === 1 ? '' : 's'}</summary><div class="lean-reason">${proseRows}</div></details>`;
 }
@@ -8486,8 +8512,10 @@ function renderBestPicks(container, renderSeq = 0) {
                     ? `<span class="bp-you ${youRec.hits * 2 >= youRec.total ? 'good' : 'bad'}" title="Your settled record on ${youStatLbl} ${(el.lean || '').toUpperCase()} legs you placed across past events (from My Placed Ledger) — informational only, does not affect model confidence">YOU ${youRec.hits}/${youRec.total}</span>`
                     : '';
                 const factors = pickDistinctFactors(el.reasons, 4);
+                // Polarity resolves against el.lean — the raw icon is directional, so an
+                // UNDER pick used to render every reason driving it as ✗ (GLOW-UP 184).
                 const factorChips = factors.length >= 2
-                    ? `<div class="bp-factors">${factors.map(r => `<span class="bp-factor bp-factor-${r.icon || 'neu'}" title="${(r.text || '').replace(/"/g, '&quot;')}">${r.icon === 'pos' ? '✓' : r.icon === 'neg' ? '✗' : '·'} ${leanFactorLabel(r.text || '')}</span>`).join('')}</div>`
+                    ? `<div class="bp-factors">${factors.map(r => factorChipHtml(r, el.lean, 'bp-factor')).join('')}</div>`
                     : '';
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
@@ -17042,22 +17070,22 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ${buildLineTimelinePanel(f)}
         ${f.lean_ss ? `<div class="detail-panel">
           <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'})</div>
-          ${buildLeanFactorBlock(f.lean_ss.reasons)}
+          ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : ''}
         ${(f.lean_ss_r1 && f.lean_ss_r1.lean !== 'push') ? `<div class="detail-panel">
           <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})</div>
-          ${buildLeanFactorBlock(f.lean_ss_r1.reasons)}
+          ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : ''}
         ${f.lean_td ? `<div class="detail-panel">
           <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'})</div>
-          ${buildLeanFactorBlock(f.lean_td.reasons)}
+          ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : ''}
         ${f.lean_ft ? `<div class="detail-panel">
           <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}</div>
-          ${buildLeanFactorBlock(f.lean_ft.reasons)}
+          ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>` : ''}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
