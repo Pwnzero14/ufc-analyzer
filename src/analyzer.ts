@@ -16750,14 +16750,23 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const riskReasons = leanReasons.filter((r) => r.icon === 'neg');
   const neutralReasons = leanReasons.filter((r) => r.icon !== 'pos' && r.icon !== 'neg');
 
-  // "Why this lean" — top 3 drivers in the direction of the lean. Pulls from
-  // proReasons for OVER and riskReasons for UNDER (risks against OVER are pros
-  // for UNDER). Position-in-array is the implicit ranking — each producer pushes
-  // its strongest reason first.
-  const driverReasons = lean.lean === 'over' ? proReasons
-                      : lean.lean === 'under' ? riskReasons
-                      : [];
-  const topDrivers = driverReasons.slice(0, 3);
+  // Columns resolved against the LEAN, not the raw icon. The icon is
+  // directional ('pos' = pushes the number up), so labelling a column "Pro"
+  // straight off it listed the reasons arguing AGAINST every UNDER lean — the
+  // same inversion GLOW-UP 184 fixed on the factor chips. Falls back to the raw
+  // split for push/no-lean, where "for" and "against" have no meaning.
+  const directional = lean.lean === 'over' || lean.lean === 'under';
+  const forReasons     = directional ? leanReasons.filter(r => factorPolarity(r.icon, lean.lean) === 'sup') : proReasons;
+  const againstReasons = directional ? leanReasons.filter(r => factorPolarity(r.icon, lean.lean) === 'opp') : riskReasons;
+  const contextReasons = directional ? leanReasons.filter(r => factorPolarity(r.icon, lean.lean) === 'neu') : neutralReasons;
+
+  // "Why this lean" — top 3 drivers in the direction of the lean.
+  // Position-in-array is the implicit ranking — each producer pushes its
+  // strongest reason first.
+  // Only for a real direction. The header prints "UNDER" for anything that
+  // isn't "over", so on a push/no-lean this block would read "Why UNDER" over a
+  // list of UP reasons — it stayed hidden before and must keep doing so.
+  const topDrivers = directional ? forReasons.slice(0, 3) : [];
   const topDriversHTML = topDrivers.length > 0 ? `
     <div class="top-drivers ${lean.lean}">
       <div class="top-drivers-head">Why ${lean.lean === 'over' ? 'OVER' : 'UNDER'} · Top ${topDrivers.length} driver${topDrivers.length > 1 ? 's' : ''}</div>
@@ -16769,18 +16778,31 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     <span>${r.text}</span>
   </div>`;
 
-  const groupedReasonsHTML = `
+  const leanDirWord = lean.lean === 'over' ? 'OVER' : lean.lean === 'under' ? 'UNDER' : '';
+  const groupsInner = `
     <div class="lean-reason-groups">
       <div class="lean-reason-col pro">
-        <div class="lean-reason-head">Pro</div>
-        ${proReasons.length ? proReasons.map(reasonRow).join('') : '<div class="lean-point muted"><span class="lean-point-icon">·</span><span>No strong pro edge</span></div>'}
+        <div class="lean-reason-head">${directional ? `Supports ${leanDirWord}` : 'Pro'}</div>
+        ${forReasons.length ? forReasons.map(reasonRow).join('') : '<div class="lean-point muted"><span class="lean-point-icon">·</span><span>No strong supporting edge</span></div>'}
       </div>
       <div class="lean-reason-col risk">
-        <div class="lean-reason-head">Risk</div>
-        ${riskReasons.length ? riskReasons.map(reasonRow).join('') : '<div class="lean-point muted"><span class="lean-point-icon">·</span><span>No major risk flag</span></div>'}
+        <div class="lean-reason-head">${directional ? 'Argues against' : 'Risk'}</div>
+        ${againstReasons.length ? againstReasons.map(reasonRow).join('') : '<div class="lean-point muted"><span class="lean-point-icon">·</span><span>No major counter-signal</span></div>'}
       </div>
-      ${neutralReasons.length ? `<div class="lean-reason-col neutral"><div class="lean-reason-head">Context</div>${neutralReasons.slice(0, 2).map(reasonRow).join('')}</div>` : ''}
+      ${contextReasons.length ? `<div class="lean-reason-col neutral"><div class="lean-reason-head">Context</div>${contextReasons.slice(0, 2).map(reasonRow).join('')}</div>` : ''}
     </div>`;
+
+  // GLOW-UP 186: fold the columns away, matching the stat panels. The top-3
+  // drivers stay visible above — those are the headline, not the detail.
+  const groupedReasonsHTML = leanReasons.length >= 2
+    ? `<details class="lean-prose"><summary>Full rationale · ${leanReasons.length} points${directional ? ` (${forReasons.length} for / ${againstReasons.length} against)` : ''}</summary>${groupsInner}</details>`
+    : groupsInner;
+
+  // Chip summary — same ✓/✗ language as the SS/TD/FT panels.
+  const fpFactors = pickDistinctFactors(leanReasons, 5);
+  const fpFactorChips = fpFactors.length >= 2
+    ? `<div class="lean-factors">${fpFactors.map(r => factorChipHtml(r, lean.lean, 'lean-factor')).join('')}</div>`
+    : '';
 
   function panelConfidence(samples: number, line: number | null): { label: 'High'|'Med'|'Low'; cls: 'high'|'med'|'low' } {
     if (samples >= 7 && line != null) return { label: 'High', cls: 'high' };
@@ -17577,6 +17599,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         <div class="panel-pair">
         <div class="detail-panel">
           <div class="detail-panel-title">Lean Analysis (FP)</div>
+          ${fpFactorChips}
           <div class="lean-reason">${topDriversHTML}${groupedReasonsHTML}</div>
           ${lean.verdict?`<div class="lean-verdict ${lean.lean}">${lean.verdict}</div>`:''}
         </div>
