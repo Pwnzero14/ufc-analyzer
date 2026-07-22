@@ -7674,6 +7674,14 @@ const BOOK_COLORS: Record<string, string> = {
   dk:   '#7de0ff',
 };
 
+// Stat labels for an EffectiveLean's _source. The "Lean Analysis" panel renders
+// getEffectiveLean(), which is whichever stat is that fighter's strongest signal
+// — so its title was wrong whenever that wasn't FP. Mid-week, with no FP lines
+// posted yet, every card read "Lean Analysis (FP)" over an SS verdict.
+const EFFECTIVE_LEAN_STAT_LABEL: Record<string, string> = {
+  fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL', kd: 'KD',
+};
+
 // ── STRUCTURED LEAN FACTORS ───────────────────────────────────────────────
 // Classifies a lean reason's prose into one scannable keyword. Hoisted out of
 // renderBestPicks (GLOW-UP 162) so the fighter-card stat panels classify with
@@ -17598,7 +17606,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         </div>
         <div class="panel-pair">
         <div class="detail-panel">
-          <div class="detail-panel-title">Lean Analysis (FP)</div>
+          <div class="detail-panel-title">Lean Analysis (${EFFECTIVE_LEAN_STAT_LABEL[lean._source || 'fp'] || 'FP'})</div>
           ${fpFactorChips}
           <div class="lean-reason">${topDriversHTML}${groupedReasonsHTML}</div>
           ${lean.verdict?`<div class="lean-verdict ${lean.lean}">${lean.verdict}</div>`:''}
