@@ -27732,6 +27732,40 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .plp-mini.miss { color: #ff8fa3; }
 .plp-mini.pending { color: var(--text3); }
 
+/* ══ GLOW-UP 187: Best Picks five-level pass ═════════════════════════════ */
+/* L5 — model-ranked vs price. "BEST" is a model ranking; say how many actually
+   clear breakeven so the header isn't read as an endorsement of all of them. */
+.bph-ev-split {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; letter-spacing: 0.06em; margin-left: 6px; cursor: help;
+}
+.bps-evpos { color: var(--green); }
+.bps-evneg { color: var(--red); opacity: 0.75; }
+
+/* L2/L3 — archive adjustment stated once per column instead of on every row. */
+.bph-archive {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  padding: 5px 10px 0;
+}
+.bph-arch {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: 3px; cursor: help; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); color: var(--text3);
+}
+.bph-arch.up   { color: #6ee7a8; border-color: rgba(38,208,124,0.22); }
+.bph-arch.down { color: #ff8fa3; border-color: rgba(255,91,120,0.22); }
+.bph-arch i { font-style: normal; opacity: 0.6; margin-left: 2px; }
+/* Thin sample — the adjustment fired off a handful of rows, so it should not
+   read as settled fact. */
+.bph-arch.thin { opacity: 0.6; border-style: dashed; }
+
+/* L4 — every row carries WIN/EV, not just the #1 hero. Same structure, smaller. */
+.bp-row-stats .bp-hs-label { font-size: 6.5px; }
+.bp-row-stats .bp-hs-val { font-size: 10px; }
+.bp-row-stats .bp-hero-side { gap: 6px; }
+
 /* ══ GLOW-UP 185: STAT OWNS COLOR ON THE BOARD ═══════════════════════════
    .line-cell carries BOTH `${stat}` and `src-${source}`, and the two palettes
    used the same literals (FP == P6 blue, SS == PP teal, TD == Betr gold), so a

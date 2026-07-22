@@ -7487,6 +7487,7 @@ function renderBestPicks(container, renderSeq = 0) {
         });
         const bestPickConfidenceCache = new Map();
         const bestPickReasonCache = new Map();
+        const bestPickArchiveMetaCache = new Map();
         const bestPickLeanCache = new Map();
         // Best Picks lookups can target a specific book via the optional `platform`
         // arg — used when a candidate carries `_platform` (e.g., a PrizePicks-specific
@@ -7962,6 +7963,7 @@ function renderBestPicks(container, renderSeq = 0) {
             if (matchingRows.length < minSamples) {
                 bestPickConfidenceCache.set(cacheKey, baseConfidence);
                 bestPickReasonCache.set(cacheKey, null);
+                bestPickArchiveMetaCache.set(cacheKey, null);
                 return baseConfidence;
             }
             let hits = 0;
@@ -7981,6 +7983,7 @@ function renderBestPicks(container, renderSeq = 0) {
             if (total < minSamples) {
                 bestPickConfidenceCache.set(cacheKey, baseConfidence);
                 bestPickReasonCache.set(cacheKey, null);
+                bestPickArchiveMetaCache.set(cacheKey, null);
                 return baseConfidence;
             }
             const hitRate = hits / total;
@@ -7988,6 +7991,7 @@ function renderBestPicks(container, renderSeq = 0) {
             if (hitRate >= 0.47 && hitRate <= 0.53) {
                 bestPickConfidenceCache.set(cacheKey, baseConfidence);
                 bestPickReasonCache.set(cacheKey, null);
+                bestPickArchiveMetaCache.set(cacheKey, null);
                 return baseConfidence;
             }
             const avgDirectionalEdge = directionalEdgeSum / total;
@@ -8001,22 +8005,30 @@ function renderBestPicks(container, renderSeq = 0) {
             const adjustedConfidence = Math.round(Math.max(0, Math.min(99, baseConfidence - penalty + bonus + oddsAdjustment.delta)));
             const lowNTag = minSamples === 2 ? ' (low-n)' : '';
             let note = null;
+            let meta = null;
             if (penalty >= 4) {
                 note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples${lowNTag}, so confidence was trimmed.`;
+                meta = { propType, lean: el.lean, platform: platform || 'active book', pct: Math.round(hitRate * 100), total, dir: 'down' };
             }
             else if (bonus >= 3) {
                 note = `Archive check: ${propType} ${el.lean}s on ${platform || 'active book'} are ${Math.round(hitRate * 100)}% over ${total} settled samples${lowNTag}, so confidence was boosted.`;
+                meta = { propType, lean: el.lean, platform: platform || 'active book', pct: Math.round(hitRate * 100), total, dir: 'up' };
             }
             if (oddsAdjustment.note) {
                 note = note ? `${note} ${oddsAdjustment.note}` : oddsAdjustment.note;
             }
             bestPickConfidenceCache.set(cacheKey, adjustedConfidence);
             bestPickReasonCache.set(cacheKey, note);
+            bestPickArchiveMetaCache.set(cacheKey, meta);
             return adjustedConfidence;
         };
         const getBestPickArchiveNote = (f) => {
             void getAdjustedBestPickConfidence(f);
             return bestPickReasonCache.get(f.name) ?? null;
+        };
+        const getBestPickArchiveMeta = (f) => {
+            void getAdjustedBestPickConfidence(f);
+            return bestPickArchiveMetaCache.get(f.name) ?? null;
         };
         const pickTier = (f) => {
             const el = getBestPickLean(f);
@@ -8363,7 +8375,13 @@ function renderBestPicks(container, renderSeq = 0) {
                 if (el.conf)
                     confVals.push(Number(el.conf) || 0);
                 const archiveNote = getBestPickArchiveNote(f);
-                let reason = archiveNote || el.verdict || el.reasons?.[0]?.text || '—';
+                // GLOW-UP 187 (L1): the row's one prose line must say something about THIS
+                // fighter. The archive note used to win this slot, but it's keyed by
+                // (propType, side, book) — so 9 of 11 rows rendered a byte-identical
+                // sentence while each fighter's own verdict (proj vs line) was suppressed.
+                // The note is a confidence ADJUSTMENT, not a rationale; it moves to the
+                // section header (L2) and is kept here only as a last resort.
+                let reason = el.verdict || el.reasons?.[0]?.text || archiveNote || '—';
                 // If we overrode the displayed line, sync the line value embedded in
                 // the verdict prefix (e.g. "SS OVER 46.5 (proj 69.3) — ...") so the
                 // reason stays consistent with the displayed line/book.
@@ -8553,15 +8571,15 @@ function renderBestPicks(container, renderSeq = 0) {
           <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
-          ${i === 0 && evd ? `<div class="bp-hero-stats">
+          ${evd ? `<div class="bp-hero-stats${i === 0 ? '' : ' bp-row-stats'}">
             <div class="best-pick-line">${line || '—'}</div>
             <div class="bp-hero-side">
               <div class="bp-hs" title="Calibrated win probability for this pick — the number EV is priced from"><span class="bp-hs-label">WIN</span><b class="bp-hs-val">${Math.round(evd.prob * 100)}%</b></div>
-              <div class="bp-hs" title="EV from ${Math.round(evd.prob * 100)}% win prob · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}"><span class="bp-hs-label">EV</span><b class="bp-hs-val ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}">${evd.isAssumedVig ? '~' : ''}${evd.ev > 0 ? '+' : ''}${evd.ev}%</b></div>
+              <div class="bp-hs" title="EV from ${Math.round(evd.prob * 100)}% win prob${evd.recalibrated ? ' (recalibrated ↻)' : ''} · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}"><span class="bp-hs-label">EV</span><b class="bp-hs-val ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}">${evd.isAssumedVig ? '~' : ''}${evd.ev > 0 ? '+' : ''}${evd.ev}%</b></div>
             </div>
           </div>` : `<div class="best-pick-line">${line || '—'}</div>`}
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
-          ${i === 0 && evd ? '' : evTag}${splitNote}
+          ${evd ? '' : evTag}${splitNote}
         </div>
         ${slateBtn}${copyBtn}
       </div>`;
@@ -8569,8 +8587,45 @@ function renderBestPicks(container, renderSeq = 0) {
             const avgConf = confVals.length ? Math.round(confVals.reduce((a, b) => a + b, 0) / confVals.length) : null;
             // GLOW-UP 161: tier tallies + avg confidence live in the section header
             // (glanceable before scrolling) instead of a footer under the 8th row.
-            const headerStats = `<span class="bph-stats">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''}</span>`;
-            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span>${headerStats}<span class="best-picks-count">${fighters.length} picks</span></div>${rows}</div>`;
+            const headerStats = `<span class="bph-stats">${tierCounts['High'] ? `<span class="bps-tally bps-high">${tierCounts['High']} HIGH</span>` : ''}${tierCounts['Med'] ? `<span class="bps-tally bps-med">${tierCounts['Med']} MED</span>` : ''}${tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''}${avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''}${
+            // GLOW-UP 187 (L5): "best" ranks by model, not by price — 5 of 7 picks
+            // sitting at EV -12% under a header that says BEST reads as an
+            // endorsement. State the split so model-ranked isn't read as value.
+            (() => {
+                let pos = 0, neg = 0;
+                for (const f of fighters) {
+                    const e = computeDetailedEV(f, getBestPickLean(f));
+                    if (!e)
+                        continue;
+                    if (e.ev > 0)
+                        pos++;
+                    else if (e.ev < 0)
+                        neg++;
+                }
+                if (!pos && !neg)
+                    return '';
+                return `<span class="bph-ev-split" title="This column ranks by model signal, not by price. ${pos} pick${pos === 1 ? '' : 's'} clear breakeven on the posted odds; ${neg} do not — those are playable as pick-em legs, not as value.">${pos ? `<b class="bps-evpos">${pos} +EV</b>` : ''}${pos && neg ? ' · ' : ''}${neg ? `<b class="bps-evneg">${neg} −EV</b>` : ''}</span>`;
+            })()}</span>`;
+            // GLOW-UP 187 (L2/L3): the archive adjustment is a property of
+            // (stat, side, book), so it belongs to the column — not stamped on every
+            // row. Deduped here, with the sample count exposed: a 3-sample archive
+            // check moving confidence is thin, and the row prose never said so.
+            const archiveChips = (() => {
+                const seen = new Map();
+                for (const f of fighters) {
+                    const m = getBestPickArchiveMeta(f);
+                    if (m)
+                        seen.set(`${m.propType}|${m.lean}|${m.platform}|${m.dir}`, m);
+                }
+                if (!seen.size)
+                    return '';
+                const chips = [...seen.values()].map(m => {
+                    const thin = m.total < 5;
+                    return `<span class="bph-arch ${m.dir === 'up' ? 'up' : 'down'}${thin ? ' thin' : ''}" title="Archive check: ${m.propType} ${m.lean}s on ${m.platform} hit ${m.pct}% across ${m.total} settled sample${m.total === 1 ? '' : 's'}, so model confidence was ${m.dir === 'up' ? 'boosted' : 'trimmed'} for those picks.${thin ? ' Thin sample — treat this adjustment as weak evidence.' : ''}">${m.dir === 'up' ? '▲' : '▼'} ${m.propType} ${m.lean.toUpperCase()} · ${m.platform.toUpperCase()} ${m.pct}% <i>n=${m.total}</i></span>`;
+                }).join('');
+                return `<div class="bph-archive" title="Confidence adjustments applied to this column from settled archive results">${chips}</div>`;
+            })();
+            return `<div class="best-picks-section ${typeClass}"><div class="best-picks-header"><span class="best-picks-title">${icon} ${title}</span>${headerStats}<span class="best-picks-count">${fighters.length} picks</span></div>${archiveChips}${rows}</div>`;
         }
         // GLOW-UP 167: controls render whenever the board has picks; the grid draws
         // the filtered view. A filter that empties the view gets its own message
