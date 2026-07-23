@@ -198,6 +198,11 @@ export const NAME_ALIASES: Record<string, string> = {
   // card + a ghost and broke opponent/moneyline resolution (Tracy Cortez's dog-FP
   // gate). normalizeName applies this so all platforms + settle collapse to one key.
   'Cong Wang':        'Wang Cong',
+  // 2026-07-23 (Davis vs Aliev card): UD/PP truncate "Muhammad Saidov" (the
+  // UFCStats card + Pick6 canonical) to "Muhammad Said". Different surname token,
+  // so namesMatch can't merge them — his UD/PP/Betr lines split off the Pick6
+  // card, leaving it "1 of 26 without lines". normalizeName collapses both.
+  'Muhammad Said':    'Muhammad Saidov',
   'Damon Jackson':    'Donte Johnson',
   'Myktybek Orolbai': 'Myktybek Orolbai Uulu',
   'Orolbai':          'Myktybek Orolbai Uulu',
