@@ -1110,6 +1110,15 @@ const UFCSTATS_NAME_ALIASES = {
     'sharabutdin magomedov': 'Shara Magomedov',
     'abusupiyan magomedov': 'Abus Magomedov',
 };
+// Pin a name straight to a UFCStats fighter-details ID, bypassing the alpha-page
+// first+last search. For a common name the search grabs whichever fighter sorts
+// first on the ?char= page, which can be a different (often retired) fighter —
+// NAME_ALIASES can't disambiguate because both share the exact same name.
+// "Mike Davis": the search resolved to an old Strikeforce Mike Davis (2-0-0,
+// c8661e204c66f325) instead of the current UFC lightweight.
+const UFCSTATS_URL_OVERRIDES = {
+    'mike davis': 'fb3e61720be4690c',
+};
 // A flat 24h TTL expires a whole card's cache in lockstep — every fighter written on one
 // visit goes stale together on the next, stampeding UFCStats (which then rate-limits, so
 // most fighters stick on "Fetching from UFCStats…"). Stagger expiry across an extra 0-8h
@@ -1257,14 +1266,21 @@ async function fetchFromUFCStats(name) {
             return null;
         }
         let detailUrl = null;
-        for (const cand of candidates) {
-            const html = await getAlphaPage(cand.char);
-            if (!html)
-                continue;
-            detailUrl = findDetailUrl(html, cand.first, cand.last);
-            if (detailUrl) {
-                debugLog(`Matched: ${name} via [${cand.char.toUpperCase()}] first=${cand.first} last=${cand.last}`);
-                break;
+        const pinnedId = UFCSTATS_URL_OVERRIDES[name.trim().toLowerCase()];
+        if (pinnedId) {
+            detailUrl = `http://www.ufcstats.com/fighter-details/${pinnedId}`;
+            debugLog(`URL pin: ${name} → ${pinnedId}`);
+        }
+        else {
+            for (const cand of candidates) {
+                const html = await getAlphaPage(cand.char);
+                if (!html)
+                    continue;
+                detailUrl = findDetailUrl(html, cand.first, cand.last);
+                if (detailUrl) {
+                    debugLog(`Matched: ${name} via [${cand.char.toUpperCase()}] first=${cand.first} last=${cand.last}`);
+                    break;
+                }
             }
         }
         if (!detailUrl) {
