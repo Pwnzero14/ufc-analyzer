@@ -50,9 +50,24 @@ platform-specific reality, not theory.
   picks in OPPOSITE directions (A "FT OVER 12.5" + B "FT UNDER 12.5") are
   contradictory: at most one can cash. The Best Picks builder auto-drops the
   weaker-confidence side (cross-section FT exclusivity pass, added 2026-07-04).
-  If an audit ever sees both again, that pass regressed. Opposite-direction
-  pairs on per-fighter stats (SS/TD) remain fine — that's the coherent
-  "A outworks B" shape.
+  If an audit ever sees both again, that pass regressed.
+- **Opposite-direction pairs on per-fighter stats (SS/TD) are NOT automatically
+  fine.** They're the coherent "A outworks B" shape *only when the under side is
+  low output over a full fight*. When the under side's path is a **finish**, the
+  shape breaks: a finish suppresses BOTH fighters' volume, so the same-fight
+  OVER goes under with it. The two picks then need opposite fight lengths and
+  cannot both be right.
+  Diagnostic: is the opponent finish-driven — **≥65% finish rate, or ≤7m career
+  average fight time**? Cross-check what the OVER needs: `line ÷ SLpM` minutes
+  vs the opponent's average. Precedent (2026-07-22): Ponzinibbio SS OVER 29.5
+  opposite Patterson SS UNDER 28.5 — Patterson finishes 86%, averages 5:14, five
+  of seven inside 3:10; Ponzinibbio needs ~6.2 min at 4.78 SS/min. The board's
+  own duration adjustment had already cut him to 24.2, under his line.
+  Since MODEL v9 this is detected and demoted 8pts with a `⚠ NEEDS ROUNDS` tag —
+  an audit should still call out any surviving pair.
+- Same shape across stats: an **SS/TD OVER paired with an FT UNDER on the same
+  fight** is the same conflict (volume needs rounds, FT under needs a finish).
+  Precedent: Petersen SS OVER 19.5 + Walker FT UNDER 14.99, Walker averaging 4.7m.
 
 ## Data traps — when a line or delta looks wrong
 
@@ -113,7 +128,9 @@ platform-specific reality, not theory.
 Work through, in order, reporting only violations and near-misses:
 
 1. Same-fight conflicts: FP doubles in a section, same-direction pairs,
-   opposite-stat over pairs.
+   opposite-stat over pairs, and **duration coupling** — any volume OVER whose
+   opponent is finish-driven (≥65% finish rate or ≤7m average), including the
+   SS-OVER-plus-FT-UNDER shape.
 2. Placeability: every dog FP UNDER on Underdog? Any pick on a blocked side?
 3. Line-side optimality: each pick's shown book vs the best book for its
    direction; flag 1.5+ point giveaways.
