@@ -21860,7 +21860,11 @@ document.getElementById('dbgHideBtn')?.addEventListener('click', () => {
       if (!name) return;
       const fp = parseFloat((row.querySelector('.betr-fp') as HTMLInputElement)?.value) || null;
       const ss = parseFloat((row.querySelector('.betr-ss') as HTMLInputElement)?.value) || null;
-      if (fp || ss) fighters.push({ name, line_fp: fp, line_ss: ss, line_td: null });
+      // GLOW-UP 190: attach the opponent from the card. pruneOrphanFighters drops
+      // any fighter without an opponent once a payload has >=10 rows, so a full
+      // slate saved without it (>=10 fighters) was silently pruned down to
+      // nothing — the reader was unusable for a full card.
+      if (fp || ss) fighters.push({ name, opponent: findOpponentFromUpcomingCard(name), line_fp: fp, line_ss: ss, line_td: null });
     });
     if (!fighters.length) {
       // No valid lines — explicitly clear Betr manual storage
