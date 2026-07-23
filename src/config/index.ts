@@ -250,7 +250,13 @@ export const NAME_ALIASES: Record<string, string> = {
 // v8 (2026-07-17): Knockdowns (KD) lean source — PrizePicks-only prop, hit-rate-driven
 //   (per-fight KD count vs line) + opponent dropped-rate corroboration. Best Picks
 //   eligible only when PP offers BOTH sides (standard projection, not demon/goblin).
-export const MODEL_VERSION = 8;
+// v9 (2026-07-22): duration coupling in the Best Picks correlation pass. A volume
+//   OVER (SS/R1 SS/TD/CTRL) opposite a finish-driven opponent (≥65% finish rate or
+//   ≤7m career average) is demoted 8pts and tagged NEEDS ROUNDS. The prior rule
+//   treated opposite-direction same-fight stat picks as the coherent "A outworks B"
+//   shape — true when the under side is low output over a full fight, false when it
+//   arrives via a finish, which suppresses BOTH fighters' volume together.
+export const MODEL_VERSION = 9;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.

@@ -8083,11 +8083,65 @@ function renderBestPicks(container, renderSeq = 0) {
                 return tb.rank - ta.rank;
             const ea = getBestPickLean(a);
             const eb = getBestPickLean(b);
-            const adjA = getAdjustedBestPickConfidence(a) - (corrPenaltyMap.get(a.name) || 0);
-            const adjB = getAdjustedBestPickConfidence(b) - (corrPenaltyMap.get(b.name) || 0);
+            // Duration coupling demotes by 8 — meaningful but below the 10 carried by a
+            // same-direction same-fight pair, which is the harder conflict.
+            const adjA = getAdjustedBestPickConfidence(a) - (corrPenaltyMap.get(a.name) || 0) - (durationCoupledMap.has(a.name) ? 8 : 0);
+            const adjB = getAdjustedBestPickConfidence(b) - (corrPenaltyMap.get(b.name) || 0) - (durationCoupledMap.has(b.name) ? 8 : 0);
             if (adjB !== adjA)
                 return adjB - adjA;
             return ((eb.ev || 0) - (ea.ev || 0));
+        };
+        // ── Duration coupling (GLOW-UP 189) ──────────────────────────────────────
+        // A volume OVER (SS/TD/CTRL) is not independent of how long the fight lasts,
+        // and the opponent controls that. The existing same-fight logic only handles
+        // SAME-direction pairs; opposite-direction SS was treated as the coherent
+        // "A outworks B" shape. That holds when the under side is low output over a
+        // full fight — it BREAKS when the under side's path is a finish, because a
+        // finish suppresses both fighters' volume together.
+        //
+        // Live case that exposed it: Ponzinibbio SS OVER 29.5 opposite Patterson SS
+        // UNDER 28.5. Patterson finishes 86% of his fights, career average 5:14, five
+        // of his last seven inside 3:10. Ponzinibbio needs ~6.2 min at his 4.78
+        // SS/min just to reach 29.5. Both picks can't be right: Patterson's under
+        // arrives via a finish, and that finish takes Ponzinibbio under too.
+        const FINISH_DRIVEN_RATE = 0.65; // finishes ≥65% of fights
+        const FINISH_DRIVEN_MINS = 7.0; // or averages under 7 minutes
+        const durationCoupledMap = new Map();
+        const isFinishDriven = (db) => {
+            if (!db)
+                return false;
+            return (db.finishRate ?? 0) >= FINISH_DRIVEN_RATE
+                || (db.avgTimeMins != null && db.avgTimeMins <= FINISH_DRIVEN_MINS);
+        };
+        const buildDurationCoupling = (pool) => {
+            for (const f of pool) {
+                const el = getBestPickLean(f);
+                if (el.lean !== 'over')
+                    continue;
+                if (el._source !== 'ss' && el._source !== 'ss_r1' && el._source !== 'td' && el._source !== 'ctrl')
+                    continue;
+                const opp = f.opponent ? allFighters.find(x => x.name.toLowerCase() === f.opponent.toLowerCase()) : null;
+                if (!isFinishDriven(opp?.db))
+                    continue;
+                const line = lineForLeanSource(f, el._source, el._platform);
+                // Minutes this OVER needs at the fighter's own career strike rate. Null
+                // when we lack a rate — the finish-driven opponent alone still qualifies.
+                const slpm = f.db?.slpm ?? null;
+                const needMins = (line != null && slpm != null && slpm > 0 && (el._source === 'ss' || el._source === 'ss_r1'))
+                    ? line / slpm
+                    : null;
+                const oppAvg = opp?.db?.avgTimeMins ?? null;
+                // If the number is reachable well inside the opponent's typical fight,
+                // duration isn't the binding constraint — don't cry wolf.
+                if (needMins != null && oppAvg != null && needMins <= oppAvg * 0.8)
+                    continue;
+                durationCoupledMap.set(f.name, {
+                    oppName: opp?.name || f.opponent || 'opponent',
+                    oppFinishPct: Math.round((opp?.db?.finishRate ?? 0) * 100),
+                    oppAvgMins: oppAvg,
+                    needMins,
+                });
+            }
         };
         // Detect same-fight pairs and penalize the lower-ranked fighter
         const buildCorrPenalties = (sorted) => {
@@ -8139,6 +8193,8 @@ function renderBestPicks(container, renderSeq = 0) {
         // Clear confidence cache so it recalculates with the overridden lean
         bestPickConfidenceCache.clear();
         bestPickReasonCache.clear();
+        // Order-independent, so it must be built BEFORE the first sort reads it.
+        buildDurationCoupling(allOversRaw);
         const allOvers = allOversRaw.sort(bestPickSort);
         buildCorrPenalties(allOvers);
         const allOversSorted = allOvers.sort(bestPickSort);
@@ -8450,6 +8506,10 @@ function renderBestPicks(container, renderSeq = 0) {
                 // tier grades signal strength + sample depth, EV prices the calibrated
                 // hit probability against the odds. Say so on the row instead of letting
                 // the two numbers silently fight each other.
+                const durCoupled = durationCoupledMap.get(f.name);
+                const durTag = durCoupled
+                    ? `<div class="bp-dur-split" title="This OVER needs rounds, and ${prettyName(durCoupled.oppName)} is a finisher — ${durCoupled.oppFinishPct}% finish rate${durCoupled.oppAvgMins != null ? `, ${durCoupled.oppAvgMins.toFixed(1)}m career average` : ''}.${durCoupled.needMins != null ? ` This line needs roughly ${durCoupled.needMins.toFixed(1)} min at his own strike rate.` : ''} An early finish takes this under regardless of who is winning, so it is NOT independent of the other side of this fight. Demoted 8pts.">⚠ NEEDS ROUNDS</div>`
+                    : '';
                 const projConflict = projOpposesLean(reason, el.lean, line);
                 const projTag = projConflict
                     ? `<div class="bp-proj-split" title="This pick's own projection (${projConflict.proj}) sits ${projConflict.gap.toFixed(1)} on the ${projConflict.implies} side of the ${line} line — the projection argues ${projConflict.implies}, the pick is ${(el.lean || '').toUpperCase()}. Not necessarily wrong: projection-vs-line contributes at most ±2.5 to the lean score, so hit-rate, opponent and matchup terms can outvote it. Worth checking manually before entering.">⚠ PROJ SAYS ${projConflict.implies}</div>`
@@ -8610,7 +8670,7 @@ function renderBestPicks(container, renderSeq = 0) {
             </div>
           </div>` : `<div class="best-pick-line">${line || '—'}</div>`}
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
-          ${evd ? '' : evTag}${splitNote}${projTag}
+          ${evd ? '' : evTag}${splitNote}${projTag}${durTag}
         </div>
         ${slateBtn}${copyBtn}
       </div>`;

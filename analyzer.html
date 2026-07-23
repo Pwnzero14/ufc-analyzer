@@ -27732,6 +27732,19 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .plp-mini.miss { color: #ff8fa3; }
 .plp-mini.pending { color: var(--text3); }
 
+/* GLOW-UP 189 — volume OVER coupled to a finisher opponent. Amber: unlike the
+   red PROJ flag this isn't the row contradicting itself, it's a dependency the
+   row can't show — but it did demote the pick, so it's louder than a hint. */
+.best-pick-line-wrap .bp-dur-split {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px; font-weight: 800; letter-spacing: 0.06em;
+  color: #ffbe6b;
+  background: rgba(255,184,77,0.08);
+  border: 1px solid rgba(255,184,77,0.32);
+  border-radius: 3px; padding: 1px 4px; margin-top: 2px;
+  text-align: center; white-space: nowrap; cursor: help;
+}
+
 /* GLOW-UP 188 — the pick's own projection argues the other way. Red rather than
    the amber of LEAN ✓ · VALUE ✗: that one is a known trade-off (signal vs
    price), this one is the row disagreeing with itself and wants a manual look. */
