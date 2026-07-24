@@ -27758,6 +27758,109 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-align: center; white-space: nowrap; cursor: help;
 }
 
+/* ══ GLOW-UP 192: Best Picks exposure + audit pass ═══════════════════════ */
+/* L1 — the 🏪 badge now confirms as well as warns */
+.best-pick-lineshop.best {
+  color: #6ee7a8; background: rgba(38,208,124,0.07); border-color: rgba(38,208,124,0.26);
+}
+.best-pick-lineshop.warn {
+  color: #ffbe6b; background: rgba(255,184,77,0.08); border-color: rgba(255,184,77,0.32);
+}
+
+/* L2 — CLEAN filter chip */
+.bpc-chip.bpc-clean.on { color: #6ee7a8; border-color: rgba(38,208,124,0.45); background: rgba(38,208,124,0.10); }
+.bpc-chip.bpc-bybook.on { color: var(--gold); border-color: rgba(248,198,74,0.45); background: rgba(248,198,74,0.10); }
+
+/* L3 — exposure strip: the board as a portfolio, not a list */
+.bp-exposure {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 6px 10px; margin-bottom: 8px;
+  border: 1px solid var(--border2); border-radius: 7px;
+  background: rgba(255,255,255,0.02);
+}
+.bpx-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.16em; color: var(--text3);
+}
+.bpx-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.04em; color: var(--text2); cursor: help;
+}
+.bpx-item b { color: var(--text); }
+.bpx-item.warn { color: #ffbe6b; }
+.bpx-item.warn b { color: #ffbe6b; }
+.bpx-books { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.bpx-book {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 1px 5px; border-radius: 3px; cursor: help;
+  border: 1px solid var(--border2); background: rgba(255,255,255,0.03); color: var(--text2);
+}
+.bpx-book i { font-style: normal; opacity: 0.65; margin-left: 2px; }
+
+/* L4 — considered but cut: audit trail, collapsed by default */
+.bp-nearmiss { margin-top: 10px; }
+.bp-nearmiss .bpnm-head { cursor: pointer; }
+.bpnm-note {
+  font-size: 9.5px; color: var(--text3); padding: 2px 10px 6px; line-height: 1.4;
+}
+.bpnm-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 10px; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
+.bpnm-dir { font-weight: 800; font-size: 7.5px; letter-spacing: 0.06em; padding: 1px 4px; border-radius: 3px; }
+.bpnm-dir.over  { color: #6ee7a8; background: rgba(38,208,124,0.08); }
+.bpnm-dir.under { color: #ff8fa3; background: rgba(255,91,120,0.08); }
+.bpnm-name { color: var(--text2); min-width: 120px; }
+.bpnm-stat { color: var(--text3); min-width: 42px; }
+.bpnm-conf { color: var(--text3); min-width: 34px; }
+.bpnm-why  { color: var(--text3); opacity: 0.85; }
+
+/* L5 — BY BOOK entry plan */
+.bp-bybook {
+  margin-bottom: 10px; padding: 8px 10px;
+  border: 1px solid rgba(248,198,74,0.22); border-radius: 7px;
+  background: rgba(248,198,74,0.03);
+}
+.bpbb-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--gold); margin-bottom: 6px;
+}
+.bpbb-sub {
+  font-weight: 400; letter-spacing: 0.04em; color: var(--text3);
+  text-transform: none; margin-left: 8px;
+}
+.bpbb-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.bpbb-card {
+  flex: 1 1 190px; min-width: 170px;
+  border: 1px solid var(--border2); border-radius: 5px;
+  background: rgba(0,0,0,0.2); overflow: hidden;
+}
+.bpbb-head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em;
+  padding: 4px 7px; display: flex; justify-content: space-between;
+  background: rgba(255,255,255,0.04); color: var(--text2);
+}
+.bpbb-count { opacity: 0.65; }
+.bpbb-line {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 7px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  border-top: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.12s;
+}
+.bpbb-line:hover { background: rgba(255,255,255,0.05); }
+.bpbb-dir { font-weight: 800; font-size: 7px; padding: 1px 3px; border-radius: 2px; }
+.bpbb-dir.over  { color: #6ee7a8; background: rgba(38,208,124,0.08); }
+.bpbb-dir.under { color: #ff8fa3; background: rgba(255,91,120,0.08); }
+.bpbb-name { flex: 1; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bpbb-stat { color: var(--text3); }
+.bpbb-line-val { color: var(--text); font-weight: 700; }
+.bpbb-flag { color: #ffbe6b; cursor: help; }
+
 /* ══ GLOW-UP 191: Parlay Lab five-level pass ═════════════════════════════ */
 /* L1 — pool rows carry EV + a live synergy hint (mirror of the ✗ conflict flag) */
 .parlay-leg-ev {
