@@ -5494,14 +5494,29 @@ function calcSSR1Lean(
   const label = proj != null
     ? `Proj R1 SS (${effective.toFixed(1)} — avg ${avgR1.toFixed(1)} + opp allows ${oppAllowed})`
     : `Avg R1 SS (${effective.toFixed(1)})`;
+  // MODEL v11: a round-1 sig-strike gap is proportionally large — the line sits
+  // ~15-20, so a 2-4 strike miss is a real edge, not noise. The old buckets scored
+  // a 4.0 gap as "slightly off" (0.6) and used a strict `< -4` boundary, so a proj
+  // exactly 4 below the line dropped to the weak tier; a striker prior then cancelled
+  // it and the lean died as a toss-up (Ankalaev proj 14.5 vs line 18.5 → NO LEAN when
+  // both projection and hit-rate said UNDER). Boundaries are now inclusive and a
+  // dedicated 2-4 tier carries the mid-size gaps.
   const diff = effective - line;
-  if      (diff > 8)   { score += 2.5; reasons.push({ icon:'pos', text:`${label} is ${diff.toFixed(1)} above line — strong over value` }); }
-  else if (diff > 4)   { score += 1.5; reasons.push({ icon:'pos', text:`${label} edges the line by ${diff.toFixed(1)}` }); }
-  else if (diff > 1.5) { score += 0.6; reasons.push({ icon:'pos', text:`${label} slightly above line` }); }
-  else if (diff < -8)  { score -= 2.5; reasons.push({ icon:'neg', text:`${label} is ${Math.abs(diff).toFixed(1)} BELOW line — strong under value` }); }
-  else if (diff < -4)  { score -= 1.5; reasons.push({ icon:'neg', text:`${label} trails line by ${Math.abs(diff).toFixed(1)}` }); }
-  else if (diff < -1.5){ score -= 0.6; reasons.push({ icon:'neg', text:`${label} slightly below line` }); }
-  else                 {               reasons.push({ icon:'neu', text:`${label} near line — toss-up` }); }
+  const adiff = Math.abs(diff);
+  const dscore = adiff >= 8 ? 2.5 : adiff >= 4 ? 1.6 : adiff >= 2 ? 1.0 : adiff >= 1 ? 0.5 : 0;
+  if (dscore === 0) {
+    reasons.push({ icon:'neu', text:`${label} near line — toss-up` });
+  } else if (diff > 0) {
+    score += dscore;
+    reasons.push({ icon:'pos', text: adiff >= 8 ? `${label} is ${diff.toFixed(1)} above line — strong over value`
+      : adiff >= 4 ? `${label} edges the line by ${diff.toFixed(1)}`
+      : `${label} is ${diff.toFixed(1)} above line` });
+  } else {
+    score -= dscore;
+    reasons.push({ icon:'neg', text: adiff >= 8 ? `${label} is ${adiff.toFixed(1)} BELOW line — strong under value`
+      : adiff >= 4 ? `${label} trails line by ${adiff.toFixed(1)}`
+      : `${label} is ${adiff.toFixed(1)} below line` });
+  }
 
   // Surface the opponent-weight correction (MODEL v10) so a flipped lean is
   // explained, not silent.
@@ -5530,8 +5545,12 @@ function calcSSR1Lean(
     else if (trend < -6) { score -= 0.7; reasons.push({ icon:'neg', text:`Recent R1 form DOWN — last 3 avg ${recentAvg.toFixed(0)} vs career ${avgR1.toFixed(0)}` }); }
   }
 
-  if (db.style === 'striker') { score += 0.4; reasons.push({ icon:'pos', text:`Striker — typically high round-1 output` }); }
-  else if (db.style === 'grappler') { score -= 0.4; reasons.push({ icon:'neg', text:`Grappler — may chase early takedowns over R1 striking volume` }); }
+  // MODEL v11: archetype nudge, but ONLY when it agrees with the projected direction.
+  // A striker's "high output" prior must not cancel a fighter's own projected-under
+  // history — that double-counts striking the R1 average already reflects, and it was
+  // exactly what buried real unders (Ankalaev, Ponzinibbio) as toss-ups.
+  if (db.style === 'striker' && diff > 0) { score += 0.4; reasons.push({ icon:'pos', text:`Striker — typically high round-1 output` }); }
+  else if (db.style === 'grappler' && diff < 0) { score -= 0.4; reasons.push({ icon:'neg', text:`Grappler — may chase early takedowns over R1 striking volume` }); }
 
   // Best-line note last so the diff reason stays as the verdict headline.
   if (lines.length > 1) {
