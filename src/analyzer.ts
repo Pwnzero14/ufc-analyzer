@@ -10365,8 +10365,16 @@ function renderParlayLab(container: HTMLElement): void {
       // Diff vs the live slip — is this a small tweak or a different bet?
       const shared = legKeys.filter(k => parlaySelectedLegs.has(k)).length;
       const fresh = legKeys.length - shared;
+      // "Matches" only when it's the SAME set — all suggestion legs in the slip
+      // AND no extras in the slip. A strict subset must not read as a match: it
+      // implies loading changes nothing when it would actually drop legs.
+      const dropped = selectedLegs.length - shared;
+      const isExactMatch = shared === legKeys.length && dropped === 0;
+      const diffLabel = isExactMatch
+        ? 'MATCHES YOUR SLIP'
+        : `${shared} shared · +${fresh} new${dropped > 0 ? ` · −${dropped}` : ''}`;
       const diffChip = selectedLegs.length
-        ? `<span class="psg-diff${shared === legKeys.length && fresh === 0 ? ' same' : ''}" title="How this suggestion compares to the slip you've built: ${shared} leg${shared === 1 ? '' : 's'} you already have, ${fresh} new. Loading it replaces your current selection.">${shared === legKeys.length ? 'MATCHES YOUR SLIP' : `${shared} shared · +${fresh} new`}</span>`
+        ? `<span class="psg-diff${isExactMatch ? ' same' : ''}" title="How this suggestion compares to the slip you've built: ${shared} leg${shared === 1 ? '' : 's'} you already have, ${fresh} new${dropped > 0 ? `, and it drops ${dropped} of yours` : ''}. Loading it replaces your current selection.">${diffLabel}</span>`
         : '';
       return `<div class="parlay-suggest-card grade-${s.health.grade}" data-suggest-legs="${legsDataAttr}" title="Click to load these ${legKeys.length} legs into your slip (replaces the current selection)">
         <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade})<span class="psg-load">LOAD →</span></div>
