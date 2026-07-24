@@ -2482,6 +2482,12 @@ function shouldSkipFpSideForFighter(
   // also has a line for them.
   const platform = platformOverride ?? getSourceActivePlatformKey(f, source);
   if (!platform) return false;
+  // Manual override wins over every inference below: the user has read the actual
+  // Pick6 card and seen there is no Less button. Needed because the scraped
+  // fp_under_available flag fails OPEN when undefined, and a fighter Pick6 prices
+  // as their dog can still be a sportsbook favourite (near-pick-em bouts), so
+  // neither the flag nor moneylineRole catches it.
+  if (direction === 'under' && platform === 'pick6' && _fpUnderBlocked.has(f.name.toLowerCase())) return true;
   // Pick6 FP UNDER is unplaceable for underdogs (More/OVER-only). The Pick6-vs-Underdog
   // line divergence detects the dog even when the moneyline map is missing the bout, so
   // check it BEFORE the moneyline early-out below.
@@ -15432,6 +15438,54 @@ async function listManualWeightMisses(): Promise<void> {
 (window as unknown as { clearMissedWeight: typeof clearManualWeightMiss }).clearMissedWeight = clearManualWeightMiss;
 (window as unknown as { listMissedWeights: typeof listManualWeightMisses }).listMissedWeights = listManualWeightMisses;
 
+// ── MANUAL FP-UNDER AVAILABILITY OVERRIDE ──────────────────────────────────
+// Pick6 makes a fighter's FP prop More/OVER-only when THEY treat him as the
+// structural dog — which is their own pricing call, not the sportsbook's. The
+// scraped Less-button flag (fp_under_available) is the authority, but it goes
+// undefined whenever findCardText can't locate the cards on Pick6's current
+// layout, and an undefined flag fails OPEN. When the sportsbook moneyline also
+// disagrees (a near-pick-em fighter Pick6 treats as the dog), nothing catches
+// it and an unplaceable FP UNDER reaches the board.
+//   window.blockFpUnder('Steve Erceg')      → mark his Pick6 FP UNDER unplaceable
+//   window.unblockFpUnder('Steve Erceg')    → clear it when Pick6 adds the Less button
+//   window.listFpUnderBlocks()
+// Persists in chrome.storage.local, so it survives reloads and needs no rebuild
+// when the line flips mid-week.
+const MANUAL_FP_UNDER_BLOCK_KEY = 'manual_fp_under_blocked_v1' as const;
+const _fpUnderBlocked = new Set<string>();
+async function loadFpUnderBlocks(): Promise<void> {
+  try {
+    const data = await storageGet<Record<string, unknown>>([MANUAL_FP_UNDER_BLOCK_KEY]);
+    const raw = data[MANUAL_FP_UNDER_BLOCK_KEY];
+    _fpUnderBlocked.clear();
+    if (Array.isArray(raw)) for (const n of raw) if (typeof n === 'string') _fpUnderBlocked.add(n.toLowerCase());
+  } catch { /* absent key is fine */ }
+}
+async function saveFpUnderBlocks(): Promise<void> {
+  await new Promise<void>((res) => chrome.storage.local.set({ [MANUAL_FP_UNDER_BLOCK_KEY]: [..._fpUnderBlocked] }, res));
+}
+async function blockFpUnder(...names: string[]): Promise<void> {
+  for (const n of names) _fpUnderBlocked.add(String(n).toLowerCase().trim());
+  await saveFpUnderBlocks();
+  _leanCache = null;
+  renderFighters();
+  console.log(`[UFC Analyzer] Pick6 FP UNDER blocked for: ${names.join(', ')}. Now ${_fpUnderBlocked.size} total.`);
+}
+async function unblockFpUnder(...names: string[]): Promise<void> {
+  for (const n of names) _fpUnderBlocked.delete(String(n).toLowerCase().trim());
+  await saveFpUnderBlocks();
+  _leanCache = null;
+  renderFighters();
+  console.log(`[UFC Analyzer] Pick6 FP UNDER un-blocked for: ${names.join(', ')}. Now ${_fpUnderBlocked.size} total.`);
+}
+function listFpUnderBlocks(): void {
+  if (!_fpUnderBlocked.size) { console.log('[UFC Analyzer] No manual FP-UNDER blocks set.'); return; }
+  console.log('[UFC Analyzer] Pick6 FP UNDER blocked for:', [..._fpUnderBlocked].join(', '));
+}
+(window as unknown as { blockFpUnder: typeof blockFpUnder }).blockFpUnder = blockFpUnder;
+(window as unknown as { unblockFpUnder: typeof unblockFpUnder }).unblockFpUnder = unblockFpUnder;
+(window as unknown as { listFpUnderBlocks: typeof listFpUnderBlocks }).listFpUnderBlocks = listFpUnderBlocks;
+
 // ── MANUAL FIGHTER-STYLE OVERRIDE ──────────────────────────────────────────
 // deriveStyle is a crude threshold classifier (tdAvg > 2.0 → grappler, etc.)
 // that misfires when a fighter has stat-padded numbers vs lower competition
@@ -19339,6 +19393,7 @@ async function loadData(): Promise<void> {
         await syncUpcomingCardContext(true);
       }
       await loadCancelledFighters();
+      await loadFpUnderBlocks();
       await loadOpeningLines();
       await loadLineHistory();
       await loadConfidenceMemoryEngine();
