@@ -269,7 +269,17 @@ export const NAME_ALIASES: Record<string, string> = {
 //   opponent-allowed > the fighter's own R1 avg, opponent-allowed is weighted 0.68.
 //   UNVALIDATED pending Davis-vs-Aliev-card results — version stamped so the archive
 //   can measure whether v10 improves R1 SS hit-rate.
-export const MODEL_VERSION = 10;
+// v11 (2026-07-24): R1 SS projection-diff recalibration + direction-consistent
+//   archetype nudge. The old diff buckets scored a 4-strike R1 gap as "slightly off"
+//   (0.6) with a strict `< -4` boundary, and a striker +0.4 prior could then oppose
+//   the fighter's own projected direction — so a clean projected-under (Ankalaev
+//   proj 14.5 vs line 18.5, Ponzinibbio proj 13.5 vs 15.5) netted inside the neutral
+//   band and rendered "NO LEAN". Buckets are now inclusive with a 2-4 mid-tier, and
+//   the archetype nudge applies only when it agrees with the projection sign. Result:
+//   clean-signal fighters (projection and hit-rate agreeing) now produce directional
+//   R1 leans; genuinely split fighters (mean-projection vs hit-rate disagreement, e.g.
+//   Guskov/Erceg/Sam) stay honest toss-ups.
+export const MODEL_VERSION = 11;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
