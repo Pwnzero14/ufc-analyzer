@@ -261,7 +261,15 @@ export const NAME_ALIASES: Record<string, string> = {
 //   treated opposite-direction same-fight stat picks as the coherent "A outworks B"
 //   shape — true when the under side is low output over a full fight, false when it
 //   arrives via a finish, which suppresses BOTH fighters' volume together.
-export const MODEL_VERSION = 9;
+// v10 (2026-07-24): opponent-weighted R1 SS projection. calcSSR1Lean blended the
+//   fighter's own R1 average with opponent-allowed 50/50; that under-reads a
+//   finish-heavy fighter (R1 average deflated by their own early stoppages) against
+//   a durable opponent (long avg fight time → fight goes rounds → fighter forced to
+//   strike). When fighter finishRate ≥50% AND opponent avgTimeMins ≥11 AND
+//   opponent-allowed > the fighter's own R1 avg, opponent-allowed is weighted 0.68.
+//   UNVALIDATED pending Davis-vs-Aliev-card results — version stamped so the archive
+//   can measure whether v10 improves R1 SS hit-rate.
+export const MODEL_VERSION = 10;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
