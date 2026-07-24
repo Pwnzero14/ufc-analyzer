@@ -5456,7 +5456,29 @@ function calcSSR1Lean(
   const oppAllowed = oppSamples.length >= 3
     ? parseFloat((oppSamples.reduce((s, v) => s + v, 0) / oppSamples.length).toFixed(1))
     : null;
-  const proj = oppAllowed != null ? parseFloat(((avgR1 + oppAllowed) / 2).toFixed(1)) : null;
+
+  // MODEL v10: opponent-weighted R1 projection. The flat 50/50 blend under-reads
+  // a FINISH-HEAVY fighter against a DURABLE opponent. A fighter who ends fights
+  // early has an R1 average deflated by their own stoppages — those low-strike
+  // rounds are how they FINISH, not how they STRIKE. When the opponent can't be
+  // put away early (long average fight time), the fight will go rounds, so the
+  // opponent's allowed number predicts the fighter's R1 output better than the
+  // fighter's finish-contaminated history. Up-weight the opponent term in exactly
+  // that case — and only when it raises the projection (correcting the deflation
+  // upward); a stingy durable opponent doesn't get inflated. Precedent: Sam
+  // Patterson (86% finish, R1 avg deflated by early subs) vs Santiago Ponzinibbio
+  // (~13m career average, effectively unfinishable early).
+  let oppWeight = 0.5;
+  let oppWeightNote: string | null = null;
+  const fighterFinishHeavy = (db.finishRate ?? 0) >= 0.5;
+  const oppDurableMins = oppDB?.avgTimeMins ?? null;
+  if (oppAllowed != null && fighterFinishHeavy && oppDurableMins != null && oppDurableMins >= 11 && oppAllowed > avgR1) {
+    oppWeight = 0.68;
+    oppWeightNote = `Finisher (${Math.round((db.finishRate ?? 0) * 100)}%) vs durable opponent (${oppDurableMins.toFixed(1)}m avg) — own R1 average deflated by early finishes, so opponent-allowed (${oppAllowed}) is weighted higher`;
+  }
+  const proj = oppAllowed != null
+    ? parseFloat((avgR1 * (1 - oppWeight) + oppAllowed * oppWeight).toFixed(1))
+    : null;
   const effective = proj ?? avgR1;
 
   // Pick the best line for the projected direction across PP/UD.
@@ -5480,6 +5502,10 @@ function calcSSR1Lean(
   else if (diff < -4)  { score -= 1.5; reasons.push({ icon:'neg', text:`${label} trails line by ${Math.abs(diff).toFixed(1)}` }); }
   else if (diff < -1.5){ score -= 0.6; reasons.push({ icon:'neg', text:`${label} slightly below line` }); }
   else                 {               reasons.push({ icon:'neu', text:`${label} near line — toss-up` }); }
+
+  // Surface the opponent-weight correction (MODEL v10) so a flipped lean is
+  // explained, not silent.
+  if (oppWeightNote) reasons.push({ icon: 'pos', text: oppWeightNote });
 
   // Hit rate is the dominant signal for a bounded single-round stat — it directly
   // measures how often the line is covered. An extreme record (never covered, or
