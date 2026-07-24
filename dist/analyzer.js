@@ -192,6 +192,15 @@ let bestPicksRenderSeq = 0;
 let bestPicksSortMode = 'model';
 let bestPicksStatFilter = 'all';
 let bestPicksEvOnly = false;
+// GLOW-UP 192: after three passes of adding caveat flags (PROJ SAYS / NEEDS
+// ROUNDS / negative EV), a way to see only the picks that carry none of them.
+let bestPicksCleanOnly = false;
+// GLOW-UP 192 (L5): entry-plan view — the board regrouped by the app you'd
+// actually enter each pick in.
+let bestPicksByBook = false;
+// GLOW-UP 192 (L4): "considered but cut" starts collapsed — it's an audit trail,
+// not something you read every visit.
+let _bpNearMissOpen = false;
 const bestPicksSlate = new Map();
 let bestPicksSlateOpen = false;
 const BP_SLATE_BOOK_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook', 'unbooked'];
@@ -8357,10 +8366,36 @@ function renderBestPicks(container, renderSeq = 0) {
         // flags all see the full columns — this transform only changes what gets
         // drawn. Ranks and the #1 hero deck follow the current view order, so
         // "sort by EV" literally re-crowns the hero.
+        // GLOW-UP 192: the metric now also resolves the DISPLAYED book and the caveat
+        // flags, so the CLEAN filter (L2), exposure strip (L3) and BY BOOK plan (L5)
+        // all read the same values the rows render — no second source of truth.
         const bpViewMetric = (f, dir) => {
             const el = getBestPickLeanForDir(f, dir) || getBestPickLean(f);
             const evd = computeDetailedEV(f, el);
-            return { src: el._source || 'fp', ev: evd ? evd.ev : null, conf: Number(el.conf) || 0 };
+            // Same line/book resolution the row render uses: stat picks take the
+            // best-side book, FP keeps its per-book platform.
+            let line = lineForLeanSource(f, el._source, el._platform);
+            let book = el._platform;
+            if (el._source !== 'fp' && (el.lean === 'over' || el.lean === 'under')) {
+                const best = bestSideLineForPick(f, el._source, el.lean);
+                if (best.line != null && best.book != null) {
+                    line = best.line;
+                    book = best.book;
+                }
+            }
+            const reason = el.verdict || el.reasons?.[0]?.text || '';
+            const projConflict = !!projOpposesLean(reason, el.lean, line);
+            // durationCoupledMap is built for the OVER pool only (a volume over is what
+            // needs rounds), so this is inherently false on the unders side.
+            const needsRounds = durationCoupledMap.has(f.name);
+            const ev = evd ? evd.ev : null;
+            // Unknown EV isn't a caveat — only a negative one is.
+            const clean = !projConflict && !needsRounds && !(ev != null && ev < 0);
+            return {
+                src: el._source || 'fp', ev, conf: Number(el.conf) || 0,
+                book: book ?? getSourceActivePlatformKey(f, el._source) ?? null,
+                line, projConflict, needsRounds, clean,
+            };
         };
         const overMetrics = new Map(overs.map(f => [f.name, bpViewMetric(f, 'over')]));
         const underMetrics = new Map(unders.map(f => [f.name, bpViewMetric(f, 'under')]));
@@ -8372,6 +8407,8 @@ function renderBestPicks(container, renderSeq = 0) {
                 if (bestPicksStatFilter !== 'all' && m.src !== bestPicksStatFilter)
                     return false;
                 if (bestPicksEvOnly && !(m.ev != null && m.ev > 0))
+                    return false;
+                if (bestPicksCleanOnly && !m.clean)
                     return false;
                 return true;
             });
@@ -8417,6 +8454,7 @@ function renderBestPicks(container, renderSeq = 0) {
         for (const m of underMetrics.values())
             bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
         const bpEvPosCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.ev != null && m.ev > 0).length;
+        const bpCleanCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.clean).length;
         const bpChipsHtml = Object.keys(BP_SRC_CHIP)
             .filter(s => (bpSrcCounts.get(s) || 0) > 0)
             .map(s => `<button class="bpc-chip${bestPicksStatFilter === s ? ' on' : ''}" data-bp-stat="${s}" title="Show only ${BP_SRC_CHIP[s]} picks (click again for all)">${BP_SRC_CHIP[s]} <i>${bpSrcCounts.get(s)}</i></button>`)
@@ -8433,6 +8471,11 @@ function renderBestPicks(container, renderSeq = 0) {
       <button class="bpc-chip${bestPicksStatFilter === 'all' ? ' on' : ''}" data-bp-stat="all" title="All stat families">ALL <i>${overs.length + unders.length}</i></button>
       ${bpChipsHtml}
       <button class="bpc-chip bpc-ev${bestPicksEvOnly ? ' on' : ''}" data-bp-evonly="1" title="Only picks whose calibrated EV clears breakeven">+EV <i>${bpEvPosCount}</i></button>
+      <button class="bpc-chip bpc-clean${bestPicksCleanOnly ? ' on' : ''}" data-bp-cleanonly="1" title="Only picks carrying no caveat — no ⚠ PROJ SAYS (projection opposes its own lean), no ⚠ NEEDS ROUNDS (volume over against a finisher), and not negative EV. The picks that need no explanation.">CLEAN <i>${bpCleanCount}</i></button>
+    </span>
+    <span class="bpc-group">
+      <span class="bpc-label">VIEW</span>
+      <button class="bpc-chip bpc-bybook${bestPicksByBook ? ' on' : ''}" data-bp-bybook="1" title="Show an entry plan: the same picks regrouped by the app you'd actually place them in, so you can work book by book instead of jumping between them.">🏪 BY BOOK</button>
     </span>
   </div>`;
         // GLOW-UP 168: per-render pick payloads for the slate toggle — built while
@@ -8564,21 +8607,32 @@ function renderBestPicks(container, renderSeq = 0) {
                 // Lineshop badge: only meaningful for FP picks now — SS/TD/FT/CTRL
                 // displayed line is already the best-side across all books.
                 const src = el._source;
+                // GLOW-UP 192 (L1): was FP-only and warn-only. Stat picks already take the
+                // best-side book via bestSideLineForPick, but the row never SAID so — you
+                // had to trust it. Now every pick reports where it stands across books:
+                // a warning when something better exists, otherwise a confirmation with
+                // the spread, so you can see what the shopping was actually worth.
                 let lineShopTag = '';
-                if (src === 'fp' && line != null) {
-                    const allFp = [
-                        ['P6', f.line_p6 ?? null],
-                        ['UD', f.line_ud ?? null],
-                        ['PP', f.line_pp ?? null],
-                        ['BTR', f.line_betr ?? null],
+                if (line != null && src && (el.lean === 'over' || el.lean === 'under')) {
+                    const shopBooks = [
+                        ['P6', 'pick6'], ['UD', 'underdog'], ['PP', 'prizepicks'],
+                        ['BTR', 'betr'], ['DK', 'draftkings_sportsbook'],
                     ];
-                    const available = allFp.filter((x) => x[1] != null);
+                    const available = shopBooks
+                        .map(([lbl, k]) => [lbl, lineForLeanSource(f, src, k)])
+                        .filter((x) => x[1] != null);
                     if (available.length > 1) {
-                        const best = el.lean === 'over'
-                            ? available.reduce((a, b) => b[1] < a[1] ? b : a)
-                            : available.reduce((a, b) => b[1] > a[1] ? b : a);
+                        const pickBest = (a, b) => el.lean === 'over' ? (b[1] < a[1] ? b : a) : (b[1] > a[1] ? b : a);
+                        const pickWorst = (a, b) => el.lean === 'over' ? (b[1] > a[1] ? b : a) : (b[1] < a[1] ? b : a);
+                        const best = available.reduce(pickBest);
+                        const worst = available.reduce(pickWorst);
+                        const spread = Math.abs(worst[1] - best[1]);
+                        const dirWord = el.lean === 'over' ? 'lowest' : 'highest';
                         if (Math.abs(best[1] - line) >= 1.5) {
-                            lineShopTag = ` <span class="best-pick-lineshop" title="Better line on ${best[0]}">🏪 ${best[0]} ${best[1]}</span>`;
+                            lineShopTag = ` <span class="best-pick-lineshop warn" title="${best[0]} offers ${best[1]} — better for an ${el.lean.toUpperCase()} than the ${line} shown here (${dirWord} line wins). Worth entering there instead.">🏪 ${best[0]} ${best[1]}</span>`;
+                        }
+                        else if (spread >= 0.5) {
+                            lineShopTag = ` <span class="best-pick-lineshop best" title="This is the best of ${available.length} books for an ${el.lean.toUpperCase()} (${dirWord} line wins) — ${available.map(x => `${x[0]} ${x[1]}`).join(' · ')}. Spread between best and worst is ${spread.toFixed(1)}, which is what the shopping saved you.">🏪 best of ${available.length} · ${spread.toFixed(1)}</span>`;
                         }
                     }
                 }
@@ -8738,8 +8792,151 @@ function renderBestPicks(container, renderSeq = 0) {
         // the filtered view. A filter that empties the view gets its own message
         // (with reset) instead of the "no leans yet" cold-start fallback.
         const hasAnyPicks = overs.length + unders.length > 0;
+        // ── GLOW-UP 192 (L3): board exposure strip ────────────────────────────────
+        // Sixteen rows read as a list; this reads them as a portfolio. How many
+        // distinct fights am I actually exposed to, is any single fight carrying too
+        // much of the board, and which apps will I be opening to enter it all.
+        const BP_BOOK_SHORT = { pick6: 'P6', underdog: 'UD', prizepicks: 'PP', betr: 'BTR', draftkings_sportsbook: 'DK' };
+        const BP_BOOK_FULL = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
+        const exposureHtml = (() => {
+            const shown = [
+                ...displayOvers.map(f => ({ f, m: overMetrics.get(f.name) })),
+                ...displayUnders.map(f => ({ f, m: underMetrics.get(f.name) })),
+            ].filter(x => !!x.m);
+            if (shown.length < 2)
+                return '';
+            const fightCount = new Map();
+            // bpFightKey lowercases for grouping, so keep a properly-cased label from
+            // the fighter objects rather than title-casing the key back.
+            const fightLabel = new Map();
+            for (const { f } of shown) {
+                const k = bpFightKey(f) || f.name.toLowerCase();
+                fightCount.set(k, (fightCount.get(k) || 0) + 1);
+                if (!fightLabel.has(k)) {
+                    fightLabel.set(k, f.opponent ? `${prettyName(f.name)} vs ${prettyName(f.opponent)}` : prettyName(f.name));
+                }
+            }
+            const distinctFights = fightCount.size;
+            let maxFight = 0;
+            let maxFightKey = '';
+            for (const [k, c] of fightCount)
+                if (c > maxFight) {
+                    maxFight = c;
+                    maxFightKey = k;
+                }
+            const maxFightLabel = fightLabel.get(maxFightKey) || maxFightKey;
+            const bookCount = new Map();
+            for (const { m } of shown)
+                if (m.book)
+                    bookCount.set(m.book, (bookCount.get(m.book) || 0) + 1);
+            const bookChips = [...bookCount.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([k, c]) => `<span class="bpx-book plat-${k}" title="${c} pick${c === 1 ? '' : 's'} to enter on ${BP_BOOK_FULL[k] || k}">${BP_BOOK_SHORT[k] || k.toUpperCase()} <i>${c}</i></span>`)
+                .join('');
+            // Concentration: >=40% of the board on one fight means the slate is much
+            // less diversified than the pick count suggests.
+            const concentrated = maxFight >= 3 && maxFight / shown.length >= 0.4;
+            return `<div class="bp-exposure">
+      <span class="bpx-label">EXPOSURE</span>
+      <span class="bpx-item" title="Distinct fights these ${shown.length} picks touch. Fewer fights than picks means repeated exposure to the same outcomes.">${distinctFights} fight${distinctFights === 1 ? '' : 's'} · ${shown.length} picks</span>
+      <span class="bpx-item${concentrated ? ' warn' : ''}" title="${concentrated ? `${maxFight} of ${shown.length} picks ride on ${maxFightLabel} — that fight going the wrong way takes a large share of the board with it. Correlated, not diversified.` : `Heaviest single fight is ${maxFightLabel} with ${maxFight} pick${maxFight === 1 ? '' : 's'}.`}">${concentrated ? '⚠ ' : ''}MAX <b>${maxFight}</b> on ${maxFightLabel}</span>
+      <span class="bpx-books" title="Where these picks would be placed — one group per app you'd open">${bookChips}</span>
+    </div>`;
+        })();
+        // ── GLOW-UP 192 (L4): considered but cut ──────────────────────────────────
+        // The board shows survivors. This shows who was in contention and why they
+        // aren't — so the selection is auditable instead of taken on trust. Reasons
+        // are derived, not guessed: dedupeNegCorrelatedSameFight either dropped a
+        // fighter because the other side of their fight outranked them, or they fell
+        // below the cut.
+        const nearMissHtml = (() => {
+            const rows = [];
+            const build = (all, final, dir) => {
+                const kept = new Set(final.map(f => f.name.toLowerCase()));
+                const keptFights = new Map();
+                for (const f of final) {
+                    const k = bpFightKey(f);
+                    if (k)
+                        keptFights.set(k, f.name);
+                }
+                for (const f of all) {
+                    if (kept.has(f.name.toLowerCase()))
+                        continue;
+                    const el = getBestPickLeanForDir(f, dir);
+                    if (!el || (el.lean !== 'over' && el.lean !== 'under'))
+                        continue;
+                    const fk = bpFightKey(f);
+                    const blockedBy = fk ? keptFights.get(fk) : undefined;
+                    const conf = Number(el.conf) || 0;
+                    const stat = el._source === 'ss_r1' ? 'R1 SS' : (el._source || 'fp').toUpperCase();
+                    const reason = blockedBy && blockedBy.toLowerCase() !== f.name.toLowerCase()
+                        ? `same fight as ${prettyName(blockedBy)}, who ranked higher`
+                        : 'below the cut for this column';
+                    rows.push(`<div class="bpnm-row">
+          <span class="bpnm-dir ${dir}">${dir.toUpperCase()}</span>
+          <span class="bpnm-name">${prettyName(f.name)}</span>
+          <span class="bpnm-stat">${stat}</span>
+          <span class="bpnm-conf">${conf}%</span>
+          <span class="bpnm-why">${reason}</span>
+        </div>`);
+                }
+            };
+            build(allOversSorted, overs, 'over');
+            build(allUndersSorted, unders, 'under');
+            if (!rows.length)
+                return '';
+            return `<div class="best-picks-section bp-nearmiss${_bpNearMissOpen ? '' : ' collapsed'}">
+      <div class="best-picks-header bpnm-head"><span class="best-picks-title">Considered but cut</span><span class="best-picks-count">${rows.length}</span><span class="section-chevron">▼</span></div>
+      <div class="section-body"><div class="bpnm-note">Fighters with an actionable lean that didn't make the board — and why. Nothing here was silently dropped.</div>${rows.join('')}</div>
+    </div>`;
+        })();
+        // ── GLOW-UP 192 (L5): BY BOOK entry plan ──────────────────────────────────
+        // Deliberately an additional panel rather than a replacement for the two
+        // columns: the grid carries the slate-tray checkboxes, jump-to-card handlers
+        // and cross-column linkage, and regrouping it would break all three. This
+        // answers the last-mile question the columns can't — "what do I open, and
+        // what do I type into it".
+        const byBookHtml = (() => {
+            if (!bestPicksByBook)
+                return '';
+            const shown = [
+                ...displayOvers.map(f => ({ f, m: overMetrics.get(f.name), dir: 'over' })),
+                ...displayUnders.map(f => ({ f, m: underMetrics.get(f.name), dir: 'under' })),
+            ].filter(x => !!x.m);
+            if (!shown.length)
+                return '';
+            const groups = new Map();
+            for (const s of shown) {
+                const k = s.m.book || 'unknown';
+                if (!groups.has(k))
+                    groups.set(k, []);
+                groups.get(k).push(s);
+            }
+            const order = [...groups.keys()].sort((a, b) => groups.get(b).length - groups.get(a).length);
+            const cards = order.map(k => {
+                const g = groups.get(k);
+                const lines = g.map(({ f, m, dir }) => {
+                    const stat = m.src === 'ss_r1' ? 'R1 SS' : m.src.toUpperCase();
+                    const flag = !m.clean ? `<span class="bpbb-flag" title="${m.projConflict ? 'Projection opposes this lean' : m.needsRounds ? 'Volume over against a finisher — needs rounds' : 'Negative EV at the posted price'}">⚠</span>` : '';
+                    return `<div class="bpbb-line" data-jump="${f.name}" title="Jump to ${prettyName(f.name)}'s card">
+          <span class="bpbb-dir ${dir}">${dir.toUpperCase()}</span>
+          <span class="bpbb-name">${prettyName(f.name)}</span>
+          <span class="bpbb-stat">${stat}</span>
+          <span class="bpbb-line-val">${m.line ?? '—'}</span>${flag}
+        </div>`;
+                }).join('');
+                return `<div class="bpbb-card">
+        <div class="bpbb-head plat-${k}">${k === 'unknown' ? 'NO BOOK' : (BP_BOOK_SHORT[k] || k.toUpperCase())}<span class="bpbb-count">${g.length}</span></div>
+        ${lines}
+      </div>`;
+            }).join('');
+            return `<div class="bp-bybook">
+      <div class="bpbb-title">ENTRY PLAN — BY BOOK<span class="bpbb-sub">the same ${shown.length} picks, grouped by the app you'd open</span></div>
+      <div class="bpbb-grid">${cards}</div>
+    </div>`;
+        })();
         const gridHtml = displayOvers.length + displayUnders.length > 0
-            ? `<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>`
+            ? `${exposureHtml}${byBookHtml}<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>${nearMissHtml}`
             : hasAnyPicks
                 ? '<div class="bp-filter-empty">No picks match the current view — <button class="bpc-reset">reset filters</button></div>'
                 : '';
@@ -8883,11 +9080,33 @@ function renderBestPicks(container, renderSeq = 0) {
         container.querySelectorAll('[data-bp-evonly]').forEach(btn => {
             btn.addEventListener('click', () => { bestPicksEvOnly = !bestPicksEvOnly; bpRerender(); });
         });
+        // GLOW-UP 192 handlers
+        container.querySelectorAll('[data-bp-cleanonly]').forEach(btn => {
+            btn.addEventListener('click', () => { bestPicksCleanOnly = !bestPicksCleanOnly; bpRerender(); });
+        });
+        container.querySelectorAll('[data-bp-bybook]').forEach(btn => {
+            btn.addEventListener('click', () => { bestPicksByBook = !bestPicksByBook; bpRerender(); });
+        });
+        container.querySelectorAll('.bp-nearmiss .bpnm-head').forEach(head => {
+            head.addEventListener('click', () => {
+                _bpNearMissOpen = !_bpNearMissOpen;
+                head.closest('.bp-nearmiss')?.classList.toggle('collapsed', !_bpNearMissOpen);
+            });
+        });
+        // BY BOOK lines jump to the fighter card, same as a board row.
+        container.querySelectorAll('.bpbb-line[data-jump]').forEach(row => {
+            row.addEventListener('click', () => {
+                const name = row.dataset['jump'];
+                if (name)
+                    jumpToFighterCard(name);
+            });
+        });
         container.querySelectorAll('.bpc-reset').forEach(btn => {
             btn.addEventListener('click', () => {
                 bestPicksSortMode = 'model';
                 bestPicksStatFilter = 'all';
                 bestPicksEvOnly = false;
+                bestPicksCleanOnly = false;
                 bpRerender();
             });
         });
