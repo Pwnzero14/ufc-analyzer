@@ -9743,8 +9743,10 @@ function renderParlayLab(container) {
     // same-fight opposite-direction FT legs are mutually exclusive; same-fight
     // same-direction FP legs are zero-sum (only one side gets the win bonus).
     const legNorm = (s) => (normalizeName(s) || s).toLowerCase();
-    const conflictsWithSlip = (cand) => {
-        for (const s of selectedLegs) {
+    // Generalised so the same rules can be checked against an arbitrary leg set —
+    // the live slip (below) and the slip-minus-weakest used by the L3 swap.
+    const conflictAgainst = (cand, against) => {
+        for (const s of against) {
             if (s.fighter === cand.fighter && s.stat === cand.stat && s.direction === cand.direction)
                 continue;
             const sameFight = legNorm(cand.opponent) === legNorm(s.fighter) || legNorm(cand.fighter) === legNorm(s.opponent);
@@ -9758,6 +9760,74 @@ function renderParlayLab(container) {
             }
         }
         return null;
+    };
+    const conflictsWithSlip = (cand) => conflictAgainst(cand, selectedLegs);
+    // Fighter lookup by normalised name — needed by every correlation call below.
+    const legFighterMap = new Map();
+    for (const vf of visibleFighters)
+        legFighterMap.set(legNorm(vf.name), vf);
+    const fighterForLeg = (l) => legFighterMap.get(legNorm(l.fighter));
+    // GLOW-UP 191 (L1): the mirror of conflictsWithSlip. The pool already warns
+    // what CLASHES with the slip; a leg that correlates positively with something
+    // already selected is just as decision-relevant while building.
+    const synergyWithSlip = (cand, candF) => {
+        for (const s of selectedLegs) {
+            if (s.fighter === cand.fighter && s.stat === cand.stat && s.direction === cand.direction)
+                continue;
+            const sf = fighterForLeg(s);
+            if (!sf)
+                continue;
+            const alert = calcPairCorrelation(cand, candF, s, sf);
+            if (alert && alert.type === 'synergy' && alert.impact > 0) {
+                return `Pairs with ${prettyName(s.fighter)} ${s.stat === 'ss_r1' ? 'R1 SS' : s.stat.toUpperCase()} in your slip — ${alert.message}`;
+            }
+        }
+        return null;
+    };
+    // GLOW-UP 191 (L4): one analysis used by BOTH the live slip and the suggestion
+    // cards, so a suggestion's EV can never disagree with what you'd see after
+    // loading it. Mirrors the previous inline slip math exactly.
+    const analyzeSlipLegs = (legs) => {
+        const nn = legs.length;
+        if (nn < 2)
+            return null;
+        const probs = legs.map((l) => {
+            const recal = getRecalibratedConfidence(l.confidence, l.stat);
+            return Math.min(0.85, Math.max(0.35, (recal ?? l.confidence) / 100));
+        });
+        const anyRecal = legs.some((l) => getRecalibratedConfidence(l.confidence, l.stat) != null);
+        const rr = Array.from({ length: nn }, () => new Array(nn).fill(0));
+        let maxPos = 0;
+        for (let i = 0; i < nn; i++)
+            for (let j = i + 1; j < nn; j++) {
+                const c1 = fighterForLeg(legs[i]);
+                const c2 = fighterForLeg(legs[j]);
+                if (!c1 || !c2)
+                    continue;
+                const alert = calcPairCorrelation(legs[i], c1, legs[j], c2);
+                if (!alert)
+                    continue;
+                const r = Math.max(-0.85, Math.min(0.85, alert.impact * 4));
+                rr[i][j] = rr[j][i] = r;
+                if (r > maxPos)
+                    maxPos = r;
+            }
+        const anyCorr = rr.some((row) => row.some((v) => Math.abs(v) > 0.01));
+        const byHits = anyCorr ? correlatedHitCounts(probs, rr) : independentHitCounts(probs);
+        const combined = Math.round((byHits[nn] || 0) * 100);
+        const evRows = [];
+        for (const key of Object.keys(PICKEM_PAYOUTS)) {
+            const table = PICKEM_PAYOUTS[key].byLegs[nn];
+            if (!table)
+                continue;
+            let ret = 0;
+            for (const hitsStr of Object.keys(table))
+                ret += (byHits[Number(hitsStr)] || 0) * table[Number(hitsStr)];
+            const topMult = table[nn] ?? Math.max(...Object.values(table));
+            evRows.push({ label: PICKEM_PAYOUTS[key].label, mult: topMult, ev: Math.round((ret - 1) * 100) });
+        }
+        evRows.sort((a, b) => b.ev - a.ev);
+        return { n: nn, combined, evRows, best: evRows[0] || null, anyCorr, maxPosCorr: maxPos, anyRecal };
     };
     // GLOW-UP 177: apply the command-strip view (filter then sort) to the pool
     // only — selection, conflict checks, health, suggestions all still see the
@@ -9802,19 +9872,30 @@ function renderParlayLab(container) {
         const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
         const sel = parlaySelectedLegs.has(key);
         const conflict = sel ? null : conflictsWithSlip(a.leg);
+        // GLOW-UP 191 (L1): only look for synergy when there's no conflict — a leg
+        // that contradicts the slip shouldn't also advertise that it pairs well.
+        const synergy = (sel || conflict) ? null : synergyWithSlip(a.leg, a.fighter);
+        const legEv = evOf(a);
         const confClass = a.leg.confidence >= 72 ? 'conf-high' : a.leg.confidence >= 58 ? 'conf-med' : 'conf-low';
         const pk = getSourceActivePlatformKey(a.fighter, a.leg.stat);
         const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(a.fighter, a.leg.stat)}">${platformKeyShort(pk)}</span>` : '';
         const warnTag = conflict ? `<span class="parlay-leg-warn" title="${conflict.replace(/"/g, '&quot;')}">✗ vs slip</span>` : '';
+        const synTag = synergy ? `<span class="parlay-leg-syn" title="${synergy.replace(/"/g, '&quot;')}">🔗 synergy</span>` : '';
+        // EV was already computed for the pool's EV sort but never shown — the sort
+        // ranked by a number the row didn't display.
+        const evTag = legEv != null
+            ? `<span class="parlay-leg-ev ${legEv > 0 ? 'pos' : legEv < 0 ? 'neg' : ''}" title="Calibrated EV for this leg as a single pick — same pipeline as the Best Picks board. Parlay EV is the slip deck on the right; this prices the leg on its own.">${legEv > 0 ? '+' : ''}${legEv}%</span>`
+            : '';
         return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
-      ${warnTag}
+      ${warnTag}${synTag}
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
       ${platChip}
       ${parlayYouTag(a.leg.stat, a.leg.direction)}
+      ${evTag}
       <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
     </div>`;
     }).join('');
@@ -9828,13 +9909,17 @@ function renderParlayLab(container) {
         const oppOk = l.opponent && l.opponent !== '?';
         return `${prettyName(l.fighter)} ${l.direction.toUpperCase()} ${l.line} ${PL_STAT_CLIP[l.stat] || l.stat.toUpperCase()}${pk ? ` @ ${PL_BOOK_NAME[pk] || pk}` : ''}${oppOk ? ` (vs ${prettyName(l.opponent)})` : ''}`;
     };
-    const slipRows = selectedPairs.length > 0
-        ? selectedPairs.map(({ leg: l, fighter: lf }) => {
-            const key = parlayLegKey(l.fighter, l.stat, l.direction);
-            const pk = getSourceActivePlatformKey(lf, l.stat);
-            const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>` : '';
-            const clip = parlayLegClip(l, lf);
-            return `<div class="parlay-slip-leg">
+    // GLOW-UP 191 (L5): legs that share a fight aren't independent, and the slip
+    // said so only via a chip. Group them under the matchup so "2 legs on one
+    // fight ≈ 1 bet" is visible in the STRUCTURE. Single-leg fights render bare —
+    // grouping every row would add chrome where there's no correlation to show.
+    const slipFightKey = (l) => [legNorm(l.fighter), legNorm(l.opponent)].sort().join('|');
+    const renderSlipLeg = ({ leg: l, fighter: lf }) => {
+        const key = parlayLegKey(l.fighter, l.stat, l.direction);
+        const pk = getSourceActivePlatformKey(lf, l.stat);
+        const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>` : '';
+        const clip = parlayLegClip(l, lf);
+        return `<div class="parlay-slip-leg">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
           <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
           <span class="parlay-leg-dir ${l.direction}">${l.direction.toUpperCase()}</span>
@@ -9844,8 +9929,50 @@ function renderParlayLab(container) {
           ${parlayYouTag(l.stat, l.direction)}
           <button class="parlay-slip-copy" data-parlay-clip="${clip.replace(/"/g, '&quot;')}" title="Copy slip line: ${clip.replace(/"/g, '&quot;')}">⧉</button>
         </div>`;
-        }).join('')
-        : '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
+    };
+    const slipRows = (() => {
+        if (!selectedPairs.length)
+            return '<div class="parlay-slip-empty">Click legs on the left to build your parlay</div>';
+        // Preserve selection order; group only where a fight actually repeats.
+        const order = [];
+        const groups = new Map();
+        for (const p of selectedPairs) {
+            const k = slipFightKey(p.leg);
+            if (!groups.has(k)) {
+                groups.set(k, []);
+                order.push(k);
+            }
+            groups.get(k).push(p);
+        }
+        return order.map((k) => {
+            const grp = groups.get(k);
+            if (grp.length < 2)
+                return renderSlipLeg(grp[0]);
+            const a = grp[0].leg;
+            const matchup = `${prettyName(a.fighter)} vs ${a.opponent && a.opponent !== '?' ? prettyName(a.opponent) : '?'}`;
+            // Strongest pairwise correlation inside this fight, for the header badge.
+            let strongest = null;
+            for (let i = 0; i < grp.length; i++)
+                for (let j = i + 1; j < grp.length; j++) {
+                    const c1 = fighterForLeg(grp[i].leg);
+                    const c2 = fighterForLeg(grp[j].leg);
+                    if (!c1 || !c2)
+                        continue;
+                    const al = calcPairCorrelation(grp[i].leg, c1, grp[j].leg, c2);
+                    if (al && (!strongest || Math.abs(al.impact) > Math.abs(strongest.impact)))
+                        strongest = al;
+                }
+            const badge = strongest
+                ? `<span class="psf-corr ${strongest.type}" title="${String(strongest.message).replace(/"/g, '&quot;')}">${strongest.type === 'conflict' ? '✗' : strongest.type === 'synergy' ? '🔗' : '⚠'} ${strongest.impact > 0 ? '+' : ''}${Math.round(strongest.impact * 100)}%</span>`
+                : '';
+            return `<div class="parlay-slip-fight">
+        <div class="psf-head" title="These ${grp.length} legs come from ONE fight — they share its duration and outcome, so they are correlated rather than independent bets.">
+          <span class="psf-matchup">${matchup}</span><span class="psf-count">${grp.length} legs · one fight</span>${badge}
+        </div>
+        ${grp.map(renderSlipLeg).join('')}
+      </div>`;
+        }).join('');
+    })();
     // GLOW-UP 178: whole-slip export — every selected leg as slip-ready lines,
     // grouped in book order (matches the Best Picks tray COPY ALL behavior).
     const PL_BOOK_ORDER = ['pick6', 'underdog', 'prizepicks', 'betr', 'draftkings_sportsbook'];
@@ -9875,73 +10002,61 @@ function renderParlayLab(container) {
     // and stake-inclusive payout EV per platform table. Independence assumed —
     // contradictory slips get the ⛔ chip instead of an EV number.
     let slipSummaryHtml = '';
+    let swapPlan = null;
     if (selectedLegs.length >= 2) {
-        const legProbs = selectedLegs.map((l) => {
-            const recal = getRecalibratedConfidence(l.confidence, l.stat);
-            return Math.min(0.85, Math.max(0.35, (recal ?? l.confidence) / 100));
-        });
-        const anyRecal = selectedLegs.some((l) => getRecalibratedConfidence(l.confidence, l.stat) != null);
-        const n = legProbs.length;
-        // Correlation-aware joint: same-fight / same-fighter legs share the fight's duration,
-        // so they aren't independent. Reuse calcPairCorrelation's impact as a correlation
-        // coefficient (ρ = impact × 4, clamped ±0.85) and Monte-Carlo the joint hit-count
-        // distribution via a Gaussian copula; cross-fight legs stay independent (ρ = 0).
-        const corrFMap = new Map();
-        for (const cf of visibleFighters)
-            corrFMap.set((normalizeName(cf.name) || cf.name).toLowerCase(), cf);
-        const rho = Array.from({ length: n }, () => new Array(n).fill(0));
-        let maxPosCorr = 0;
-        for (let i = 0; i < n; i++)
-            for (let j = i + 1; j < n; j++) {
-                const cf1 = corrFMap.get((normalizeName(selectedLegs[i].fighter) || selectedLegs[i].fighter).toLowerCase());
-                const cf2 = corrFMap.get((normalizeName(selectedLegs[j].fighter) || selectedLegs[j].fighter).toLowerCase());
-                if (!cf1 || !cf2)
-                    continue;
-                const alert = calcPairCorrelation(selectedLegs[i], cf1, selectedLegs[j], cf2);
-                if (!alert)
-                    continue;
-                const r = Math.max(-0.85, Math.min(0.85, alert.impact * 4));
-                rho[i][j] = rho[j][i] = r;
-                if (r > maxPosCorr)
-                    maxPosCorr = r;
-            }
-        const anyCorr = rho.some((row) => row.some((v) => Math.abs(v) > 0.01));
-        const pByHits = anyCorr ? correlatedHitCounts(legProbs, rho) : independentHitCounts(legProbs);
-        const combined = Math.round((pByHits[n] || 0) * 100);
+        // GLOW-UP 191 (L4): shared analysis — the suggestion cards run the exact
+        // same function, so a suggestion's EV can't disagree with the slip's.
+        const A = analyzeSlipLegs(selectedLegs);
+        const { n, combined, evRows, best, anyCorr, maxPosCorr, anyRecal } = A;
         const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
+        const weakestKey = parlayLegKey(weakest.fighter, weakest.stat, weakest.direction);
         const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m) => !!m) || null;
-        let payoutHtml = '';
-        let bestBookHtml = '';
-        if (!slipContradiction) {
-            const evRows = [];
-            for (const key of Object.keys(PICKEM_PAYOUTS)) {
-                const table = PICKEM_PAYOUTS[key].byLegs[n];
-                if (!table)
-                    continue;
-                let ret = 0;
-                for (const hitsStr of Object.keys(table))
-                    ret += (pByHits[Number(hitsStr)] || 0) * table[Number(hitsStr)];
-                const topMult = table[n] ?? Math.max(...Object.values(table));
-                evRows.push({ label: PICKEM_PAYOUTS[key].label, mult: topMult, ev: Math.round((ret - 1) * 100) });
-            }
-            evRows.sort((a, b) => b.ev - a.ev);
-            if (evRows.length) {
-                // GLOW-UP 179: the best-EV book is the headline — the number that
-                // decides WHERE to place. The full per-book list stays as a trailing
-                // strip with the winner marked, so the ranking is still legible.
-                const best = evRows[0];
-                bestBookHtml = `<span class="pss-bestbook ${best.ev >= 0 ? 'pos' : 'neg'}" title="Highest-EV book for this ${n}-leg slip at ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs' : ' (independent)'}. Where this slip prices best — verify multipliers in-app, promos and boosts change them.">BEST BOOK <b class="pss-bb-name">${best.label}</b> <span class="pss-bb-mult">${best.mult}x</span> <b class="pss-bb-ev">${best.ev >= 0 ? '+' : ''}${best.ev}%</b></span>`;
-                payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs (Gaussian copula)' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them.">${evRows.map((r, idx) => `<span class="pss-ev ${idx === 0 ? 'best ' : ''}${r.ev >= 0 ? 'pos' : 'neg'}">${idx === 0 ? '★ ' : ''}${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
-            }
+        // GLOW-UP 191 (L3): the weakest leg was a passive warning. Find the best
+        // legal replacement now so the chip can offer a one-click fix — highest
+        // confidence, not already selected, stronger than what it replaces, and not
+        // conflicting with the REST of the slip. availableLegs is confidence-desc,
+        // so the first match is the best one.
+        const restOfSlip = selectedLegs.filter((l) => parlayLegKey(l.fighter, l.stat, l.direction) !== weakestKey);
+        const swapCand = availableLegs.find((a) => {
+            const k = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
+            if (parlaySelectedLegs.has(k))
+                return false;
+            if (a.leg.confidence <= weakest.confidence)
+                return false;
+            return !conflictAgainst(a.leg, restOfSlip);
+        });
+        if (swapCand) {
+            swapPlan = {
+                fromKey: weakestKey,
+                toKey: parlayLegKey(swapCand.leg.fighter, swapCand.leg.stat, swapCand.leg.direction),
+                toLabel: `${prettyName(swapCand.leg.fighter)} ${swapCand.leg.direction.toUpperCase()} ${swapCand.leg.stat === 'ss_r1' ? 'R1 SS' : swapCand.leg.stat.toUpperCase()} ${swapCand.leg.line} (${swapCand.leg.confidence}%)`,
+            };
         }
+        let payoutHtml = '';
+        if (!slipContradiction && evRows.length) {
+            payoutHtml = `<span class="pss-payouts" title="Stake-inclusive payout tables × ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs (Gaussian copula)' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them.">${evRows.map((r, idx) => `<span class="pss-ev ${idx === 0 ? 'best ' : ''}${r.ev >= 0 ? 'pos' : 'neg'}">${idx === 0 ? '★ ' : ''}${r.label} ${r.mult}x <b>${r.ev >= 0 ? '+' : ''}${r.ev}%</b></span>`).join('')}</span>`;
+        }
+        // GLOW-UP 191 (L2): the headline numbers become a deck, and the missing one
+        // is the DOLLAR return — EV% and a multiplier don't answer "what does this
+        // pay". $10 is the reference stake.
+        const STAKE = 10;
+        const deckHtml = (!slipContradiction && best)
+            ? `<div class="pss-deck">
+          <div class="pss-tile"><span class="pss-t-label">LEGS</span><b class="pss-t-val">${n}</b></div>
+          <div class="pss-tile" title="${anyCorr ? 'Joint P(all hit) — correlation-adjusted for same-fight legs via a duration copula, not the independent product' : 'Product of independent leg probabilities'} (clamped 35-85)"><span class="pss-t-label">COMBINED</span><b class="pss-t-val">~${combined}%</b></div>
+          <div class="pss-tile" title="Highest-EV book for this ${n}-leg slip at ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them."><span class="pss-t-label">BEST BOOK</span><b class="pss-t-val">${best.label} <i class="pss-t-mult">${best.mult}x</i></b></div>
+          <div class="pss-tile" title="What a $${STAKE} stake returns if ALL ${n} legs hit, at ${best.label}'s ${best.mult}x. This is the payout, not the expected value — the EV tile prices how likely that is."><span class="pss-t-label">$${STAKE} RETURNS</span><b class="pss-t-val money">$${(STAKE * best.mult) % 1 === 0 ? (STAKE * best.mult).toFixed(0) : (STAKE * best.mult).toFixed(2)}</b></div>
+          <div class="pss-tile" title="Expected value at the best book — the payout table weighted by the calibrated chance of each hit-count. Negative means the price doesn't clear the model's probability."><span class="pss-t-label">EV</span><b class="pss-t-val ${best.ev >= 0 ? 'pos' : 'neg'}">${best.ev >= 0 ? '+' : ''}${best.ev}%</b></div>
+        </div>`
+            : '';
         slipSummaryHtml = `<div class="parlay-slip-summary">
-      <span class="pss-item"><b>${selectedLegs.length}</b> LEGS</span>
-      <span class="pss-item" title="${anyCorr ? 'Joint P(all hit) — correlation-adjusted for same-fight legs via a duration copula, not the independent product' : 'Product of independent leg probabilities'} (clamped 35-85)">COMBINED <b>~${combined}%</b></span>
-      ${bestBookHtml}
-      <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b></span>
-      ${maxPosCorr >= 0.5 ? `<span class="pss-corr" title="Same-fight legs here are strongly positively correlated — they mostly hit or miss together, so this slip is closer to ONE bet than ${selectedLegs.length}. The combined % and EV account for it, but you are not diversifying.">🔗 ~1 BET (correlated)</span>` : anyCorr ? `<span class="pss-corr" title="Same-fight legs are correlated — the combined % and EV are the joint probability, not the independent product.">🔗 corr-adjusted</span>` : ''}
-      ${payoutHtml}
-      ${slipContradiction ? `<span class="pss-conflict" title="${slipContradiction.replace(/"/g, '&quot;')}">⛔ CONTRADICTORY LEGS</span>` : ''}
+      ${deckHtml}
+      <div class="pss-strip">
+        <span class="pss-weak" title="Lowest-confidence leg in the slip — the most likely one to sink it">WEAKEST <b>${prettyName(weakest.fighter)} ${weakest.stat === 'ss_r1' ? 'R1 SS' : weakest.stat.toUpperCase()} ${weakest.confidence}%</b><button class="pss-weak-act" data-parlay-drop="${weakestKey}" title="Drop this leg from the slip">✕ drop</button>${swapPlan ? `<button class="pss-weak-act swap" data-parlay-swap="1" title="Swap it for ${swapPlan.toLabel.replace(/"/g, '&quot;')} — the highest-confidence available leg that doesn't conflict with the rest of your slip">⇄ swap</button>` : ''}</span>
+        ${maxPosCorr >= 0.5 ? `<span class="pss-corr" title="Same-fight legs here are strongly positively correlated — they mostly hit or miss together, so this slip is closer to ONE bet than ${selectedLegs.length}. The combined % and EV account for it, but you are not diversifying.">🔗 ~1 BET (correlated)</span>` : anyCorr ? `<span class="pss-corr" title="Same-fight legs are correlated — the combined % and EV are the joint probability, not the independent product.">🔗 corr-adjusted</span>` : ''}
+        ${payoutHtml}
+        ${slipContradiction ? `<span class="pss-conflict" title="${slipContradiction.replace(/"/g, '&quot;')}">⛔ CONTRADICTORY LEGS</span>` : ''}
+      </div>
     </div>`;
     }
     // Health display
@@ -9968,10 +10083,26 @@ function renderParlayLab(container) {
             const tag = alertCount > 0 ? `${alertCount} synerg${alertCount > 1 ? 'ies' : 'y'}` : '';
             const cTag = conflictCount > 0 ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : '';
             const tags = [tag, cTag].filter(Boolean).join(', ');
-            const legsDataAttr = s.legs.map(l => parlayLegKey(l.fighter, l.stat, l.direction)).join(',');
-            return `<div class="parlay-suggest-card grade-${s.health.grade}" data-suggest-legs="${legsDataAttr}">
-        <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade})</div>
+            const legKeys = s.legs.map(l => parlayLegKey(l.fighter, l.stat, l.direction));
+            const legsDataAttr = legKeys.join(',');
+            // GLOW-UP 191 (L4): price the suggestion with the SAME analysis the slip
+            // uses, so "score 83" is no longer the only number — you can compare a
+            // suggestion to what you've built on the axis that decides placement.
+            const sa = analyzeSlipLegs(s.legs);
+            const evChip = sa?.best
+                ? `<span class="psg-ev ${sa.best.ev >= 0 ? 'pos' : 'neg'}" title="Best-EV book for this suggestion at ${sa.anyRecal ? 'recalibrated' : 'model'} leg probabilities${sa.anyCorr ? ', correlation-adjusted' : ''} — same pipeline as your slip deck. $10 returns $${(10 * sa.best.mult) % 1 === 0 ? (10 * sa.best.mult).toFixed(0) : (10 * sa.best.mult).toFixed(2)} if all ${sa.n} hit.">${sa.best.label} ${sa.best.mult}x <b>${sa.best.ev >= 0 ? '+' : ''}${sa.best.ev}%</b></span>`
+                : '';
+            const combChip = sa ? `<span class="psg-comb" title="Joint probability all ${sa.n} legs hit${sa.anyCorr ? ' (correlation-adjusted)' : ''}">~${sa.combined}%</span>` : '';
+            // Diff vs the live slip — is this a small tweak or a different bet?
+            const shared = legKeys.filter(k => parlaySelectedLegs.has(k)).length;
+            const fresh = legKeys.length - shared;
+            const diffChip = selectedLegs.length
+                ? `<span class="psg-diff${shared === legKeys.length && fresh === 0 ? ' same' : ''}" title="How this suggestion compares to the slip you've built: ${shared} leg${shared === 1 ? '' : 's'} you already have, ${fresh} new. Loading it replaces your current selection.">${shared === legKeys.length ? 'MATCHES YOUR SLIP' : `${shared} shared · +${fresh} new`}</span>`
+                : '';
+            return `<div class="parlay-suggest-card grade-${s.health.grade}" data-suggest-legs="${legsDataAttr}" title="Click to load these ${legKeys.length} legs into your slip (replaces the current selection)">
+        <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade})<span class="psg-load">LOAD →</span></div>
         <div class="parlay-suggest-legs">${legsText}</div>
+        <div class="parlay-suggest-meta">${combChip}${evChip}${diffChip}</div>
         <div class="parlay-suggest-score">Avg confidence: ${Math.round(s.health.avgConfidence)}%${tags ? ` · ${tags}` : ''}</div>
       </div>`;
         }).join('');
@@ -10059,6 +10190,29 @@ function renderParlayLab(container) {
             if (!key)
                 return;
             parlaySelectedLegs.delete(key);
+            renderParlayLab(container);
+        });
+    });
+    // GLOW-UP 191 (L3): weakest-leg actions — drop it, or swap it for the best
+    // legal replacement computed during render.
+    container.querySelectorAll('[data-parlay-drop]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset['parlayDrop'];
+            if (!key)
+                return;
+            parlaySelectedLegs.delete(key);
+            renderParlayLab(container);
+        });
+    });
+    container.querySelectorAll('[data-parlay-swap]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!swapPlan)
+                return;
+            parlaySelectedLegs.delete(swapPlan.fromKey);
+            parlaySelectedLegs.add(swapPlan.toKey);
+            showToast(`⇄ Swapped in ${swapPlan.toLabel}`);
             renderParlayLab(container);
         });
     });

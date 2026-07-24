@@ -27758,6 +27758,104 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-align: center; white-space: nowrap; cursor: help;
 }
 
+/* ══ GLOW-UP 191: Parlay Lab five-level pass ═════════════════════════════ */
+/* L1 — pool rows carry EV + a live synergy hint (mirror of the ✗ conflict flag) */
+.parlay-leg-ev {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--text3); cursor: help; min-width: 34px; text-align: right;
+}
+.parlay-leg-ev.pos { color: #6ee7a8; }
+.parlay-leg-ev.neg { color: #ff8fa3; }
+.parlay-leg-syn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.06em;
+  color: #6ee7a8; background: rgba(38,208,124,0.08);
+  border: 1px solid rgba(38,208,124,0.3); border-radius: 3px;
+  padding: 1px 4px; margin-left: 4px; white-space: nowrap; cursor: help;
+}
+
+/* L2 — the slip headline becomes a deck; the dollar return is the point */
+.pss-deck {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 6px;
+}
+.pss-tile {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 5px 9px; border-radius: 5px; cursor: help;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border2);
+  min-width: 64px;
+}
+.pss-t-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3);
+}
+.pss-t-val { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 800; line-height: 1; color: var(--text); }
+.pss-t-val.pos { color: #6ee7a8; }
+.pss-t-val.neg { color: #ff8fa3; }
+.pss-t-val.money { color: var(--gold); }
+.pss-t-mult { font-style: normal; font-size: 10px; opacity: 0.7; }
+.pss-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* L3 — the weakest-leg chip becomes actionable instead of just a warning */
+.pss-weak-act {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.06em;
+  margin-left: 5px; padding: 1px 5px; border-radius: 3px; cursor: pointer;
+  background: rgba(255,255,255,0.05); color: var(--text2);
+  border: 1px solid var(--border2);
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.pss-weak-act:hover { color: var(--text); border-color: var(--border3); background: rgba(255,255,255,0.09); }
+.pss-weak-act.swap:hover { color: #6ee7a8; border-color: rgba(38,208,124,0.4); }
+
+/* L4 — suggestions priced and diffed against the live slip */
+.parlay-suggest-meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 2px; }
+.psg-comb, .psg-ev, .psg-diff {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 1px 5px; border-radius: 3px; cursor: help; white-space: nowrap;
+  border: 1px solid var(--border2); background: rgba(255,255,255,0.03); color: var(--text2);
+}
+.psg-ev.pos { color: #6ee7a8; border-color: rgba(38,208,124,0.28); }
+.psg-ev.neg { color: #ff8fa3; border-color: rgba(255,91,120,0.28); }
+.psg-diff { color: var(--text3); }
+.psg-diff.same { color: var(--gold); border-color: rgba(248,198,74,0.35); }
+.psg-load {
+  float: right; font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.1em; color: var(--text3); opacity: 0;
+  transition: opacity 0.15s;
+}
+.parlay-suggest-card:hover .psg-load { opacity: 1; color: var(--gold); }
+
+/* L5 — same-fight legs grouped so correlation reads structurally */
+.parlay-slip-fight {
+  border: 1px solid rgba(248,198,74,0.22);
+  border-radius: 6px; padding: 4px; margin-bottom: 4px;
+  background: rgba(248,198,74,0.03);
+}
+.psf-head {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 2px 4px 4px; cursor: help;
+}
+.psf-matchup {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--text2);
+}
+.psf-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.08em; color: var(--gold); opacity: 0.85;
+}
+.psf-corr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; padding: 1px 4px; border-radius: 3px;
+  border: 1px solid var(--border2); color: var(--text3);
+}
+.psf-corr.synergy { color: #6ee7a8; border-color: rgba(38,208,124,0.3); }
+.psf-corr.conflict { color: #ff8fa3; border-color: rgba(255,91,120,0.3); }
+.psf-corr.caution { color: #ffbe6b; border-color: rgba(255,184,77,0.3); }
+
 /* ══ GLOW-UP 187: Best Picks five-level pass ═════════════════════════════ */
 /* L5 — model-ranked vs price. "BEST" is a model ranking; say how many actually
    clear breakeven so the header isn't read as an endorsement of all of them. */
