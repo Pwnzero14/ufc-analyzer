@@ -17753,7 +17753,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : ''}
-        ${(f.lean_ss_r1 && f.lean_ss_r1.lean !== 'push') ? `<div class="detail-panel">
+        ${f.lean_ss_r1 ? `<div class="detail-panel">
           <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})</div>
           ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
