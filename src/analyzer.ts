@@ -14656,6 +14656,24 @@ function statUnderBookOffered(f: AnalyzerFighter, source: string, book: string):
   return true; // ft / ctrl / ss_r1: no per-book under gating modeled (matches Best Picks)
 }
 
+// DK is the only book with real American odds, so it's the only one that can post
+// a "chalk" side with no value even when placeable. Exclude DK sides at -300 or
+// worse (a -5000 TD under etc.); -299 and better is fine. Pick-em books carry no
+// American odds, so this only ever gates DK candidates.
+const DK_CHALK_THRESHOLD = -300;
+function dkSideChalk(f: AnalyzerFighter, source: string, dir: string): boolean {
+  const field =
+      source === 'ss'    ? (dir === 'over' ? 'ss_over_odds'    : 'ss_under_odds')
+    : source === 'ss_r1' ? (dir === 'over' ? 'ss_r1_over_odds' : 'ss_r1_under_odds')
+    : source === 'td'    ? (dir === 'over' ? 'td_over_odds'    : 'td_under_odds')
+    : source === 'ft'    ? (dir === 'over' ? 'ft_over_odds'    : 'ft_under_odds')
+    : source === 'ctrl'  ? (dir === 'over' ? 'ctrl_over_odds'  : 'ctrl_under_odds')
+    : null;
+  if (!field) return false;
+  const odds = (f as unknown as Record<string, unknown>)[field] as number | null;
+  return odds != null && Number.isFinite(odds) && odds <= DK_CHALK_THRESHOLD;
+}
+
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: string | null; line: number | null } {
@@ -14683,7 +14701,9 @@ function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: 
     .map(([bk, fld]) => ({ bk, val: (f as unknown as Record<string, unknown>)[fld as string] as number | null }))
     .filter((c): c is { bk: string; val: number } => c.val != null && Number.isFinite(c.val)
       // Drop books that don't offer the UNDER side (e.g. Pick6 TD-under is More-only).
-      && !(dir === 'under' && !statUnderBookOffered(f, source, c.bk)));
+      && !(dir === 'under' && !statUnderBookOffered(f, source, c.bk))
+      // Drop DK chalk sides (-300 or worse) — placeable but no value.
+      && !(c.bk === 'draftkings_sportsbook' && dkSideChalk(f, source, dir)));
   if (!cands.length) return { book: null, line: null };
   const best = dir === 'over'
     ? cands.reduce((a, b) => (b.val < a.val ? b : a))
