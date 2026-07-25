@@ -6501,7 +6501,23 @@ function ensureLineLeans(): void {
 function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
   // Sub-leans are pre-adjusted by applyWeightMissToFighter during primeCaches,
   // so this just picks priority and tags with _source/_label.
-  if (f.lean?.lean && f.lean.lean !== 'none') return { ...f.lean, _source: 'fp', _label: '' };
+  // GLOW-UP 194: FP is top priority, but only when its side is actually PLACEABLE.
+  // A dog's FP-under with no Underdog line (Pick6 blocks it) isn't an actionable
+  // play, so fall through to the top placeable sub-lean IN THE SAME DIRECTION
+  // (never flip the model's read) and only fall back to the unplaceable FP when
+  // nothing else covers that direction.
+  if (f.lean?.lean && f.lean.lean !== 'none') {
+    const fpDir = f.lean.lean;
+    if (fpDir === 'push' || !shouldSkipFpSideForFighter(f, 'fp', fpDir as 'over' | 'under')) {
+      return { ...f.lean, _source: 'fp', _label: '' };
+    }
+    if (f.lean_ss?.lean === fpDir)    return { ...f.lean_ss,    _source: 'ss',    _label: ' (SS)' };
+    if (f.lean_td?.lean === fpDir)    return { ...f.lean_td,    _source: 'td',    _label: ' (TD)' };
+    if (f.lean_ft?.lean === fpDir)    return { ...f.lean_ft,    _source: 'ft',    _label: ' (FT)' };
+    if (f.lean_ss_r1?.lean === fpDir) return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
+    if (f.lean_kd?.lean === fpDir)    return { ...f.lean_kd,    _source: 'kd',    _label: ' (KD)' };
+    return { ...f.lean, _source: 'fp', _label: '' };
+  }
   if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push') return { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
   if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push') return { ...f.lean_td, _source: 'td', _label: ' (TD)' };
   if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push') return { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
