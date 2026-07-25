@@ -14582,6 +14582,89 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   buildDataSubNav(container);
 }
 
+// ── GLOW-UP 194: Lean Over/Under triage surface ──────────────────────────────
+// Turns the directional filter views from "the same full cards, filtered" into a
+// purpose-built triage: conviction order (L2), a command header (L1), compact
+// rows (L3), same-fight correlation flags (L4), and one-click add-to-slip (L5).
+let _leanCompact = false; // L3 compact-density toggle (per-session)
+const _leanSlateData = new Map<string, BestPicksSlatePick>(); // L5 staging for add-to-slip
+
+// Per-stat book fields in preference order (full SourcePlatformKey → line field).
+const LEAN_STAT_FIELDS: Record<string, Array<[string, keyof AnalyzerFighter]>> = {
+  fp:    [['pick6','line_p6'],['underdog','line_ud'],['betr','line_betr'],['prizepicks','line_pp']],
+  ss:    [['pick6','line_p6_ss'],['underdog','line_ud_ss'],['prizepicks','line_pp_ss'],['betr','line_betr_ss'],['draftkings_sportsbook','line_dk_ss']],
+  ss_r1: [['prizepicks','line_pp_ss_r1'],['underdog','line_ud_ss_r1'],['draftkings_sportsbook','line_dk_ss_r1']],
+  td:    [['pick6','line_p6_td'],['underdog','line_ud_td'],['prizepicks','line_pp_td'],['betr','line_betr_td'],['draftkings_sportsbook','line_dk_td']],
+  ft:    [['prizepicks','line_pp_ft'],['draftkings_sportsbook','line_dk_ft'],['underdog','line_ud_ft'],['pick6','line_p6_ft'],['betr','line_betr_ft']],
+  ctrl:  [['pick6','line_p6_ctrl'],['underdog','line_ud_ctrl'],['prizepicks','line_pp_ctrl'],['betr','line_betr_ctrl'],['draftkings_sportsbook','line_dk_ctrl']],
+  kd:    [['prizepicks','line_pp_kd']],
+};
+const LEAN_BOOK_LABEL: Record<string, string> = { pick6:'Pick6', underdog:'Underdog', prizepicks:'PrizePicks', betr:'Betr', draftkings_sportsbook:'DK' };
+
+// Best entry book+line for a lean's stat/direction (over → lowest line, under →
+// highest), mirroring the card's best-shop logic for the add-to-slip payload.
+function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: string | null; line: number | null } {
+  const fields = LEAN_STAT_FIELDS[source] || [];
+  const cands = fields
+    .map(([bk, fld]) => ({ bk, val: (f as unknown as Record<string, unknown>)[fld as string] as number | null }))
+    .filter((c): c is { bk: string; val: number } => c.val != null && Number.isFinite(c.val));
+  if (!cands.length) return { book: null, line: null };
+  const best = dir === 'over'
+    ? cands.reduce((a, b) => (b.val < a.val ? b : a))
+    : cands.reduce((a, b) => (b.val > a.val ? b : a));
+  return { book: best.bk, line: best.val };
+}
+
+function buildLeanSlatePick(f: AnalyzerFighter, lean: EffectiveLean): { key: string; pick: BestPicksSlatePick } {
+  const source = lean._source || 'fp';
+  const dir = lean.lean;
+  const { book, line } = leanBestBook(f, source, dir);
+  const finalLine = line ?? lean.line ?? null;
+  const statLabel = EFFECTIVE_LEAN_STAT_LABEL[source] || 'FP';
+  const bookLabel = book ? (LEAN_BOOK_LABEL[book] || book) : 'No book';
+  const clip = `${prettyName(f.name)} ${dir.toUpperCase()} ${finalLine ?? ''} ${statLabel}${book ? ` @ ${bookLabel}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`.replace(/\s+/g, ' ').trim();
+  // Same key shape as Best Picks (`name|lean|source`) so a pick added here and one
+  // added there are the SAME slate entry — they dedupe and sync automatically.
+  return {
+    key: `${f.name}|${dir}|${source}`,
+    pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
+  };
+}
+
+// L1 — directional command header: count, tier breakdown, avg EV, strongest play.
+function buildLeanViewHeader(fighters: AnalyzerFighter[], dir: 'over' | 'under'): HTMLElement {
+  const el = document.createElement('div');
+  el.className = `lean-cmd-header lch-${dir}`;
+  let high = 0, med = 0, low = 0, evSum = 0, evCount = 0;
+  let top: { name: string; label: string; conf: number } | null = null;
+  for (const f of fighters) {
+    const lean = getEffectiveLean(f);
+    const conf = lean.conf || 0;
+    if (conf >= 72) high++; else if (conf >= 58) med++; else low++;
+    const ev = computeFighterEV(f, lean);
+    if (ev != null) { evSum += ev; evCount++; }
+    if (!top || conf > top.conf) {
+      top = { name: prettyName(f.name), label: `${EFFECTIVE_LEAN_STAT_LABEL[lean._source || 'fp'] || 'FP'}${lean.line != null ? ' ' + lean.line : ''}`, conf };
+    }
+  }
+  const avgEv = evCount ? evSum / evCount : null;
+  const dirLabel = dir === 'over' ? '▲ LEAN OVER' : '▼ LEAN UNDER';
+  el.innerHTML = `
+    <div class="lch-row">
+      <span class="lch-title">${dirLabel}</span>
+      <span class="lch-count">${fighters.length}</span>
+      <span class="lch-tiers">
+        <span class="lch-tier high" title="Confidence ≥72%">${high} High</span>
+        <span class="lch-tier med" title="Confidence 58–71%">${med} Med</span>
+        <span class="lch-tier low" title="Confidence &lt;58%">${low} Low</span>
+      </span>
+      ${avgEv != null ? `<span class="lch-ev ${avgEv > 0 ? 'pos' : 'neg'}" title="Average EV across these leans">avg EV ${avgEv > 0 ? '+' : ''}${avgEv.toFixed(1)}%</span>` : ''}
+      ${top ? `<span class="lch-top" title="Highest-confidence play in this direction">⭐ ${top.name} · ${top.label} · ${Math.round(top.conf)}%</span>` : ''}
+      <button class="lch-compact-toggle${_leanCompact ? ' on' : ''}" data-lean-compact title="Toggle compact triage rows (hide the stat deck &amp; line grid for faster scanning)">▤ COMPACT</button>
+    </div>`;
+  return el;
+}
+
 // Coalesce multiple renderFighters() calls in the same frame into a single
 // render. Many code paths (mergeAndEnrich, line-move handlers, sort/filter,
 // news arrivals) fire renderFighters() back-to-back; without coalescing each
@@ -15246,7 +15329,21 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   return fallbackByReverse || null;
 }
   // Filter out cancelled fighters from the display list
-  const activeFighters = fighters.filter(f => !isCancelledFighter(f.name));
+  let activeFighters = fighters.filter(f => !isCancelledFighter(f.name));
+
+  // GLOW-UP 194 L2 — Lean Over/Under are a directional TRIAGE, not a card readout,
+  // so default them to conviction order (strongest directional play first) instead
+  // of card-order. Any explicit sort choice still wins.
+  const isLeanView = currentView === 'over' || currentView === 'under';
+  if (isLeanView && currentSort === 'default') {
+    activeFighters = [...activeFighters].sort((a, b) => {
+      const ca = getEffectiveLean(a).conf || 0, cb = getEffectiveLean(b).conf || 0;
+      if (cb !== ca) return cb - ca;
+      const ea = computeFighterEV(a, getEffectiveLean(a)) ?? -999;
+      const eb = computeFighterEV(b, getEffectiveLean(b)) ?? -999;
+      return eb - ea;
+    });
+  }
 
   // Compute which (platform, stat) slots have data for at least one fighter on
   // this slate. lineCell skips emitting cells (placeholder or real) for slots
@@ -15349,8 +15446,31 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       frag.appendChild(pair);
     });
   } else {
+    // GLOW-UP 194 — Lean Over/Under triage: command header (L1), rank badges (L2),
+    // same-fight correlation flags (L4), one-click add-to-slip (L5).
+    if (isLeanView) {
+      _leanSlateData.clear();
+      frag.appendChild(buildLeanViewHeader(activeFighters, currentView as 'over' | 'under'));
+    }
+    const inViewNames = isLeanView ? new Set(activeFighters.map(x => normalizeName(x.name))) : null;
     activeFighters.forEach((f, i) => {
       const row = buildRowForFighter(f, i, Math.floor(i / 2));
+      if (isLeanView) {
+        row.classList.add('lean-view-row');
+        const lean = getEffectiveLean(f);
+        const { key, pick } = buildLeanSlatePick(f, lean);
+        _leanSlateData.set(key, pick);
+        const inSlate = bestPicksSlate.has(key);
+        const oppNorm = f.opponent ? normalizeName(f.opponent) : null;
+        const sameFight = !!(oppNorm && inViewNames && inViewNames.has(oppNorm));
+        if (sameFight) row.classList.add('lean-samefight');
+        const controls = document.createElement('div');
+        controls.className = 'lean-row-controls';
+        controls.innerHTML = `<span class="lean-rank" title="Conviction rank">#${i + 1}</span>`
+          + (sameFight ? `<span class="lean-corr-flag" title="Opponent also leans ${currentView.toUpperCase()} — same-fight ${currentView} legs are negatively correlated; lean one side">⚠ corr</span>` : '')
+          + `<button class="lean-slate-btn${inSlate ? ' on' : ''}" data-slate-key="${key.replace(/"/g, '&quot;')}" title="${inSlate ? 'Remove from My Slate' : 'Add to My Slate'}">${inSlate ? '✓' : '+'}</button>`;
+        row.querySelector('.fighter-main')?.prepend(controls);
+      }
       frag.appendChild(row);
       if (i % 2 === 1 && i < activeFighters.length - 1) {
         const sp = document.createElement('div');
@@ -15381,6 +15501,30 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 
   // Commit the entire fragment in one DOM operation.
   container.appendChild(frag);
+
+  // GLOW-UP 194 — lean-view container state (L3 compact) + control handlers.
+  container.classList.toggle('lean-triage', isLeanView);
+  container.classList.toggle('lean-compact', isLeanView && _leanCompact);
+  if (isLeanView) {
+    container.querySelectorAll<HTMLElement>('.lean-slate-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.dataset['slateKey'] || '';
+        if (bestPicksSlate.has(key)) {
+          bestPicksSlate.delete(key);
+        } else {
+          const d = _leanSlateData.get(key);
+          if (d) { if (!bestPicksSlate.size) bestPicksSlateOpen = true; bestPicksSlate.set(key, d); }
+        }
+        renderFighters();
+      });
+    });
+    container.querySelector<HTMLElement>('[data-lean-compact]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _leanCompact = !_leanCompact;
+      renderFighters();
+    });
+  }
 
   // ── Animate bars on scroll into view (IntersectionObserver) ─────────
   // Skip bars inside .fighter-detail — those are hidden by default and get
