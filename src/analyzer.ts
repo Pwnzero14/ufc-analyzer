@@ -17990,13 +17990,10 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     const sideCls = lean.lean === 'over' ? 'over' : lean.lean === 'under' ? 'under' : 'push';
     const lineTxt = lean.line != null ? ` ${lean.line}` : '';
     const sideTxt = lean.lean === 'push' ? 'TOSS-UP' : lean.lean.toUpperCase();
-    const confTxt = displayConf > 0
-      ? `<span class="play-pill-conf">${Math.round(displayConf)}%${gradeLetter ? ` ${gradeLetter}` : ''}</span>`
-      : '';
-    const evTxt = leanEvDetail != null && lean.lean !== 'push'
-      ? `<span class="play-pill-ev ${leanEvDetail.ev > 0 ? 'ev-pos' : leanEvDetail.ev < 0 ? 'ev-neg' : ''}">${leanEvDetail.isAssumedVig ? '~' : ''}${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%</span>`
-      : '';
-    return `<div class="play-pill play-${sideCls}" title="${(lean.verdict || '').replace(/"/g, '&quot;')}">${arrow} ${sideTxt} ${stat}${lineTxt}${confTxt}${evTxt}</div>`;
+    // Slimmed to a pure scan anchor — direction · stat · line. Conf% and EV live
+    // on the right-side lean cell; repeating them here read as redundant (and the
+    // EV divider was visually busy).
+    return `<div class="play-pill play-${sideCls}" title="${(lean.verdict || '').replace(/"/g, '&quot;')}">${arrow} ${sideTxt} ${stat}${lineTxt}</div>`;
   })();
 
   // GLOW-UP 193 L2 — opponent profile strip: promotes the buried opponent context
