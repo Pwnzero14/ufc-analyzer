@@ -14269,6 +14269,26 @@ function getDisplayedConf(f) {
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f, source, dir) {
+    // FP is special: per-book scoring means FP lines are NOT cross-book comparable
+    // (no line-shopping), and FP-under placeability varies by book — a dog's FP UNDER
+    // is placeable ONLY on Underdog (Pick6/PP/Betr block it). Resolve to the first
+    // PLACEABLE book (active platform preferred) using the real placeability rule,
+    // never a naive min/max.
+    if (source === 'fp') {
+        const fpBooks = [
+            ['pick6', 'line_p6'], ['underdog', 'line_ud'], ['prizepicks', 'line_pp'], ['betr', 'line_betr'],
+        ];
+        const ordered = fpBooks.slice().sort((a, b) => (b[0] === currentPlatform ? 1 : 0) - (a[0] === currentPlatform ? 1 : 0));
+        for (const [bk, fld] of ordered) {
+            const v = f[fld];
+            if (v == null || !Number.isFinite(v))
+                continue;
+            if (shouldSkipFpSideForFighter(f, 'fp', dir, bk))
+                continue;
+            return { book: bk, line: v };
+        }
+        return { book: null, line: null };
+    }
     const fields = LEAN_STAT_FIELDS[source] || [];
     const cands = fields
         .map(([bk, fld]) => ({ bk, val: f[fld] }))
