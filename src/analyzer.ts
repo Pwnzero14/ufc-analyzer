@@ -15484,7 +15484,20 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
         controls.innerHTML = `<span class="lean-rank" title="Conviction rank">#${i + 1}</span>`
           + (sameFight ? `<span class="lean-corr-flag" title="Opponent also leans ${currentView.toUpperCase()} — same-fight ${currentView} legs are negatively correlated; lean one side">⚠ corr</span>` : '')
           + `<button class="lean-slate-btn${inSlate ? ' on' : ''}" data-slate-key="${key.replace(/"/g, '&quot;')}" title="${inSlate ? 'Remove from My Slate' : 'Add to My Slate'}">${inSlate ? '✓' : '+'}</button>`;
-        row.querySelector('.fighter-main')?.prepend(controls);
+        const fmain = row.querySelector('.fighter-main');
+        // Compact-mode play line — fills the space freed by hiding the line grid so
+        // a slim row still shows WHAT to bet (side · stat · line · book), not just
+        // the direction. display:none in full mode → takes no grid cell.
+        const cp = document.createElement('div');
+        cp.className = 'lean-compact-play';
+        cp.innerHTML = `<span class="lcp-side ${pick.dir === 'OVER' ? 'over' : 'under'}">${pick.dir === 'OVER' ? '▲' : '▼'} ${pick.dir}</span>`
+          + `<span class="lcp-stat">${pick.statLabel}</span>`
+          + `<span class="lcp-line">${pick.line ?? '—'}</span>`
+          + (pick.book ? `<span class="lcp-book" title="Best entry book for this side">@ ${pick.bookLabel}</span>` : '');
+        const finfo = fmain?.querySelector('.fighter-info');
+        if (finfo && finfo.nextSibling) fmain!.insertBefore(cp, finfo.nextSibling);
+        else fmain?.appendChild(cp);
+        fmain?.prepend(controls);
       }
       frag.appendChild(row);
       if (i % 2 === 1 && i < activeFighters.length - 1) {
