@@ -6511,11 +6511,15 @@ function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
     if (fpDir === 'push' || !shouldSkipFpSideForFighter(f, 'fp', fpDir as 'over' | 'under')) {
       return { ...f.lean, _source: 'fp', _label: '' };
     }
-    if (f.lean_ss?.lean === fpDir)    return { ...f.lean_ss,    _source: 'ss',    _label: ' (SS)' };
-    if (f.lean_td?.lean === fpDir)    return { ...f.lean_td,    _source: 'td',    _label: ' (TD)' };
-    if (f.lean_ft?.lean === fpDir)    return { ...f.lean_ft,    _source: 'ft',    _label: ' (FT)' };
-    if (f.lean_ss_r1?.lean === fpDir) return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
-    if (f.lean_kd?.lean === fpDir)    return { ...f.lean_kd,    _source: 'kd',    _label: ' (KD)' };
+    // Only fall through to a sub-lean whose side is actually placeable on some book
+    // (leanBestBook returns a book) — else a Pick6 TD-under (More-only) would just be
+    // the next unplaceable play. If nothing in-direction is placeable, keep the FP.
+    const _pl = (src: string) => leanBestBook(f, src, fpDir).book != null;
+    if (f.lean_ss?.lean === fpDir && _pl('ss'))       return { ...f.lean_ss,    _source: 'ss',    _label: ' (SS)' };
+    if (f.lean_td?.lean === fpDir && _pl('td'))       return { ...f.lean_td,    _source: 'td',    _label: ' (TD)' };
+    if (f.lean_ft?.lean === fpDir && _pl('ft'))       return { ...f.lean_ft,    _source: 'ft',    _label: ' (FT)' };
+    if (f.lean_ss_r1?.lean === fpDir && _pl('ss_r1')) return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
+    if (f.lean_kd?.lean === fpDir && _pl('kd'))       return { ...f.lean_kd,    _source: 'kd',    _label: ' (KD)' };
     return { ...f.lean, _source: 'fp', _label: '' };
   }
   if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push') return { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
@@ -14630,6 +14634,28 @@ function getDisplayedConf(f: AnalyzerFighter): number {
   return recal != null ? recal : boosted;
 }
 
+// Per-book UNDER-side availability for stat props. MUST stay in sync with
+// renderBestPicks' ssUnderBookOffered / tdUnderBookOffered — it's the same rule,
+// reused here so leanBestBook and the effective-lean fall-through can't surface an
+// unplaceable under (e.g. a Pick6 TD under, which is More/OVER-only unless a Less
+// button is confirmed, or a non-favorite's Pick6 SS under).
+function statUnderBookOffered(f: AnalyzerFighter, source: string, book: string): boolean {
+  if (source === 'ss') {
+    if (book === 'draftkings_sportsbook' || book === 'prizepicks' || book === 'betr') return true;
+    const dog = isMoneylineUnderdog(f);
+    if (book === 'underdog') return dog;     // UD: under only for underdogs
+    if (book === 'pick6') return !dog;       // Pick6: under only for favorites
+    return true;
+  }
+  if (source === 'td') {
+    if (book === 'pick6') return (f.td_under_available ?? null) === true;   // More-only unless Less confirmed
+    if (book === 'underdog') return (f.ud_td_under_avail ?? null) !== false;
+    return true;
+  }
+  if (source === 'kd') return (f.kd_under_available ?? null) === true;      // PP demon/goblin = More-only
+  return true; // ft / ctrl / ss_r1: no per-book under gating modeled (matches Best Picks)
+}
+
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: string | null; line: number | null } {
@@ -14655,7 +14681,9 @@ function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: 
   const fields = LEAN_STAT_FIELDS[source] || [];
   const cands = fields
     .map(([bk, fld]) => ({ bk, val: (f as unknown as Record<string, unknown>)[fld as string] as number | null }))
-    .filter((c): c is { bk: string; val: number } => c.val != null && Number.isFinite(c.val));
+    .filter((c): c is { bk: string; val: number } => c.val != null && Number.isFinite(c.val)
+      // Drop books that don't offer the UNDER side (e.g. Pick6 TD-under is More-only).
+      && !(dir === 'under' && !statUnderBookOffered(f, source, c.bk)));
   if (!cands.length) return { book: null, line: null };
   const best = dir === 'over'
     ? cands.reduce((a, b) => (b.val < a.val ? b : a))
@@ -15244,11 +15272,15 @@ function _renderFightersImpl(): void {
     if (currentView === 'over' || currentView === 'under') {
       const _eff = getEffectiveLean(f);
       if (_eff.lean !== currentView) return false;
-      // GLOW-UP 194: an unplaceable FP lean isn't an actionable play, so drop it
-      // from the directional triage entirely — a dog's FP UNDER with no Underdog
-      // line (Pick6 blocks the under) has nowhere to bet. A placeable FP OVER is
-      // unaffected and still shows in the Over section.
-      if (_eff._source === 'fp' && shouldSkipFpSideForFighter(f, 'fp', currentView as 'over' | 'under')) return false;
+      // GLOW-UP 194: drop unplaceable effective leans from the directional triage —
+      // no bettable side means it's not an actionable play. FP via the dedicated
+      // placeability rule; stats via leanBestBook (which now filters under-side book
+      // availability, e.g. Pick6 TD-under being More-only). Covers both the FP
+      // fallback and a fighter whose top lean is an unplaceable stat under.
+      const _placeable = _eff._source === 'fp'
+        ? !shouldSkipFpSideForFighter(f, 'fp', currentView as 'over' | 'under')
+        : leanBestBook(f, _eff._source, currentView).book != null;
+      if (!_placeable) return false;
     }
     // Advanced tag filters
     if (_tags['lean']) { if (getEffectiveLean(f).lean !== _tags['lean']) return false; }
