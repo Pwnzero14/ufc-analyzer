@@ -14317,6 +14317,23 @@ function statUnderBookOffered(f, source, book) {
         return (f.kd_under_available ?? null) === true; // PP demon/goblin = More-only
     return true; // ft / ctrl / ss_r1: no per-book under gating modeled (matches Best Picks)
 }
+// DK is the only book with real American odds, so it's the only one that can post
+// a "chalk" side with no value even when placeable. Exclude DK sides at -300 or
+// worse (a -5000 TD under etc.); -299 and better is fine. Pick-em books carry no
+// American odds, so this only ever gates DK candidates.
+const DK_CHALK_THRESHOLD = -300;
+function dkSideChalk(f, source, dir) {
+    const field = source === 'ss' ? (dir === 'over' ? 'ss_over_odds' : 'ss_under_odds')
+        : source === 'ss_r1' ? (dir === 'over' ? 'ss_r1_over_odds' : 'ss_r1_under_odds')
+            : source === 'td' ? (dir === 'over' ? 'td_over_odds' : 'td_under_odds')
+                : source === 'ft' ? (dir === 'over' ? 'ft_over_odds' : 'ft_under_odds')
+                    : source === 'ctrl' ? (dir === 'over' ? 'ctrl_over_odds' : 'ctrl_under_odds')
+                        : null;
+    if (!field)
+        return false;
+    const odds = f[field];
+    return odds != null && Number.isFinite(odds) && odds <= DK_CHALK_THRESHOLD;
+}
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f, source, dir) {
@@ -14345,7 +14362,9 @@ function leanBestBook(f, source, dir) {
         .map(([bk, fld]) => ({ bk, val: f[fld] }))
         .filter((c) => c.val != null && Number.isFinite(c.val)
         // Drop books that don't offer the UNDER side (e.g. Pick6 TD-under is More-only).
-        && !(dir === 'under' && !statUnderBookOffered(f, source, c.bk)));
+        && !(dir === 'under' && !statUnderBookOffered(f, source, c.bk))
+        // Drop DK chalk sides (-300 or worse) — placeable but no value.
+        && !(c.bk === 'draftkings_sportsbook' && dkSideChalk(f, source, dir)));
     if (!cands.length)
         return { book: null, line: null };
     const best = dir === 'over'
