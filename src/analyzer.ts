@@ -14601,6 +14601,19 @@ const LEAN_STAT_FIELDS: Record<string, Array<[string, keyof AnalyzerFighter]>> =
 };
 const LEAN_BOOK_LABEL: Record<string, string> = { pick6:'Pick6', underdog:'Underdog', prizepicks:'PrizePicks', betr:'Betr', draftkings_sportsbook:'DK' };
 
+// The confidence a row actually DISPLAYS (raw model conf → CLV boost →
+// recalibration), so conviction rank + header tiers match the number on screen.
+// Mirrors the pipeline in buildFighterRow.
+function getDisplayedConf(f: AnalyzerFighter): number {
+  const lean = getEffectiveLean(f);
+  const raw = lean.conf || 0;
+  if (raw <= 0) return 0;
+  const clv = getClvBoost(f, lean);
+  const boosted = clv ? Math.max(25, Math.min(90, raw + clv.delta)) : raw;
+  const recal = getRecalibratedConfidence(boosted, lean._source);
+  return recal != null ? recal : boosted;
+}
+
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: string | null; line: number | null } {
@@ -14639,7 +14652,7 @@ function buildLeanViewHeader(fighters: AnalyzerFighter[], dir: 'over' | 'under')
   let top: { name: string; label: string; conf: number } | null = null;
   for (const f of fighters) {
     const lean = getEffectiveLean(f);
-    const conf = lean.conf || 0;
+    const conf = getDisplayedConf(f);
     if (conf >= 72) high++; else if (conf >= 58) med++; else low++;
     const ev = computeFighterEV(f, lean);
     if (ev != null) { evSum += ev; evCount++; }
@@ -14660,7 +14673,7 @@ function buildLeanViewHeader(fighters: AnalyzerFighter[], dir: 'over' | 'under')
       </span>
       ${avgEv != null ? `<span class="lch-ev ${avgEv > 0 ? 'pos' : 'neg'}" title="Average EV across these leans">avg EV ${avgEv > 0 ? '+' : ''}${avgEv.toFixed(1)}%</span>` : ''}
       ${top ? `<span class="lch-top" title="Highest-confidence play in this direction">⭐ ${top.name} · ${top.label} · ${Math.round(top.conf)}%</span>` : ''}
-      <button class="lch-compact-toggle${_leanCompact ? ' on' : ''}" data-lean-compact title="Toggle compact triage rows (hide the stat deck &amp; line grid for faster scanning)">▤ COMPACT</button>
+      <button class="lch-compact-toggle${_leanCompact ? ' on' : ''}" data-lean-compact title="Slim these rows to identity + play + lean (hide the stat deck &amp; line grid) for faster directional scanning">▤ ${_leanCompact ? 'FULL ROWS' : 'SLIM ROWS'}</button>
     </div>`;
   return el;
 }
@@ -15336,8 +15349,10 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // of card-order. Any explicit sort choice still wins.
   const isLeanView = currentView === 'over' || currentView === 'under';
   if (isLeanView && currentSort === 'default') {
+    const _dc = new Map<string, number>();
+    for (const f of activeFighters) _dc.set(f.name, getDisplayedConf(f));
     activeFighters = [...activeFighters].sort((a, b) => {
-      const ca = getEffectiveLean(a).conf || 0, cb = getEffectiveLean(b).conf || 0;
+      const ca = _dc.get(a.name) ?? 0, cb = _dc.get(b.name) ?? 0;
       if (cb !== ca) return cb - ca;
       const ea = computeFighterEV(a, getEffectiveLean(a)) ?? -999;
       const eb = computeFighterEV(b, getEffectiveLean(b)) ?? -999;
