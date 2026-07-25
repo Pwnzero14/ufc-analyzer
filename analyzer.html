@@ -482,6 +482,64 @@ body {
   font-size: 9px; color: var(--text3); margin-top: 3px;
 }
 
+/* GLOW-UP 193 L1 — card-head play pill (scan anchor) */
+.play-pill {
+  display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin-top: 5px; padding: 3px 8px; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.02em; white-space: nowrap; cursor: default;
+}
+.play-pill.play-over  { background: rgba(0,232,122,0.14); color: var(--green); border: 1px solid rgba(0,232,122,0.42); }
+.play-pill.play-under { background: rgba(255,58,96,0.14); color: var(--red);   border: 1px solid rgba(255,58,96,0.42); }
+.play-pill.play-push  { background: rgba(240,192,64,0.12); color: var(--amber); border: 1px solid rgba(240,192,64,0.38); }
+.play-pill-conf { font-weight: 600; opacity: 0.72; font-size: 9px; }
+.play-pill-ev { font-weight: 700; font-size: 9px; padding-left: 3px; border-left: 1px solid currentColor; }
+.play-pill-ev.ev-pos { color: var(--green); }
+.play-pill-ev.ev-neg { color: var(--red); }
+
+/* GLOW-UP 193 L2 — opponent profile strip */
+.opp-profile-strip {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+}
+.opp-profile-vs { color: var(--text3); font-weight: 600; opacity: 0.85; }
+.opp-chip {
+  padding: 1px 5px; border-radius: 4px; color: var(--text2);
+  background: var(--bg3); border: 1px solid var(--border); white-space: nowrap;
+}
+.opp-chip.opp-chip-style { text-transform: capitalize; color: var(--text1); }
+.opp-chip.opp-chip-allows { color: var(--stat-ss); border-color: color-mix(in srgb, var(--stat-ss) 35%, transparent); }
+
+/* GLOW-UP 193 L3 — projection provenance micro-chain */
+.stat-prov {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+  margin-top: 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; color: var(--text3); line-height: 1.3;
+}
+.stat-prov-step { opacity: 0.9; }
+.stat-prov-step:last-child { color: var(--text1); font-weight: 700; opacity: 1; }
+.stat-prov-arrow { opacity: 0.45; margin: 0 1px; }
+
+/* GLOW-UP 193 L5 — conviction reflow + signal-only mode */
+.detail-signal-bar { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin: -2px 0 2px; }
+.detail-signal-toggle {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.05em; padding: 3px 9px; border-radius: 5px; cursor: pointer;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+}
+.detail-signal-toggle:hover { border-color: rgba(240,192,64,0.4); color: var(--amber); }
+.detail-signal-toggle.active { background: rgba(240,192,64,0.14); color: var(--amber); border-color: rgba(240,192,64,0.45); }
+.detail-leans-section {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+}
+.detail-leans-section > .detail-section-head { color: var(--amber); }
+.detail-leans-section > .detail-section-head::before { background: var(--amber); }
+@media (max-width: 1100px) { .detail-leans-section { grid-template-columns: 1fr; } }
+.detail-grid.signal-only > * { display: none !important; }
+.detail-grid.signal-only > .detail-signal-bar { display: flex !important; }
+.detail-grid.signal-only > .detail-leans-section { display: grid !important; }
+
 /* Lines */
 .platform-lines { display: flex; gap: 5px; flex-wrap: wrap; }
 .line-cell {
