@@ -14371,16 +14371,17 @@ function renderFighters() {
     });
 }
 function updateViewTabCounts() {
-    let over = 0, under = 0, bestOver = 0, bestUnder = 0;
+    // Count only PLACEABLE directional leans so the LEAN OVER/UNDER tab badges match
+    // what the (now placeability-filtered) views actually render — an unplaceable FP
+    // lean is dropped from both the view and the count.
+    let bestOver = 0, bestUnder = 0;
     for (const f of allFighters) {
         const el = getEffectiveLean(f);
         if (el.lean === 'over') {
-            over++;
             if (!shouldSkipFpSideForFighter(f, el._source, 'over', el._platform))
                 bestOver++;
         }
         else if (el.lean === 'under') {
-            under++;
             if (!shouldSkipFpSideForFighter(f, el._source, 'under', el._platform))
                 bestUnder++;
         }
@@ -14392,8 +14393,8 @@ function updateViewTabCounts() {
     };
     // Best Picks panel caps each section at 8; this approximates the visible pick count.
     setText('tabCountAll', allFighters.length);
-    setText('tabCountOver', over);
-    setText('tabCountUnder', under);
+    setText('tabCountOver', bestOver);
+    setText('tabCountUnder', bestUnder);
     setText('tabCountBestPicks', Math.min(8, bestOver) + Math.min(8, bestUnder));
 }
 function isPlaceholderFighter(f) {
@@ -14876,10 +14877,17 @@ function _renderFightersImpl() {
     let fighters = allFighters.filter(f => {
         if (_nameQ && !f.name.toLowerCase().includes(_nameQ))
             return false;
-        if (currentView === 'over' && getEffectiveLean(f).lean !== 'over')
-            return false;
-        if (currentView === 'under' && getEffectiveLean(f).lean !== 'under')
-            return false;
+        if (currentView === 'over' || currentView === 'under') {
+            const _eff = getEffectiveLean(f);
+            if (_eff.lean !== currentView)
+                return false;
+            // GLOW-UP 194: an unplaceable FP lean isn't an actionable play, so drop it
+            // from the directional triage entirely — a dog's FP UNDER with no Underdog
+            // line (Pick6 blocks the under) has nowhere to bet. A placeable FP OVER is
+            // unaffected and still shows in the Over section.
+            if (_eff._source === 'fp' && shouldSkipFpSideForFighter(f, 'fp', currentView))
+                return false;
+        }
         // Advanced tag filters
         if (_tags['lean']) {
             if (getEffectiveLean(f).lean !== _tags['lean'])
@@ -15186,18 +15194,21 @@ function _renderFightersImpl() {
                 const fmain = row.querySelector('.fighter-main');
                 // Compact-mode play line — fills the space freed by hiding the line grid so
                 // a slim row still shows WHAT to bet (side · stat · line · book), not just
-                // the direction. display:none in full mode → takes no grid cell.
-                const cp = document.createElement('div');
-                cp.className = 'lean-compact-play';
-                cp.innerHTML = `<span class="lcp-side ${pick.dir === 'OVER' ? 'over' : 'under'}">${pick.dir === 'OVER' ? '▲' : '▼'} ${pick.dir}</span>`
-                    + `<span class="lcp-stat">${pick.statLabel}</span>`
-                    + `<span class="lcp-line">${pick.line ?? '—'}</span>`
-                    + (pick.book ? `<span class="lcp-book" title="Best entry book for this side">@ ${pick.bookLabel}</span>` : '');
-                const finfo = fmain?.querySelector('.fighter-info');
-                if (finfo && finfo.nextSibling)
-                    fmain.insertBefore(cp, finfo.nextSibling);
-                else
-                    fmain?.appendChild(cp);
+                // the direction. Only when there's a placeable book (no book → no bet → no
+                // line). display:none in full mode → takes no grid cell.
+                if (pick.book != null && pick.line != null) {
+                    const cp = document.createElement('div');
+                    cp.className = 'lean-compact-play';
+                    cp.innerHTML = `<span class="lcp-side ${pick.dir === 'OVER' ? 'over' : 'under'}">${pick.dir === 'OVER' ? '▲' : '▼'} ${pick.dir}</span>`
+                        + `<span class="lcp-stat">${pick.statLabel}</span>`
+                        + `<span class="lcp-line">${pick.line}</span>`
+                        + `<span class="lcp-book" title="Best entry book for this side">@ ${pick.bookLabel}</span>`;
+                    const finfo = fmain?.querySelector('.fighter-info');
+                    if (finfo && finfo.nextSibling)
+                        fmain.insertBefore(cp, finfo.nextSibling);
+                    else
+                        fmain?.appendChild(cp);
+                }
                 fmain?.prepend(controls);
             }
             frag.appendChild(row);
