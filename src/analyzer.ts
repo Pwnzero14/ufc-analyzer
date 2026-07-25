@@ -16929,10 +16929,25 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     { source: 'betr' as const, value: f.line_betr_ctrl },
     { source: 'dk'   as const, value: f.line_dk_ctrl   },
   ] as BookEntry[]).filter(c => c.value != null);
+  // GLOW-UP 193 L4 — extend best-line shopping to R1 SS (cross-book comparable
+  // across PP/UD/DK, and now a full lean source). FP is intentionally NOT shopped:
+  // each book scores fantasy points on a different formula, so raw FP lines aren't
+  // comparable across books.
+  const ssR1Candidates: BookEntry[] = ([
+    { source: 'pp' as const, value: f.line_pp_ss_r1 },
+    { source: 'ud' as const, value: f.line_ud_ss_r1 },
+    { source: 'dk' as const, value: f.line_dk_ss_r1 },
+  ] as BookEntry[]).filter(c => c.value != null);
   const bestSS   = calcBestShop(ssCandidates,   f.lean_ss?.lean   ?? null);
   const bestTD   = calcBestShop(tdCandidates,   f.lean_td?.lean   ?? null);
   const bestFT   = calcBestShop(ftCandidates,   f.lean_ft?.lean   ?? null);
   const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
+  const bestSSR1 = calcBestShop(ssR1Candidates, f.lean_ss_r1?.lean ?? null);
+  // Best-side badge for the inline R1 SS cells (they don't route through lineCell).
+  const ssR1BestBadge = (source: 'pp'|'ud'|'dk'): string => bestSSR1 === source
+    ? `<div class="best-shop-badge" title="Best line for ${(f.lean_ss_r1?.lean || '').toUpperCase()} R1 SS: ${source.toUpperCase()} vs other books">best</div>`
+    : '';
+  const ssR1BestCls = (source: 'pp'|'ud'|'dk'): string => bestSSR1 === source ? ' best-line' : '';
 
   // Worst-line: the least favorable line for the lean direction (opposite of best)
   function calcWorstShop(
@@ -17964,6 +17979,79 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
       </div>
     </div>`;
 
+  // GLOW-UP 193 L1 — card-head "play pill": a compact scan anchor next to the
+  // fighter identity so ALL FIGHTERS scans top-to-bottom instead of eye-tracking
+  // to the far-right lean cell. Same effective lean, surfaced on the left with the
+  // line included and the verdict reason on hover.
+  const playPillHtml = (() => {
+    if (!lean || lean.lean === 'none' || !db.loaded) return '';
+    const stat = EFFECTIVE_LEAN_STAT_LABEL[lean._source || 'fp'] || 'FP';
+    const arrow = lean.lean === 'over' ? '▲' : lean.lean === 'under' ? '▼' : '~';
+    const sideCls = lean.lean === 'over' ? 'over' : lean.lean === 'under' ? 'under' : 'push';
+    const lineTxt = lean.line != null ? ` ${lean.line}` : '';
+    const sideTxt = lean.lean === 'push' ? 'TOSS-UP' : lean.lean.toUpperCase();
+    const confTxt = displayConf > 0
+      ? `<span class="play-pill-conf">${Math.round(displayConf)}%${gradeLetter ? ` ${gradeLetter}` : ''}</span>`
+      : '';
+    const evTxt = leanEvDetail != null && lean.lean !== 'push'
+      ? `<span class="play-pill-ev ${leanEvDetail.ev > 0 ? 'ev-pos' : leanEvDetail.ev < 0 ? 'ev-neg' : ''}">${leanEvDetail.isAssumedVig ? '~' : ''}${leanEvDetail.ev > 0 ? '+' : ''}${leanEvDetail.ev}%</span>`
+      : '';
+    return `<div class="play-pill play-${sideCls}" title="${(lean.verdict || '').replace(/"/g, '&quot;')}">${arrow} ${sideTxt} ${stat}${lineTxt}${confTxt}${evTxt}</div>`;
+  })();
+
+  // GLOW-UP 193 L2 — opponent profile strip: promotes the buried opponent context
+  // (archetype, durability, and what they ALLOW) into a legible chip row, so a high
+  // projection reads as "because this opponent gets hit" — these are the exact
+  // quantities the v10/v11 projection weighting feeds on.
+  const oppProfileHtml = (() => {
+    const odb = oppEntry?.db;
+    if (!odb || !odb.loaded) return '';
+    const r1Samples = (odb.oppHistory ?? []).slice(0, 5)
+      .map(h => h.sigStrR1)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+    const oppR1Allowed = r1Samples.length >= 3
+      ? parseFloat((r1Samples.reduce((s, v) => s + v, 0) / r1Samples.length).toFixed(1))
+      : null;
+    const chips: string[] = [];
+    if (odb.style) chips.push(`<span class="opp-chip opp-chip-style">${odb.style}</span>`);
+    if (odb.avgTimeMins != null) chips.push(`<span class="opp-chip" title="Opponent average fight time — durability (a long average means they don't get finished early, so the fight goes rounds)">⏱ ${odb.avgTimeMins.toFixed(1)}m</span>`);
+    const allows: string[] = [];
+    if (oppAvgFPAllowed != null) allows.push(`FP ${oppAvgFPAllowed}`);
+    if (oppAvgSSAllowed != null) allows.push(`SS ${oppAvgSSAllowed}`);
+    if (oppR1Allowed != null) allows.push(`R1 ${oppR1Allowed}`);
+    if (allows.length) chips.push(`<span class="opp-chip opp-chip-allows" title="Fantasy/strike output this opponent has historically ALLOWED (last 5) — the projection's opponent term">allows ${allows.join(' · ')}</span>`);
+    if (odb.tdDef != null) chips.push(`<span class="opp-chip" title="Opponent takedown defense %">TD-def ${Math.round(odb.tdDef)}%</span>`);
+    if (!chips.length) return '';
+    return `<div class="opp-profile-strip"><span class="opp-profile-vs" title="Opponent">vs ${prettyName(oppName || 'opp')}</span>${chips.join('')}</div>`;
+  })();
+
+  // GLOW-UP 193 L3 — projection provenance: the stat-deck tooltips already carry
+  // the full "(avg + opp)/2 × norm = final" math; this surfaces it as a compact
+  // inline micro-chain so the opponent-weighting is visible without hovering.
+  const provChain = (parts: string[]): string => parts.length >= 2
+    ? `<div class="stat-prov">${parts.map((p, i) => `${i > 0 ? '<span class="stat-prov-arrow">→</span>' : ''}<span class="stat-prov-step">${p}</span>`).join('')}</div>`
+    : '';
+  const fpProvHtml = (() => {
+    if (!db.loaded || (projFP == null && normDisplayFP == null)) return '';
+    const steps: string[] = [];
+    if (platformAvgFP != null) steps.push(`avg ${platformAvgFP.toFixed(1)}`);
+    if (mlAdjFP != null && platformAvgFP != null && Math.abs(mlAdjFP - platformAvgFP) >= 0.5) steps.push(`ML ${mlAdjFP.toFixed(1)}`);
+    if (projFP != null && oppAvgFPAllowed != null) steps.push(`opp ${oppAvgFPAllowed}`);
+    if (normDisplayFP != null) steps.push(`×${roundNormFactor.toFixed(2)}`);
+    const finalFP = normDisplayFP ?? projFP ?? mlAdjFP ?? platformAvgFP;
+    if (finalFP != null) steps.push(`= ${finalFP.toFixed(1)}`);
+    return provChain(steps);
+  })();
+  const ssProvHtml = (() => {
+    if (!db.loaded || (projSS == null && normDisplaySS == null)) return '';
+    const steps: string[] = [];
+    if (avgSS != null) steps.push(`avg ${avgSS.toFixed(1)}`);
+    if (projSS != null && oppAvgSSAllowed != null) steps.push(`opp ${oppAvgSSAllowed}`);
+    if (normDisplaySS != null) steps.push(`×${roundNormFactor.toFixed(2)}`);
+    if (finalDisplaySS != null) steps.push(`= ${finalDisplaySS.toFixed(1)}`);
+    return provChain(steps);
+  })();
+
   const row = document.createElement('div') as HTMLDivElement;
   const rowRoleClass = isDog ? ' role-dog' : ' role-fav';
   const rowConfTier = displayConf >= 72 ? ' conf-tier-high' : displayConf >= 58 ? ' conf-tier-med' : displayConf > 0 ? ' conf-tier-low' : '';
@@ -17979,6 +18067,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           ${(() => { const recent = (db.history || []).slice(0, 5).filter(h => h.result === 'win' || h.result === 'loss'); return recent.length >= 2 ? `<div class="form-dots" title="Last ${recent.length} fights — newest first">${recent.map(h => `<span class="form-dot ${h.result}"></span>`).join('')}</div>` : ''; })()}
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px">${archetypeBadgeHtml}${archetypeAlertHtml}</div>
           ${sharpBadgeHtml}
+          ${playPillHtml}
+          ${oppProfileHtml}
         </div>
       </div>
       <div class="platform-lines">
@@ -17989,7 +18079,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('p6', 'ctrl', f.line_p6_ctrl)}
         ${lineCell('ud', 'fp', f.line_ud)}
         ${lineCell('ud', 'ss', f.line_ud_ss)}
-        ${(f.line_ud_ss_r1 != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>R1 SS</span></div><div class="line-value ud">${f.line_ud_ss_r1}</div></div>` : ''}
+        ${(f.line_ud_ss_r1 != null && showSource('ud')) ? `<div class="line-cell ss src-ud${ssR1BestCls('ud')}"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>R1 SS</span></div><div class="line-value ud">${f.line_ud_ss_r1}</div>${ssR1BestBadge('ud')}</div>` : ''}
         ${(f.line_ud_ss_body != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Body</span></div><div class="line-value ud">${f.line_ud_ss_body}</div></div>` : ''}
         ${(f.line_ud_ss_leg != null && showSource('ud')) ? `<div class="line-cell ss src-ud"><div class="line-platform"><span class="line-source-tag src-ud">UD</span><span>Leg</span></div><div class="line-value ud">${f.line_ud_ss_leg}</div></div>` : ''}
         ${lineCell('ud', 'td', f.line_ud_td)}
@@ -18002,7 +18092,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('betr', 'ctrl', f.line_betr_ctrl)}
         ${lineCell('pp', 'fp', f.line_pp)}
         ${lineCell('pp', 'ss', f.line_pp_ss)}
-        ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div></div>` : ''}
+        ${(f.line_pp_ss_r1 != null && showSource('pp')) ? `<div class="line-cell ss src-pp${ssR1BestCls('pp')}"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>R1 SS</span></div><div class="line-value pp">${f.line_pp_ss_r1}</div>${ssR1BestBadge('pp')}</div>` : ''}
         ${(f.line_pp_ss_body != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Body</span></div><div class="line-value pp">${f.line_pp_ss_body}</div></div>` : ''}
         ${(f.line_pp_ss_leg != null && showSource('pp')) ? `<div class="line-cell ss src-pp"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>Leg</span></div><div class="line-value pp">${f.line_pp_ss_leg}</div></div>` : ''}
         ${(f.line_pp_kd != null && showSource('pp')) ? `<div class="line-cell ss src-pp" title="Knockdowns O/U (PrizePicks). ${f.kd_under_available === true ? 'More + Less offered — Best Picks eligible.' : 'More-only (demon/goblin) — display only, not Best Picks eligible.'}"><div class="line-platform"><span class="line-source-tag src-pp">PP</span><span>KD${f.kd_under_available === true ? '' : ' ↑'}</span></div><div class="line-value pp">${f.line_pp_kd}</div></div>` : ''}
@@ -18010,7 +18100,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${lineCell('pp', 'ft', f.line_pp_ft)}
         ${lineCell('pp', 'ctrl', f.line_pp_ctrl)}
         ${lineCell('dk', 'ss', f.line_dk_ss)}
-        ${(f.line_dk_ss_r1 != null && showSource('dk')) ? `<div class="line-cell ss src-dk"><div class="line-platform"><span class="line-source-tag src-dk">DK</span><span>R1 SS</span></div><div class="line-value dk">${f.line_dk_ss_r1}</div></div>` : ''}
+        ${(f.line_dk_ss_r1 != null && showSource('dk')) ? `<div class="line-cell ss src-dk${ssR1BestCls('dk')}"><div class="line-platform"><span class="line-source-tag src-dk">DK</span><span>R1 SS</span></div><div class="line-value dk">${f.line_dk_ss_r1}</div>${ssR1BestBadge('dk')}</div>` : ''}
         ${lineCell('dk', 'td', f.line_dk_td)}
         ${lineCell('dk', 'ft', f.line_dk_ft)}
         ${lineCell('dk', 'ctrl', f.line_dk_ctrl)}
@@ -18027,6 +18117,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
             <span class="stat-card-num">${normDisplayFP!=null?normDisplayFP.toFixed(1):projFP!=null?projFP.toFixed(1):mlAdjFP!=null?mlAdjFP.toFixed(1):(platformAvgFP!=null?platformAvgFP.toFixed(1):'...')}</span>
             <span class="stat-card-meta">${avgFPPercentileLabel}${projFP!=null&&!normDisplayFP?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgFPAllowed} FP avg">(${oppAvgFPAllowed})</span>`:''}${mlAdjShift!=null&&Math.abs(mlAdjShift)>=3&&!normDisplayFP&&!projFP?`<span class="ml-adj-badge ${mlAdjShift>0?'pos':'neg'}">${mlAdjShift>0?'+':''}${mlAdjShift.toFixed(1)}</span>`:''}${trendChip(fpTrend,`${_twLabel} avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</span>
           </div>
+          ${fpProvHtml}
           ${db.fpFloor!=null?`<div class="stat-card-foot">${fpFloor}–${fpCeiling}</div>`:''}
         </div>
         <div class="stat-card stat-card-ss">
@@ -18038,6 +18129,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
             <span class="stat-row-label">${projSS!=null?'proj':'avg'}</span>
             <span class="stat-row-val">${finalDisplaySS!=null?finalDisplaySS.toFixed(1):'...'}${ssSpreadLabel?`<span class="ss-spread-inline" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor!==1.0?`±${(parseFloat(ssSpreadLabel.slice(1))*roundNormFactor).toFixed(1)}`:ssSpreadLabel}</span>`:''}${projSS!=null&&!normDisplaySS?`<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>`:''}${trendChip(ssTrend,`SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</span>
           </div>
+          ${ssProvHtml}
           <div class="stat-row" title="Current active platform SS betting line">
             <span class="stat-row-label">line</span>
             <span class="stat-row-val">${primarySSLine!=null?primarySSLine.toFixed(1):'...'}</span>
@@ -18116,7 +18208,36 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   };
 
   // The closure captures all per-row state (db, oppEntry, history strings, etc).
+  // GLOW-UP 193 L5 — the actionable "why" lean panels were dead-last under every
+  // history/model panel. Hoist them into a conviction-first section at the TOP of
+  // the expanded card, gated behind a per-card SIGNAL-ONLY toggle for the
+  // full-slate / 50%-zoom workflow.
+  const leanPanelsHtml = [
+    f.lean_ss ? `<div class="detail-panel">
+          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'})</div>
+          ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
+          <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
+        </div>` : '',
+    f.lean_ss_r1 ? `<div class="detail-panel">
+          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1||'—'} · UD: ${f.line_ud_ss_r1||'—'} · DK: ${f.line_dk_ss_r1||'—'})</div>
+          ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
+          <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
+        </div>` : '',
+    f.lean_td ? `<div class="detail-panel">
+          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'})</div>
+          ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
+          <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
+        </div>` : '',
+    f.lean_ft ? `<div class="detail-panel">
+          <div class="detail-panel-title">FT Lean${f.lean_ft.lean!=='push'?` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean==='over'?'▲ OVER':'▼ UNDER'} ${f.lean_ft.conf}%</span>`:''} · P6: ${f.line_p6_ft||'—'} · UD: ${f.line_ud_ft||'—'} · PP: ${f.line_pp_ft||'—'}</div>
+          ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
+          <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
+        </div>` : '',
+  ].filter(Boolean).join('');
+
   _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
+        <div class="detail-signal-bar">${leanPanelsHtml ? `<button class="detail-signal-toggle" type="button" data-signal-toggle title="Hide reference panels — show only the actionable leans">⚡ SIGNAL ONLY</button>` : ''}</div>
+        ${leanPanelsHtml ? `<div class="detail-leans-section"><div class="detail-section-head">⚡ Leans — the play</div>${leanPanelsHtml}</div>` : ''}
         <div class="detail-section-head">📊 Stat Head-to-Head — ${prettyName(f.name)} vs ${prettyName(oppName || 'Opponent')}</div>
         <div class="stat-pair">
         <div class="detail-panel"><div class="detail-panel-title">FP History vs Line (${platformLabel})</div>${historyHTML}${synthFor(activeLine, h => getFightFantasyValueForPlatform(h, historyPlatform))}${activeLine?`<div class="panel-meta"><div class="panel-meta-line"></div>${buildPanelMetaChips([{ tag: platformKeyShort(getSourceActivePlatformKey(f, 'fp')), raw: activeLine }])}</div>`:''}</div>
@@ -18228,26 +18349,6 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
         ${buildOpponentQualityPanel(db, activeLine, platformStatLine(f, 'ss'))}
         </div>
         ${buildLineTimelinePanel(f)}
-        ${f.lean_ss?`<div class="detail-panel">
-          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss||'—'} · UD: ${f.line_ud_ss||'—'} · PP: ${f.line_pp_ss||'—'})</div>
-          ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
-          <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
-        </div>`:''}
-        ${f.lean_ss_r1?`<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1||'—'} · UD: ${f.line_ud_ss_r1||'—'} · DK: ${f.line_dk_ss_r1||'—'})</div>
-          ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
-          <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
-        </div>`:''}
-        ${f.lean_td?`<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td||'—'} · UD: ${f.line_ud_td||'—'} · PP: ${f.line_pp_td||'—'})</div>
-          ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
-          <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
-        </div>`:''}
-        ${f.lean_ft?`<div class="detail-panel">
-          <div class="detail-panel-title">FT Lean${f.lean_ft.lean!=='push'?` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean==='over'?'▲ OVER':'▼ UNDER'} ${f.lean_ft.conf}%</span>`:''} · P6: ${f.line_p6_ft||'—'} · UD: ${f.line_ud_ft||'—'} · PP: ${f.line_pp_ft||'—'}</div>
-          ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
-          <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
-        </div>`:''}
         ${buildStyleMatchupPanel(db, oppEntry?.db || null, platformStatLine(f, 'ss'), platformStatLine(f, 'td'))}
       </div>`);
 
@@ -18292,6 +18393,18 @@ function expandRowDetailPanel(row: HTMLElement): void {
   if (builder) {
     detail.innerHTML = builder();
     _pendingDetailBuilders.delete(row);
+    // GLOW-UP 193 L5 — SIGNAL-ONLY toggle: collapse reference/history panels to
+    // just the actionable leans section.
+    const sigToggle = detail.querySelector('[data-signal-toggle]') as HTMLButtonElement | null;
+    const grid = detail.querySelector('.detail-grid') as HTMLElement | null;
+    if (sigToggle && grid) {
+      sigToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const on = grid.classList.toggle('signal-only');
+        sigToggle.textContent = on ? '◱ SHOW ALL' : '⚡ SIGNAL ONLY';
+        sigToggle.classList.toggle('active', on);
+      });
+    }
   }
   // Animate bars inside the detail panel when expanding.
   // Reset bars to 0 first (in case of re-expand), then fill with stagger.
