@@ -588,10 +588,27 @@ body {
   border-color: rgba(0,232,122,0.5); }
 .lean-samefight { border-color: color-mix(in srgb, var(--amber) 30%, var(--border)); }
 
-/* L3 compact triage — hide the stat deck + line grid, keep identity + lean */
+/* L3 compact triage — hide the stat deck + line grid; flip .fighter-main to flex
+   so the freed space collapses and the play line + lean cell sit cleanly. The
+   compact play line (side · stat · line · book) keeps a slim row actionable. */
+.lean-compact-play { display: none; }
 .lean-compact .lean-view-row .platform-lines,
-.lean-compact .lean-view-row .stats-mini { display: none; }
-.lean-compact .lean-view-row .fighter-main { align-items: center; }
+.lean-compact .lean-view-row .stats-mini,
+.lean-compact .lean-view-row .play-pill { display: none; }
+.lean-compact .lean-view-row .fighter-main {
+  display: flex; align-items: center; gap: 18px;
+  padding-top: 8px; padding-bottom: 8px;
+}
+.lean-compact .lean-view-row .lean-cell { margin-left: auto; }
+.lean-compact .lean-view-row .lean-compact-play {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+  padding: 4px 12px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border);
+}
+.lcp-side.over { color: var(--green); } .lcp-side.under { color: var(--red); }
+.lcp-stat { color: var(--text2); }
+.lcp-line { color: var(--text1); font-size: 14px; }
+.lcp-book { color: var(--text3); font-size: 10px; font-weight: 600; }
 
 /* Lines */
 .platform-lines { display: flex; gap: 5px; flex-wrap: wrap; }
