@@ -266,7 +266,25 @@ export const NAME_ALIASES = {
 //   clean-signal fighters (projection and hit-rate agreeing) now produce directional
 //   R1 leans; genuinely split fighters (mean-projection vs hit-rate disagreement, e.g.
 //   Guskov/Erceg/Sam) stay honest toss-ups.
-export const MODEL_VERSION = 11;
+// v12 (2026-07-28): Prop Line Predictor SS rebuilt on RATES. The old formula blended
+//   `avgSigStr` (per-FIGHT total, deflated by the fighter's own early finishes) with
+//   `sapm × 15` (already a per-15-MINUTE rate), then multiplied the blend by
+//   `expectedMin / avgHistMin` — applying a duration multiplier to a term that was
+//   already duration-normalised. A finisher with a short average fight got scaled
+//   2–2.6×: Uros Medic (22.3 avg SS, 3:59 avg fight, career max 69 SS) projected
+//   101.5 against a 29.5 opener. Measured across the Ankalaev slate, prediction error
+//   correlated −0.50 with average fight length. Now: per-minute rates for both terms,
+//   duration applied ONCE, rate clamped to a plausible 0.5–9.0 SS/min band (a single
+//   cached 235-SS row implied 15.7/min), `> 0` guards replacing `??` (which does not
+//   fall through on 0 — unfetched fighters had slpm/avgSigStr of exactly 0, making the
+//   projection purely the opponent's absorbed number; Rzepecki/Vagaev/Tuchalov were
+//   the slate's three biggest under-predictions), and the market fight-time line
+//   blended 50/50 into expected minutes. Validated against posted UD SS lines on the
+//   Ankalaev slate (n=22): MAE 13.9 → 9.2, worst error 34.5 → 32.5. NOTE the learned
+//   `ss_pace_modifier` values (0.70–0.90) were fit against the inflated formula and
+//   are now stale — expect a residual under-bias (~−3) until the learning cycle
+//   re-converges from the corrected base.
+export const MODEL_VERSION = 12;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

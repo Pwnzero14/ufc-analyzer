@@ -11693,11 +11693,19 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
     const f1Book = PropLinePredictorService.computeBookPriorFP(propArchive, pair.f1);
     const f2Book = PropLinePredictorService.computeBookPriorFP(propArchive, pair.f2);
 
+    // MODEL v12: hand the predictor the market's fight-time line. It's the book's
+    // own read on how long this fight lasts and prices in finish likelihood the
+    // career averages miss, so the SS projection blends it into expected minutes.
+    const marketFt = (name: string): number | null => {
+      const entry = allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(name) || ''));
+      if (!entry) return null;
+      return entry.line_pp_ft ?? entry.line_dk_ft ?? entry.line_ud_ft ?? entry.line_p6_ft ?? entry.line_betr_ft ?? null;
+    };
     predictions.push(PropLinePredictorService.predictFighter(
-      pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book,
+      pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1),
     ));
     predictions.push(PropLinePredictorService.predictFighter(
-      pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book,
+      pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2),
     ));
   }
 
