@@ -136,6 +136,30 @@ export class PropLinePredictorService {
       td_attempt_modifier: ensureModifier(stored.td_attempt_modifier),
       fp_global_modifier: ensureModifier(stored.fp_global_modifier),
     };
+    // ── MODEL v13 one-time renormalisation ────────────────────────────────────
+    // Until v12 the SS formula double-counted duration and ran hot, so the learning
+    // cycle spent events pushing ss_pace_modifier DOWN to compensate — far enough
+    // that lightHeavyweight pinned at the 0.70 clamp floor (saturated, i.e. it
+    // wanted to go lower and couldn't). Those values are an artifact of the bug,
+    // not learned signal: with the formula corrected they under-predict by 3-6 SS.
+    // Rescale once so `default` returns to 1.0 (DEFAULT_WEIGHTS' intent), applying
+    // the SAME factor to every class so the relative per-class learning survives.
+    // Gated on its OWN marker — `version` is a learning-RUN counter (incremented
+    // per cycle, 14 and climbing), so gating on it would both never fire and reset
+    // the user's run count.
+    if (!merged.ssPaceRenormalizedV13) {
+      const anchor = merged.ss_pace_modifier.default;
+      if (Number.isFinite(anchor) && anchor > 0 && Math.abs(anchor - 1) > 0.02) {
+        const factor = 1 / anchor;
+        for (const k of Object.keys(merged.ss_pace_modifier) as Array<keyof PerClassModifier>) {
+          const v = merged.ss_pace_modifier[k];
+          if (typeof v === 'number' && Number.isFinite(v)) merged.ss_pace_modifier[k] = v * factor;
+        }
+        clampModifier(merged.ss_pace_modifier, 0.7, 1.4);
+      }
+      merged.ssPaceRenormalizedV13 = true;
+      await this.saveWeights(merged);
+    }
     return merged;
   }
 
@@ -287,6 +311,7 @@ export class PropLinePredictorService {
     trend: FighterTrend | null,
     weightClass?: WeightClass | null,
     marketFtMin?: number | null,
+    marketExpectedMin?: number | null,
   ): StatPrediction {
     const reasons: string[] = [];
 
@@ -300,12 +325,20 @@ export class PropLinePredictorService {
     // opener, and the error correlated -0.50 with average fight length across the
     // slate. Everything is now a per-minute RATE and duration is applied ONCE.
     const { expectedMin: modelMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
-    // The market's fight-time line is the book's own duration read and prices in
-    // finish likelihood that career averages miss (Medic: model ~9min vs a 7:30
-    // line with no-distance at -1500). Blend it evenly when we have one.
-    const expectedMin = (marketFtMin != null && Number.isFinite(marketFtMin) && marketFtMin > 0)
-      ? 0.5 * modelMin + 0.5 * marketFtMin
-      : modelMin;
+    // Duration source, best first (MODEL v13):
+    //  1. Market-DERIVED E[minutes] from DK's round ladder + Go-the-Distance. The
+    //     career-rate estimate can't see that a fight is priced 64% to end inside
+    //     7:30. Weighted 0.75 rather than 1.0 so a misparsed/stale market can't fully
+    //     drive the projection — measured on the Ankalaev slate, 0.75 and 1.0 were
+    //     within noise (MAE 7.9 vs 8.0) and 0.75 kept bias nearer zero.
+    //  2. The pick-em fight-time line (a median, cruder but usually present earlier).
+    //  3. Career-based estimate alone.
+    const MARKET_MIN_WEIGHT = 0.75;
+    const expectedMin = (marketExpectedMin != null && Number.isFinite(marketExpectedMin) && marketExpectedMin > 0)
+      ? MARKET_MIN_WEIGHT * marketExpectedMin + (1 - MARKET_MIN_WEIGHT) * modelMin
+      : (marketFtMin != null && Number.isFinite(marketFtMin) && marketFtMin > 0)
+        ? 0.5 * modelMin + 0.5 * marketFtMin
+        : modelMin;
 
     // Fighter's own output rate. NOTE the `> 0` guards: `??` does NOT fall through
     // on 0, and an unfetched fighter has slpm/avgSigStr of exactly 0 — which used
@@ -327,8 +360,13 @@ export class PropLinePredictorService {
     reasons.push(`Output ${fighterRate.toFixed(2)} SS/min`);
     if (opponentDB) reasons.push(`Opp absorbs ${oppRate.toFixed(2)} SS/min`);
     reasons.push(
-      `Expected ${expectedMin.toFixed(1)}min (P(fin) ${(pFinish * 100).toFixed(0)}%`
-      + `${marketFtMin != null && marketFtMin > 0 ? `, market FT ${marketFtMin}` : ''})`,
+      `Expected ${expectedMin.toFixed(1)}min (`
+      + (marketExpectedMin != null && marketExpectedMin > 0
+        ? `DK round market ${marketExpectedMin.toFixed(1)}min`
+        : marketFtMin != null && marketFtMin > 0
+          ? `market FT ${marketFtMin}, career P(fin) ${(pFinish * 100).toFixed(0)}%`
+          : `career P(fin) ${(pFinish * 100).toFixed(0)}%`)
+      + ')',
     );
 
     // Core formula — pace modifier is per-weight-class so flyweight error doesn't drift heavyweight calibration
@@ -696,8 +734,9 @@ export class PropLinePredictorService {
     weightClass?: WeightClass | null,
     bookPriorFP?: { median: number; sampleCount: number } | null,
     marketFtMin?: number | null,
+    marketExpectedMin?: number | null,
   ): PropPrediction {
-    const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, marketFtMin);
+    const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, marketFtMin, marketExpectedMin);
     const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
     const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
 

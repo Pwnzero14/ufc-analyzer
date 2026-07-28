@@ -401,7 +401,12 @@ export interface PredictorWeights {
   fp_ctrl_weight: number;
   fp_kd_weight: number;
   fp_win_weight: number;
+  /** Learning-cycle RUN COUNTER — incremented once per learning cycle, not a schema
+   *  version. Do not use it to gate migrations. */
   version: number;
+  /** Set once when the MODEL v13 renormalisation has been applied to
+   *  ss_pace_modifier (see PropLinePredictorService.getWeights). */
+  ssPaceRenormalizedV13?: boolean;
 }
 
 export interface FighterTrend {

@@ -18,7 +18,7 @@ export declare class PropLinePredictorService {
         avgHistMin: number;
         avgFinishMin: number;
     };
-    static predictSS(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null, marketFtMin?: number | null): StatPrediction;
+    static predictSS(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null, marketFtMin?: number | null, marketExpectedMin?: number | null): StatPrediction;
     static predictTD(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null): StatPrediction;
     private static calcBetrFP;
     static predictFantasy(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, ssLine: number, tdLine: number, weightClass?: WeightClass | null, bookPriorFP?: {
@@ -28,7 +28,7 @@ export declare class PropLinePredictorService {
     static predictFighter(fighter: string, opponent: string, fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null, bookPriorFP?: {
         median: number;
         sampleCount: number;
-    } | null, marketFtMin?: number | null): PropPrediction;
+    } | null, marketFtMin?: number | null, marketExpectedMin?: number | null): PropPrediction;
     static runLearningCycle(eventName: string, archiveRecords: PropArchiveRecord[]): Promise<LearningResult | null>;
 }
 //# sourceMappingURL=PropLinePredictorService.d.ts.map

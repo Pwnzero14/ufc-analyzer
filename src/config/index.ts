@@ -297,7 +297,28 @@ export const NAME_ALIASES: Record<string, string> = {
 //   `ss_pace_modifier` values (0.70–0.90) were fit against the inflated formula and
 //   are now stale — expect a residual under-bias (~−3) until the learning cycle
 //   re-converges from the corrected base.
-export const MODEL_VERSION = 12;
+// v13 (2026-07-28): market-derived expected duration + pace-modifier renormalisation.
+//   (a) New `marketExpectedFightMinutesFromLadder` builds the per-round finish
+//   distribution from DK's "Fight to Start Round" ladder and "Go the Distance"
+//   market — both FULL-SLATE (26/26 on the Ankalaev card), unlike the Time-of-Finish
+//   histogram which is main-event-only. predictSS prefers it at 0.75 weight, then
+//   the pick-em FT line, then the career estimate, so it is inert until those
+//   markets post mid-fight-week.
+//   (b) The learned `ss_pace_modifier` values were an artifact of the pre-v12
+//   duration double-count: the learning cycle spent 14 runs pushing them DOWN to
+//   damp the inflation, far enough that lightHeavyweight pinned at the 0.70 clamp
+//   FLOOR (saturated). With the formula corrected they under-predicted by 3-6 SS, so
+//   a one-time renormalisation rescales every class by the same factor to bring
+//   `default` back to 1.0 (DEFAULT_WEIGHTS' intent), preserving relative per-class
+//   learning. Gated on its own `ssPaceRenormalizedV13` marker — NOT on `version`,
+//   which is a learning-run counter.
+//   Validated on the Ankalaev slate vs posted UD SS lines (n=22):
+//     v12                      MAE 9.2  bias -3.2
+//     market duration alone    MAE 8.8  bias -6.6  (net-negative — needs (b))
+//     (a)+(b) together         MAE 7.9  bias -0.1
+//   Excluding the two known bad-data fighters (Rzepecki: no cached history at all;
+//   Zaynukov: a single corrupt 235-SS row), n=20 → MAE 6.6.
+export const MODEL_VERSION = 13;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
