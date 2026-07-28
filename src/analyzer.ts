@@ -11790,7 +11790,12 @@ function renderPredictionsHtml(
       const d = pred - book;
       const thr = src === 'td' ? 0.5 : 2;
       const cls = d >= thr ? 'pos' : d <= -thr ? 'neg' : 'flat';
-      return `<div class="pred-book ${cls}" title="Model ${pred} vs book ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">BK ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
+      // Name the actual book instead of a generic "BK". getSourceActiveLine walks the
+      // platform priority, so the number can come from any of P6/UD/PP/BT/DK — printing
+      // "BK" hid which one, and the whole point of the chip is comparing to a real line.
+      const bookKey = f ? getSourceActivePlatformKey(f, src) : null;
+      const bookTag = bookKey ? platformKeyShort(bookKey) : 'BK';
+      return `<div class="pred-book ${cls}" title="Model ${pred} vs ${bookTag} line ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
     };
 
     const rows = latest.predictions.map(p => {
