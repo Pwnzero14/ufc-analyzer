@@ -10275,14 +10275,17 @@ function renderParlayLab(container) {
       <button class="plq-chip${parlayPoolDir === 'under' ? ' on' : ''}" data-plq-dir="under" title="Only UNDER legs">UNDER</button>
     </span>
   </div>`;
-    // GLOW-UP 197 L2 — how many legs in the pool come from each fight. A flat list of
-    // 19 legs hid the fact that several share a fight: you could stack two legs off one
-    // outcome without noticing, because the row never said who the opponent was. The
-    // ✗ vs-slip flag only fires against the CURRENT slip, not between pool rows.
-    const poolFightCount = new Map();
-    for (const a of displayLegs) {
-        const fk = [a.leg.fighter, a.leg.opponent || ''].map(x => x.toLowerCase()).sort().join('|');
-        poolFightCount.set(fk, (poolFightCount.get(fk) || 0) + 1);
+    // GLOW-UP 197 L2 — the row never said who the opponent was, so fight membership was
+    // invisible in a flat 19-leg list. The `vs <Opponent>` label fixes that on every row.
+    // The amber flag is deliberately scoped to fights ALREADY IN THE SLIP: flagging
+    // "this fight has siblings in the pool" fired on nearly every row (19 legs over ~7
+    // fights) and so discriminated nothing. What matters is whether picking this leg
+    // doubles up on an outcome you're already exposed to.
+    const legFightKeyOf = (l) => [l.fighter, l.opponent || ''].map(x => x.toLowerCase()).sort().join('|');
+    const slipFightCount = new Map();
+    for (const l of selectedLegs) {
+        const k = legFightKeyOf(l);
+        slipFightCount.set(k, (slipFightCount.get(k) || 0) + 1);
     }
     // GLOW-UP 197 L3 — marginal impact. Picking a leg was guesswork: the row showed the
     // leg's own confidence and EV, but not what it would do to the SLIP once correlation
@@ -10303,10 +10306,10 @@ function renderParlayLab(container) {
         const mTag = mDelta != null
             ? `<span class="parlay-leg-marg ${mDelta > 0 ? 'pos' : mDelta < 0 ? 'neg' : 'flat'}" title="Adding this leg would take slip health from ${baseHealthScore} to ${baseHealthScore + mDelta} — correlation with the legs you've already picked included. A strong leg can still score negative here if it rides a fight you're already on.">${mDelta > 0 ? '▲' : mDelta < 0 ? '▼' : '·'}${mDelta > 0 ? '+' : ''}${mDelta}</span>`
             : '';
-        const legFightKey = [a.leg.fighter, a.leg.opponent || ''].map(x => x.toLowerCase()).sort().join('|');
-        const sharesFight = (poolFightCount.get(legFightKey) || 0) > 1;
+        const legFightKey = legFightKeyOf(a.leg);
+        const inSlipFight = !sel ? (slipFightCount.get(legFightKey) || 0) : 0;
         const vsTag = a.leg.opponent
-            ? `<span class="parlay-leg-vs${sharesFight ? ' shared' : ''}" title="${sharesFight ? `This fight supplies ${poolFightCount.get(legFightKey)} legs in the pool — picking more than one of them stakes the same outcome twice.` : `Opponent: ${prettyName(a.leg.opponent)}`}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}${sharesFight ? ` <i>×${poolFightCount.get(legFightKey)}</i>` : ''}</span>`
+            ? `<span class="parlay-leg-vs${inSlipFight ? ' shared' : ''}" title="${inSlipFight ? `Your slip already has ${inSlipFight} leg${inSlipFight === 1 ? '' : 's'} on this fight — adding this one stakes the same outcome again rather than diversifying. The marginal health delta already prices it.` : `Opponent: ${prettyName(a.leg.opponent)}`}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}${inSlipFight ? ` <i>↺${inSlipFight}</i>` : ''}</span>`
             : '';
         const conflict = sel ? null : conflictsWithSlip(a.leg);
         // GLOW-UP 191 (L1): only look for synergy when there's no conflict — a leg
