@@ -13,11 +13,21 @@ platform-specific reality, not theory.
 
 ## Placeability — a correct lean is worthless if the book blocks the side
 
-- A **dog's FP UNDER is placeable ONLY on Underdog**. Pick6 blocks it (the
-  `fp_under_available` Less-button flag), PrizePicks and Betr block it too.
-  Never endorse a dog FP UNDER pick shown against any book but UD.
+- A **dog's FP UNDER is blocked on exactly two books: Pick6 and Betr** (both are
+  OVER/More-only for dogs). It **IS placeable on Underdog AND PrizePicks** —
+  those post the dog's fantasy line with a real under side. This is
+  `PICKEM_UNDER_FORBIDDEN_PLATFORMS = {pick6, betr}` in analyzer.ts; the code is
+  the source of truth. (Corrected 2026-07-25 by the user; an older note claiming
+  "UD only / PP blocks it" was wrong — do not reintroduce it.)
+  - **Pick6 lists every dog** (all over-only). **Betr lists only SOME dogs** — so
+    a missing Betr dog line is normal, not a scrape failure.
+  - Near-pick-em fighters flip fav/dog as the line moves, and UD/PP will sometimes
+    post the *dog's* fantasy line instead of the favorite's — with the under
+    available. That's why the `role === 'even'` branch fails CLOSED for pick6/betr
+    unless the `fp_under_available` Less flag affirmatively confirms the side.
 - Betr's dog FP OVER is inflated to +money — not true pick-em value. The user
-  does not take those.
+  does not take those. (So a dog's Betr FP cell has NO takeable side: no under,
+  and an over the user won't play.)
 - PrizePicks and Betr offer SS both sides to all fighters — SS picks are safe
   on side availability.
 - A rocket/boost icon on Betr/UD FP lines means OVER-only at +money. The
