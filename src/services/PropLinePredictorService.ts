@@ -101,6 +101,14 @@ const DEFAULT_WEIGHTS: PredictorWeights = {
 // Learning-cycle hyperparams
 const LEARNING_RATE = 0.1;      // fraction of relative error applied per event
 const MAX_STEP_PER_EVENT = 0.08; // cap per-event multiplicative change at ±8%
+
+// MODEL v12 — SS rate bounds. Sustained UFC significant-strike output tops out
+// around 8-9 per minute; anything beyond that is a parse artifact rather than a
+// fighter (e.g. a single cached row reading 235 SS, which implies 15.7/min).
+// Clamping the rate keeps one bad history row from blowing up a projection.
+const SS_RATE_MIN = 0.5;
+const SS_RATE_MAX = 9.0;
+const LEAGUE_SS_RATE = 3.9;     // league-typical SS landed (and absorbed) per minute
 const MIN_CLASS_SAMPLES = 2;    // need at least this many per-class samples to update a class-specific bucket
 
 // ── Service ─────────────────────────────────────────────────────────────
@@ -278,33 +286,54 @@ export class PropLinePredictorService {
     weights: PredictorWeights,
     trend: FighterTrend | null,
     weightClass?: WeightClass | null,
+    marketFtMin?: number | null,
   ): StatPrediction {
     const reasons: string[] = [];
 
-    // Fighter's average sig strikes per fight
-    const fighterAvgSS = fighterDB.avgSigStr ?? ((fighterDB.slpm ?? 3) * 15);
-    reasons.push(`Avg SS: ${fighterAvgSS.toFixed(1)}`);
+    // ── MODEL v12: rate-based projection ──────────────────────────────────────
+    // The old formula blended `avgSigStr` (a per-FIGHT total, deflated by the
+    // fighter's own early finishes) with `sapm * 15` (already a per-15-MINUTE
+    // rate), then multiplied the blend by `expectedMin / avgHistMin`. That applied
+    // a duration multiplier to a term that was already duration-normalised, so a
+    // finisher with a short average fight length got scaled 2-2.6x — Uros Medic
+    // (22.3 avg SS, 3:59 avg fight, career max 69) projected 101.5 against a 29.5
+    // opener, and the error correlated -0.50 with average fight length across the
+    // slate. Everything is now a per-minute RATE and duration is applied ONCE.
+    const { expectedMin: modelMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    // The market's fight-time line is the book's own duration read and prices in
+    // finish likelihood that career averages miss (Medic: model ~9min vs a 7:30
+    // line with no-distance at -1500). Blend it evenly when we have one.
+    const expectedMin = (marketFtMin != null && Number.isFinite(marketFtMin) && marketFtMin > 0)
+      ? 0.5 * modelMin + 0.5 * marketFtMin
+      : modelMin;
 
-    // Opponent absorbed: use opponent's SAPM * 15 as proxy for how many strikes they absorb
-    const oppAbsorbedSS = opponentDB ? ((opponentDB.sapm ?? 3) * 15) : fighterAvgSS;
-    if (opponentDB) reasons.push(`Opp absorbs: ${oppAbsorbedSS.toFixed(1)} SS/fight`);
-
-    // Expected-duration scaling replaces the naive scheduledRounds/3 multiplier.
-    // fighterAvgSS (per-fight) is divided out implicitly: we rebase to the
-    // fighter's own avg fight length, then re-scale to *this* fight's expected
-    // length. So if the fighter normally goes 13 min but the matchup expects
-    // 9 min (highly finishable opp), the SS line drops accordingly.
-    const { expectedMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
-    const durationModifier = avgHistMin > 0 ? expectedMin / avgHistMin : (scheduledRounds / 3);
-    if (Math.abs(durationModifier - 1) > 0.05) {
-      reasons.push(`Duration: ${expectedMin.toFixed(1)}min (P(fin) ${(pFinish * 100).toFixed(0)}%, ×${durationModifier.toFixed(2)})`);
-    } else if (scheduledRounds === 5) {
-      reasons.push('5-round fight');
-    }
+    // Fighter's own output rate. NOTE the `> 0` guards: `??` does NOT fall through
+    // on 0, and an unfetched fighter has slpm/avgSigStr of exactly 0 — which used
+    // to yield fighterAvgSS = 0 and make the projection purely the opponent's
+    // absorbed number (Rzepecki/Vagaev/Tuchalov were the slate's three biggest
+    // under-predictions for exactly this reason).
+    const histRate = (fighterDB.avgSigStr != null && fighterDB.avgSigStr > 0 && avgHistMin > 0)
+      ? fighterDB.avgSigStr / avgHistMin
+      : null;
+    const fighterRate = clamp(
+      histRate ?? ((fighterDB.slpm ?? 0) > 0 ? (fighterDB.slpm as number) : LEAGUE_SS_RATE),
+      SS_RATE_MIN, SS_RATE_MAX,
+    );
+    // Opponent's absorbed rate (SAPM is already per-minute — no ×15).
+    const oppRate = clamp(
+      (opponentDB && (opponentDB.sapm ?? 0) > 0) ? (opponentDB.sapm as number) : LEAGUE_SS_RATE,
+      SS_RATE_MIN, SS_RATE_MAX,
+    );
+    reasons.push(`Output ${fighterRate.toFixed(2)} SS/min`);
+    if (opponentDB) reasons.push(`Opp absorbs ${oppRate.toFixed(2)} SS/min`);
+    reasons.push(
+      `Expected ${expectedMin.toFixed(1)}min (P(fin) ${(pFinish * 100).toFixed(0)}%`
+      + `${marketFtMin != null && marketFtMin > 0 ? `, market FT ${marketFtMin}` : ''})`,
+    );
 
     // Core formula — pace modifier is per-weight-class so flyweight error doesn't drift heavyweight calibration
     const ssMod = getMod(weights.ss_pace_modifier, weightClass);
-    let predicted = ((fighterAvgSS + oppAbsorbedSS) / 2) * ssMod * durationModifier;
+    let predicted = ((fighterRate + oppRate) / 2) * expectedMin * ssMod;
 
     // Style adjustments
     if (fighterDB.style === 'striker') {
@@ -330,7 +359,13 @@ export class PropLinePredictorService {
     );
 
     const line = round1(clamp(predicted, 0.5, 200));
-    const lean = predicted > fighterAvgSS ? 'over' : 'under';
+    // "over"/"under" here means: is this matchup projected ABOVE the fighter's own
+    // historical per-fight norm? Derive the norm from the rate so a fighter with no
+    // usable avgSigStr still gets a sane comparison instead of a divide-by-zero.
+    const ownNorm = (fighterDB.avgSigStr != null && fighterDB.avgSigStr > 0)
+      ? fighterDB.avgSigStr
+      : fighterRate * (avgHistMin > 0 ? avgHistMin : expectedMin);
+    const lean = predicted > ownNorm ? 'over' : 'under';
 
     return { line, lean, confidence: Math.round(confidence), reasons };
   }
@@ -660,8 +695,9 @@ export class PropLinePredictorService {
     trend: FighterTrend | null,
     weightClass?: WeightClass | null,
     bookPriorFP?: { median: number; sampleCount: number } | null,
+    marketFtMin?: number | null,
   ): PropPrediction {
-    const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
+    const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, marketFtMin);
     const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
     const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
 
