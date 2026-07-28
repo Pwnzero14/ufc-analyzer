@@ -5484,6 +5484,34 @@ function marketFtUnderProbDirect(name, line) {
     }
     return Math.min(1, Math.max(0, p)); // decisions sit at full duration — never under a sub-max line
 }
+// E[fight minutes] from the "Fight to Start Round" ladder + "Go the Distance".
+// Unlike the Time-of-Finish version below, these two markets carry FULL-SLATE
+// coverage (26/26 on the Ankalaev card) rather than main-event-only, so this is
+// the variant the Prop Line Predictor can actually rely on. Builds the per-round
+// finish distribution from the ladder:
+//   P(finish in round r) = P(reach r) − P(reach r+1),  final round exits to decision
+// then takes the mid-round finish time as the expected exit point.
+function marketExpectedFightMinutesFromLadder(name, schedRounds) {
+    const pDecision = resolveDistanceDecisionProb(name);
+    const ladder = resolveRoundStartFromMap(name);
+    if (pDecision == null || !ladder)
+        return null;
+    const maxRound = schedRounds && schedRounds > 0 ? schedRounds : 3;
+    // P(reach round r) for r = 1..maxRound. De-vig noise can break monotonicity, so
+    // clamp each rung between the decision probability and the previous rung.
+    const reach = [1];
+    for (let r = 2; r <= maxRound; r++) {
+        const prev = reach[reach.length - 1];
+        const raw = devigReachRound(ladder[String(r)]);
+        reach.push(Math.min(prev, Math.max(pDecision, raw ?? prev)));
+    }
+    let e = 0;
+    for (let r = 1; r <= maxRound; r++) {
+        const next = r < maxRound ? reach[r] : pDecision;
+        e += Math.max(0, reach[r - 1] - next) * ((r - 1) * 5 + 2.5);
+    }
+    return e + pDecision * (maxRound * 5);
+}
 // E[fight minutes] straight from the Time-of-Finish histogram + distance market.
 function marketExpectedFightMinutesDirect(name, schedRounds) {
     const shape = finishHistogramConditional(name);
@@ -11426,8 +11454,12 @@ async function generatePredictions(container) {
                 return null;
             return entry.line_pp_ft ?? entry.line_dk_ft ?? entry.line_ud_ft ?? entry.line_p6_ft ?? entry.line_betr_ft ?? null;
         };
-        predictions.push(PropLinePredictorService.predictFighter(pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1)));
-        predictions.push(PropLinePredictorService.predictFighter(pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2)));
+        // MODEL v13: prefer a market-DERIVED expected duration (DK round ladder +
+        // Go-the-Distance, both full-slate). Falls back to the pick-em FT line, then to
+        // the career-based estimate, so it's inert until those markets post.
+        const mktMin = (name) => marketExpectedFightMinutesDirect(name, rounds) ?? marketExpectedFightMinutesFromLadder(name, rounds);
+        predictions.push(PropLinePredictorService.predictFighter(pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1), mktMin(pair.f1)));
+        predictions.push(PropLinePredictorService.predictFighter(pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2), mktMin(pair.f2)));
     }
     const eventName = upcomingEventName || 'Unknown Event';
     const predEvent = {
