@@ -324,7 +324,17 @@ export class PropLinePredictorService {
     // (22.3 avg SS, 3:59 avg fight, career max 69) projected 101.5 against a 29.5
     // opener, and the error correlated -0.50 with average fight length across the
     // slate. Everything is now a per-minute RATE and duration is applied ONCE.
-    const { expectedMin: modelMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    const { expectedMin: rawModelMin, pFinish, avgHistMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
+    // MODEL v14: the career-based estimate systematically over-reads duration — it
+    // weights the non-finish branch against `rounds × 5` with pFinish capped at 0.85,
+    // so a fight the market prices as a near-certain early finish still carries a big
+    // full-length component. Measured against the DK round-market read on the Ankalaev
+    // slate: mean 11.16min career vs 9.66min market, i.e. the career figure runs ~15%
+    // long. Correct it at source so every downstream branch is on the same scale —
+    // without this, projections silently drop ~13% the moment DK opens its round
+    // markets mid-fight-week, which is a data-availability artifact, not a real signal.
+    const CAREER_MIN_DAMPING = 0.87;
+    const modelMin = rawModelMin * CAREER_MIN_DAMPING;
     // Duration source, best first (MODEL v13):
     //  1. Market-DERIVED E[minutes] from DK's round ladder + Go-the-Distance. The
     //     career-rate estimate can't see that a fight is priced 64% to end inside

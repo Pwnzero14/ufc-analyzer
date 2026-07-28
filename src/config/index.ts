@@ -318,7 +318,18 @@ export const NAME_ALIASES: Record<string, string> = {
 //     (a)+(b) together         MAE 7.9  bias -0.1
 //   Excluding the two known bad-data fighters (Rzepecki: no cached history at all;
 //   Zaynukov: a single corrupt 235-SS row), n=20 → MAE 6.6.
-export const MODEL_VERSION = 13;
+// v14 (2026-07-28): damp the career-based duration estimate by 0.87 at source.
+//   v13 shipped two halves that offset each other — the pace-modifier renormalisation
+//   (×1.228 up) and market-derived duration (×0.866 down) — but the market half is
+//   data-gated on DK's round markets, which post mid-fight-week. Before they open,
+//   only the uplift is live, so projections ran the full ~23% hot (Medic 39.5 → 48
+//   instead of the intended ~42) and would then have DROPPED ~13% the moment DK
+//   opened, a pure data-availability artifact. Root cause is that the career estimate
+//   over-reads duration (non-finish branch weighted against rounds × 5 with pFinish
+//   capped at 0.85): measured 11.16min career vs 9.66min market on the Ankalaev slate.
+//   Damping it at source puts every branch on one scale, so predictions are consistent
+//   whether or not the markets have posted.
+export const MODEL_VERSION = 14;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
