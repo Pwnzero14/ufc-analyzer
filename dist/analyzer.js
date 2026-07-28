@@ -8476,10 +8476,19 @@ function renderBestPicks(container, renderSeq = 0) {
             const ev = evd ? evd.ev : null;
             // Unknown EV isn't a caveat — only a negative one is.
             const clean = !projConflict && !needsRounds && !(ev != null && ev < 0);
+            // GLOW-UP 196 L1 — the projection and its gap to the line were already computed
+            // but only ever reached the UI inside prose ("edges the line by 12.1"), so rows
+            // weren't numerically comparable. Signed so positive ALWAYS means favourable,
+            // whichever side the pick is on, and measured against the DISPLAYED line (the
+            // one you'd actually enter) rather than whichever line the lean happened to use.
+            const proj = (typeof el.avg === 'number' && Number.isFinite(el.avg)) ? el.avg : null;
+            const edge = (proj != null && line != null)
+                ? parseFloat((el.lean === 'under' ? line - proj : proj - line).toFixed(1))
+                : null;
             return {
                 src: el._source || 'fp', ev, conf: Number(el.conf) || 0,
                 book: book ?? getSourceActivePlatformKey(f, el._source) ?? null,
-                line, projConflict, needsRounds, clean,
+                line, projConflict, needsRounds, clean, proj, edge,
             };
         };
         const overMetrics = new Map(overs.map(f => [f.name, bpViewMetric(f, 'over')]));
@@ -8502,6 +8511,12 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             else if (bestPicksSortMode === 'conf') {
                 out = [...out].sort((a, b) => (metrics.get(b.name)?.conf ?? 0) - (metrics.get(a.name)?.conf ?? 0));
+            }
+            else if (bestPicksSortMode === 'edge') {
+                // GLOW-UP 196 L5 — rank by how far the projection sits from the line you'd
+                // enter. Distinct from EV (which prices the calibrated win probability) and
+                // from MODEL (score + demotions): this is raw disagreement with the book.
+                out = [...out].sort((a, b) => (metrics.get(b.name)?.edge ?? -Infinity) - (metrics.get(a.name)?.edge ?? -Infinity));
             }
             return out;
         };
@@ -8550,6 +8565,7 @@ function renderBestPicks(container, renderSeq = 0) {
       <button class="bpc-btn${bestPicksSortMode === 'model' ? ' on' : ''}" data-bp-sort="model" title="The model's own pick order — score, tier, and correlation demotions">MODEL</button>
       <button class="bpc-btn${bestPicksSortMode === 'ev' ? ' on' : ''}" data-bp-sort="ev" title="Highest calibrated EV first — money order, not signal order">EV</button>
       <button class="bpc-btn${bestPicksSortMode === 'conf' ? ' on' : ''}" data-bp-sort="conf" title="Highest model confidence first">CONF%</button>
+      <button class="bpc-btn${bestPicksSortMode === 'edge' ? ' on' : ''}" data-bp-sort="edge" title="Biggest gap between the model's projection and the line you'd enter (the Δ chip) — raw disagreement with the book, independent of how EV prices it">Δ EDGE</button>
     </span>
     <span class="bpc-group">
       <span class="bpc-label">SHOW</span>
@@ -8723,7 +8739,14 @@ function renderBestPicks(container, renderSeq = 0) {
                 }
                 // GLOW-UP 162 (Best Picks level-up 1): EV magnitude classes — +EV picks
                 // read as money at a glance; ev-hot (>= +10%) gets the loud treatment.
-                const evClass = evd && evd.ev >= 10 ? ' ev-hot' : evd && evd.ev > 0 ? ' ev-pos' : '';
+                // GLOW-UP 196 L3 — there was no negative branch here, so a -14% EV pick rendered
+                // identically to a strong one and read as equally actionable just because it held
+                // a rank. Sub-breakeven picks are now visually demoted (still present and still
+                // ranked — the model's order is information — just no longer competing for the eye).
+                const evClass = evd && evd.ev >= 10 ? ' ev-hot'
+                    : evd && evd.ev > 0 ? ' ev-pos'
+                        : evd && evd.ev < 0 ? ' bp-weak'
+                            : '';
                 // GLOW-UP 162 (level-up 3): structured factor chips — the lean's ranked
                 // reason stack rendered as scannable ✓/✗ chips (label = keyword class,
                 // full reason text on hover) instead of dying unseen behind one prose line.
@@ -8807,6 +8830,17 @@ function renderBestPicks(container, renderSeq = 0) {
                 const factorChips = factors.length >= 2
                     ? `<div class="bp-factors">${factors.map(r => factorChipHtml(r, el.lean, 'bp-factor')).join('')}</div>`
                     : '';
+                // GLOW-UP 196 L1 — numeric edge. The projection and its gap to the line were
+                // already computed but only surfaced inside prose ("edges the line by 12.1"),
+                // so rows couldn't be compared at a glance or sorted on it. Signed so positive
+                // is always favourable regardless of side, measured against the DISPLAYED line.
+                const bpProj = (typeof el.avg === 'number' && Number.isFinite(el.avg)) ? el.avg : null;
+                const bpEdge = (bpProj != null && line != null)
+                    ? parseFloat((el.lean === 'under' ? line - bpProj : bpProj - line).toFixed(1))
+                    : null;
+                const edgeChip = (bpEdge != null && bpProj != null)
+                    ? `<span class="bp-edge ${bpEdge > 0 ? 'pos' : bpEdge < 0 ? 'neg' : 'flat'}" title="Model projection ${bpProj.toFixed(1)} vs the ${line} line you'd enter — a ${Math.abs(bpEdge).toFixed(1)} gap on the ${bpEdge >= 0 ? (el.lean || '').toUpperCase() : 'opposite'} side. This is how far the model disagrees with the book: a bigger gap is a bigger claimed edge, and also the place the model is furthest from the market.">Δ <b>${bpEdge > 0 ? '+' : ''}${bpEdge.toFixed(1)}</b></span>`
+                    : '';
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
@@ -8814,7 +8848,7 @@ function renderBestPicks(container, renderSeq = 0) {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${onlyBookTag}${placedTag}${youTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
           ${evd ? `<div class="bp-hero-stats${i === 0 ? '' : ' bp-row-stats'}">
@@ -8928,6 +8962,53 @@ function renderBestPicks(container, renderSeq = 0) {
       <span class="bpx-books" title="Where these picks would be placed — one group per app you'd open">${bookChips}</span>
     </div>`;
         })();
+        // ── GLOW-UP 196 L2: per-fight roll-up ─────────────────────────────────────
+        // The ⇄ DUAL / ↔ SAME FIGHT badges tell a row that it shares a fight with
+        // another row, but not WITH WHAT — so reading a board where one fight feeds
+        // three picks across both columns meant hovering badges and cross-referencing
+        // two columns by eye. This enumerates every multi-pick fight in one place:
+        // what the picks are, which side each sits on, and how much of the board rides
+        // on that single outcome. Click jumps to the fighter card.
+        const fightRollupHtml = (() => {
+            const shown = [
+                ...displayOvers.map(f => ({ f, m: overMetrics.get(f.name), dir: 'over' })),
+                ...displayUnders.map(f => ({ f, m: underMetrics.get(f.name), dir: 'under' })),
+            ].filter(x => !!x.m);
+            if (shown.length < 2)
+                return '';
+            const byFight = new Map();
+            for (const row of shown) {
+                const k = bpFightKey(row.f) || row.f.name.toLowerCase();
+                if (!byFight.has(k)) {
+                    byFight.set(k, {
+                        label: row.f.opponent ? `${prettyName(row.f.name)} vs ${prettyName(row.f.opponent)}` : prettyName(row.f.name),
+                        picks: [],
+                    });
+                }
+                byFight.get(k).picks.push(row);
+            }
+            const multi = [...byFight.values()].filter(v => v.picks.length >= 2).sort((a, b) => b.picks.length - a.picks.length);
+            if (!multi.length)
+                return '';
+            const cards = multi.map(v => {
+                const overN = v.picks.filter(p => p.dir === 'over').length;
+                const underN = v.picks.length - overN;
+                const legs = v.picks.map(p => {
+                    const stat = EFFECTIVE_LEAN_STAT_LABEL[p.m.src] || p.m.src.toUpperCase();
+                    return `<button class="bpfr-leg ${p.dir}" data-jump="${p.f.name}" title="${prettyName(p.f.name)} ${p.dir.toUpperCase()} ${stat} ${p.m.line ?? ''} — click to open the card">`
+                        + `${p.dir === 'over' ? '▲' : '▼'} ${prettyName(p.f.name).split(' ').slice(-1)[0]} <i>${stat}${p.m.line != null ? ` ${p.m.line}` : ''}</i></button>`;
+                }).join('');
+                const heavy = v.picks.length >= 3;
+                return `<div class="bpfr-fight${heavy ? ' heavy' : ''}">
+        <div class="bpfr-head"><span class="bpfr-name">${v.label}</span><span class="bpfr-count" title="${v.picks.length} of the ${shown.length} picks on the board ride on this one fight (${overN} over, ${underN} under)">${heavy ? '⚠ ' : ''}${v.picks.length} picks</span></div>
+        <div class="bpfr-legs">${legs}</div>
+      </div>`;
+            }).join('');
+            return `<div class="bp-fight-rollup">
+      <div class="bpfr-label" title="Every fight feeding more than one pick on this board. One fight going the wrong way takes all of its picks with it — these are the correlated clusters.">↔ SHARED FIGHTS <i>${multi.length}</i></div>
+      <div class="bpfr-grid">${cards}</div>
+    </div>`;
+        })();
         // ── GLOW-UP 192 (L4): considered but cut ──────────────────────────────────
         // The board shows survivors. This shows who was in contention and why they
         // aren't — so the selection is auditable instead of taken on trust. Reasons
@@ -9021,7 +9102,7 @@ function renderBestPicks(container, renderSeq = 0) {
     </div>`;
         })();
         const gridHtml = displayOvers.length + displayUnders.length > 0
-            ? `${exposureHtml}${byBookHtml}<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>${nearMissHtml}`
+            ? `${exposureHtml}${fightRollupHtml}${byBookHtml}<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>${nearMissHtml}`
             : hasAnyPicks
                 ? '<div class="bp-filter-empty">No picks match the current view — <button class="bpc-reset">reset filters</button></div>'
                 : '';
@@ -9125,6 +9206,14 @@ function renderBestPicks(container, renderSeq = 0) {
         // Click a pick to jump to that fighter's card
         container.querySelectorAll('.best-pick-row[data-jump]').forEach(el => {
             el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+        });
+        // GLOW-UP 196 L2 — the shared-fight roll-up's leg buttons carry data-jump too, but
+        // the handler above is scoped to .best-pick-row, so they need their own binding.
+        container.querySelectorAll('.bpfr-leg[data-jump]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                jumpToFighterCard(btn.dataset['jump'] || '');
+            });
         });
         // GLOW-UP 169: hovering a linked row lights up its same-fight counterpart
         // in the other column — the ↔/⇄ tag says a pair exists, the glow says WHERE.
