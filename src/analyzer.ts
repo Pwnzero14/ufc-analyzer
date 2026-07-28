@@ -9882,6 +9882,15 @@ interface ParlayHealth {
   alerts: CorrelationAlert[];
   avgConfidence: number;
   legCount: number;
+  /** GLOW-UP 197 L1 — the score's component parts. It's assembled from four
+   *  distinct terms and then shown as one opaque number, so a 93 gave no hint
+   *  what to change to improve it. */
+  breakdown?: {
+    base: number;      // average leg confidence — the starting point
+    corr: number;      // sum of correlation-alert impacts (±)
+    legs: number;      // leg-count bonus/penalty (2-4 sweet spot, 6+ penalised)
+    diversity: number; // all legs from different fights
+  };
 }
 
 const parlaySelectedLegs: Set<string> = new Set(); // "fighter|stat|dir" keys
@@ -10190,23 +10199,37 @@ function analyzeParlayHealth(legs: ParlayLeg[], fighters: AnalyzerFighter[]): Pa
 
   // Score: start at base from average confidence, adjust by correlation alerts
   let score = avgConfidence;
+  let corrTerm = 0;
   for (const a of alerts) {
-    score += a.impact * 30; // each ±0.1 impact = ±3 points on health score
+    corrTerm += a.impact * 30; // each ±0.1 impact = ±3 points on health score
   }
+  score += corrTerm;
 
   // Leg count bonus/penalty
-  if (legs.length >= 2 && legs.length <= 4) score += 3; // sweet spot
-  if (legs.length >= 6) score -= (legs.length - 5) * 4; // diminishing odds
+  let legsTerm = 0;
+  if (legs.length >= 2 && legs.length <= 4) legsTerm += 3; // sweet spot
+  if (legs.length >= 6) legsTerm -= (legs.length - 5) * 4; // diminishing odds
+  score += legsTerm;
 
   // Diversity bonus: legs from different fights
   const fightKeys = new Set(legs.map(l => [l.fighter, l.opponent].sort().join('vs')));
-  if (fightKeys.size >= 2 && fightKeys.size === legs.length) score += 5; // all independent fights
+  let diversityTerm = 0;
+  if (fightKeys.size >= 2 && fightKeys.size === legs.length) diversityTerm += 5; // all independent fights
+  score += diversityTerm;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   const grade: ParlayHealth['grade'] =
     score >= 78 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor';
 
-  return { score, grade, alerts, avgConfidence, legCount: legs.length };
+  return {
+    score, grade, alerts, avgConfidence, legCount: legs.length,
+    breakdown: {
+      base: parseFloat(avgConfidence.toFixed(1)),
+      corr: parseFloat(corrTerm.toFixed(1)),
+      legs: legsTerm,
+      diversity: diversityTerm,
+    },
+  };
 }
 
 /** Scan all available legs and surface pairs with positive correlation (synergy). */
@@ -10528,9 +10551,40 @@ function renderParlayLab(container: HTMLElement): void {
     </span>
   </div>`;
 
+  // GLOW-UP 197 L2 — how many legs in the pool come from each fight. A flat list of
+  // 19 legs hid the fact that several share a fight: you could stack two legs off one
+  // outcome without noticing, because the row never said who the opponent was. The
+  // ✗ vs-slip flag only fires against the CURRENT slip, not between pool rows.
+  const poolFightCount = new Map<string, number>();
+  for (const a of displayLegs) {
+    const fk = [a.leg.fighter, a.leg.opponent || ''].map(x => x.toLowerCase()).sort().join('|');
+    poolFightCount.set(fk, (poolFightCount.get(fk) || 0) + 1);
+  }
+
+  // GLOW-UP 197 L3 — marginal impact. Picking a leg was guesswork: the row showed the
+  // leg's own confidence and EV, but not what it would do to the SLIP once correlation
+  // with the legs already selected is accounted for. A high-confidence leg that rides
+  // the same fight can still drop slip health. Re-scores the slip with each candidate
+  // added (cheap — 19 candidates over a <=5-leg slip) and shows the delta.
+  const baseHealthScore = health ? health.score : null;
+  const marginalDelta = (leg: ParlayLeg): number | null => {
+    if (baseHealthScore == null) return null; // needs a >=2-leg slip to compare against
+    const withLeg = analyzeParlayHealth([...selectedLegs, leg], visibleFighters);
+    return withLeg.score - baseHealthScore;
+  };
+
   const poolRows = displayLegs.map(a => {
     const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
     const sel = parlaySelectedLegs.has(key);
+    const mDelta = sel ? null : marginalDelta(a.leg);
+    const mTag = mDelta != null
+      ? `<span class="parlay-leg-marg ${mDelta > 0 ? 'pos' : mDelta < 0 ? 'neg' : 'flat'}" title="Adding this leg would take slip health from ${baseHealthScore} to ${baseHealthScore! + mDelta} — correlation with the legs you've already picked included. A strong leg can still score negative here if it rides a fight you're already on.">${mDelta > 0 ? '▲' : mDelta < 0 ? '▼' : '·'}${mDelta > 0 ? '+' : ''}${mDelta}</span>`
+      : '';
+    const legFightKey = [a.leg.fighter, a.leg.opponent || ''].map(x => x.toLowerCase()).sort().join('|');
+    const sharesFight = (poolFightCount.get(legFightKey) || 0) > 1;
+    const vsTag = a.leg.opponent
+      ? `<span class="parlay-leg-vs${sharesFight ? ' shared' : ''}" title="${sharesFight ? `This fight supplies ${poolFightCount.get(legFightKey)} legs in the pool — picking more than one of them stakes the same outcome twice.` : `Opponent: ${prettyName(a.leg.opponent)}`}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}${sharesFight ? ` <i>×${poolFightCount.get(legFightKey)}</i>` : ''}</span>`
+      : '';
     const conflict = sel ? null : conflictsWithSlip(a.leg);
     // GLOW-UP 191 (L1): only look for synergy when there's no conflict — a leg
     // that contradicts the slip shouldn't also advertise that it pairs well.
@@ -10549,13 +10603,13 @@ function renderParlayLab(container: HTMLElement): void {
     return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
-      ${warnTag}${synTag}
+      ${vsTag}${warnTag}${synTag}
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
       ${platChip}
       ${parlayYouTag(a.leg.stat, a.leg.direction)}
-      ${evTag}
+      ${evTag}${mTag}
       <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
     </div>`;
   }).join('');
@@ -10725,10 +10779,22 @@ function renderParlayLab(container: HTMLElement): void {
       return `<div class="parlay-corr-alert ${a.type}">${icon} ${a.message}</div>`;
     }).join('');
 
+    // GLOW-UP 197 L1 — decompose the score. It's four separate terms collapsed into
+    // one number, so a "93 EXCELLENT" told you nothing about what to change. Each
+    // term is now a chip: where the score started (avg leg confidence) and what
+    // each adjustment did to it.
+    const bd = health.breakdown;
+    const bdHtml = bd ? `<div class="ph-breakdown">
+      <span class="ph-bd" title="Starting point: the average confidence of your ${health.legCount} legs. Everything else adjusts this.">conf <b>${bd.base.toFixed(0)}</b></span>
+      ${bd.corr !== 0 ? `<span class="ph-bd ${bd.corr > 0 ? 'pos' : 'neg'}" title="Net correlation adjustment across every leg pair. Positive = the legs reinforce each other (synergy); negative = they fight each other or ride the same outcome.">corr <b>${bd.corr > 0 ? '+' : ''}${bd.corr.toFixed(1)}</b></span>` : ''}
+      ${bd.legs !== 0 ? `<span class="ph-bd ${bd.legs > 0 ? 'pos' : 'neg'}" title="${bd.legs > 0 ? '2-4 legs is the sweet spot — enough payout without stacking too much that must all land.' : 'Six or more legs is penalised: every extra leg multiplies the ways the slip dies.'}">legs <b>${bd.legs > 0 ? '+' : ''}${bd.legs}</b></span>` : ''}
+      ${bd.diversity !== 0 ? `<span class="ph-bd pos" title="Every leg comes from a different fight, so no single fight going wrong takes out more than one leg.">spread <b>+${bd.diversity}</b></span>` : ''}
+    </div>` : '';
     healthHtml = `<div class="parlay-health">
       <div class="parlay-health-title">PARLAY HEALTH</div>
       <span class="parlay-health-score ${health.grade}">${health.score}</span>
       <span class="parlay-health-label">${health.grade.toUpperCase()} — ${health.legCount} legs, avg conf ${Math.round(health.avgConfidence)}%</span>
+      ${bdHtml}
       ${alertsHtml ? `<div class="parlay-corr-list">${alertsHtml}</div>` : ''}
     </div>`;
   }
