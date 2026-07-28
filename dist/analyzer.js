@@ -14317,12 +14317,93 @@ function statUnderBookOffered(f, source, book) {
         return (f.kd_under_available ?? null) === true; // PP demon/goblin = More-only
     return true; // ft / ctrl / ss_r1: no per-book under gating modeled (matches Best Picks)
 }
+// GLOW-UP 195 L3 — per-book placement breakdown for a lean's direction: which books
+// will take it, and which have a line but block the side (or price it as chalk).
+// Same rules as leanBestBook, but it reports the WHY instead of just picking one.
+function placementDetail(f, source, dir) {
+    const ok = [], blocked = [];
+    for (const [bk, fld] of (LEAN_STAT_FIELDS[source] || [])) {
+        const v = f[fld];
+        if (v == null || !Number.isFinite(v))
+            continue;
+        const label = LEAN_BOOK_LABEL[bk] || bk;
+        if (source === 'fp') {
+            if (shouldSkipFpSideForFighter(f, 'fp', dir, bk)) {
+                blocked.push(`${label} (${dir} not offered)`);
+                continue;
+            }
+        }
+        else if (dir === 'under' && !statUnderBookOffered(f, source, bk)) {
+            blocked.push(`${label} (no under side)`);
+            continue;
+        }
+        if (bk === 'draftkings_sportsbook' && dkSideChalk(f, source, dir)) {
+            const o = dkSideOdds(f, source, dir);
+            blocked.push(`${label} (${o != null ? fmtOdds(o) : 'chalk'} — chalk)`);
+            continue;
+        }
+        ok.push(`${label} ${v}`);
+    }
+    return { ok, blocked };
+}
+// Placement chip for a lean panel title: the resolved best book, or a NO BOOK flag
+// when every book with a line blocks the side. Hover lists the full breakdown.
+function buildPlacementChip(f, source, dir) {
+    if (dir !== 'over' && dir !== 'under')
+        return '';
+    const { ok, blocked } = placementDetail(f, source, dir);
+    const best = leanBestBook(f, source, dir);
+    const blockedTxt = blocked.length ? ` · Blocked: ${blocked.join(', ')}` : '';
+    if (best.book == null) {
+        return `<span class="place-chip blocked" title="No book takes this ${dir.toUpperCase()}${blockedTxt || ' (no line posted)'}">⛔ NO BOOK</span>`;
+    }
+    const label = LEAN_BOOK_LABEL[best.book] || best.book;
+    return `<span class="place-chip ok" title="Best placeable entry for this ${dir.toUpperCase()}: ${label} ${best.line}${ok.length > 1 ? ` · Also takes it: ${ok.filter(o => !o.startsWith(label)).join(', ')}` : ''}${blockedTxt}">✔ ${label} ${best.line}</span>`;
+}
+// GLOW-UP 195 — the line-grid source keys → canonical book keys.
+const LINE_SRC_TO_BOOK = {
+    p6: 'pick6', ud: 'underdog', pp: 'prizepicks', betr: 'betr', dk: 'draftkings_sportsbook',
+};
+// Which SIDES a book actually offers for a stat on this fighter. These rules already
+// existed (they gate Best Picks and the directional views) but the line grid never
+// showed them — a cell could read "P6 TD 0.5" with no hint that only the OVER is
+// takeable there. Conservative by design: a side is only reported unavailable when a
+// rule or a positively-false flag says so (UD's avail flags fail open — see
+// project_underdog_api_quirks).
+function sideAvailability(f, stat, book) {
+    if (stat === 'fp') {
+        return {
+            over: !shouldSkipFpSideForFighter(f, 'fp', 'over', book),
+            under: !shouldSkipFpSideForFighter(f, 'fp', 'under', book),
+        };
+    }
+    if (stat === 'ctrl') {
+        // Pick6 CTRL is sometimes OVER-only; calcCTRLLean already suppresses the lean.
+        return { over: true, under: book === 'pick6' ? (f.ctrl_under_available ?? null) !== false : true };
+    }
+    if (stat === 'ft') {
+        if (book === 'underdog') {
+            return { over: (f.ud_ft_over_avail ?? null) !== false, under: (f.ud_ft_under_avail ?? null) !== false };
+        }
+        return { over: true, under: true };
+    }
+    // ss / td — under side via the authoritative shared rule; over side only marked
+    // unavailable when UD explicitly recorded it false.
+    let over = true;
+    if (book === 'underdog') {
+        if (stat === 'ss')
+            over = (f.ud_ss_over_avail ?? null) !== false;
+        if (stat === 'td')
+            over = (f.ud_td_over_avail ?? null) !== false;
+    }
+    return { over, under: statUnderBookOffered(f, stat, book) };
+}
 // DK is the only book with real American odds, so it's the only one that can post
 // a "chalk" side with no value even when placeable. Exclude DK sides at -300 or
 // worse (a -5000 TD under etc.); -299 and better is fine. Pick-em books carry no
 // American odds, so this only ever gates DK candidates.
 const DK_CHALK_THRESHOLD = -300;
-function dkSideChalk(f, source, dir) {
+function dkSideOdds(f, source, dir) {
     const field = source === 'ss' ? (dir === 'over' ? 'ss_over_odds' : 'ss_under_odds')
         : source === 'ss_r1' ? (dir === 'over' ? 'ss_r1_over_odds' : 'ss_r1_under_odds')
             : source === 'td' ? (dir === 'over' ? 'td_over_odds' : 'td_under_odds')
@@ -14330,9 +14411,14 @@ function dkSideChalk(f, source, dir) {
                     : source === 'ctrl' ? (dir === 'over' ? 'ctrl_over_odds' : 'ctrl_under_odds')
                         : null;
     if (!field)
-        return false;
+        return null;
     const odds = f[field];
-    return odds != null && Number.isFinite(odds) && odds <= DK_CHALK_THRESHOLD;
+    return odds != null && Number.isFinite(odds) ? odds : null;
+}
+function fmtOdds(o) { return o > 0 ? `+${o}` : String(o); }
+function dkSideChalk(f, source, dir) {
+    const odds = dkSideOdds(f, source, dir);
+    return odds != null && odds <= DK_CHALK_THRESHOLD;
 }
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
@@ -16901,8 +16987,32 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
             ? `<div class="best-shop-badge" title="Best line for ${leanDir?.toUpperCase()} on ${sourceLabel}: ${value} vs other books">best</div>`
             : '';
         const lineClass = isBest ? ' best-line' : isWorst ? ' worst-line' : '';
+        // GLOW-UP 195 L1/L2 — one-sided marker. The book may only offer ONE side
+        // (Pick6 TD is More-only, a dog's Pick6 FP has no Less, …), and DK — the only
+        // book with real odds — can price a side as chalk (-300 or worse), which is
+        // one-sided in practice even when both are posted. Same ↑ convention the KD
+        // chip already uses. Both sides usable → no mark, so the grid stays quiet.
+        const sides = sideAvailability(f, stat, LINE_SRC_TO_BOOK[source]);
+        const chalkOver = source === 'dk' && dkSideChalk(f, stat, 'over');
+        const chalkUnder = source === 'dk' && dkSideChalk(f, stat, 'under');
+        const usableOver = sides.over && !chalkOver;
+        const usableUnder = sides.under && !chalkUnder;
+        let sideMark = '';
+        if (!usableOver && !usableUnder) {
+            sideMark = `<span class="side-only none" title="Neither side is takeable on ${sourceLabel} for this ${stat.toUpperCase()}">⛔</span>`;
+        }
+        else if (usableOver !== usableUnder) {
+            const onlyOver = usableOver;
+            const byChalk = onlyOver ? chalkUnder : chalkOver;
+            const chalkOdds = dkSideOdds(f, stat, onlyOver ? 'under' : 'over');
+            const why = byChalk
+                ? `${sourceLabel} prices the ${onlyOver ? 'UNDER' : 'OVER'} at ${chalkOdds != null ? fmtOdds(chalkOdds) : 'chalk'} — chalk (${DK_CHALK_THRESHOLD} or worse), no value. Only the ${onlyOver ? 'OVER' : 'UNDER'} is worth taking here.`
+                : `${sourceLabel} offers the ${onlyOver ? 'OVER' : 'UNDER'} only on this ${stat.toUpperCase()} — the ${onlyOver ? 'under' : 'over'} side is not placeable.`;
+            sideMark = `<span class="side-only${byChalk ? ' chalk' : ''}" title="${why}">${onlyOver ? '↑' : '↓'}</span>`;
+        }
+        const oneSidedCls = sideMark ? (usableOver !== usableUnder ? ' one-sided' : ' no-side') : '';
         const sparkHtml = buildChipSparkline(f.name, stat, source);
-        return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span></div><div class="line-value ${source}">${value}${movementHtml}</div>${sparkHtml}${bestBadge}</div>`;
+        return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}${oneSidedCls}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span>${sideMark}</div><div class="line-value ${source}">${value}${movementHtml}</div>${sparkHtml}${bestBadge}</div>`;
     };
     function platformStatLine(entry, stat) {
         if (!entry)
@@ -17794,12 +17904,19 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const stat = EFFECTIVE_LEAN_STAT_LABEL[lean._source || 'fp'] || 'FP';
         const arrow = lean.lean === 'over' ? '▲' : lean.lean === 'under' ? '▼' : '~';
         const sideCls = lean.lean === 'over' ? 'over' : lean.lean === 'under' ? 'under' : 'push';
-        const lineTxt = lean.line != null ? ` ${lean.line}` : '';
         const sideTxt = lean.lean === 'push' ? 'TOSS-UP' : lean.lean.toUpperCase();
-        // Slimmed to a pure scan anchor — direction · stat · line. Conf% and EV live
-        // on the right-side lean cell; repeating them here read as redundant (and the
-        // EV divider was visually busy).
-        return `<div class="play-pill play-${sideCls}" title="${(lean.verdict || '').replace(/"/g, '&quot;')}">${arrow} ${sideTxt} ${stat}${lineTxt}</div>`;
+        // Slimmed to a pure scan anchor — direction · stat · line · book. Conf% and EV
+        // live on the right-side lean cell; repeating them here read as redundant (and
+        // the EV divider was visually busy). GLOW-UP 195 L4: resolve the line/book
+        // through leanBestBook so the pill names the book that will actually TAKE the
+        // play (the card head never showed placement) — matches the slim-row play line.
+        const resolved = lean.lean === 'push' ? { book: null, line: null } : leanBestBook(f, lean._source || 'fp', lean.lean);
+        const shownLine = resolved.line ?? lean.line ?? null;
+        const lineTxt = shownLine != null ? ` ${shownLine}` : '';
+        const bookTxt = resolved.book
+            ? `<span class="play-pill-book" title="Best placeable entry for this side">@ ${LEAN_BOOK_LABEL[resolved.book] || resolved.book}</span>`
+            : (lean.lean !== 'push' ? `<span class="play-pill-book blocked" title="No book takes this side — see the lean panel for the per-book breakdown">no book</span>` : '');
+        return `<div class="play-pill play-${sideCls}" title="${(lean.verdict || '').replace(/"/g, '&quot;')}">${arrow} ${sideTxt} ${stat}${lineTxt}${bookTxt}</div>`;
     })();
     // GLOW-UP 193 L2 — opponent profile strip: promotes the buried opponent context
     // (archetype, durability, and what they ALLOW) into a legible chip row, so a high
@@ -18040,22 +18157,22 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     // full-slate / 50%-zoom workflow.
     const leanPanelsHtml = [
         f.lean_ss ? `<div class="detail-panel">
-          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'})</div>
+          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : '',
         f.lean_ss_r1 ? `<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})</div>
+          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})${buildPlacementChip(f, 'ss_r1', f.lean_ss_r1.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : '',
         f.lean_td ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'})</div>
+          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
           ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : '',
         f.lean_ft ? `<div class="detail-panel">
-          <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}</div>
+          <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>` : '',

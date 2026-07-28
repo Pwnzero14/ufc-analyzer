@@ -536,6 +536,40 @@ body {
 .detail-grid.signal-only > .detail-signal-bar { display: flex !important; }
 .detail-grid.signal-only > .detail-leans-section { display: grid !important; }
 
+/* GLOW-UP 195 — placeability marks on the line grid.
+   ↑ / ↓ = only that side is takeable (book offers one side, or DK priced the other
+   as chalk). No mark = both sides usable, so the grid stays quiet by default. */
+.side-only {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800;
+  line-height: 1; margin-left: 1px; cursor: help; color: var(--amber);
+}
+.side-only.chalk { color: var(--red); opacity: 0.9; }
+.side-only.none { color: var(--red); font-size: 8px; }
+.line-cell.one-sided { border-style: dashed; }
+.line-cell.no-side { opacity: 0.55; border-style: dashed; }
+
+/* L3 — placement chip on lean panel titles: where this lean can actually be placed */
+.place-chip {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.02em; white-space: nowrap; cursor: help; vertical-align: middle;
+}
+.place-chip.ok { color: var(--green); background: rgba(0,232,122,0.12); border: 1px solid rgba(0,232,122,0.38); }
+.place-chip.blocked { color: var(--red); background: rgba(255,58,96,0.12); border: 1px solid rgba(255,58,96,0.38); }
+
+/* L4 — book on the play pill */
+.play-pill-book { font-weight: 600; font-size: 9px; opacity: 0.8; }
+.play-pill-book.blocked { color: var(--red); opacity: 1; }
+
+/* L5 — header legend for the placeability marks */
+.place-legend {
+  margin-left: 10px; font-family: 'JetBrains Mono', monospace; font-size: 8px;
+  font-weight: 600; color: var(--text3); text-transform: none; letter-spacing: 0;
+  cursor: help; white-space: nowrap;
+}
+.place-legend .pl-k { color: var(--amber); font-weight: 800; margin: 0 2px 0 6px; }
+.place-legend .pl-k.pl-chalk { color: var(--red); }
+
 /* GLOW-UP 194 — Lean Over/Under triage surface */
 /* L1 command header */
 .lean-cmd-header {
@@ -28473,7 +28507,13 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 <!-- STICKY FIGHTER HEADER (shown when cardContainer is visible) -->
 <div class="fighter-header-row is-hidden" id="fighterHeaderRow">
   <div class="fhr-label">Fighter</div>
-  <div class="fhr-label">Lines</div>
+  <div class="fhr-label">Lines
+    <span class="place-legend" title="Placeability marks on the line cells:&#10;↑  only the OVER is takeable on that book&#10;↓  only the UNDER is takeable&#10;⛔ neither side is takeable&#10;A RED arrow means the other side exists but DraftKings prices it at -300 or worse (chalk — no value).&#10;Dashed cell border = one-sided. No mark = both sides fine.">
+      <span class="pl-k">↑</span>over-only
+      <span class="pl-k">↓</span>under-only
+      <span class="pl-k pl-chalk">↑</span>chalk
+    </span>
+  </div>
   <div class="fhr-label fhr-center">Avg FP · SS · TDs · Consist</div>
   <div class="fhr-label fhr-right">Lean</div>
   <div></div>
