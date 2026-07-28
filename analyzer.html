@@ -536,6 +536,41 @@ body {
 .detail-grid.signal-only > .detail-signal-bar { display: flex !important; }
 .detail-grid.signal-only > .detail-leans-section { display: grid !important; }
 
+/* ── GLOW-UP 197 — Parlay Lab third pass ─────────────────────────────────── */
+
+/* L1 — health score decomposed into its four terms */
+.ph-breakdown { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.ph-bd {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px; cursor: help; white-space: nowrap;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+}
+.ph-bd b { font-weight: 800; font-size: 9.5px; margin-left: 2px; }
+.ph-bd.pos { color: var(--green); border-color: color-mix(in srgb, var(--green) 30%, transparent); }
+.ph-bd.neg { color: var(--red);   border-color: color-mix(in srgb, var(--red) 30%, transparent); }
+
+/* L2 — fight context on pool legs; `shared` = this fight supplies >1 pool leg */
+.parlay-leg-vs {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600;
+  color: var(--text3); padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+  border: 1px solid transparent; cursor: help;
+}
+.parlay-leg-vs.shared {
+  color: var(--amber); background: rgba(240,192,64,0.10);
+  border-color: rgba(240,192,64,0.32);
+}
+.parlay-leg-vs i { font-style: normal; font-weight: 800; }
+
+/* L3 — marginal slip-health impact of adding this leg */
+.parlay-leg-marg {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800;
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap; cursor: help;
+  background: var(--bg3); border: 1px solid var(--border);
+}
+.parlay-leg-marg.pos  { color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent); }
+.parlay-leg-marg.neg  { color: var(--red);   border-color: color-mix(in srgb, var(--red) 34%, transparent); }
+.parlay-leg-marg.flat { color: var(--text3); }
+
 /* ── GLOW-UP 196 — Best Picks second pass ────────────────────────────────── */
 
 /* L1 — numeric edge chip (projection vs the line you'd enter) */
