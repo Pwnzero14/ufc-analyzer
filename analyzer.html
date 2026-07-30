@@ -855,6 +855,20 @@ body {
   background: color-mix(in srgb, var(--gold) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent); }
 
+/* MODEL v16 — CTRL lean panel. The over-only constraint is stated on the panel
+   because it changes what the panel MEANS: an under lean here is information,
+   never a play, and that shouldn't have to be inferred. */
+.ctrl-overonly-note {
+  margin: 6px 0 8px; padding: 5px 9px; border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.5;
+  background: rgba(255,138,61,0.10); color: var(--orange);
+  border: 1px solid rgba(255,138,61,0.32);
+}
+.ctrl-noplay {
+  margin-top: 6px; font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; color: var(--text3); font-style: italic;
+}
+
 /* ── GLOW-UP 200 — Best Picks third pass ── */
 /* L1 board verdict — one read across both columns, above the exposure strip. */
 .bp-verdict {
