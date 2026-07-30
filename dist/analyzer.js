@@ -195,6 +195,10 @@ let bestPicksEvOnly = false;
 // GLOW-UP 192: after three passes of adding caveat flags (PROJ SAYS / NEEDS
 // ROUNDS / negative EV), a way to see only the picks that carry none of them.
 let bestPicksCleanOnly = false;
+// GLOW-UP 200 L3 — inverse of CLEAN. The caveats were computed (projConflict /
+// needsRounds / negative EV) and shown per-row, but there was no way to isolate
+// them: you could hide the flagged picks, never review only them.
+let bestPicksFlaggedOnly = false;
 // GLOW-UP 192 (L5): entry-plan view — the board regrouped by the app you'd
 // actually enter each pick in.
 let bestPicksByBook = false;
@@ -8531,6 +8535,8 @@ function renderBestPicks(container, renderSeq = 0) {
                     return false;
                 if (bestPicksCleanOnly && !m.clean)
                     return false;
+                if (bestPicksFlaggedOnly && m.clean)
+                    return false;
                 return true;
             });
             if (bestPicksSortMode === 'ev') {
@@ -8600,6 +8606,7 @@ function renderBestPicks(container, renderSeq = 0) {
       ${bpChipsHtml}
       <button class="bpc-chip bpc-ev${bestPicksEvOnly ? ' on' : ''}" data-bp-evonly="1" title="Only picks whose calibrated EV clears breakeven">+EV <i>${bpEvPosCount}</i></button>
       <button class="bpc-chip bpc-clean${bestPicksCleanOnly ? ' on' : ''}" data-bp-cleanonly="1" title="Only picks carrying no caveat — no ⚠ PROJ SAYS (projection opposes its own lean), no ⚠ NEEDS ROUNDS (volume over against a finisher), and not negative EV. The picks that need no explanation.">CLEAN <i>${bpCleanCount}</i></button>
+      <button class="bpc-chip bpc-flagged${bestPicksFlaggedOnly ? ' on' : ''}" data-bp-flaggedonly="1" title="Only picks carrying a caveat — ⚠ PROJ SAYS, ⚠ NEEDS ROUNDS, or negative EV. The review queue: exactly the picks that need a second look before you lock them.">FLAGGED <i>${(overs.length + unders.length) - bpCleanCount}</i></button>
     </span>
     <span class="bpc-group">
       <span class="bpc-label">VIEW</span>
@@ -8683,6 +8690,12 @@ function renderBestPicks(container, renderSeq = 0) {
                     : _newsAlertFighters.has(f.name.toLowerCase())
                         ? ` <span class="bp-flag bp-flag-news" title="Recent injury/withdrawal news on this fighter — check headlines before entering">⚠ NEWS</span>`
                         : '';
+                // GLOW-UP 200 L2 — this pick won its fight on model SCORE while the side it
+                // displaced scored higher on CONFIDENCE. Worth knowing before you lock it.
+                const inv = bpInversion.get(f.name.toLowerCase());
+                const invTag = inv
+                    ? ` <span class="bp-flag bp-flag-inv" title="${inv.name} was cut from this fight at ${inv.conf}% confidence — higher than this pick's. The model still ranked this side first (score includes correlation and duration demotions that confidence doesn't), but the more confident side of the fight is the one you're NOT on.">⇅ ${inv.conf}% CUT</span>`
+                    : '';
                 // Calibrated EV under the confidence meter — same evWinProb pipeline as
                 // the fighter rows, so board and picks can never disagree.
                 const evd = computeDetailedEV(f, el);
@@ -8871,7 +8884,7 @@ function renderBestPicks(container, renderSeq = 0) {
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -8971,13 +8984,29 @@ function renderBestPicks(container, renderSeq = 0) {
                     maxFightKey = k;
                 }
             const maxFightLabel = fightLabel.get(maxFightKey) || maxFightKey;
+            // GLOW-UP 200 L5 — the book chips counted picks but never priced them, so a
+            // book carrying 6 thin picks looked heavier than one carrying 2 strong ones.
+            // Average EV per book says which app is actually carrying the slate.
             const bookCount = new Map();
-            for (const { m } of shown)
-                if (m.book)
-                    bookCount.set(m.book, (bookCount.get(m.book) || 0) + 1);
+            const bookEv = new Map();
+            for (const { m } of shown) {
+                if (!m.book)
+                    continue;
+                bookCount.set(m.book, (bookCount.get(m.book) || 0) + 1);
+                if (m.ev != null)
+                    bookEv.set(m.book, [...(bookEv.get(m.book) || []), m.ev]);
+            }
             const bookChips = [...bookCount.entries()]
                 .sort((a, b) => b[1] - a[1])
-                .map(([k, c]) => `<span class="bpx-book plat-${k}" title="${c} pick${c === 1 ? '' : 's'} to enter on ${BP_BOOK_FULL[k] || k}">${BP_BOOK_SHORT[k] || k.toUpperCase()} <i>${c}</i></span>`)
+                .map(([k, c]) => {
+                const evs = bookEv.get(k) || [];
+                const avg = evs.length ? evs.reduce((s, v) => s + v, 0) / evs.length : null;
+                const evChip = avg != null
+                    ? ` <em class="bpx-book-ev ${avg > 0 ? 'pos' : 'neg'}">${avg > 0 ? '+' : ''}${avg.toFixed(0)}%</em>`
+                    : '';
+                const evTitle = avg != null ? ` · average EV ${avg > 0 ? '+' : ''}${avg.toFixed(1)}% across ${evs.length} priced pick${evs.length === 1 ? '' : 's'}` : '';
+                return `<span class="bpx-book plat-${k}" title="${c} pick${c === 1 ? '' : 's'} to enter on ${BP_BOOK_FULL[k] || k}${evTitle}">${BP_BOOK_SHORT[k] || k.toUpperCase()} <i>${c}</i>${evChip}</span>`;
+            })
                 .join('');
             // Concentration: >=40% of the board on one fight means the slate is much
             // less diversified than the pick count suggests.
@@ -9036,6 +9065,88 @@ function renderBestPicks(container, renderSeq = 0) {
       <div class="bpfr-grid">${cards}</div>
     </div>`;
         })();
+        // ── GLOW-UP 200 L2: rank inversions ───────────────────────────────────────
+        // dedupeNegCorrelatedSameFight keeps ONE pick per fight per column, ranked by
+        // model score. Score is not confidence, so the survivor can be the LOWER-
+        // confidence side — on the Medic/Rodriguez card, Uros Medic (68%) was cut for
+        // Daniel Rodriguez (52%) and Kyle Prepolec (61%) for Mateusz Rebecki (53%),
+        // two of four dedups. The cut list recorded it; the surviving row never did,
+        // so the board silently presented the weaker side as the fight's best pick.
+        // Not necessarily wrong — score carries demotions confidence doesn't — but it
+        // must be visible.
+        const bpInversion = new Map();
+        let bpDedupCount = 0;
+        {
+            const scan = (all, final, dir) => {
+                const kept = new Map();
+                for (const f of final) {
+                    const k = bpFightKey(f);
+                    if (k)
+                        kept.set(k, f);
+                }
+                for (const f of all) {
+                    const fk = bpFightKey(f);
+                    if (!fk)
+                        continue;
+                    const winner = kept.get(fk);
+                    if (!winner || winner.name.toLowerCase() === f.name.toLowerCase())
+                        continue;
+                    bpDedupCount++;
+                    const cutEl = getBestPickLeanForDir(f, dir);
+                    const winEl = getBestPickLeanForDir(winner, dir);
+                    if (!cutEl || !winEl)
+                        continue;
+                    const cutConf = Number(cutEl.conf) || 0;
+                    const winConf = Number(winEl.conf) || 0;
+                    if (cutConf <= winConf)
+                        continue;
+                    const key = winner.name.toLowerCase();
+                    const prev = bpInversion.get(key);
+                    if (!prev || cutConf > prev.conf)
+                        bpInversion.set(key, { name: prettyName(f.name), conf: cutConf });
+                }
+            };
+            scan(allOversSorted, overs, 'over');
+            scan(allUndersSorted, unders, 'under');
+        }
+        // ── GLOW-UP 200 L1: board verdict strip ───────────────────────────────────
+        // Each column summarises itself (tiers · avg conf · +EV count), but nothing
+        // summarised the BOARD — so "how good is tonight overall, and how much of it
+        // needs a second look" meant adding two headers up by eye. Every figure here
+        // is already computed per-pick; this only aggregates.
+        const verdictHtml = (() => {
+            const all = [
+                ...displayOvers.map(f => overMetrics.get(f.name)).filter((m) => !!m),
+                ...displayUnders.map(f => underMetrics.get(f.name)).filter((m) => !!m),
+            ];
+            if (all.length < 2)
+                return '';
+            const evs = all.map(m => m.ev).filter((v) => v != null);
+            const avgEv = evs.length ? evs.reduce((s, v) => s + v, 0) / evs.length : null;
+            const avgConf = all.reduce((s, m) => s + m.conf, 0) / all.length;
+            const flagged = all.filter(m => !m.clean).length;
+            const negEv = all.filter(m => m.ev != null && m.ev < 0).length;
+            const inversions = bpInversion.size;
+            // A board is only as good as its weakest habit: lead with the count that
+            // most often needs action rather than the flattering average.
+            const verdictCls = avgEv == null ? 'flat' : avgEv >= 10 ? 'strong' : avgEv > 0 ? 'ok' : 'weak';
+            return `<div class="bp-verdict bpv-${verdictCls}">
+      <span class="bpv-label">BOARD</span>
+      <span class="bpv-picks" title="Picks currently displayed across both columns">${all.length} picks</span>
+      <span class="bpv-conf" title="Mean displayed confidence across the board">avg conf <b>${Math.round(avgConf)}%</b></span>
+      ${avgEv != null ? `<span class="bpv-ev ${avgEv > 0 ? 'pos' : 'neg'}" title="Mean calibrated EV across the ${evs.length} priced picks. Not a return estimate — the average edge you're taking.">avg EV <b>${avgEv > 0 ? '+' : ''}${avgEv.toFixed(1)}%</b></span>` : ''}
+      <span class="bpv-sep"></span>
+      ${flagged > 0
+                ? `<button class="bpv-flag" data-bp-flaggedonly="1" title="${flagged} pick(s) carry a caveat — projection opposing its own lean, a volume over needing rounds, or negative EV. Click to review only those.">⚠ ${flagged} need review</button>`
+                : `<span class="bpv-clean" title="No pick carries a caveat">✓ all clean</span>`}
+      ${negEv > 0 ? `<span class="bpv-neg" title="${negEv} pick(s) price below breakeven — the model likes the signal, the odds don't pay for it">${negEv} −EV</span>` : ''}
+      ${inversions > 0
+                ? `<span class="bpv-inv" title="${inversions} fight(s) where the pick shown was ranked first on model score while the side it displaced scored higher on confidence. Look for the ⇅ chip.">⇅ ${inversions} inversion${inversions === 1 ? '' : 's'}</span>`
+                : bpDedupCount > 0
+                    ? `<span class="bpv-inv-none" title="${bpDedupCount} same-fight dedupe(s) happened and in every one the surviving pick was ALSO the more confident side. A zero here is a real check, not an unrun one.">⇅ 0 of ${bpDedupCount} dedupes</span>`
+                    : ''}
+    </div>`;
+        })();
         // ── GLOW-UP 192 (L4): considered but cut ──────────────────────────────────
         // The board shows survivors. This shows who was in contention and why they
         // aren't — so the selection is auditable instead of taken on trust. Reasons
@@ -9065,12 +9176,18 @@ function renderBestPicks(container, renderSeq = 0) {
                     const reason = blockedBy && blockedBy.toLowerCase() !== f.name.toLowerCase()
                         ? `same fight as ${prettyName(blockedBy)}, who ranked higher`
                         : 'below the cut for this column';
-                    rows.push(`<div class="bpnm-row">
+                    // GLOW-UP 200 L4 — the audit trail was honest but inert: you could read
+                    // that a fighter was cut and had no way to go look at them. Rows now jump
+                    // to the card, and a cut that OUTRANKS its winner on confidence says so
+                    // here too, matching the ⇅ chip on the surviving row.
+                    const beat = blockedBy ? (Number(getBestPickLeanForDir(allFighters.find(x => x.name.toLowerCase() === blockedBy.toLowerCase()) || f, dir)?.conf) || 0) : 0;
+                    const inverted = !!blockedBy && conf > beat;
+                    rows.push(`<div class="bpnm-row${inverted ? ' bpnm-inverted' : ''}" data-bpnm-jump="${f.name.replace(/"/g, '&quot;')}" title="Open ${prettyName(f.name)}'s card">
           <span class="bpnm-dir ${dir}">${dir.toUpperCase()}</span>
           <span class="bpnm-name">${prettyName(f.name)}</span>
           <span class="bpnm-stat">${stat}</span>
           <span class="bpnm-conf">${conf}%</span>
-          <span class="bpnm-why">${reason}</span>
+          <span class="bpnm-why">${reason}${inverted ? ` <b class="bpnm-inv" title="This cut pick was MORE confident than the one that displaced it (${beat}%). The model ranks on score, not confidence.">⇅ more confident than the pick that displaced it</b>` : ''}</span>
         </div>`);
                 }
             };
@@ -9129,7 +9246,7 @@ function renderBestPicks(container, renderSeq = 0) {
     </div>`;
         })();
         const gridHtml = displayOvers.length + displayUnders.length > 0
-            ? `${exposureHtml}${fightRollupHtml}${byBookHtml}<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>${nearMissHtml}`
+            ? `${verdictHtml}${exposureHtml}${fightRollupHtml}${byBookHtml}<div class="best-picks-grid">${buildSection(displayOvers, 'over')}${buildSection(displayUnders, 'under')}</div>${nearMissHtml}`
             : hasAnyPicks
                 ? '<div class="bp-filter-empty">No picks match the current view — <button class="bpc-reset">reset filters</button></div>'
                 : '';
@@ -9284,6 +9401,16 @@ function renderBestPicks(container, renderSeq = 0) {
         // GLOW-UP 192 handlers
         container.querySelectorAll('[data-bp-cleanonly]').forEach(btn => {
             btn.addEventListener('click', () => { bestPicksCleanOnly = !bestPicksCleanOnly; bpRerender(); });
+        });
+        // GLOW-UP 200 L4 — cut rows jump to the fighter's card.
+        container.querySelectorAll('[data-bpnm-jump]').forEach(row => {
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                jumpToFighterCard(row.dataset['bpnmJump'] || '');
+            });
+        });
+        container.querySelectorAll('[data-bp-flaggedonly]').forEach(btn => {
+            btn.addEventListener('click', () => { bestPicksFlaggedOnly = !bestPicksFlaggedOnly; bpRerender(); });
         });
         container.querySelectorAll('[data-bp-bybook]').forEach(btn => {
             btn.addEventListener('click', () => { bestPicksByBook = !bestPicksByBook; bpRerender(); });
