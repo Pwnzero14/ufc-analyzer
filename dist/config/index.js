@@ -348,7 +348,7 @@ export const NAME_ALIASES = {
 //   end alone. This is the first model change here validated against ACTUAL RESULTS
 //   rather than posted lines, which cannot separate "model is wrong" from "book
 //   shaded it".
-export const MODEL_VERSION = 15;
+export const MODEL_VERSION = 16;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

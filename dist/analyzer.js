@@ -7786,6 +7786,32 @@ function renderBestPicks(container, renderSeq = 0) {
                     return f.line_dk_ft ?? f.line_p6_ft ?? f.line_ud_ft ?? f.line_pp_ft ?? f.line_betr_ft ?? null;
                 return f.line_betr_ft ?? f.line_p6_ft ?? f.line_ud_ft ?? f.line_pp_ft ?? f.line_dk_ft ?? null;
             }
+            // CTRL (MODEL v16). This branch did not exist, so the function fell through to
+            // `return null` for control time — which silently made CTRL uncollectable as a
+            // Best Picks candidate regardless of confidence (the collector guards on
+            // `lineForLeanSource(f, 'ctrl') != null`). Hailey Cowan's CTRL OVER at 86% was
+            // being dropped here, not out-ranked.
+            if (source === 'ctrl') {
+                if (platform === 'pick6')
+                    return f.line_p6_ctrl ?? null;
+                if (platform === 'underdog')
+                    return f.line_ud_ctrl ?? null;
+                if (platform === 'prizepicks')
+                    return f.line_pp_ctrl ?? null;
+                if (platform === 'betr')
+                    return f.line_betr_ctrl ?? null;
+                if (platform === 'draftkings_sportsbook')
+                    return f.line_dk_ctrl ?? null;
+                if (currentPlatform === 'pick6')
+                    return f.line_p6_ctrl ?? f.line_ud_ctrl ?? f.line_pp_ctrl ?? f.line_betr_ctrl ?? f.line_dk_ctrl ?? null;
+                if (currentPlatform === 'underdog')
+                    return f.line_ud_ctrl ?? f.line_p6_ctrl ?? f.line_pp_ctrl ?? f.line_betr_ctrl ?? f.line_dk_ctrl ?? null;
+                if (currentPlatform === 'prizepicks')
+                    return f.line_pp_ctrl ?? f.line_p6_ctrl ?? f.line_ud_ctrl ?? f.line_betr_ctrl ?? f.line_dk_ctrl ?? null;
+                if (currentPlatform === 'draftkings_sportsbook')
+                    return f.line_dk_ctrl ?? f.line_p6_ctrl ?? f.line_ud_ctrl ?? f.line_pp_ctrl ?? f.line_betr_ctrl ?? null;
+                return f.line_betr_ctrl ?? f.line_p6_ctrl ?? f.line_ud_ctrl ?? f.line_pp_ctrl ?? f.line_dk_ctrl ?? null;
+            }
             return null;
         };
         // For SS/TD/FT/CTRL picks: pick the easiest line for the lean direction
@@ -7857,6 +7883,12 @@ function renderBestPicks(container, renderSeq = 0) {
             // variance — keep the bonus modest so KD picks must earn their slot on confidence.
             if (source === 'kd')
                 return 1.0;
+            // CTRL (MODEL v16): explicitly zero, not an accidental fall-through. Control
+            // time is the newest source on the board and has no settled track record yet,
+            // so it must out-CONFIDENCE an SS/TD candidate to take the slot rather than
+            // being handed a head start. Revisit once the archive carries CTRL outcomes.
+            if (source === 'ctrl')
+                return 0;
             return 0;
         };
         // Per-book FP lean: PrizePicks uses a different scoring formula, so its line
@@ -7957,6 +7989,13 @@ function renderBestPicks(container, renderSeq = 0) {
             // per product rule, they're display-only.
             if (c._source === 'kd')
                 return f.kd_under_available === true;
+            // CTRL is OVER-only (MODEL v16). Belt-and-braces with the collector above so a
+            // CTRL under can never reach the board through any other path — the Less side
+            // isn't reliably offered on any book, so it would be an unenterable pick.
+            // Everything below (chalk reject, per-book side availability) still applies to
+            // the over.
+            if (c._source === 'ctrl' && c.lean !== 'over')
+                return false;
             const dir = c.lean;
             const sideOdds = sideOddsFor(f, c._source, dir);
             const platform = c._platform ?? getSourceActivePlatformKey(f, c._source);
@@ -8036,6 +8075,17 @@ function renderBestPicks(container, renderSeq = 0) {
             }
             if (f.lean_kd?.lean && f.lean_kd.lean !== 'none' && f.lean_kd.lean !== 'push' && lineForLeanSource(f, 'kd') != null) {
                 candidates.push({ ...f.lean_kd, _source: 'kd', _label: ' (KD line)' });
+            }
+            // CTRL (MODEL v16): control time was a full lean source with its own panel data
+            // and line cells, but was never collected as a Best Picks candidate at all — so
+            // a CTRL edge could never reach the board no matter how strong.
+            // OVER-ONLY by product rule: control-time props are More-only in practice
+            // (Pick6 is the primary CTRL book and gives them no Less button), so an UNDER
+            // is unplaceable even when the model likes it. calcCtrlLean already suppresses
+            // the under when the scraper positively confirms no Less side; this is the
+            // stricter, suppress-by-default version for pick selection.
+            if (f.lean_ctrl?.lean === 'over' && lineForLeanSource(f, 'ctrl') != null) {
+                candidates.push({ ...f.lean_ctrl, _source: 'ctrl', _label: ' (CTRL line)' });
             }
             return candidates.filter(c => isCandidateUsable(f, c));
         };
@@ -18940,6 +18990,21 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
+        </div>` : '',
+        // CTRL panel (MODEL v16). CTRL had history/opp panels and line cells but no
+        // lean panel, so its verdict was computed and never shown. The over-only rule
+        // is stated ON the panel rather than left implicit: when the model lands on
+        // UNDER, the honest answer is "no play", not a pick you can't enter.
+        f.lean_ctrl ? `<div class="detail-panel">
+          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl || '—'} · UD: ${f.line_ud_ctrl || '—'} · PP: ${f.line_pp_ctrl || '—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}</div>
+          <div class="ctrl-overonly-note" title="Control-time props are More-only in practice — Pick6 is the primary CTRL book and posts no Less button, and no other book reliably offers the under. So CTRL contributes OVER picks to the board and nothing else; an under lean is information, not a play.">⚠ OVER-ONLY market — the under side isn't offered, so only an OVER can become a pick.</div>
+          ${buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean)}
+          <div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>
+          ${f.lean_ctrl.lean !== 'over'
+            ? `<div class="ctrl-noplay">${f.lean_ctrl.lean === 'under'
+                ? 'Model leans UNDER here — not takeable, so this fighter contributes no CTRL pick.'
+                : 'No CTRL edge either way.'}</div>`
+            : ''}
         </div>` : '',
     ].filter(Boolean).join('');
     _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
