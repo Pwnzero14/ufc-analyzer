@@ -15015,6 +15015,114 @@ function buildLeanSlatePick(f: AnalyzerFighter, lean: EffectiveLean): { key: str
   };
 }
 
+// ── GLOW-UP 198 — ALL FIGHTERS full-slate pass ────────────────────────────
+// The default landing view was the only major surface with no header: Best Picks,
+// Slate Check and the directional views all summarise themselves; this one opened
+// straight onto row 1. Nothing here is newly derived — every number below is
+// already computed per row, it just had nowhere to be read at slate level.
+let _slateCompact = false;                                     // L3 density
+type SlateFilter = 'all' | 'lean' | 'ev' | 'gaps';
+let _slateFilter: SlateFilter = 'all';                         // L2 filter chips
+
+const SLATE_BOOKS: Array<{ key: 'p6' | 'ud' | 'pp' | 'betr' | 'dk'; label: string }> = [
+  { key: 'p6', label: 'P6' }, { key: 'ud', label: 'UD' }, { key: 'pp', label: 'PP' },
+  { key: 'betr', label: 'BT' }, { key: 'dk', label: 'DK' },
+];
+
+/**
+ * Books that posted anything at all for this slate. A book sitting at zero (DK
+ * routinely, since it posts props progressively) is a BOOK-level absence, which
+ * Slate Check already reports — not a per-fighter gap. Counting it made LINE GAPS
+ * match every fighter on the card and the filter did nothing.
+ */
+function slateLiveBooks(fighters: AnalyzerFighter[]): Array<'p6' | 'ud' | 'pp' | 'betr' | 'dk'> {
+  return SLATE_BOOKS.filter(b => fighters.some(f => hasSourceLine(f, b.key))).map(b => b.key);
+}
+
+/** L2 — does this fighter survive the active slate filter? */
+function slateFilterAccepts(
+  f: AnalyzerFighter,
+  liveBooks: Array<'p6' | 'ud' | 'pp' | 'betr' | 'dk'>,
+): boolean {
+  if (_slateFilter === 'all') return true;
+  const lean = getEffectiveLean(f);
+  const directional = lean.lean === 'over' || lean.lean === 'under';
+  if (_slateFilter === 'lean') return directional;
+  if (_slateFilter === 'ev') {
+    if (!directional) return false;
+    const ev = computeFighterEV(f, lean);
+    return ev != null && ev > 0;
+  }
+  // 'gaps' — missing a book that OTHER fighters on this slate do have, i.e. a
+  // real per-fighter hole rather than a book that hasn't posted yet.
+  return liveBooks.some(k => !hasSourceLine(f, k));
+}
+
+// L1 — slate command header: fights, leans, tiers, avg EV, top edge, coverage.
+function buildSlateViewHeader(shown: AnalyzerFighter[], total: number): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'slate-cmd-header';
+  let over = 0, under = 0, high = 0, med = 0, low = 0;
+  let evSum = 0, evCount = 0, posEv = 0;
+  let top: { name: string; label: string; conf: number } | null = null;
+  for (const f of shown) {
+    const lean = getEffectiveLean(f);
+    const directional = lean.lean === 'over' || lean.lean === 'under';
+    if (lean.lean === 'over') over++; else if (lean.lean === 'under') under++;
+    if (directional) {
+      const conf = getDisplayedConf(f);
+      if (conf >= 72) high++; else if (conf >= 58) med++; else low++;
+      if (!top || conf > top.conf) {
+        top = {
+          name: prettyName(f.name),
+          label: `${EFFECTIVE_LEAN_STAT_LABEL[lean._source || 'fp'] || 'FP'}${lean.line != null ? ' ' + lean.line : ''}`,
+          conf,
+        };
+      }
+    }
+    const ev = computeFighterEV(f, lean);
+    if (ev != null) { evSum += ev; evCount++; if (ev > 0) posEv++; }
+  }
+  const avgEv = evCount ? evSum / evCount : null;
+  const filtered = shown.length !== total;
+  const cov = SLATE_BOOKS.map(b => ({
+    label: b.label,
+    n: shown.filter(f => hasSourceLine(f, b.key)).length,
+  }));
+  const chip = (id: SlateFilter, text: string, title: string): string =>
+    `<button class="sch-filter${_slateFilter === id ? ' on' : ''}" data-slate-filter="${id}" title="${title}">${text}</button>`;
+
+  el.innerHTML = `
+    <div class="sch-row">
+      <span class="sch-title">◆ SLATE</span>
+      <span class="sch-count" title="${filtered ? `${shown.length} shown of ${total} fighters` : `${total} fighters on the slate`}">${shown.length}${filtered ? `<i class="sch-of">/${total}</i>` : ''}</span>
+      <span class="sch-dirs">
+        <span class="sch-dir over" title="Fighters whose effective lean is OVER">▲ ${over}</span>
+        <span class="sch-dir under" title="Fighters whose effective lean is UNDER">▼ ${under}</span>
+      </span>
+      <span class="sch-tiers">
+        <span class="sch-tier high" title="Confidence ≥72%">${high} High</span>
+        <span class="sch-tier med" title="Confidence 58–71%">${med} Med</span>
+        <span class="sch-tier low" title="Confidence &lt;58%">${low} Low</span>
+      </span>
+      ${avgEv != null ? `<span class="sch-ev ${avgEv > 0 ? 'pos' : 'neg'}" title="Average EV across every fighter with a priced lean — ${posEv} of ${evCount} are above breakeven">avg EV ${avgEv > 0 ? '+' : ''}${avgEv.toFixed(1)}% <i class="sch-ev-n">${posEv}/${evCount} +EV</i></span>` : ''}
+      ${top ? `<span class="sch-top" title="Highest-confidence lean on the slate">⭐ ${top.name} · ${top.label} · ${Math.round(top.conf)}%</span>` : ''}
+    </div>
+    <div class="sch-row sch-row-2">
+      <span class="sch-filters">
+        ${chip('all', 'ALL', 'Every fighter on the slate')}
+        ${chip('lean', 'HAS LEAN', 'Only fighters with a directional lean (over or under)')}
+        ${chip('ev', '+EV', 'Only leans priced above breakeven')}
+        ${chip('gaps', 'LINE GAPS', 'Fighters missing at least one book — the fetch worklist behind Slate Check coverage')}
+      </span>
+      <span class="sch-cov" title="Fighters covered per book, of ${shown.length} shown">
+        ${cov.map(c => `<span class="sch-cov-book${c.n === 0 ? ' none' : c.n === shown.length ? ' full' : ''}">${c.label} <b>${c.n}</b></span>`).join('')}
+      </span>
+      <button class="sch-compact-toggle${_slateCompact ? ' on' : ''}" data-slate-compact title="Slim every row to identity + lean (hide the line grid &amp; stat deck) for faster full-slate scanning">▤ ${_slateCompact ? 'FULL ROWS' : 'SLIM ROWS'}</button>
+    </div>`;
+  return el;
+}
+
 // L1 — directional command header: count, tier breakdown, avg EV, strongest play.
 function buildLeanViewHeader(fighters: AnalyzerFighter[], dir: 'over' | 'under'): HTMLElement {
   const el = document.createElement('div');
@@ -15179,8 +15287,19 @@ function computeFightCorrelation(
   return null;
 }
 
-function cardPositionForFightIndex(fightIndex: number, totalFights: number): FightCardPosition {
-  if (fightIndex === 0) return 'main';
+// GLOW-UP 198 L4 — the MAIN EVENT badge is now headliner-matched, like the 5R
+// chip beside it. `rounds` was fixed to use fightIsMainEvent() (cd122bb) but this
+// stayed on raw array position, so on a card whose UFCStats order isn't main-first
+// the badge and the rounds chip pointed at DIFFERENT fights. Positional 'main' is
+// kept only as the fallback when no headliner could be identified at all.
+function cardPositionForFightIndex(
+  fightIndex: number,
+  totalFights: number,
+  isMainEvent: boolean,
+  headlinerKnown: boolean,
+): FightCardPosition {
+  if (isMainEvent) return 'main';
+  if (!headlinerKnown && fightIndex === 0) return 'main';
   if (fightIndex === 1) return 'co-main';
   if (fightIndex < Math.ceil(totalFights * 0.55)) return 'main-card';
   return 'prelim';
@@ -15227,7 +15346,8 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
     const weightClass = cardPair?.weightClass;
     const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
     const correlation = b ? computeFightCorrelation(a, b) : null;
-    const rounds: 3 | 5 = fightIsMainEvent(a, b) ? 5 : 3;
+    const isMain = fightIsMainEvent(a, b);
+    const rounds: 3 | 5 = isMain ? 5 : 3;
     const topEdge = !!topEdgeName && (a.name === topEdgeName || b?.name === topEdgeName);
     out.push({
       fighterA: a,
@@ -15235,7 +15355,7 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
       fightIndex,
       weightClass,
       rounds,
-      cardPosition: cardPositionForFightIndex(fightIndex, totalFights),
+      cardPosition: cardPositionForFightIndex(fightIndex, totalFights, isMain, !!headlinerPair),
       ftLine: ft?.value ?? null,
       ftPlatKey: ft?.plat ?? null,
       bothHaveCtrl: fighterHasCtrlProp(a) && fighterHasCtrlProp(b),
@@ -15743,6 +15863,15 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
     });
   }
 
+  // GLOW-UP 198 L2 — apply the slate filter before _slatePresentSlots so a
+  // filtered slate also collapses any book column it just emptied.
+  const isSlateView = currentView === 'all';
+  const _slateTotalBeforeFilter = activeFighters.length;
+  if (isSlateView && _slateFilter !== 'all') {
+    const liveBooks = _slateFilter === 'gaps' ? slateLiveBooks(activeFighters) : [];
+    activeFighters = activeFighters.filter(f => slateFilterAccepts(f, liveBooks));
+  }
+
   // Compute which (platform, stat) slots have data for at least one fighter on
   // this slate. lineCell skips emitting cells (placeholder or real) for slots
   // outside this set, so dead columns don't take horizontal space across cards.
@@ -15769,7 +15898,12 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // per row triggers a layout pass per row (~80 passes for a 26-fighter card).
   const frag = document.createDocumentFragment();
 
-  const showFightGroups = currentSort === 'default' && currentView === 'all' && !currentSearch.trim();
+  if (isSlateView) frag.appendChild(buildSlateViewHeader(activeFighters, _slateTotalBeforeFilter));
+
+  // A filter breaks opponent adjacency, so fall back to the flat list — same
+  // reason an active search does.
+  const showFightGroups = currentSort === 'default' && currentView === 'all'
+    && !currentSearch.trim() && _slateFilter === 'all';
 
   const buildRowForFighter = (f: AnalyzerFighter, rowIdx: number, fightIndex: number): HTMLDivElement => {
     const explicitOpp = sanitizeOpponentName(f.opponent, f.name);
@@ -15915,6 +16049,24 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 
   // Commit the entire fragment in one DOM operation.
   container.appendChild(frag);
+
+  // GLOW-UP 198 L2/L3 — slate filter + density handlers. Bound after the commit
+  // because the header lives inside the fragment.
+  container.classList.toggle('slate-compact', isSlateView && _slateCompact);
+  if (isSlateView) {
+    container.querySelector<HTMLElement>('[data-slate-compact]')?.addEventListener('click', () => {
+      _slateCompact = !_slateCompact;
+      renderFighters();
+    });
+    container.querySelectorAll<HTMLElement>('[data-slate-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const next = (btn.dataset['slateFilter'] || 'all') as SlateFilter;
+        // Re-clicking the active chip clears it, so the filter is never a trap.
+        _slateFilter = _slateFilter === next ? 'all' : next;
+        renderFighters();
+      });
+    });
+  }
 
   // GLOW-UP 194 — lean-view container state (L3 compact) + control handlers.
   container.classList.toggle('lean-triage', isLeanView);

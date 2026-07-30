@@ -30,6 +30,11 @@
   /* Aliases used by archive/dashboard panels */
   --surface2:   #141b2d;
   --text-muted: #5c6d92;
+  /* --text1 is referenced in 12 places (fighter names, stat values, rank badges)
+     but was never defined, so every one of them silently inherited its colour
+     instead of taking the primary text tone. Aliased rather than rewritten
+     per-site so there's one definition to change. */
+  --text1:      #f4f7ff;
   --amber:      #f8c64a;
   --accent:     #56c3ff;
 
@@ -735,6 +740,91 @@ body {
 .lcp-stat { color: var(--text2); }
 .lcp-line { color: var(--text1); font-size: 14px; }
 .lcp-book { color: var(--text3); font-size: 10px; font-weight: 600; }
+
+/* ── GLOW-UP 198 — ALL FIGHTERS slate header (L1), filters (L2), density (L3) ── */
+.slate-cmd-header {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 14px; margin-bottom: 10px;
+  background: linear-gradient(180deg, var(--bg3), var(--bg2));
+  border: 1px solid var(--border); border-left: 3px solid var(--gold);
+  border-radius: 8px;
+}
+.sch-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sch-row-2 { gap: 10px; }
+.sch-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800;
+  letter-spacing: 1.2px; color: var(--gold); }
+.sch-count { font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 800;
+  color: var(--text); line-height: 1; }
+.sch-of { font-size: 12px; font-weight: 600; font-style: normal; color: var(--text3); }
+.sch-dirs { display: flex; gap: 8px; }
+.sch-dir { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; }
+.sch-dir.over { color: var(--green); }
+.sch-dir.under { color: var(--red); }
+.sch-tiers { display: flex; gap: 6px; }
+.sch-tier { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+  background: var(--bg4); border: 1px solid var(--border); color: var(--text3); }
+.sch-tier.high { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, transparent); }
+.sch-tier.med  { color: var(--text2); }
+.sch-ev { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; }
+.sch-ev.pos { color: var(--green); } .sch-ev.neg { color: var(--red); }
+.sch-ev-n { font-size: 9px; font-style: normal; color: var(--text3); font-weight: 600; }
+.sch-top { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text2);
+  padding: 3px 9px; border-radius: 5px;
+  background: color-mix(in srgb, var(--gold) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent); }
+
+.sch-filters { display: flex; gap: 5px; }
+.sch-filter { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.6px; padding: 4px 9px; border-radius: 5px; cursor: pointer;
+  background: var(--bg4); border: 1px solid var(--border); color: var(--text3); }
+.sch-filter:hover { color: var(--text2); border-color: var(--border2); }
+.sch-filter.on { background: color-mix(in srgb, var(--gold) 15%, transparent);
+  color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+
+.sch-cov { display: flex; gap: 4px; margin-left: auto; }
+.sch-cov-book { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+  padding: 3px 7px; border-radius: 4px; color: var(--text3);
+  background: var(--bg4); border: 1px solid var(--border); }
+.sch-cov-book b { color: var(--text2); font-weight: 800; }
+.sch-cov-book.full { border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+.sch-cov-book.full b { color: var(--green); }
+.sch-cov-book.none { opacity: 0.45; }
+.sch-cov-book.none b { color: var(--red); }
+
+.sch-compact-toggle { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.6px; padding: 4px 9px; border-radius: 5px; cursor: pointer;
+  background: var(--bg4); border: 1px solid var(--border); color: var(--text3); }
+.sch-compact-toggle:hover { color: var(--text2); border-color: var(--border2); }
+.sch-compact-toggle.on { background: rgba(86,195,255,0.14); color: var(--stat-fp);
+  border-color: color-mix(in srgb, var(--stat-fp) 45%, transparent); }
+
+/* L3 slim rows — same approach as .lean-compact, but scoped to the slate view so
+   the two densities stay independent. .fighter-main is a fixed grid, so it flips
+   to flex here rather than having its columns resized. */
+.slate-compact .fighter-row .platform-lines,
+.slate-compact .fighter-row .stats-mini,
+.slate-compact .fighter-row .opp-profile-strip { display: none; }
+.slate-compact .fighter-row .fighter-main {
+  display: flex; align-items: center; gap: 18px;
+  padding-top: 8px; padding-bottom: 8px;
+}
+/* .lean-cell is a column stack. With the line grid and stat deck gone it has
+   nothing beside it, so every badge stacks and IT sets the row height — slim
+   rows came out taller than full ones. Flatten it to a wrapping row and drop the
+   tertiary chips; the lean chip, EV and NEWS still carry the decision. */
+.slate-compact .fighter-row .lean-cell {
+  margin-left: auto;
+  flex-direction: row; align-items: center; justify-content: flex-end;
+  flex-wrap: wrap; gap: 6px; max-width: 58%;
+}
+.slate-compact .fighter-row .weighted-avg-label,
+.slate-compact .fighter-row .fair-value-chip,
+.slate-compact .fighter-row .archive-accuracy-badge,
+.slate-compact .fighter-row .form-dots { display: none; }
+.slate-compact .fighter-row .fighter-main { padding-top: 6px; padding-bottom: 6px; }
+/* Pairs stack vertically when slim so the spine doesn't strand two narrow rows. */
+.slate-compact .fight-pair { display: block; }
+.slate-compact .fight-spine { display: none; }
 
 /* Lines */
 .platform-lines { display: flex; gap: 5px; flex-wrap: wrap; }
