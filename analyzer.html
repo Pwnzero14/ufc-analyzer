@@ -792,6 +792,62 @@ body {
   background: color-mix(in srgb, var(--gold) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent); }
 
+/* ── GLOW-UP 200 — Best Picks third pass ── */
+/* L1 board verdict — one read across both columns, above the exposure strip. */
+.bp-verdict {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 9px 14px; margin-bottom: 8px; border-radius: 8px;
+  background: linear-gradient(180deg, var(--bg3), var(--bg2));
+  border: 1px solid var(--border); border-left: 3px solid var(--border3);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.bp-verdict.bpv-strong { border-left-color: var(--green); }
+.bp-verdict.bpv-ok     { border-left-color: var(--gold); }
+.bp-verdict.bpv-weak   { border-left-color: var(--red); }
+.bpv-label { font-size: 9px; font-weight: 800; letter-spacing: 1.2px; color: var(--text3); }
+.bpv-picks { font-weight: 700; color: var(--text); }
+.bpv-conf, .bpv-ev { color: var(--text2); }
+.bpv-conf b { color: var(--text); font-weight: 800; }
+.bpv-ev.pos b { color: var(--green); } .bpv-ev.neg b { color: var(--red); }
+.bpv-sep { flex: 1; }
+.bpv-flag {
+  font-family: inherit; font-size: 10px; font-weight: 700; cursor: pointer;
+  padding: 3px 9px; border-radius: 5px;
+  background: rgba(240,192,64,0.14); color: var(--amber);
+  border: 1px solid rgba(240,192,64,0.4);
+}
+.bpv-flag:hover { background: rgba(240,192,64,0.24); }
+.bpv-clean { font-size: 10px; font-weight: 700; color: var(--green); }
+.bpv-neg, .bpv-inv {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
+  background: rgba(255,58,96,0.12); color: var(--red); border: 1px solid rgba(255,58,96,0.3);
+}
+.bpv-inv-none { font-size: 10px; font-weight: 600; color: var(--text3); opacity: 0.7; }
+.bpv-inv { background: rgba(150,120,255,0.14); color: #b3a0ff; border-color: rgba(150,120,255,0.38); }
+
+/* L2 rank-inversion chip on the surviving row */
+.bp-flag-inv {
+  background: rgba(150,120,255,0.16) !important; color: #b3a0ff !important;
+  border: 1px solid rgba(150,120,255,0.45) !important;
+}
+
+/* L3 FLAGGED filter chip — inverse of CLEAN, so it takes the warning hue */
+.bpc-chip.bpc-flagged.on {
+  background: rgba(240,192,64,0.16); color: var(--amber);
+  border-color: rgba(240,192,64,0.5);
+}
+
+/* L4 cut rows are now clickable */
+.bpnm-row[data-bpnm-jump] { cursor: pointer; border-radius: 4px; }
+.bpnm-row[data-bpnm-jump]:hover { background: rgba(255,255,255,0.05); }
+.bpnm-row.bpnm-inverted { border-left: 2px solid rgba(150,120,255,0.55); padding-left: 6px; }
+.bpnm-inv { color: #b3a0ff; font-weight: 700; }
+
+/* L5 per-book EV inside the exposure book chips */
+.bpx-book-ev { font-style: normal; font-weight: 800; font-size: 9px; margin-left: 3px; }
+.bpx-book-ev.pos { color: var(--green); }
+.bpx-book-ev.neg { color: var(--red); }
+
 /* GLOW-UP 199 — Learning Drilldown directive → board. The count chip turns the
    directive from advice into a link; the pattern chip below announces that the
    short board is a deliberate filter, not a bug. */
