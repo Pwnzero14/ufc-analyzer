@@ -7214,7 +7214,20 @@ async function renderLearningDiagnosticsWidget() {
     // Directive line: verb chip (▲ LEAN INTO green / ▼ FADE red) + target text.
     // The target inherits its container's styling (gold headline in the title
     // slot, muted meta in the fade slot) so only the verb becomes a badge.
-    const directiveHtml = (verb, target) => `<span class="ld-chip ld-chip-${verb}">${verb === 'lean' ? '▲ LEAN INTO' : '▼ FADE'}</span><span class="ld-target">${escLd(target)}</span>`;
+    // GLOW-UP 199: the directive now names its own matches on tonight's card and
+    // links to them. Without the count it was advice with no addressee.
+    const directiveHtml = (verb, target, m = { full: 0, sideOnly: 0 }, sideLabel = '') => {
+        const head = `<span class="ld-chip ld-chip-${verb}">${verb === 'lean' ? '▲ LEAN INTO' : '▼ FADE'}</span><span class="ld-target">${escLd(target)}</span>`;
+        if (m.full > 0) {
+            return head + `<button class="ld-matches ld-matches-${verb}" data-ld-match="${verb}" title="${m.full} fighter(s) on this card carry this exact pattern — click to filter the board to them">${m.full} on this card →</button>`;
+        }
+        // Say WHY it's zero: nobody on that side at all, vs. several but untagged.
+        const why = m.sideOnly > 0
+            ? `${m.sideOnly} fighter(s) lean ${escLd(sideLabel)} on this card, but none carry the "${escLd(target.split('·').pop()?.trim() || '')}" tag yet — lines are still filling in.`
+            : `No fighter on this card leans ${escLd(sideLabel)} at all.`;
+        const short = m.sideOnly > 0 ? `0 of ${m.sideOnly} ${escLd(sideLabel)}` : 'none on this card';
+        return head + `<span class="ld-matches ld-matches-none" title="${why}">${short}</span>`;
+    };
     // Footer becomes stat chips instead of one gray string. SS/FP are market
     // over-rates (share of resolved props that went OVER), not model accuracy —
     // the titles say so to head off misreading.
@@ -7322,18 +7335,32 @@ async function renderLearningDiagnosticsWidget() {
             else {
                 setText('ldPatternMiss', 'Top miss tag: Need >=3 settled tagged rows');
             }
+            _memoryDirectives = { lean: topHit || null, fade: topMiss || null };
+            const leanMatches = countDirectiveMatches(topHit);
+            const fadeMatches = countDirectiveMatches(topMiss);
+            const leanSide = topHit ? `${formatSourceLabel(topHit.source)} ${topHit.lean.toUpperCase()}` : '';
+            const fadeSide = topMiss ? `${formatSourceLabel(topMiss.source)} ${topMiss.lean.toUpperCase()}` : '';
             if (topHit && topMiss) {
-                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel));
-                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel));
+                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel, leanMatches, leanSide));
+                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel, fadeMatches, fadeSide));
             }
             else if (topHit) {
-                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel));
+                setHtml('ldDrilldownTitle', directiveHtml('lean', hitLabel, leanMatches, leanSide));
                 setText('ldDrilldownMeta', 'No clear fade yet');
             }
             else {
                 setText('ldDrilldownTitle', 'No clear lean yet');
-                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel));
+                setHtml('ldDrilldownMeta', directiveHtml('fade', missLabel, fadeMatches, fadeSide));
             }
+            // Bind after the innerHTML writes above, or the buttons don't exist yet.
+            document.querySelectorAll('[data-ld-match]').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    _slateFilter = btn.dataset['ldMatch'] === 'fade' ? 'fadepattern' : 'pattern';
+                    document.querySelector('.tab-btn[data-view="all"]')?.click();
+                    renderFighters();
+                });
+            });
             setHtml('ldDrilldownBody', `<span class="ld-evidence" title="Settled picks carrying context tags — the sample base behind this directive">📎 ${memoryProfile.taggedSamples} tagged samples</span>`);
             const topShort = topHit ? hitLabel : (topMiss ? `fade ${missLabel}` : null);
             setHtml('ldFooterSummary', footerHtml(resolvedRows.length, ssLabel, fpLabel, topShort));
@@ -9389,15 +9416,100 @@ function renderBestPicks(container, renderSeq = 0) {
         renderModelHealthWidget();
     })();
 }
+// ── GLOW-UP 199 — memory-tag helpers, hoisted to module scope ─────────────
+// These were closures inside persistBestPicksSnapshot. The Learning Drilldown
+// now needs to tag LIVE board fighters with the same vocabulary the archive was
+// tagged with, and the two must classify identically or the directive would
+// count fighters the snapshot wouldn't. Same reason leanFactorLabel was hoisted
+// in GLOW-UP 184.
+function resolveOpponentDbFor(f) {
+    const normalizedOpp = normalizeName(f.opponent || '')?.toLowerCase() || '';
+    const opponent = normalizedOpp
+        ? (_fighterByNorm?.get(normalizedOpp) || allFighters.find((entry) => (normalizeName(entry.name) || entry.name).toLowerCase() === normalizedOpp) || null)
+        : null;
+    return opponent?.db?.loaded ? opponent.db : null;
+}
+function sourceAverageForFighter(f, source) {
+    const history = f.db?.history || [];
+    if (source === 'fp')
+        return activePlatformAvgFP(f.db) ?? f.db.avgFP_weighted ?? f.db.avgFP ?? null;
+    const pick = (get) => {
+        const values = history.map(get).filter((v) => typeof v === 'number' && Number.isFinite(v));
+        return values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
+    };
+    if (source === 'ss')
+        return pick((fight) => fight.sigStr);
+    if (source === 'ss_r1')
+        return pick((fight) => fight.sigStrR1);
+    if (source === 'td')
+        return pick((fight) => fight.td);
+    const mins = history
+        .map((fight) => Number(fight.timeSecs) / 60)
+        .filter((v) => Number.isFinite(v) && v > 0);
+    return mins.length ? mins.reduce((s, v) => s + v, 0) / mins.length : null;
+}
+// GLOW-UP 199 — the Learning Drilldown's two directives, cached at module scope
+// so the slate filter can reach them. The panel derived them and then dropped
+// them on the floor: it said "LEAN INTO SS UNDER · split markets" without ever
+// naming which of tonight's fighters actually qualify.
+let _memoryDirectives = { lean: null, fade: null };
+/** Does this fighter's live lean carry the directive's source + side + tag? */
+function fighterMatchesDirective(f, sig) {
+    if (!sig)
+        return false;
+    const el = getEffectiveLean(f);
+    if (el.lean !== sig.lean)
+        return false;
+    if ((el._source || 'fp') !== sig.source)
+        return false;
+    return memoryTagsForFighter(f, sig.source, el).includes(sig.tag);
+}
+/**
+ * How many board fighters match a directive — full (source+side+tag) and
+ * sideOnly (source+side, tag ignored). The split matters: "none on this card"
+ * is ambiguous on its own, since it can mean nobody leans that way OR that
+ * several do but none carry the tag. Reporting both also proves the matcher is
+ * live rather than silently returning zero.
+ */
+function countDirectiveMatches(sig) {
+    const out = { full: 0, sideOnly: 0 };
+    if (!sig || !allFighters.length)
+        return out;
+    for (const f of allFighters) {
+        if (isCancelledFighter(f.name))
+            continue;
+        const el = getEffectiveLean(f);
+        if (el.lean !== sig.lean || (el._source || 'fp') !== sig.source)
+            continue;
+        out.sideOnly++;
+        if (memoryTagsForFighter(f, sig.source, el).includes(sig.tag))
+            out.full++;
+    }
+    return out;
+}
+/** Context tags for a live board fighter, in the archive's tag vocabulary. */
+function memoryTagsForFighter(f, source, el) {
+    const activeLine = getSourceActiveLine(f, source);
+    if (activeLine == null || !f.db?.loaded)
+        return [];
+    return deriveConfidenceMemoryTagsLive({
+        fighterName: f.name,
+        source,
+        lean: el.lean,
+        baseConfidence: el.conf || 0,
+        score: el.score ?? 0,
+        db: f.db,
+        avgValue: sourceAverageForFighter(f, source),
+        line: activeLine,
+        selectedLine: activeLine,
+        availableLines: getSourceLineEntries(f, source).map((entry) => entry.value),
+        oppDB: resolveOpponentDbFor(f),
+        moneyline: f.moneyline ?? null,
+    });
+}
 async function persistBestPicksSnapshot(overs, unders) {
     try {
-        const resolveOpponentDb = (f) => {
-            const normalizedOpp = normalizeName(f.opponent || '')?.toLowerCase() || '';
-            const opponent = normalizedOpp
-                ? (_fighterByNorm?.get(normalizedOpp) || allFighters.find((entry) => (normalizeName(entry.name) || entry.name).toLowerCase() === normalizedOpp) || null)
-                : null;
-            return opponent?.db?.loaded ? opponent.db : null;
-        };
+        const resolveOpponentDb = resolveOpponentDbFor;
         const getSourceAverageFromFighter = (f, source) => {
             const history = f.db?.history || [];
             if (source === 'fp')
@@ -14691,6 +14803,11 @@ function slateLiveBooks(fighters) {
 function slateFilterAccepts(f, liveBooks) {
     if (_slateFilter === 'all')
         return true;
+    // GLOW-UP 199 — arrived from a Learning Drilldown directive.
+    if (_slateFilter === 'pattern')
+        return fighterMatchesDirective(f, _memoryDirectives.lean);
+    if (_slateFilter === 'fadepattern')
+        return fighterMatchesDirective(f, _memoryDirectives.fade);
     const lean = getEffectiveLean(f);
     const directional = lean.lean === 'over' || lean.lean === 'under';
     if (_slateFilter === 'lean')
@@ -14807,6 +14924,17 @@ function buildSlateViewHeader(shown, total) {
         ${chip('lean', 'HAS LEAN', 'Only fighters with a directional lean (over or under)')}
         ${chip('ev', '+EV', 'Only leans priced above breakeven')}
         ${chip('gaps', 'LINE GAPS', 'Fighters missing at least one book — the fetch worklist behind Slate Check coverage')}
+        ${(() => {
+        // A pattern filter arrives from the Learning Drilldown, not from these
+        // chips, so it needs to announce itself or the board looks arbitrarily short.
+        const sig = _slateFilter === 'pattern' ? _memoryDirectives.lean
+            : _slateFilter === 'fadepattern' ? _memoryDirectives.fade : null;
+        if (!sig)
+            return '';
+        const verb = _slateFilter === 'pattern' ? '▲ LEAN INTO' : '▼ FADE';
+        const label = `${formatSourceLabel(sig.source)} ${sig.lean.toUpperCase()} · ${sig.tagLabel}`;
+        return `<button class="sch-pattern ${_slateFilter === 'pattern' ? 'is-lean' : 'is-fade'}" data-slate-filter="all" title="Archive pattern from the Learning Drilldown — ${Math.round(sig.hitRate * 100)}% over ${sig.total} settled rows. Click to clear.">${verb} ${label} ✕</button>`;
+    })()}
       </span>
       <span class="sch-cov" title="Fighters covered per book, of ${shown.length} shown">
         ${cov.map(c => `<span class="sch-cov-book${c.n === 0 ? ' none' : c.n === shown.length ? ' full' : ''}">${c.label} <b>${c.n}</b></span>`).join('')}
