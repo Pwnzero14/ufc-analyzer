@@ -316,7 +316,39 @@ export const NAME_ALIASES = {
 //   capped at 0.85): measured 11.16min career vs 9.66min market on the Ankalaev slate.
 //   Damping it at source puts every branch on one scale, so predictions are consistent
 //   whether or not the markets have posted.
-export const MODEL_VERSION = 14;
+// v15 (2026-07-28): shrink the observed SS rate toward the league mean.
+//   An observed SS/min is a noisy estimate of a true rate, and extreme observations
+//   carry the most noise, so they regress. Measured WALK-FORWARD over 1,891 fights
+//   from 325 cached fighters — rate computed from prior fights only, projected across
+//   each fight's ACTUAL duration so the test isolates the rate rather than the
+//   duration model:
+//     prior rate    mean error (predicted - actual)
+//       0-3 SS/min      -6.83   LOW rates were UNDER-predicted
+//       3-4             -2.03
+//       4-5             +2.51
+//       5-6             +5.29
+//       6+             +17.45   HIGH rates over-predicted, 72% of the time
+//   Regressing actual rate on prior rate gives slope 0.49 (about half of any deviation
+//   from the mean evaporates), rising with sample size — 0.28 at 3-5 prior fights,
+//   0.70 at 8+ — exactly as regression to the mean predicts. Implemented as
+//   empirical-Bayes shrinkage (K = 36 "phantom minutes" at the league mean), NOT the
+//   raw linear fit, which over-corrects the low extreme.
+//   ONE-SIDED — only rates ABOVE the mean are shrunk. Splitting mean vs median vs
+//   trimmed mean shows the tails are not equally supported: the 6+ bucket is
+//   +17.45/+16.20/+18.08 (robust however measured) while 0-3 is -6.83/-3.88/-5.30
+//   (half the mean is outlier skew). The low-end correction is also contradicted by
+//   the live market — it moved Robert Valentin, whose projection matched his posted
+//   line almost exactly (22.8 vs 21.5), out to 30.4. Both variants were measured:
+//                       actual results (n=1891)      live lines (n=14)
+//     v14 no shrink     MAE 20.52  bias +1.61        MAE 7.7  bias +5.5
+//     two-sided         MAE 19.79  bias +2.18        MAE 7.7  bias +6.6
+//     ONE-SIDED         MAE 19.75  bias -0.31        MAE 7.0  bias +4.9
+//   One-sided is better on both metrics and on both datasets; it keeps the whole
+//   high-end fix (6+ bucket bias +17.45 -> +4.95) and leaves the weakly-evidenced low
+//   end alone. This is the first model change here validated against ACTUAL RESULTS
+//   rather than posted lines, which cannot separate "model is wrong" from "book
+//   shaded it".
+export const MODEL_VERSION = 15;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

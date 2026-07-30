@@ -87,6 +87,18 @@ const MAX_STEP_PER_EVENT = 0.08; // cap per-event multiplicative change at ±8%
 const SS_RATE_MIN = 0.5;
 const SS_RATE_MAX = 9.0;
 const LEAGUE_SS_RATE = 3.9; // league-typical SS landed (and absorbed) per minute
+// MODEL v15 — the MEASURED mean realised SS rate over 1,891 walk-forward fights from
+// the cached population. Deliberately a separate constant from LEAGUE_SS_RATE above:
+// this is the shrinkage TARGET that SS_RATE_SHRINK_K was fitted against, and using a
+// different value here would re-bias every shrunk rate. (LEAGUE_SS_RATE is the
+// zero-data FALLBACK and is left at 3.9 — moving it is a separate, unvalidated change
+// affecting fighters with no history at all. Worth revisiting together.)
+const SS_RATE_LEAGUE_MEAN = 4.55;
+// Shrinkage strength in "phantom minutes at the league mean": a fighter with 36 logged
+// minutes gets a 50/50 blend, a veteran with 150 keeps ~80% of their own rate. Fitted
+// by MAE sweep on the same 1,891 observations (best at 36; the curve is flat from
+// ~25-50, so this is not a sharp overfit).
+const SS_RATE_SHRINK_K = 36;
 const MIN_CLASS_SAMPLES = 2; // need at least this many per-class samples to update a class-specific bucket
 // ── Service ─────────────────────────────────────────────────────────────
 export class PropLinePredictorService {
@@ -300,10 +312,54 @@ export class PropLinePredictorService {
         const histRate = (fighterDB.avgSigStr != null && fighterDB.avgSigStr > 0 && avgHistMin > 0)
             ? fighterDB.avgSigStr / avgHistMin
             : null;
-        const fighterRate = clamp(histRate ?? ((fighterDB.slpm ?? 0) > 0 ? fighterDB.slpm : LEAGUE_SS_RATE), SS_RATE_MIN, SS_RATE_MAX);
+        const rawRate = clamp(histRate ?? ((fighterDB.slpm ?? 0) > 0 ? fighterDB.slpm : LEAGUE_SS_RATE), SS_RATE_MIN, SS_RATE_MAX);
+        // ── MODEL v15: shrink the observed rate toward the league mean ─────────────
+        // An observed SS/min is a NOISY estimate of a fighter's true rate, and extreme
+        // observations carry the most noise — so they regress. Measured walk-forward over
+        // 1,891 fights from 325 cached fighters (rate from prior fights only, projected
+        // across the fight's ACTUAL duration so this isolates the rate, not the duration):
+        //   prior rate   mean error (predicted - actual)
+        //     0-3 SS/min      -6.83   <- LOW rates were UNDER-predicted
+        //     3-4             -2.03
+        //     4-5             +2.51
+        //     5-6             +5.29
+        //     6+             +17.45   <- HIGH rates badly OVER-predicted, 72% of the time
+        // Regressing actual rate on prior rate gives slope 0.49 — about half of any
+        // deviation from the league mean evaporates — and the slope rises with sample
+        // size (0.28 at 3-5 prior fights, 0.70 at 8+), exactly as regression to the mean
+        // predicts. Empirical-Bayes form is used rather than that raw linear fit, which
+        // over-corrects the extreme low end (it wanted +134% on a 1.32 SS/min fighter
+        // where the bucket evidence supports ~+11%). K is in "phantom minutes at league
+        // average", fitted on the same set: it shrinks proportionally, cannot overshoot,
+        // and handles sample size natively — a fighter with few logged minutes is pulled
+        // harder than a veteran. Effect on bias: 6+ bucket +17.45 -> +4.96, 0-3 bucket
+        // -6.83 -> +0.74. MAE gains only 3.6%, but the systematic tilt is what mattered:
+        // the model was over-projecting precisely the fighters an OVER would be bet on.
+        // ONE-SIDED on purpose. Splitting mean vs median vs trimmed mean per bucket shows
+        // the two tails are not equally supported:
+        //     6+ SS/min : mean +17.45, median +16.20, trimmed +18.08  <- robust, not outliers
+        //     5-6       : mean  +5.29, median  +4.28, trimmed  +6.05  <- solid
+        //     3-4       : mean  -2.03, median  +0.32, trimmed  -0.51  <- ~zero
+        //     0-3       : mean  -6.83, median  -3.88, trimmed  -5.30  <- half the mean is skew
+        // The over-prediction at high rates is consistent however it's measured. The
+        // low-end under-prediction is materially weaker AND is contradicted by the live
+        // market: shrinking Robert Valentin UP (1.30 -> 3.21 SS/min) moved a projection
+        // that matched his posted line almost exactly (22.8 vs 21.5) out to 30.4. Claiming
+        // the book is that wrong about a low-output fighter needs better evidence than an
+        // outlier-skewed bucket mean, so only rates ABOVE the league mean are shrunk.
+        const priorMinutes = (avgHistMin > 0 && histRate != null)
+            ? avgHistMin * (fighterDB.history?.length ?? 0)
+            : 0;
+        const fighterRate = (priorMinutes > 0 && rawRate > SS_RATE_LEAGUE_MEAN)
+            ? clamp((rawRate * priorMinutes + SS_RATE_SHRINK_K * SS_RATE_LEAGUE_MEAN) / (priorMinutes + SS_RATE_SHRINK_K), SS_RATE_MIN, SS_RATE_MAX)
+            : rawRate;
         // Opponent's absorbed rate (SAPM is already per-minute — no ×15).
         const oppRate = clamp((opponentDB && (opponentDB.sapm ?? 0) > 0) ? opponentDB.sapm : LEAGUE_SS_RATE, SS_RATE_MIN, SS_RATE_MAX);
-        reasons.push(`Output ${fighterRate.toFixed(2)} SS/min`);
+        // Show the shrink when it actually moved the number, so a projection that
+        // disagrees with the raw career rate explains itself.
+        reasons.push(Math.abs(fighterRate - rawRate) >= 0.15
+            ? `Output ${fighterRate.toFixed(2)} SS/min (${rawRate.toFixed(2)} raw, regressed on ${priorMinutes.toFixed(0)}min)`
+            : `Output ${fighterRate.toFixed(2)} SS/min`);
         if (opponentDB)
             reasons.push(`Opp absorbs ${oppRate.toFixed(2)} SS/min`);
         reasons.push(`Expected ${expectedMin.toFixed(1)}min (`
