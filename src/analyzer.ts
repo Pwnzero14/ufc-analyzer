@@ -15058,6 +15058,39 @@ function slateFilterAccepts(
   return liveBooks.some(k => !hasSourceLine(f, k));
 }
 
+/**
+ * L5 — add-to-slip on the slate view, hung off the play pill.
+ *
+ * Docked inside `.play-pill`, deliberately. Two alternatives were tried and are
+ * NOT improvements:
+ *  1. A 46px left gutter (what the lean views use) — doesn't transfer, because
+ *     inside `.fight-pair` the `.fighter-main` grid is fractional
+ *     (`minmax(192px, 1.15fr) …`) and its identity column already ellipsizes
+ *     ordinary names; taking 46px more would truncate further.
+ *  2. Stacked above the ▼ in `.row-expand-slot` — costs no width, but that column
+ *     is 22px of dead space at the far right of a very wide row, and the button
+ *     was effectively invisible there. Rejected on discoverability (user call).
+ * The pill wraps to two lines on narrow identity columns. That's accepted: the
+ * button belongs to the play, and reading as part of the pill is worth the row.
+ * Same `name|lean|source` key as Best Picks, so a pick added here is the SAME
+ * slate entry and the two surfaces dedupe.
+ */
+function attachSlateSlipButton(row: HTMLElement, f: AnalyzerFighter): void {
+  const pill = row.querySelector('.play-pill');
+  if (!pill) return;
+  const lean = getEffectiveLean(f);
+  if (lean.lean !== 'over' && lean.lean !== 'under') return;
+  const { key, pick } = buildLeanSlatePick(f, lean);
+  _leanSlateData.set(key, pick);
+  const inSlate = bestPicksSlate.has(key);
+  const btn = document.createElement('button');
+  btn.className = `slate-slip-btn${inSlate ? ' on' : ''}`;
+  btn.dataset['slateKey'] = key;
+  btn.title = inSlate ? 'Remove from My Slate' : `Add to My Slate — ${pick.clip}`;
+  btn.textContent = inSlate ? '✓' : '+';
+  pill.appendChild(btn);
+}
+
 // L1 — slate command header: fights, leans, tiers, avg EV, top edge, coverage.
 function buildSlateViewHeader(shown: AnalyzerFighter[], total: number): HTMLElement {
   const el = document.createElement('div');
@@ -15107,6 +15140,7 @@ function buildSlateViewHeader(shown: AnalyzerFighter[], total: number): HTMLElem
       </span>
       ${avgEv != null ? `<span class="sch-ev ${avgEv > 0 ? 'pos' : 'neg'}" title="Average EV across every fighter with a priced lean — ${posEv} of ${evCount} are above breakeven">avg EV ${avgEv > 0 ? '+' : ''}${avgEv.toFixed(1)}% <i class="sch-ev-n">${posEv}/${evCount} +EV</i></span>` : ''}
       ${top ? `<span class="sch-top" title="Highest-confidence lean on the slate">⭐ ${top.name} · ${top.label} · ${Math.round(top.conf)}%</span>` : ''}
+      ${bestPicksSlate.size ? `<button class="sch-slip" data-slate-jump="1" title="${bestPicksSlate.size} pick(s) in My Slate — the tray only renders on AI BEST PICKS. Click to jump there and review them.">🧾 MY SLATE <b>${bestPicksSlate.size}</b> →</button>` : ''}
     </div>
     <div class="sch-row sch-row-2">
       <span class="sch-filters">
@@ -15866,6 +15900,9 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   // GLOW-UP 198 L2 — apply the slate filter before _slatePresentSlots so a
   // filtered slate also collapses any book column it just emptied.
   const isSlateView = currentView === 'all';
+  // Both the slate and the lean views populate _leanSlateData for their add-to-slip
+  // handlers, so it has to be cleared for either — not just the lean branch.
+  if (isSlateView) _leanSlateData.clear();
   const _slateTotalBeforeFilter = activeFighters.length;
   if (isSlateView && _slateFilter !== 'all') {
     const liveBooks = _slateFilter === 'gaps' ? slateLiveBooks(activeFighters) : [];
@@ -15914,6 +15951,8 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
     const row = buildFighterRow(f, oppEntry ?? null, fightIndex);
     row.style.setProperty('--row-index', String(rowIdx % 18));
     if (isPlaceholderFighter(f)) row.classList.add('fighter-row-placeholder');
+    // GLOW-UP 198 L5 — slate rows can feed My Slate too, not just the lean views.
+    if (isSlateView && !isPlaceholderFighter(f)) attachSlateSlipButton(row, f);
     return row;
   };
 
@@ -16063,6 +16102,28 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
         const next = (btn.dataset['slateFilter'] || 'all') as SlateFilter;
         // Re-clicking the active chip clears it, so the filter is never a trap.
         _slateFilter = _slateFilter === next ? 'all' : next;
+        renderFighters();
+      });
+    });
+    // The My Slate tray is built inside the Best Picks render path only, so adding
+    // from here has nowhere to show itself. Jump the user to the tray instead.
+    container.querySelector<HTMLElement>('[data-slate-jump]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bestPicksSlateOpen = true;
+      (document.querySelector('.tab-btn[data-view="bestpicks"]') as HTMLElement | null)?.click();
+    });
+    // L5 — same toggle semantics as the lean views' .lean-slate-btn. stopPropagation
+    // matters: the row itself is clickable and would otherwise expand underneath.
+    container.querySelectorAll<HTMLElement>('.slate-slip-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.dataset['slateKey'] || '';
+        if (bestPicksSlate.has(key)) {
+          bestPicksSlate.delete(key);
+        } else {
+          const d = _leanSlateData.get(key);
+          if (d) { if (!bestPicksSlate.size) bestPicksSlateOpen = true; bestPicksSlate.set(key, d); }
+        }
         renderFighters();
       });
     });
