@@ -147,6 +147,16 @@ Work through, in order, reporting only violations and near-misses:
 4. Combo-prop sanity: any line ≈ sum of both fighters' plausible lines.
 5. FT picks: scheduled rounds correct (5R only for the title main event)?
 6. Tier consistency: High picks with thin samples or archive-note demotions.
+   **Never compare a confidence number to one from a different surface.** The
+   "considered but cut" list prints RAW `el.conf`; a pick row's WIN% is the
+   DISPLAYED confidence (CLV boost → recalibration → `evWinProb`). They are
+   different quantities and routinely differ by 15+ points. Comparing across them
+   (2026-07-30: "Medic 68% was cut for Rodriguez 52%") manufactures a same-fight
+   "rank inversion" that does not exist — checked raw-to-raw, the Medic/Rodriguez
+   board had 0 inversions across 5 dedups. The board now reports this itself via
+   the ⇅ chip and `⇅ N of M dedupes` in the BOARD strip (GLOW-UP 200) — read that
+   instead of deriving it by eye. Same rule for EV: an `~EV` chip (assumed -110
+   vig) is not comparable to a real-odds EV.
 7. Fighter flags: ⚠ NEWS or ⚖ MISS on any picked fighter — call it out with
    the direction of impact.
 
