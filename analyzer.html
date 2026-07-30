@@ -53,9 +53,36 @@
      teal, TD == Betr gold) AND landed on the same element — .line-cell carries
      both `${stat}` and `src-${source}` — so a chip's color was decided by
      cascade order rather than meaning. Stat wins on the board now. */
+  /* ── CANONICAL COLOUR MAPPING (GLOW-UP 198 — roadmap item E) ──────────────
+     One written rule so new chips stop being coloured by feel. Three axes, and a
+     colour may only ever carry ONE of them:
+
+       1. DIRECTION / OUTCOME  → --green (over, favourable, positive EV, ✓)
+                                 --red   (under, unfavourable, negative EV, ✗,
+                                          and "cannot be placed": no book / chalk)
+       2. ATTENTION            → --amber (caution that still permits action:
+                                          NEEDS ROUNDS, ⚠ corr, one-sided book,
+                                          concentration, mid-grade)
+                                 --gold  (BRAND accent / selection: TOP PICK,
+                                          event name, in-slate, active tab)
+       3. STAT FAMILY          → --stat-fp / --stat-ss / --stat-td / --stat-ft /
+                                 --stat-ctrl. ONLY for chips that identify a
+                                 single stat. A chip carrying several stats at
+                                 once stays neutral (--text2/--border) — tagging
+                                 it with one family's hue is arbitrary.
+
+     Consequences worth stating: direction beats stat (an SS chip showing an OVER
+     is green, not teal); a stat-family hue must never mean "good"; --amber must
+     never be used as decoration, only as caution.
+
+     FIXED HERE: --stat-td was literally #f8c64a — the SAME hex as both --gold
+     (brand) and --amber (caution) — so a TD chip was indistinguishable from a
+     warning. TD keeps its gold-family identity but now has its own hue. It has
+     only 5 usages (all genuinely TD), so this is contained; --gold (182 usages)
+     and --amber (22) were left alone because their semantics are correct. */
   --stat-fp:   #56c3ff;
   --stat-ss:   #2cd4d0;
-  --stat-td:   #f8c64a;
+  --stat-td:   #e2a12a;
   --stat-ft:   #927dff;
   --stat-ctrl: #ff8345;
 
@@ -528,7 +555,9 @@ body {
   background: var(--bg3); border: 1px solid var(--border); white-space: nowrap;
 }
 .opp-chip.opp-chip-style { text-transform: capitalize; color: var(--text1); }
-.opp-chip.opp-chip-allows { color: var(--stat-ss); border-color: color-mix(in srgb, var(--stat-ss) 35%, transparent); }
+/* Carries FP + SS + R1 at once, so under the canonical mapping it can't wear a
+   single stat family's hue (was --stat-ss). Neutral, emphasised by weight. */
+.opp-chip.opp-chip-allows { color: var(--text1); border-color: var(--border2); }
 
 /* GLOW-UP 193 L3 — projection provenance micro-chain */
 .stat-prov {
@@ -553,8 +582,10 @@ body {
   grid-column: 1 / -1;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
 }
-.detail-leans-section > .detail-section-head { color: var(--amber); }
-.detail-leans-section > .detail-section-head::before { background: var(--amber); }
+/* Section accent, not a warning — --amber is reserved for caution, so this uses
+   the brand accent. Same hex today; correct if the two ever diverge. */
+.detail-leans-section > .detail-section-head { color: var(--gold); }
+.detail-leans-section > .detail-section-head::before { background: var(--gold); }
 @media (max-width: 1100px) { .detail-leans-section { grid-template-columns: 1fr; } }
 .detail-grid.signal-only > * { display: none !important; }
 .detail-grid.signal-only > .detail-signal-bar { display: flex !important; }
@@ -714,8 +745,10 @@ body {
   font-size: 9px; font-weight: 700; padding: 3px 9px; border-radius: 5px; cursor: pointer;
   background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
 .lch-compact-toggle:hover { color: var(--text1); border-color: var(--text3); }
-.lch-compact-toggle.on { background: rgba(86,195,255,0.14); color: var(--stat-fp);
-  border-color: color-mix(in srgb, var(--stat-fp) 45%, transparent); }
+/* Active toggle = selection state, so brand accent — not --stat-fp, which would
+   claim this control identifies the FP stat. */
+.lch-compact-toggle.on { background: rgba(248,198,74,0.14); color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 
 /* L2/L4/L5 per-row controls (rank · corr flag · add-to-slip). Prepended into
    .fighter-main, but ABSOLUTELY positioned so they're pulled out of its fixed
@@ -904,8 +937,9 @@ body {
   letter-spacing: 0.6px; padding: 4px 9px; border-radius: 5px; cursor: pointer;
   background: var(--bg4); border: 1px solid var(--border); color: var(--text3); }
 .sch-compact-toggle:hover { color: var(--text2); border-color: var(--border2); }
-.sch-compact-toggle.on { background: rgba(86,195,255,0.14); color: var(--stat-fp);
-  border-color: color-mix(in srgb, var(--stat-fp) 45%, transparent); }
+/* Selection state → brand accent, same rule as .lch-compact-toggle.on */
+.sch-compact-toggle.on { background: rgba(248,198,74,0.14); color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 
 /* L3 slim rows — same approach as .lean-compact, but scoped to the slate view so
    the two densities stay independent. .fighter-main is a fixed grid, so it flips
