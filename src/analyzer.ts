@@ -9709,6 +9709,9 @@ function fighterMatchesDirective(f: AnalyzerFighter, sig: ConfidenceMemorySignal
   const el = getEffectiveLean(f);
   if (el.lean !== sig.lean) return false;
   if ((el._source || 'fp') !== sig.source) return false;
+  // Must mirror countDirectiveMatches exactly, or the filtered board would show
+  // rows the count didn't include.
+  if (shouldSkipFpSideForFighter(f, el._source, el.lean, el._platform)) return false;
   return memoryTagsForFighter(f, sig.source, el).includes(sig.tag);
 }
 
@@ -9726,6 +9729,10 @@ function countDirectiveMatches(sig: ConfidenceMemorySignal | null): { full: numb
     if (isCancelledFighter(f.name)) continue;
     const el = getEffectiveLean(f);
     if (el.lean !== sig.lean || (el._source || 'fp') !== sig.source) continue;
+    // Same placeability gate updateViewTabCounts uses, so a directive can never
+    // point at a side no book will take (a dog's FP UNDER on Betr/Pick6). Without
+    // it these counts also disagreed with the LEAN OVER/UNDER tab badges.
+    if (shouldSkipFpSideForFighter(f, el._source, el.lean, el._platform)) continue;
     out.sideOnly++;
     if (memoryTagsForFighter(f, sig.source, el).includes(sig.tag)) out.full++;
   }
