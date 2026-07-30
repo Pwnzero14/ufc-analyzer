@@ -5236,6 +5236,16 @@ function calcLean(
     score: parseFloat(score.toFixed(2)),
     reasons,
     verdict,
+    // GLOW-UP 199 L1/L2 — every STAT lean (calcSSLean, calcSSR1Lean, calcTDLean, …)
+    // returns its projection and line; the FP lean never did. Consequences were both
+    // silent: the Δ edge chip (GLOW-UP 196) rendered blank on every FP pick, and
+    // projOpposesLean — the ⚠ PROJ SAYS caution — had to regex the verdict PROSE and
+    // its pattern only matched the stat format, so an FP pick whose own projection
+    // opposed it was never flagged (Uros Medic: "LEAN OVER BTR 102.5 … Proj FP 75.1 …
+    // is 27.4 pts BELOW the line" carried no warning). Exposing the numbers fixes the
+    // chip and lets the caution be computed rather than parsed.
+    avg: effectiveFP ?? undefined,
+    line,
     ev,
     ensembleAgreement: confidenceModel.ensembleAgreement,
     bayesianProbability: confidenceModel.bayesianProbability,
@@ -7848,12 +7858,31 @@ const BOOK_COLORS: Record<string, string> = {
  *
  *  Parses the DISPLAYED reason on purpose — the claim being checked is that the
  *  row as shown is self-consistent. */
-function projOpposesLean(reason: string, side: string | null | undefined, displayedLine: number | null): { proj: number; gap: number; implies: 'OVER' | 'UNDER' } | null {
+// GLOW-UP 199 L2 — takes the projection as a NUMBER (from the lean's own `avg`) and
+// only falls back to scraping the verdict prose when that's missing.
+//
+// It used to be prose-only, with a pattern anchored to the STAT verdict format
+// ("SS OVER 51.5 (proj 69.3) — …"). FP leans render a different shape
+// ("LEAN OVER BTR 102.5 (avg 78.8) — Proj FP (75.1 …) is 27.4 pts BELOW the line"),
+// so the regex never matched and the ⚠ PROJ SAYS caution was silently absent on every
+// FP pick — including ones whose own text said the projection sat 27 points the wrong
+// side of the line. FP is also what actually gets placed, so this was the worst place
+// to lose the warning. Now that calcLean exposes `avg`, the check is arithmetic.
+function projOpposesLean(
+  reason: string,
+  side: string | null | undefined,
+  displayedLine: number | null,
+  projValue?: number | null,
+): { proj: number; gap: number; implies: 'OVER' | 'UNDER' } | null {
   if (displayedLine == null || (side !== 'over' && side !== 'under')) return null;
-  const m = reason.match(/^(?:R1 SS|SS|TD|FT|FP|CTRL)\s+(?:OVER|UNDER)\s+[\d.]+m?\s+\((?:proj|avg)\s+([\d.]+)m?\)/i);
-  if (!m) return null;
-  const proj = parseFloat(m[1]);
-  if (!Number.isFinite(proj)) return null;
+  let proj: number | null = (typeof projValue === 'number' && Number.isFinite(projValue)) ? projValue : null;
+  if (proj == null) {
+    // Legacy path — leans that still don't carry a numeric projection.
+    const m = reason.match(/^(?:R1 SS|SS|TD|FT|FP|CTRL)\s+(?:OVER|UNDER)\s+[\d.]+m?\s+\((?:proj|avg)\s+([\d.]+)m?\)/i);
+    if (!m) return null;
+    proj = parseFloat(m[1]);
+  }
+  if (proj == null || !Number.isFinite(proj)) return null;
   const opposes = side === 'over' ? proj < displayedLine : proj > displayedLine;
   if (!opposes) return null;
   return { proj, gap: Math.abs(proj - displayedLine), implies: proj > displayedLine ? 'OVER' : 'UNDER' };
@@ -8781,7 +8810,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       if (best.line != null && best.book != null) { line = best.line; book = best.book; }
     }
     const reason = el.verdict || el.reasons?.[0]?.text || '';
-    const projConflict = !!projOpposesLean(reason, el.lean, line);
+    const projConflict = !!projOpposesLean(reason, el.lean, line, el.avg);
     // durationCoupledMap is built for the OVER pool only (a volume over is what
     // needs rounds), so this is inherently false on the unders side.
     const needsRounds = durationCoupledMap.has(f.name);
@@ -8837,6 +8866,36 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // shape, still one fight's worth of variance) or the same fighter dual-
   // listed on two stats. Computed on the DISPLAY lists so tags never point
   // at rows the 167 filters hid.
+  // ── GLOW-UP 199 L3: placed-vs-board reconciliation ────────────────────────
+  // `isPlaced` matches on the FULL slate key (name|direction|stat), so it only lights
+  // up when you placed exactly the pick the board is showing. Place a different stat
+  // or the opposite side on that fighter and the row says nothing — you can be staked
+  // on Bogdan Grad FP OVER while the board recommends Grad SS UNDER and see no hint of
+  // it. Index every placed leg by fighter so a row can report what you already hold.
+  const placedByFighter = new Map<string, Array<{ dir: string; stat: string }>>();
+  for (const key of bestPicksPlaced.keys()) {
+    const [pName, pDir, pStat] = key.split('|');
+    if (!pName) continue;
+    const k = (normalizeName(pName) || pName).toLowerCase();
+    if (!placedByFighter.has(k)) placedByFighter.set(k, []);
+    placedByFighter.get(k)!.push({ dir: pDir || '', stat: pStat || 'fp' });
+  }
+  // Returns a chip when this fighter carries a placed leg that ISN'T this pick:
+  // opposite direction is a genuine conflict, a different stat is worth knowing.
+  const placedElsewhereTag = (f: AnalyzerFighter, dir: string, src: string): string => {
+    const held = placedByFighter.get((normalizeName(f.name) || f.name).toLowerCase());
+    if (!held || !held.length) return '';
+    const other = held.filter(h => !(h.dir === dir && h.stat === src));
+    if (!other.length) return '';
+    const opposed = other.filter(h => h.dir && h.dir !== dir);
+    const label = (h: { dir: string; stat: string }) =>
+      `${(h.dir || '').toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[h.stat] || h.stat.toUpperCase()}`;
+    if (opposed.length) {
+      return `<span class="bp-placed-conflict" title="You already have money on ${prettyName(f.name)} the OTHER way — placed ${opposed.map(label).join(', ')}, while this pick is ${dir.toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[src] || src.toUpperCase()}. Taking both stakes opposite outcomes on one fighter.">⚠ PLACED ${opposed.map(label).join(', ')}</span>`;
+    }
+    return `<span class="bp-placed-other" title="You've already placed a different stat on ${prettyName(f.name)}: ${other.map(label).join(', ')}. Same fighter, so this adds exposure to one outcome rather than diversifying.">● PLACED ${other.map(label).join(', ')}</span>`;
+  };
+
   const bpFightKey = (f: AnalyzerFighter): string => {
     const opp = f.opponent ? f.opponent.toLowerCase() : '';
     return opp ? [f.name.toLowerCase(), opp].sort().join('|') : '';
@@ -8980,7 +9039,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const durTag = durCoupled
         ? `<div class="bp-dur-split" title="This OVER needs rounds, and ${prettyName(durCoupled.oppName)} is a finisher — ${durCoupled.oppFinishPct}% finish rate${durCoupled.oppAvgMins != null ? `, ${durCoupled.oppAvgMins.toFixed(1)}m career average` : ''}.${durCoupled.needMins != null ? ` This line needs roughly ${durCoupled.needMins.toFixed(1)} min at his own strike rate.` : ''} An early finish takes this under regardless of who is winning, so it is NOT independent of the other side of this fight. Demoted 8pts.">⚠ NEEDS ROUNDS</div>`
         : '';
-      const projConflict = projOpposesLean(reason, el.lean, line);
+      const projConflict = projOpposesLean(reason, el.lean, line, el.avg);
       const projTag = projConflict
         ? `<div class="bp-proj-split" title="This pick's own projection (${projConflict.proj}) sits ${projConflict.gap.toFixed(1)} on the ${projConflict.implies} side of the ${line} line — the projection argues ${projConflict.implies}, the pick is ${(el.lean || '').toUpperCase()}. Not necessarily wrong: projection-vs-line contributes at most ±2.5 to the lean score, so hit-rate, opponent and matchup terms can outvote it. Worth checking manually before entering.">⚠ PROJ SAYS ${projConflict.implies}</div>`
         : '';
@@ -9160,7 +9219,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp')}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -9191,6 +9250,23 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''
     }${
       avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''
+    }${
+      // GLOW-UP 199 L5 — aggregate Δ. Every pick now carries a signed edge (GLOW-UP
+      // 196, extended to FP by L1 above), so the column can report how far the model
+      // sits from the books OVERALL rather than only per row. This is a health signal,
+      // not a scoreboard: a column averaging a large positive Δ is one where the model
+      // disagrees with every book at once, which is exactly the shape MODEL v15 found
+      // to be over-projection rather than edge. Flagged above 10 so it reads as
+      // "check this" rather than "free money".
+      (() => {
+        const ds = fighters
+          .map(f => (type === 'over' ? overMetrics : underMetrics).get(f.name)?.edge)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+        if (ds.length < 2) return '';
+        const avgD = ds.reduce((a, b) => a + b, 0) / ds.length;
+        const stretched = avgD >= 10;
+        return `<span class="bph-avgd${stretched ? ' warn' : ''}" title="Mean gap between the model's projection and the line you'd enter, across this column's ${ds.length} picks.${stretched ? ' Above 10 the column is disagreeing with the books broadly rather than on a few spots — the pattern MODEL v15 measured as over-projection, so treat it as a prompt to check rather than a signal to press.' : ''}">${stretched ? '⚠ ' : ''}avg Δ ${avgD > 0 ? '+' : ''}${avgD.toFixed(1)}</span>`;
+      })()
     }${
       // GLOW-UP 187 (L5): "best" ranks by model, not by price — 5 of 7 picks
       // sitting at EV -12% under a header that says BEST reads as an
@@ -9415,6 +9491,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // below the cut.
   const nearMissHtml = (() => {
     const rows: string[] = [];
+    // GLOW-UP 199 L4 — the list is collapsed by default, so the header was the only
+    // thing most reads ever saw and it carried a bare count. Tally WHY things were cut
+    // so the closed state still answers "did I lose anything that mattered".
+    let cutSameFight = 0, cutBelowBar = 0, cutInverted = 0;
     const build = (all: AnalyzerFighter[], final: AnalyzerFighter[], dir: 'over' | 'under') => {
       const kept = new Set(final.map(f => f.name.toLowerCase()));
       const keptFights = new Map<string, string>();
@@ -9437,6 +9517,8 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         const beat = blockedBy ? (Number(getBestPickLeanForDir(
           allFighters.find(x => x.name.toLowerCase() === blockedBy.toLowerCase()) || f, dir)?.conf) || 0) : 0;
         const inverted = !!blockedBy && conf > beat;
+        if (blockedBy && blockedBy.toLowerCase() !== f.name.toLowerCase()) cutSameFight++; else cutBelowBar++;
+        if (inverted) cutInverted++;
         rows.push(`<div class="bpnm-row${inverted ? ' bpnm-inverted' : ''}" data-bpnm-jump="${f.name.replace(/"/g, '&quot;')}" title="Open ${prettyName(f.name)}'s card">
           <span class="bpnm-dir ${dir}">${dir.toUpperCase()}</span>
           <span class="bpnm-name">${prettyName(f.name)}</span>
@@ -9450,7 +9532,13 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     build(allUndersSorted, unders, 'under');
     if (!rows.length) return '';
     return `<div class="best-picks-section bp-nearmiss${_bpNearMissOpen ? '' : ' collapsed'}">
-      <div class="best-picks-header bpnm-head"><span class="best-picks-title">Considered but cut</span><span class="best-picks-count">${rows.length}</span><span class="section-chevron">▼</span></div>
+      <div class="best-picks-header bpnm-head"><span class="best-picks-title">Considered but cut</span><span class="best-picks-count">${rows.length}</span><span class="bpnm-summary">${
+        [
+          cutSameFight ? `<span class="bpnm-s" title="Cut because the other side of their fight ranked higher — one pick per fight per column.">${cutSameFight} same-fight</span>` : '',
+          cutBelowBar ? `<span class="bpnm-s" title="Had an actionable lean but ranked below the cut for their column.">${cutBelowBar} below bar</span>` : '',
+          cutInverted ? `<span class="bpnm-s warn" title="These cut picks were MORE confident than the pick that displaced them — the model ranks on score, not confidence. Worth opening the list.">⇅ ${cutInverted} more confident</span>` : '',
+        ].filter(Boolean).join('')
+      }</span><span class="section-chevron">▼</span></div>
       <div class="section-body"><div class="bpnm-note">Fighters with an actionable lean that didn't make the board — and why. Nothing here was silently dropped.</div>${rows.join('')}</div>
     </div>`;
   })();

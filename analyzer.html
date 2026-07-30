@@ -591,6 +591,36 @@ body {
 .detail-grid.signal-only > .detail-signal-bar { display: flex !important; }
 .detail-grid.signal-only > .detail-leans-section { display: grid !important; }
 
+/* ── GLOW-UP 199 — Best Picks third pass ─────────────────────────────────── */
+
+/* L3 — you already hold a position on this fighter that isn't this pick */
+.bp-placed-conflict, .bp-placed-other {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.02em; white-space: nowrap; cursor: help; vertical-align: middle;
+}
+/* opposite side on a fighter you're staked on — a real conflict, not a note */
+.bp-placed-conflict { color: var(--red); background: rgba(255,58,96,0.12); border: 1px solid rgba(255,58,96,0.40); }
+/* different stat, same fighter — added exposure rather than diversification */
+.bp-placed-other { color: var(--gold); background: rgba(248,198,74,0.10); border: 1px solid rgba(248,198,74,0.32); }
+
+/* L4 — why things were cut, readable while the list stays collapsed */
+.bpnm-summary { display: inline-flex; gap: 5px; margin-left: 8px; flex-wrap: wrap; }
+.bpnm-s {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px; cursor: help; white-space: nowrap;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+}
+.bpnm-s.warn { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 38%, transparent); }
+
+/* L5 — column-level gap to the books */
+.bph-avgd {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; cursor: help; white-space: nowrap;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+}
+.bph-avgd.warn { color: var(--amber); background: rgba(248,198,74,0.10); border-color: rgba(248,198,74,0.38); }
+
 /* ── GLOW-UP 197 — Parlay Lab third pass ─────────────────────────────────── */
 
 /* L1 — health score decomposed into its four terms */
