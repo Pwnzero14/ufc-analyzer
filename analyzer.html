@@ -792,6 +792,29 @@ body {
   background: color-mix(in srgb, var(--gold) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent); }
 
+/* GLOW-UP 199 — Learning Drilldown directive → board. The count chip turns the
+   directive from advice into a link; the pattern chip below announces that the
+   short board is a deliberate filter, not a bug. */
+.ld-matches {
+  margin-left: 8px; padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.4px; white-space: nowrap;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text2);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ld-matches-lean:hover { background: rgba(0,232,122,0.18); border-color: var(--green); color: var(--green); }
+.ld-matches-fade:hover { background: rgba(255,58,96,0.18); border-color: var(--red); color: var(--red); }
+.ld-matches-none { cursor: default; opacity: 0.45; background: transparent; }
+
+.sch-pattern {
+  padding: 4px 9px; border-radius: 5px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.4px; white-space: nowrap;
+}
+.sch-pattern.is-lean { background: rgba(0,232,122,0.15); color: var(--green); border: 1px solid rgba(0,232,122,0.45); }
+.sch-pattern.is-fade { background: rgba(255,58,96,0.15); color: var(--red); border: 1px solid rgba(255,58,96,0.45); }
+.sch-pattern:hover { filter: brightness(1.25); }
+
 /* Slate counter — the My Slate tray only exists on Best Picks, so adding from
    here needs both a confirmation and a way to reach it. */
 .sch-slip {
