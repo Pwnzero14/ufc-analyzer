@@ -18038,17 +18038,45 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // over → want the LOWEST line (easiest to beat); under → want the HIGHEST line.
   // Only badge when ≥2 books post the stat AND spread ≥ 0.5.
   type BookEntry = { source: 'p6'|'ud'|'pp'|'betr'|'dk'; value: number };
+  // Chip key → the book key statUnderBookOffered expects.
+  const SHOP_BOOK_KEY: Record<'p6'|'ud'|'pp'|'betr'|'dk', string> = {
+    p6: 'pick6', ud: 'underdog', pp: 'prizepicks', betr: 'betr', dk: 'draftkings_sportsbook',
+  };
+  /**
+   * Books that actually offer the side we're leaning. For an UNDER this matters:
+   * Pick6 TD props are More-only unless a Less button was positively scraped, and
+   * that varies PER FIGHTER on the same card (Stirling 1.5 has Less, Blachowicz
+   * 1.5 does not). Without this filter the badge recommended the mathematically
+   * best line on a book that wouldn't take the bet — and contradicted the play
+   * pill on the same row, which routes through leanBestBook and DOES filter.
+   * Overs need no gating: every book that posts a line takes the over.
+   */
+  const shopPlaceable = (
+    list: BookEntry[],
+    leanDir: string,
+    stat: 'ss'|'ss_r1'|'td'|'ft'|'ctrl',
+  ): BookEntry[] => leanDir !== 'under'
+    ? list
+    : list.filter(c => statUnderBookOffered(f, stat, SHOP_BOOK_KEY[c.source]));
+
   function calcBestShop(
     candidates: BookEntry[],
-    leanDir: string | null | undefined
+    leanDir: string | null | undefined,
+    stat: 'ss'|'ss_r1'|'td'|'ft'|'ctrl'
   ): 'p6'|'ud'|'pp'|'betr'|'dk' | null {
     const visible = candidates.filter(c => c.value != null && showSource(c.source));
     if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none') return null;
-    const vals = visible.map(c => c.value);
+    const usable = shopPlaceable(visible, leanDir, stat);
+    if (!usable.length) return null;
+    // Exactly one book takes this side while others show a line: that IS the
+    // shopping answer, even with no spread to compare — flag it rather than
+    // going silent and leaving the unplaceable books looking equally valid.
+    if (usable.length === 1) return usable[0].source;
+    const vals = usable.map(c => c.value);
     if (Math.max(...vals) - Math.min(...vals) < 0.5) return null;
     const best = leanDir === 'over'
-      ? visible.reduce((b, c) => c.value < b.value ? c : b)
-      : visible.reduce((b, c) => c.value > b.value ? c : b);
+      ? usable.reduce((b, c) => c.value < b.value ? c : b)
+      : usable.reduce((b, c) => c.value > b.value ? c : b);
     return best.source;
   }
   const ssCandidates: BookEntry[] = ([
@@ -18088,11 +18116,11 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     { source: 'ud' as const, value: f.line_ud_ss_r1 },
     { source: 'dk' as const, value: f.line_dk_ss_r1 },
   ] as BookEntry[]).filter(c => c.value != null);
-  const bestSS   = calcBestShop(ssCandidates,   f.lean_ss?.lean   ?? null);
-  const bestTD   = calcBestShop(tdCandidates,   f.lean_td?.lean   ?? null);
-  const bestFT   = calcBestShop(ftCandidates,   f.lean_ft?.lean   ?? null);
-  const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
-  const bestSSR1 = calcBestShop(ssR1Candidates, f.lean_ss_r1?.lean ?? null);
+  const bestSS   = calcBestShop(ssCandidates,   f.lean_ss?.lean   ?? null, 'ss');
+  const bestTD   = calcBestShop(tdCandidates,   f.lean_td?.lean   ?? null, 'td');
+  const bestFT   = calcBestShop(ftCandidates,   f.lean_ft?.lean   ?? null, 'ft');
+  const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null, 'ctrl');
+  const bestSSR1 = calcBestShop(ssR1Candidates, f.lean_ss_r1?.lean ?? null, 'ss_r1');
   // Best-side badge for the inline R1 SS cells (they don't route through lineCell).
   const ssR1BestBadge = (source: 'pp'|'ud'|'dk'): string => bestSSR1 === source
     ? `<div class="best-shop-badge" title="Best line for ${(f.lean_ss_r1?.lean || '').toUpperCase()} R1 SS: ${source.toUpperCase()} vs other books">best</div>`
@@ -18102,21 +18130,27 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // Worst-line: the least favorable line for the lean direction (opposite of best)
   function calcWorstShop(
     candidates: BookEntry[],
-    leanDir: string | null | undefined
+    leanDir: string | null | undefined,
+    stat: 'ss'|'ss_r1'|'td'|'ft'|'ctrl'
   ): 'p6'|'ud'|'pp'|'betr'|'dk' | null {
     const visible = candidates.filter(c => c.value != null && showSource(c.source));
     if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none') return null;
-    const vals = visible.map(c => c.value);
+    // Same placeability filter as calcBestShop: a book that won't take the side
+    // isn't a worse price, it's not a price at all. Calling it "worst" implies
+    // it was in the running.
+    const usable = shopPlaceable(visible, leanDir, stat);
+    if (usable.length < 2) return null;
+    const vals = usable.map(c => c.value);
     if (Math.max(...vals) - Math.min(...vals) < 0.5) return null;
     const worst = leanDir === 'over'
-      ? visible.reduce((w, c) => c.value > w.value ? c : w)
-      : visible.reduce((w, c) => c.value < w.value ? c : w);
+      ? usable.reduce((w, c) => c.value > w.value ? c : w)
+      : usable.reduce((w, c) => c.value < w.value ? c : w);
     return worst.source;
   }
-  const worstSS   = calcWorstShop(ssCandidates,   f.lean_ss?.lean   ?? null);
-  const worstTD   = calcWorstShop(tdCandidates,   f.lean_td?.lean   ?? null);
-  const worstFT   = calcWorstShop(ftCandidates,   f.lean_ft?.lean   ?? null);
-  const worstCTRL = calcWorstShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
+  const worstSS   = calcWorstShop(ssCandidates,   f.lean_ss?.lean   ?? null, 'ss');
+  const worstTD   = calcWorstShop(tdCandidates,   f.lean_td?.lean   ?? null, 'td');
+  const worstFT   = calcWorstShop(ftCandidates,   f.lean_ft?.lean   ?? null, 'ft');
+  const worstCTRL = calcWorstShop(ctrlCandidates, f.lean_ctrl?.lean ?? null, 'ctrl');
 
   const lineCell = (source: 'p6'|'ud'|'pp'|'betr'|'dk', stat: 'fp'|'ss'|'td'|'ft'|'ctrl', value: number | null | undefined): string => {
     if (!showSource(source)) return '';
