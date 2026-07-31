@@ -25,23 +25,23 @@ export class ScraperService {
                 if (!nameMatch)
                     return;
                 const name = nameMatch[1].trim();
-                // Same too-tight container as content.ts: the nearest classed ancestor wraps
-                // only the card face, so the More/Less button row falls outside it and every
-                // *_under_available probe returned false. Walk up to the first ancestor that
-                // includes the button row, stopping before any container holding >1 card.
-                const tightCard = btn.closest('div[class]');
-                let cardEl = tightCard;
-                let probe = tightCard;
-                for (let i = 0; i < 6 && probe; i++) {
-                    const t = probe.innerText || '';
-                    if ((t.match(/\bvs\b/gi) || []).length > 1)
-                        break;
-                    cardEl = probe;
-                    if (/\bMore\b/i.test(t))
-                        break;
-                    probe = probe.parentElement?.closest('div[class]') || null;
-                }
-                const cardText = cardEl?.innerText || '';
+                // Line parsing stays on the tight container (proven correct); only the
+                // Less probe walks up, because the More/Less row renders OUTSIDE the
+                // nearest classed ancestor. Widening cardText for every stat regressed
+                // TD capture to zero, so the two are kept separate.
+                const cardText = btn.closest('div[class]')?.innerText || '';
+                const hasLess = (() => {
+                    let probe = btn.closest('div[class]');
+                    for (let i = 0; i < 6 && probe; i++) {
+                        const t = probe.innerText || '';
+                        if ((t.match(/\bvs\b/gi) || []).length > 1)
+                            break;
+                        if (/\bMore\b/i.test(t))
+                            return /\bLess\b/i.test(t);
+                        probe = probe.parentElement?.closest('div[class]') || null;
+                    }
+                    return /\bLess\b/i.test(cardText);
+                })();
                 const oppMatch = cardText.match(/vs\s+([^\n]+)/i);
                 const opponent = oppMatch ? oppMatch[1].trim() : null;
                 // Fantasy Points
@@ -59,7 +59,7 @@ export class ScraperService {
                         fighters[name].line_fp = line;
                         // Underdogs get a More/OVER-only FP prop — detect the Less button so FP UNDERs
                         // can be gated without relying on the (often-incomplete) moneyline odds map.
-                        fighters[name].fp_under_available = /\bLess\b/i.test(cardText);
+                        fighters[name].fp_under_available = hasLess;
                     }
                 }
                 // Significant Strikes
@@ -73,7 +73,7 @@ export class ScraperService {
                         }
                         fighters[name].line_ss = line;
                         // Pick6 sometimes only offers "More" (OVER) on SS — detect Less button.
-                        fighters[name].ss_under_available = /\bLess\b/i.test(cardText);
+                        fighters[name].ss_under_available = hasLess;
                     }
                 }
                 // Takedowns
@@ -86,7 +86,7 @@ export class ScraperService {
                         }
                         fighters[name].line_td = line;
                         // Pick6 low takedown lines are often More/OVER-only — detect Less button.
-                        fighters[name].td_under_available = /\bLess\b/i.test(cardText);
+                        fighters[name].td_under_available = hasLess;
                     }
                 }
                 // Control Time — stored in minutes. Matches either decimal minutes
@@ -111,7 +111,7 @@ export class ScraperService {
                     }
                     fighters[name].line_ctrl = ctrlLine;
                     // Pick6 CTRL UNDERs are only sometimes offered — detect by presence of "Less" button.
-                    fighters[name].ctrl_under_available = /\bLess\b/i.test(cardText);
+                    fighters[name].ctrl_under_available = hasLess;
                 }
             });
             // Fallback Strategy 2: Broader selector
