@@ -352,6 +352,24 @@ async function scrapePick6AllStats() {
                     prev.line_td = f.line_td;
                 if (f.line_ctrl != null)
                     prev.line_ctrl = f.line_ctrl;
+                // Per-stat Less-button flags MUST merge alongside their line. This is an
+                // allowlist, not a pass-through: a fighter is created by whichever stat tab
+                // sees them first, and every later tab's flags were being dropped here even
+                // though the scrape captured them correctly. Net effect — a fighter's TD line
+                // arrived from the Takedowns tab while td_under_available stayed null, and the
+                // analyzer reads a null TD flag as More-only (suppress-by-default), so EVERY
+                // Pick6 TD UNDER was killed before it could be ranked. Measured 2026-07-31:
+                // td_under_available === true on 0 of 8 Pick6 fighters holding a TD line,
+                // while the site showed Less buttons on four of them. Same trap as the
+                // mergeFighters allowlist in background.ts.
+                if (f.fp_under_available != null)
+                    prev.fp_under_available = f.fp_under_available;
+                if (f.ss_under_available != null)
+                    prev.ss_under_available = f.ss_under_available;
+                if (f.td_under_available != null)
+                    prev.td_under_available = f.td_under_available;
+                if (f.ctrl_under_available != null)
+                    prev.ctrl_under_available = f.ctrl_under_available;
                 if (!prev.opponent && f.opponent)
                     prev.opponent = f.opponent;
                 map.set(key, prev);
