@@ -85,7 +85,26 @@ function scrapePick6() {
       const nameMatch = ariaLabel.match(/Open (.+?)'s stat/i);
       if (!nameMatch) return;
       const name = nameMatch[1].trim();
-      const cardText = btn.closest('div[class]')?.innerText || '';
+      // The nearest classed ancestor wraps only the card FACE — the More/Less button
+      // row sits outside it, so probing that text found neither button and every
+      // *_under_available flag came back false regardless of what the site showed.
+      // Measured 2026-07-31 on the Takedowns tab: `More` present in the tight
+      // container on 0 of 8 cards; walking up ONE level resolved Less correctly on
+      // all 8 (true for Rebecki/Elliott/Tybura, false for the five More-only cards).
+      // Walk up to the first ancestor that includes the button row, but stop before
+      // any container holding more than one card — that would make Less look true
+      // for everybody. Line parsing is unaffected: the wider text is a superset.
+      const tightCard = btn.closest('div[class]');
+      let cardEl = tightCard;
+      let probe = tightCard;
+      for (let i = 0; i < 6 && probe; i++) {
+        const t = probe.innerText || '';
+        if ((t.match(/\bvs\b/gi) || []).length > 1) break;  // walked into the grid
+        cardEl = probe;                                     // still a single card
+        if (/\bMore\b/i.test(t)) break;                     // button row included
+        probe = probe.parentElement?.closest('div[class]') || null;
+      }
+      const cardText = cardEl?.innerText || '';
       const oppMatch = cardText.match(/vs\s+([^\n]+)/i);
       const opponent = oppMatch ? oppMatch[1].trim() : null;
 

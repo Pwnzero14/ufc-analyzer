@@ -25,7 +25,23 @@ export class ScraperService {
                 if (!nameMatch)
                     return;
                 const name = nameMatch[1].trim();
-                const cardText = btn.closest('div[class]')?.innerText || '';
+                // Same too-tight container as content.ts: the nearest classed ancestor wraps
+                // only the card face, so the More/Less button row falls outside it and every
+                // *_under_available probe returned false. Walk up to the first ancestor that
+                // includes the button row, stopping before any container holding >1 card.
+                const tightCard = btn.closest('div[class]');
+                let cardEl = tightCard;
+                let probe = tightCard;
+                for (let i = 0; i < 6 && probe; i++) {
+                    const t = probe.innerText || '';
+                    if ((t.match(/\bvs\b/gi) || []).length > 1)
+                        break;
+                    cardEl = probe;
+                    if (/\bMore\b/i.test(t))
+                        break;
+                    probe = probe.parentElement?.closest('div[class]') || null;
+                }
+                const cardText = cardEl?.innerText || '';
                 const oppMatch = cardText.match(/vs\s+([^\n]+)/i);
                 const opponent = oppMatch ? oppMatch[1].trim() : null;
                 // Fantasy Points
