@@ -17691,16 +17691,40 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     const activeLine = activePlatformLine(f);
     const platformLabel = activePlatformLabel(f);
     const showSource = (s) => !!sourceVisibility[s];
-    function calcBestShop(candidates, leanDir) {
+    // Chip key → the book key statUnderBookOffered expects.
+    const SHOP_BOOK_KEY = {
+        p6: 'pick6', ud: 'underdog', pp: 'prizepicks', betr: 'betr', dk: 'draftkings_sportsbook',
+    };
+    /**
+     * Books that actually offer the side we're leaning. For an UNDER this matters:
+     * Pick6 TD props are More-only unless a Less button was positively scraped, and
+     * that varies PER FIGHTER on the same card (Stirling 1.5 has Less, Blachowicz
+     * 1.5 does not). Without this filter the badge recommended the mathematically
+     * best line on a book that wouldn't take the bet — and contradicted the play
+     * pill on the same row, which routes through leanBestBook and DOES filter.
+     * Overs need no gating: every book that posts a line takes the over.
+     */
+    const shopPlaceable = (list, leanDir, stat) => leanDir !== 'under'
+        ? list
+        : list.filter(c => statUnderBookOffered(f, stat, SHOP_BOOK_KEY[c.source]));
+    function calcBestShop(candidates, leanDir, stat) {
         const visible = candidates.filter(c => c.value != null && showSource(c.source));
         if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none')
             return null;
-        const vals = visible.map(c => c.value);
+        const usable = shopPlaceable(visible, leanDir, stat);
+        if (!usable.length)
+            return null;
+        // Exactly one book takes this side while others show a line: that IS the
+        // shopping answer, even with no spread to compare — flag it rather than
+        // going silent and leaving the unplaceable books looking equally valid.
+        if (usable.length === 1)
+            return usable[0].source;
+        const vals = usable.map(c => c.value);
         if (Math.max(...vals) - Math.min(...vals) < 0.5)
             return null;
         const best = leanDir === 'over'
-            ? visible.reduce((b, c) => c.value < b.value ? c : b)
-            : visible.reduce((b, c) => c.value > b.value ? c : b);
+            ? usable.reduce((b, c) => c.value < b.value ? c : b)
+            : usable.reduce((b, c) => c.value > b.value ? c : b);
         return best.source;
     }
     const ssCandidates = [
@@ -17740,33 +17764,39 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         { source: 'ud', value: f.line_ud_ss_r1 },
         { source: 'dk', value: f.line_dk_ss_r1 },
     ].filter(c => c.value != null);
-    const bestSS = calcBestShop(ssCandidates, f.lean_ss?.lean ?? null);
-    const bestTD = calcBestShop(tdCandidates, f.lean_td?.lean ?? null);
-    const bestFT = calcBestShop(ftCandidates, f.lean_ft?.lean ?? null);
-    const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
-    const bestSSR1 = calcBestShop(ssR1Candidates, f.lean_ss_r1?.lean ?? null);
+    const bestSS = calcBestShop(ssCandidates, f.lean_ss?.lean ?? null, 'ss');
+    const bestTD = calcBestShop(tdCandidates, f.lean_td?.lean ?? null, 'td');
+    const bestFT = calcBestShop(ftCandidates, f.lean_ft?.lean ?? null, 'ft');
+    const bestCTRL = calcBestShop(ctrlCandidates, f.lean_ctrl?.lean ?? null, 'ctrl');
+    const bestSSR1 = calcBestShop(ssR1Candidates, f.lean_ss_r1?.lean ?? null, 'ss_r1');
     // Best-side badge for the inline R1 SS cells (they don't route through lineCell).
     const ssR1BestBadge = (source) => bestSSR1 === source
         ? `<div class="best-shop-badge" title="Best line for ${(f.lean_ss_r1?.lean || '').toUpperCase()} R1 SS: ${source.toUpperCase()} vs other books">best</div>`
         : '';
     const ssR1BestCls = (source) => bestSSR1 === source ? ' best-line' : '';
     // Worst-line: the least favorable line for the lean direction (opposite of best)
-    function calcWorstShop(candidates, leanDir) {
+    function calcWorstShop(candidates, leanDir, stat) {
         const visible = candidates.filter(c => c.value != null && showSource(c.source));
         if (visible.length < 2 || !leanDir || leanDir === 'push' || leanDir === 'none')
             return null;
-        const vals = visible.map(c => c.value);
+        // Same placeability filter as calcBestShop: a book that won't take the side
+        // isn't a worse price, it's not a price at all. Calling it "worst" implies
+        // it was in the running.
+        const usable = shopPlaceable(visible, leanDir, stat);
+        if (usable.length < 2)
+            return null;
+        const vals = usable.map(c => c.value);
         if (Math.max(...vals) - Math.min(...vals) < 0.5)
             return null;
         const worst = leanDir === 'over'
-            ? visible.reduce((w, c) => c.value > w.value ? c : w)
-            : visible.reduce((w, c) => c.value < w.value ? c : w);
+            ? usable.reduce((w, c) => c.value > w.value ? c : w)
+            : usable.reduce((w, c) => c.value < w.value ? c : w);
         return worst.source;
     }
-    const worstSS = calcWorstShop(ssCandidates, f.lean_ss?.lean ?? null);
-    const worstTD = calcWorstShop(tdCandidates, f.lean_td?.lean ?? null);
-    const worstFT = calcWorstShop(ftCandidates, f.lean_ft?.lean ?? null);
-    const worstCTRL = calcWorstShop(ctrlCandidates, f.lean_ctrl?.lean ?? null);
+    const worstSS = calcWorstShop(ssCandidates, f.lean_ss?.lean ?? null, 'ss');
+    const worstTD = calcWorstShop(tdCandidates, f.lean_td?.lean ?? null, 'td');
+    const worstFT = calcWorstShop(ftCandidates, f.lean_ft?.lean ?? null, 'ft');
+    const worstCTRL = calcWorstShop(ctrlCandidates, f.lean_ctrl?.lean ?? null, 'ctrl');
     const lineCell = (source, stat, value) => {
         if (!showSource(source))
             return '';
