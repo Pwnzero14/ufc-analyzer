@@ -119,24 +119,40 @@ export class ScraperService {
                     if (!fighters[name]) {
                         fighters[name] = { name, line_fp: null, line_ss: null, line_td: null, opponent };
                     }
+                    // Per-stat Less-button flags. FP captured its flag here but SS/TD/CTRL did
+                    // NOT, so any tab that fell through to this fallback wrote a line with the
+                    // availability flag left null — and the analyzer treats a null TD/CTRL flag
+                    // as More-only (suppress-by-default), silently killing every Pick6 TD UNDER
+                    // candidate before it could even be ranked. Observed 2026-07-31: all 8 Pick6
+                    // fighters with a TD line had td_under_available === null while the site
+                    // plainly showed Less buttons on four of them.
+                    const lessBtn = /\bLess\b/i.test(text);
                     if (fpMatch) {
                         fighters[name].line_fp = parseFloat(fpMatch[1]);
-                        fighters[name].fp_under_available = /\bLess\b/i.test(text);
+                        fighters[name].fp_under_available = lessBtn;
                     }
-                    if (ssMatch)
+                    if (ssMatch) {
                         fighters[name].line_ss = parseFloat(ssMatch[1]);
-                    if (tdMatch)
+                        fighters[name].ss_under_available = lessBtn;
+                    }
+                    if (tdMatch) {
                         fighters[name].line_td = parseFloat(tdMatch[1]);
+                        fighters[name].td_under_available = lessBtn;
+                    }
                     if (ctrlMatchMMSS) {
                         const m = parseInt(ctrlMatchMMSS[1], 10);
                         const s = parseInt(ctrlMatchMMSS[2], 10);
-                        if (!isNaN(m) && !isNaN(s))
+                        if (!isNaN(m) && !isNaN(s)) {
                             fighters[name].line_ctrl = parseFloat((m + s / 60).toFixed(2));
+                            fighters[name].ctrl_under_available = lessBtn;
+                        }
                     }
                     else if (ctrlMatchDec) {
                         const v = parseFloat(ctrlMatchDec[1]);
-                        if (!isNaN(v) && v >= 0 && v < 25)
+                        if (!isNaN(v) && v >= 0 && v < 25) {
                             fighters[name].line_ctrl = v;
+                            fighters[name].ctrl_under_available = lessBtn;
+                        }
                     }
                 });
             }
