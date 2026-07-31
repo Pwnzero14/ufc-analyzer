@@ -85,19 +85,26 @@ function scrapePick6() {
             // Walk up to the first ancestor that includes the button row, but stop before
             // any container holding more than one card — that would make Less look true
             // for everybody. Line parsing is unaffected: the wider text is a superset.
-            const tightCard = btn.closest('div[class]');
-            let cardEl = tightCard;
-            let probe = tightCard;
-            for (let i = 0; i < 6 && probe; i++) {
-                const t = probe.innerText || '';
-                if ((t.match(/\bvs\b/gi) || []).length > 1)
-                    break; // walked into the grid
-                cardEl = probe; // still a single card
-                if (/\bMore\b/i.test(t))
-                    break; // button row included
-                probe = probe.parentElement?.closest('div[class]') || null;
-            }
-            const cardText = cardEl?.innerText || '';
+            // LINE PARSING stays on the tight container — proven correct on 8/8 cards, and
+            // widening it for every stat regressed TD capture to zero. Only the Less probe
+            // needs the wider text, so it gets its own variable and nothing else changes.
+            const cardText = btn.closest('div[class]')?.innerText || '';
+            // Button text: walk up to the first ancestor that actually contains the
+            // More/Less row, stopping before any ancestor holding more than one card
+            // (a grid container would make Less look true for everyone).
+            const buttonText = (() => {
+                let probe = btn.closest('div[class]');
+                for (let i = 0; i < 6 && probe; i++) {
+                    const t = probe.innerText || '';
+                    if ((t.match(/\bvs\b/gi) || []).length > 1)
+                        break;
+                    if (/\bMore\b/i.test(t))
+                        return t;
+                    probe = probe.parentElement?.closest('div[class]') || null;
+                }
+                return cardText;
+            })();
+            const hasLess = /\bLess\b/i.test(buttonText);
             const oppMatch = cardText.match(/vs\s+([^\n]+)/i);
             const opponent = oppMatch ? oppMatch[1].trim() : null;
             const fpMatch = cardText.match(/([\d]+\.?\d*)\s*\n?\s*(?:Fantasy|Fight)\s*(?:Points?|Score|Pts?\.?)/i)
@@ -113,7 +120,7 @@ function scrapePick6() {
                     fighters[name].line_fp = line;
                     // Underdogs get a More/OVER-only FP prop — detect the Less button so FP UNDERs
                     // can be gated without relying on the (often-incomplete) moneyline odds map.
-                    fighters[name].fp_under_available = /\bLess\b/i.test(cardText);
+                    fighters[name].fp_under_available = hasLess;
                 }
             }
             const ssMatch = cardText.match(/([\d]+\.?\d*)\s*\n?\s*Significant Strikes/i);
@@ -125,7 +132,7 @@ function scrapePick6() {
                     }
                     fighters[name].line_ss = line;
                     // Pick6 sometimes only offers "More" (OVER) on SS — detect Less button.
-                    fighters[name].ss_under_available = /\bLess\b/i.test(cardText);
+                    fighters[name].ss_under_available = hasLess;
                 }
             }
             const tdMatch = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
@@ -137,7 +144,7 @@ function scrapePick6() {
                     }
                     fighters[name].line_td = line;
                     // Pick6 low takedown lines are often More/OVER-only — detect Less button.
-                    fighters[name].td_under_available = /\bLess\b/i.test(cardText);
+                    fighters[name].td_under_available = hasLess;
                 }
             }
             // Control Time — minutes. Accepts "2:30 Control" or "2.5 Control Time".
@@ -162,7 +169,7 @@ function scrapePick6() {
                 // Pick6 sometimes only offers "More" (OVER) for Control Time — no Less/UNDER side.
                 // Detect by checking if the card has a visible "Less" button. Scraping CTRL
                 // happens on the Control Time tab, so Less-presence here reflects CTRL specifically.
-                fighters[name].ctrl_under_available = /\bLess\b/i.test(cardText);
+                fighters[name].ctrl_under_available = hasLess;
             }
         });
         // ── Secondary: Pick6 sports/props page (different card layout) ───────
