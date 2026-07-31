@@ -344,17 +344,28 @@ async function scrapePick6AllStats() {
     try {
         const merged = [];
         let lastSentCount = 0;
-        let lastSentCtrlCount = 0;
+        let lastSentCells = 0;
         // Send partial results immediately so the service worker can exit early.
-        // Fires when fighter count grows OR when new CTRL data arrives (count alone
-        // misses CTRL because it lands on an existing fighter, not a new row — which
-        // would otherwise leave CTRL stuck in the content script until the final send).
+        //
+        // Fires when the fighter count grows OR when the total number of filled stat
+        // cells grows. The cell count matters because EVERY stat after the first tab
+        // lands on an EXISTING fighter rather than adding a row, so the count alone
+        // goes flat and no send fires. This previously had a CTRL-only special case;
+        // TD has the identical property and never got one, so a Takedowns pass that
+        // added 8 lines to known fighters triggered no send at all — the TD data sat
+        // here unsent, waiting to be carried out by the eventual CTRL send. When the
+        // service worker hit its ctrlGrace timeout (background.ts ~2481) and closed
+        // the tab first, TD and CTRL were lost together. Observed 2026-07-31: the
+        // crawl logged `td=8, ctrl=13` while storage held TD: 0, CTRL: 0.
+        // Counting cells covers FP/SS/TD/CTRL uniformly — no per-stat cases to forget.
+        const statCells = (list) => list.reduce((n, f) => n + (f.line_fp != null ? 1 : 0) + (f.line_ss != null ? 1 : 0)
+            + (f.line_td != null ? 1 : 0) + (f.line_ctrl != null ? 1 : 0), 0);
         const sendInterim = () => {
             const valid = merged.filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null || f.line_ctrl != null);
-            const ctrlCount = valid.filter((f) => f.line_ctrl != null).length;
-            if (valid.length > lastSentCount || ctrlCount > lastSentCtrlCount) {
+            const cells = statCells(valid);
+            if (valid.length > lastSentCount || cells > lastSentCells) {
                 lastSentCount = valid.length;
-                lastSentCtrlCount = ctrlCount;
+                lastSentCells = cells;
                 try {
                     chrome.runtime.sendMessage({ type: 'LINES_CAPTURED', platform: 'pick6', data: { fighters: valid } });
                 }
