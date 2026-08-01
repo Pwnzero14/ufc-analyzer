@@ -53,6 +53,20 @@ declare function getPrizePicksCardCount(): number;
 declare function waitForPrizePicksBoardReady(timeoutMs?: number): Promise<boolean>;
 declare function clickLikeUser(el: any): void;
 declare function clickButtonByLabels(context: any, labels: any, waitMs?: number): Promise<boolean>;
+/**
+ * Same as clickButtonByLabels but POLLS for the control to appear instead of
+ * probing the DOM once.
+ *
+ * Needed for chips that only exist after a previous click has rendered (Pick6's
+ * Fight Time / Control Time sub-pills appear only once the Time tab is open, and
+ * those tabs live on different category URLs so the click can trigger a real
+ * navigation). The single-probe version raced that render: it looked once, found
+ * nothing, logged "Chip not found" and returned false — so the Control Time pass
+ * silently never ran and CTRL stayed 0 no matter how long the service worker
+ * waited. Confirmed by watching the fetch: it opened Time and never clicked
+ * Control Time.
+ */
+declare function clickButtonByLabelsWhenReady(context: any, labels: any, waitMs?: number, timeoutMs?: number): Promise<boolean>;
 declare function clickPrizePicksButton(labels: any, waitMs?: number): Promise<boolean>;
 declare function scrapePrizePicksAllStats(): Promise<any[]>;
 declare function scrapeDKSportsbookProps(): unknown[];

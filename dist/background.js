@@ -1633,7 +1633,29 @@ function mergeOrReplaceFighters(existing, incoming, platform) {
     }
     return mergeFighters(existing, normalizedIncoming);
 }
-async function handleLinesCaptured(platform, data) {
+/**
+ * Serialises capture handling. handleLinesCapturedInner is read-modify-write
+ * (`await getLines()` … merge … `set`), and scrapePick6UrlsConcurrently opens
+ * SEVERAL Pick6 tabs at once — each running its own crawl with its own
+ * accumulator. Their payloads arrive concurrently, both read the same `existing`
+ * snapshot, and the second write clobbers the first's contribution.
+ *
+ * Symptom (2026-07-31): TD and CTRL never coexisted. One fetch stored
+ * TD 8 / CTRL 0, the next TD 0 / CTRL 13 — whichever tab wrote last won, because
+ * TD comes from one tab's crawl and CTRL from another's. Both were captured and
+ * both were sent; only one survived the store.
+ *
+ * Chaining every call through one promise makes each capture read the previous
+ * one's committed result, so payloads accumulate instead of racing.
+ */
+let _linesCaptureChain = Promise.resolve();
+function handleLinesCaptured(platform, data) {
+    _linesCaptureChain = _linesCaptureChain
+        .catch(() => { })
+        .then(() => handleLinesCapturedInner(platform, data));
+    return _linesCaptureChain;
+}
+async function handleLinesCapturedInner(platform, data) {
     try {
         if (!data?.fighters || !Array.isArray(data.fighters))
             return;
@@ -2448,7 +2470,11 @@ async function scrapePick6UrlsConcurrently(urls, expectedFighters, attemptLog) {
         let lastSeenCount = baselineCount;
         let bestCount = baselineCount;
         let loopCount = 0;
-        while (Date.now() - started < 12000) {
+        // Cap raised 12s → 18s so the 15s CTRL backstop above can actually be reached.
+        // This is only an upper bound: every real exit is driven by the coverage /
+        // quiet-time checks below, which now fire SOONER than before on cards without
+        // a CTRL market.
+        while (Date.now() - started < 18000) {
             loopCount++;
             const count = store.pick6?.fighters?.length || 0;
             const capturedAt = store.pick6?.capturedAt || 0;
@@ -2467,8 +2493,30 @@ async function scrapePick6UrlsConcurrently(urls, expectedFighters, attemptLog) {
             // captured FP/SS/TD but not yet CTRL, give the scraper extra time to finish that pass
             // before closing tabs. Some events don't offer CTRL on Pick6 — cap the extra wait so
             // we don't hang forever on those.
+            // CTRL runs LAST (Time → Control Time pill) and lands on EXISTING fighters, so
+            // it always arrives well after FP/SS/TD. Under auto-fetch several Pick6 tabs
+            // open at once and contend for rAF, pushing that pass past the old flat 9s
+            // grace — CTRL landed 0 on every fetch while a manual visit captured 13/28.
+            //
+            // A flat, longer timeout would tax every card that has no CTRL market. Instead
+            // key off whether payloads are still ARRIVING: with the interim-send fix
+            // (e894dfe) each stat pass now pushes its own payload, so continued traffic
+            // means the crawl is still working and CTRL may yet land. Going quiet for
+            // 2.5s once the other stats are complete means nothing further is coming.
+            // Net effect: FASTER than before on CTRL-less cards (exits ~2.5s after the
+            // last payload rather than burning the full 9s), and patient when CTRL is
+            // genuinely en route. The absolute cap is the backstop.
             const ctrlSeen = coverage.ctrlCount > 0;
-            const ctrlGraceMet = ctrlSeen || elapsedMs >= 9000;
+            const otherStatsDone = hasEnoughPick6StatCoverage(coverage, expectedFighters);
+            // Must be LONGER than the CTRL click sequence, or we exit mid-pass. The content
+            // script clicks Time (1000ms wait) then the Control Time pill (1200ms) and only
+            // then scrapes — over 2.5s of silence by design. A 2.5s window cut the tab off
+            // during exactly that gap, which is why CTRL went to 0 after the first attempt
+            // at this heuristic. 6s clears the sequence with margin.
+            const quietSinceLastPayload = lastChangeAt > 0 && (Date.now() - lastChangeAt >= 6000);
+            const ctrlGraceMet = ctrlSeen
+                || (otherStatsDone && quietSinceLastPayload)
+                || elapsedMs >= 15000;
             if (hasEnoughPick6StatCoverage(coverage, expectedFighters) && ctrlGraceMet) {
                 console.log(`[UFC Auto-Scrape] pick6 concurrent coverage complete at T+${Date.now() - globalStart}ms: fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, ctrl=${coverage.ctrlCount}, all3=${coverage.allThreeCount}`);
                 break;

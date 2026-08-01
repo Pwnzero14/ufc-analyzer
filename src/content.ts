@@ -424,8 +424,13 @@ async function scrapePick6AllStats() {
       // Control Time sub-row appears only after Time is clicked). Click the parent
       // first to surface the sub-tabs, then the Control Time sub-tab. Waits bumped
       // beyond a single rAF tick to survive throttled inactive tabs.
-      await clickButtonByLabels('pick6', ['time'], 1000);
-      const ctrlClicked = await clickButtonByLabels('pick6', ['control time', 'control mins', 'control minutes'], 1200);
+      // Both wait for their control to exist. The Time tab and its Fight Time /
+      // Control Time sub-pills render asynchronously (and sit on a different
+      // category URL, so the click can navigate), which the old fixed 1000ms
+      // gap did not reliably cover — the Control Time pill was probed once,
+      // missed, and the whole CTRL pass was skipped.
+      await clickButtonByLabelsWhenReady('pick6', ['time'], 1000, 6000);
+      const ctrlClicked = await clickButtonByLabelsWhenReady('pick6', ['control time', 'control mins', 'control minutes'], 1200, 6000);
       if (ctrlClicked) {
         log('pick6', 'Clicked Control Time pill, scraping');
         await scrollToLoadAll({ timeoutMs: 1200, intervalMs: 200 });
@@ -655,6 +660,35 @@ async function clickButtonByLabels(context, labels, waitMs = 900): Promise<boole
   const btn = findButtonByText(labels);
   if (!btn) {
     log(context, `Chip not found: ${labels.join(' | ')}`);
+    return false;
+  }
+  clickLikeUser(btn);
+  await sleep(waitMs);
+  return true;
+}
+
+/**
+ * Same as clickButtonByLabels but POLLS for the control to appear instead of
+ * probing the DOM once.
+ *
+ * Needed for chips that only exist after a previous click has rendered (Pick6's
+ * Fight Time / Control Time sub-pills appear only once the Time tab is open, and
+ * those tabs live on different category URLs so the click can trigger a real
+ * navigation). The single-probe version raced that render: it looked once, found
+ * nothing, logged "Chip not found" and returned false — so the Control Time pass
+ * silently never ran and CTRL stayed 0 no matter how long the service worker
+ * waited. Confirmed by watching the fetch: it opened Time and never clicked
+ * Control Time.
+ */
+async function clickButtonByLabelsWhenReady(context, labels, waitMs = 900, timeoutMs = 6000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let btn = findButtonByText(labels);
+  while (!btn && Date.now() < deadline) {
+    await sleep(200);
+    btn = findButtonByText(labels);
+  }
+  if (!btn) {
+    log(context, `Chip not found after ${timeoutMs}ms: ${labels.join(' | ')}`);
     return false;
   }
   clickLikeUser(btn);
