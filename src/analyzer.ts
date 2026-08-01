@@ -16198,6 +16198,22 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
   const oppNorm = rawOpp ? (normalizeName(rawOpp) || rawOpp) : (cardOpp ? (normalizeName(cardOpp) || cardOpp) : null);
   const singleToken = looseOpp && looseOpp.split(' ').length === 1 ? looseOpp.toLowerCase() : null;
 
+  // The UFCStats card is AUTHORITATIVE over a platform's abbreviated opponent text.
+  // Pick6 renders opponents surname-only ("vs Miller"), which makes singleToken match
+  // ANY fighter sharing that surname at score 82 — outranking nothing, because cardOpp
+  // was previously consulted only when rawOpp was absent. On the Gamrot/Salkilld card
+  // that paired Billy Ray Goff (card opponent: Ty Miller, welterweight) with JULIANA
+  // Miller (womenFlyweight), because Ty Miller had no lines yet 6 days out and was the
+  // only Miller missing from the board. That single bad pair then cascaded: Juliana was
+  // consumed by Goff, so Ravena Oliveira slid onto Alexia Thainara and Amanda Lemos was
+  // left orphaned — the classic "every pair after slot N is wrong" shift.
+  const cardOppNorm = cardOpp ? (normalizeName(cardOpp) || cardOpp).toLowerCase() : null;
+  const matchesCardOpp = (candidateNorm: string): boolean => {
+    if (!cardOppNorm) return false;
+    const c = candidateNorm.toLowerCase();
+    return c === cardOppNorm || namesMatch(c, cardOppNorm);
+  };
+
   // Fast-path: exact normalized name lookup via pre-built map (O(1) vs O(N) loop)
   if (oppNorm && _fighterByNorm) {
     const direct = _fighterByNorm.get(oppNorm.toLowerCase());
@@ -16221,7 +16237,14 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
       else if (rawOpp && namesMatch(candidate.name, rawOpp)) score = Math.max(score, 88);
     }
 
-    if (singleToken) {
+    // Card agreement wins outright — a full-name pairing from UFCStats beats any
+    // abbreviated platform string.
+    if (matchesCardOpp(candidateNorm)) score = Math.max(score, 110);
+
+    // Surname/first-name guesses are only allowed when the card has NOTHING to say
+    // about this fighter. If the card names an opponent and this candidate isn't
+    // them, a shared surname is a collision, not a match.
+    if (singleToken && (!cardOppNorm || matchesCardOpp(candidateNorm))) {
       const parts = candidateNorm.toLowerCase().split(' ');
       const first = parts[0] || '';
       const last = parts[parts.length - 1] || '';
@@ -16246,13 +16269,21 @@ function resolveOpponentEntry(fighter: AnalyzerFighter, explicitOpp: string | nu
 
   if (best && !tieAtBest) return best;
 
-  const fallbackBySingleToken = singleToken ? findOpponentBySingleToken(singleToken, fighter.name) : null;
+  // Both remaining fallbacks are surname/reverse guesses. Gate them the same way:
+  // when the card names an opponent who simply isn't on the board yet (no lines
+  // posted), the honest answer is "unresolved" — the row shows the card's name as a
+  // placeholder. Guessing produces a wrong pairing AND steals a fighter from their
+  // real opponent, shifting every pair after them.
+  const fallbackBySingleToken = (singleToken && !cardOppNorm)
+    ? findOpponentBySingleToken(singleToken, fighter.name)
+    : null;
   if (fallbackBySingleToken) return fallbackBySingleToken;
 
   const fallbackByReverse = allFighters.find((x) => {
     if (x.name === fighter.name) return false;
     if (!x.opponent) return false;
     const xOppNorm = normalizeName(x.opponent) || x.opponent;
+    if (cardOppNorm && !matchesCardOpp(normalizeName(x.name) || x.name)) return false;
     return xOppNorm === fighterNorm || namesMatch(xOppNorm, fighterNorm);
   });
   return fallbackByReverse || null;
