@@ -223,6 +223,13 @@ export const NAME_ALIASES: Record<string, string> = {
   // attaches to the card fighter (and his opponent's opp-SS shows blank too).
   'Vinicius De Oliveira Prestes De Matos': 'Vinicius Oliveira',
   'Vinicius De Oliveira': 'Vinicius Oliveira',
+  // 2026-08-02 (Gamrot vs Salkilld card): Underdog writes the surname as ONE word
+  // ("Yadier Delvalle") while UFCStats + the card use two ("Yadier del Valle").
+  // normalizeName title-cases per word, giving "Yadier Delvalle" vs "Yadier Del
+  // Valle" — different token counts, so namesMatch can't bridge them and his UD
+  // SS line never attached to the card fighter (row showed "No visible source
+  // lines" while UD plainly listed him at 27.5).
+  'Yadier Delvalle':  'Yadier Del Valle',
   // Platforms use her given name "Beatriz"; UFCStats fighter page is "Bia Mesquita".
   'Beatriz Mesquita':    'Bia Mesquita',
   // UFCStats lists these two Magomedovs by short first names (Shara / Abus); the
