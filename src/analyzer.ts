@@ -15720,7 +15720,6 @@ function cardPositionForFightIndex(
 
 function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
   const out: FightPair[] = [];
-  const totalFights = Math.ceil(activeFighters.length / 2);
 
   // Identify the main event by the (now title-authoritative) headliner pair rather
   // than array position — UFCStats upcoming-card order is NOT reliably main-first,
@@ -15749,14 +15748,72 @@ function buildFights(activeFighters: AnalyzerFighter[]): FightPair[] {
     if (c > topEdgeConf) { topEdgeConf = c; topEdgeName = f.name; }
   }
 
-  for (let i = 0; i < activeFighters.length; i += 2) {
-    const a = activeFighters[i];
-    const b = activeFighters[i + 1] || null;
-    const fightIndex = Math.floor(i / 2);
-    const cardPair = upcomingCardPairs[fightIndex];
-    // Trust upcomingCardPairs ordering — orderFightersByCard() aligns activeFighters
-    // to the same sequence. weightClass falls back to undefined when missing.
-    const weightClass = cardPair?.weightClass;
+  // ── Card-driven pairing ────────────────────────────────────────────────
+  // Previously this walked activeFighters two at a time and TRUSTED
+  // orderFightersByCard to have aligned them, reading weightClass from
+  // upcomingCardPairs[i/2] by position. Any card pair contributing an ODD number
+  // of fighters shifted every fight after it by one — and that happens routinely:
+  // a fighter with no lines yet, or (2026-08-02) a STALE cached card. The cached
+  // card held 9 fights while UFCStats listed 11, so Sousa/Miranda and Johns/Rosas
+  // fell into the unordered tail and Billy Ray Goff ended up beside JULIANA Miller
+  // instead of Ty Miller, dragging Oliveira, Sousa, Miranda, Johns and Rosas out
+  // of position behind him.
+  //
+  // Pair from the card itself and adjacency can't drift. Fighters absent from the
+  // (possibly stale) card fall through to adjacency at the end, so a lagging cache
+  // degrades to the old behaviour for those rows only instead of corrupting all of
+  // them.
+  const unpaired = new Set(activeFighters);
+  const takeFromBoard = (cardName: string): AnalyzerFighter | null => {
+    for (const f of unpaired) {
+      const n = normalizeName(f.name) || f.name;
+      if (n === cardName) { unpaired.delete(f); return f; }
+    }
+    for (const f of unpaired) {
+      const n = normalizeName(f.name) || f.name;
+      if (namesMatch(n, cardName) || strictCardNameMatch(n, cardName)) { unpaired.delete(f); return f; }
+    }
+    return null;
+  };
+
+  const slots: Array<{ a: AnalyzerFighter; b: AnalyzerFighter | null; weightClass?: WeightClass }> = [];
+  for (const cp of upcomingCardPairs) {
+    const f1 = takeFromBoard(cp.f1);
+    const f2 = takeFromBoard(cp.f2);
+    if (!f1 && !f2) continue;               // neither side on the board yet
+    // A half-resolved pair keeps its own slot rather than borrowing the next
+    // fight's fighter — that borrowing is what cascaded.
+    slots.push({ a: (f1 || f2)!, b: f1 ? f2 : null, weightClass: cp.weightClass });
+  }
+  // Anyone the card doesn't know about (stale cache, late addition). Pair them by
+  // their OWN opponent field before falling back to adjacency — the platforms know
+  // these matchups even when the cached card predates them, and adjacency here was
+  // what left Jessie Rosas orphaned while Richie Miranda sat next to Miles Johns.
+  const leftovers = activeFighters.filter((f) => unpaired.has(f));
+  for (const f of leftovers) {
+    if (!unpaired.has(f)) continue;
+    unpaired.delete(f);
+    let partner: AnalyzerFighter | null = null;
+    const oppNorm = f.opponent ? (normalizeName(f.opponent) || f.opponent) : null;
+    if (oppNorm) {
+      for (const g of unpaired) {
+        const gn = normalizeName(g.name) || g.name;
+        if (gn === oppNorm || namesMatch(gn, oppNorm) || strictCardNameMatch(gn, oppNorm)) {
+          partner = g;
+          unpaired.delete(g);
+          break;
+        }
+      }
+    }
+    slots.push({ a: f, b: partner });
+  }
+
+  // Real slot count — ceil(fighters/2) over-counted whenever a pair was half
+  // resolved, skewing the main-card/prelim split in cardPositionForFightIndex.
+  const totalFights = slots.length;
+
+  for (let fightIndex = 0; fightIndex < slots.length; fightIndex++) {
+    const { a, b, weightClass } = slots[fightIndex];
     const ft = pickFightTimeLine(a) || pickFightTimeLine(b);
     const correlation = b ? computeFightCorrelation(a, b) : null;
     const isMain = fightIsMainEvent(a, b);
@@ -19942,8 +19999,14 @@ function namesMatch(a: string, b: string): boolean {
   // match as the same fighter when one first name is an abbreviation/initial
   // (e.g. "C Chandler" → "Chelsea Chandler") or the initials agree.
   if (aLast === bLast && aLast.length > 4) {
-    const aAbbrev = aFirst.length <= 2 || aFirst.endsWith('.');
-    const bAbbrev = bFirst.length <= 2 || bFirst.endsWith('.');
+    // An abbreviation is exactly ONE character. normalizeName strips periods
+    // ("T. Miller" → "T Miller"), so a real initial is always length 1 — while
+    // `<= 2` swept in genuine two-letter first names: Ty, Bo, Al, Ed, Su, Yu, Li.
+    // That made "Ty Miller" indistinguishable from ANY Miller, so on the
+    // Gamrot/Salkilld card the board consumed JULIANA Miller as Ty Miller,
+    // paired her with Billy Ray Goff and left Ravena Oliveira unpaired.
+    const aAbbrev = aFirst.length === 1 || aFirst.endsWith('.');
+    const bAbbrev = bFirst.length === 1 || bFirst.endsWith('.');
     if (aAbbrev || bAbbrev || aFirst[0] === bFirst[0]) return true;
   }
   return false;
