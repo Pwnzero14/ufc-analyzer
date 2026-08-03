@@ -28771,6 +28771,114 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border-color: rgba(248,198,74,0.45);
   background: rgba(248,198,74,0.10);
 }
+
+/* ══ GLOW-UP 202: fighter cards join the gold-accent family ═══════════════
+   Finishes GLOW-UP 111, which was committed 38 days ago and left "still off".
+
+   IT WAS NOT TOO SUBTLE — IT WAS DEAD. The standing note on 111 said its gold
+   was too faint and to raise the opacities. That would have changed nothing:
+   111's gold background never rendered on a single real row. 111 sits at
+   ~6773, and GLOW-UP 107's role tint sits LATER at ~7519 with
+   `.fighter-row.role-fav:not(.expanded)` — (0,3,0) and !important, versus
+   111's (0,2,0) !important. Higher specificity wins regardless of order, and
+   every fighter row carries role-fav or role-dog, so what actually painted was
+   107's CYAN/ORANGE wash. 111's own header comment says the tint should move
+   from cyan/orange to gold; the rule that undoes it was already in the file.
+   Third instance this session of a later block silently killing an earlier
+   pass — check who wins before believing a value is merely weak.
+
+   Hence the role-scoped selectors below. A selector LIST keeps each selector's
+   own specificity, so the two role forms outrank 107 while the bare form still
+   covers rows with no role.
+
+   THE ACCENT EDGE MOVES TO THE TOP. Every other family member puts it on the
+   left, but on a fighter row border-left is role identity — cyan favourite,
+   orange dog — and identity outranks cohesion. Two consequences worth knowing:
+     · It is drawn as a BACKGROUND LAYER, not a ::before. `.fighter-row` has
+       no `position`, so a pseudo-element would need `position: relative`
+       added, which changes the containing block for every absolutely
+       positioned descendant in a very dense row. A background layer needs
+       nothing, and the row's existing `overflow: hidden` clips it to the
+       rounded corners for free.
+     · The hairline fades out at both ends. Across 20+ stacked rows a hard
+       full-width bar would read as a table rule; a fade reads as sheen.
+
+   Border sides are set INDIVIDUALLY and border-left is never mentioned, so
+   role identity survives untouched — no second border-left-color declaration
+   needed to unwind a shorthand, which is what 111 had to do. */
+.fighter-row.role-fav:not(.expanded),
+.fighter-row.role-dog:not(.expanded),
+.fighter-row:not(.expanded) {
+  background:
+    linear-gradient(90deg, transparent 6%, rgba(248,198,74,0.26) 50%, transparent 94%) top / 100% 1px no-repeat,
+    radial-gradient(ellipse 70% 120% at 50% 0%, rgba(248,198,74,0.055), transparent 72%),
+    linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.008) 100%),
+    var(--bg2) !important;
+  border-top-color: rgba(248,198,74,0.15) !important;
+  border-right-color: rgba(248,198,74,0.15) !important;
+  border-bottom-color: rgba(248,198,74,0.15) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 28px rgba(0,0,0,0.38),
+    0 0 22px rgba(248,198,74,0.055) !important;
+}
+.fighter-row.role-fav:not(.expanded):hover,
+.fighter-row.role-dog:not(.expanded):hover,
+.fighter-row:not(.expanded):hover {
+  background:
+    linear-gradient(90deg, transparent 4%, rgba(248,198,74,0.50) 50%, transparent 96%) top / 100% 1px no-repeat,
+    radial-gradient(ellipse 75% 130% at 50% 0%, rgba(248,198,74,0.10), transparent 74%),
+    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.010) 100%),
+    var(--bg2) !important;
+  border-top-color: rgba(248,198,74,0.30) !important;
+  border-right-color: rgba(248,198,74,0.30) !important;
+  border-bottom-color: rgba(248,198,74,0.30) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 12px 34px rgba(0,0,0,0.45),
+    0 0 26px rgba(248,198,74,0.12) !important;
+}
+
+/* Expanding a row used to REMOVE its gold. `.fighter-row.expanded` was given a
+   gold peak glow (0 0 44px rgba(248,198,74,0.07)) early in the sheet, but a
+   later same-specificity rule re-declares box-shadow with no gold in it and
+   wins on order — so the most important state on the board was also its least
+   gold one, and expanding a card made the accent vanish. Expanded is now the
+   family peak, which is what it was always meant to be. border-left is left
+   alone here too: it carries --gold / --cyan / orange by role already. */
+.fighter-row.expanded {
+  background:
+    linear-gradient(90deg, transparent 3%, rgba(248,198,74,0.65) 50%, transparent 97%) top / 100% 1px no-repeat,
+    radial-gradient(ellipse 80% 140% at 50% 0%, rgba(248,198,74,0.12), transparent 76%),
+    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.010) 100%),
+    var(--bg2) !important;
+  border-top-color: rgba(248,198,74,0.34) !important;
+  border-right-color: rgba(248,198,74,0.34) !important;
+  border-bottom-color: rgba(248,198,74,0.34) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 16px 44px rgba(0,0,0,0.5),
+    0 0 40px rgba(248,198,74,0.14) !important;
+}
+
+/* Inner card ring, lifted in step so it doesn't read as a duller layer inside
+   a brighter frame. Role selectors kept from 111 — the ring is only drawn on
+   rows that carry a role. */
+.fighter-row.role-fav .fighter-card,
+.fighter-row.role-dog .fighter-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 4px 16px rgba(0,0,0,0.22),
+    0 0 0 1px rgba(248,198,74,0.10) !important;
+}
+.fighter-row.role-fav .fighter-card:hover,
+.fighter-row.role-dog .fighter-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 8px 28px rgba(0,0,0,0.30),
+    0 0 24px rgba(248,198,74,0.10),
+    0 0 0 1px rgba(248,198,74,0.18) !important;
+}
 </style>
 </head>
 <body>
