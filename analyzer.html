@@ -3148,8 +3148,12 @@ body {
   align-items: center;
   padding: 6px 14px;
   gap: 10px;
-  background: rgba(6,7,16,0.96);
-  backdrop-filter: blur(6px);
+  /* Opaque, and deliberately so. This bar is STICKY, so a backdrop-filter here
+     re-samples the backdrop on every scroll frame — the most expensive place in
+     the app to put one. At 0.96 alpha only ~4% of the backdrop transmitted, so
+     the blur was buying almost nothing for that cost. Going fully opaque makes
+     the blur provably invisible, which is why it is gone. */
+  background: rgb(6,7,16);
   border-bottom: 1px solid var(--border2);
   box-shadow: 0 4px 10px rgba(0,0,0,0.28);
   position: sticky;
@@ -12279,7 +12283,9 @@ html { scroll-behavior: smooth; }
 
 /* --- Sticky column header: accent underline + label separators --- */
 .fighter-header-row {
-  background: linear-gradient(180deg, rgba(6,7,16,0.97), rgba(10,14,26,0.95));
+  /* Opaque stops — this is the rule that actually wins the background, so the
+     0.97/0.95 alphas here were the ones letting the backdrop through. */
+  background: linear-gradient(180deg, rgb(6,7,16), rgb(10,14,26));
   border-bottom: 1px solid rgba(248,198,74,0.15);
   box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 1px 0 rgba(248,198,74,0.06);
 }
@@ -15576,10 +15582,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 }
 
 /* --- Fighter header row: deeper frost + hover labels --- */
-.fighter-header-row {
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-}
 .fhr-label {
   transition: color 0.15s ease, text-shadow 0.15s ease;
 }
