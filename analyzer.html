@@ -6415,8 +6415,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 24px 80px rgba(0,0,0,0.7),
     0 0 24px rgba(248,198,74,0.06) !important;
-  backdrop-filter: blur(12px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
 }
 
 /* ─── Gold accent spine at top ─── */
@@ -6576,6 +6574,7 @@ html { scroll-behavior: smooth; }
 
 /* ─── Modal container: gold-accented glass ─── */
 .lineshop-modal-box {
+  position: relative;   /* was the backdrop-filter containing block for ::before */
   background: linear-gradient(180deg,
     rgba(255,255,255,0.03) 0%,
     rgba(255,255,255,0.008) 100%) var(--bg2) !important;
@@ -6584,8 +6583,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 24px 80px rgba(0,0,0,0.7),
     0 0 24px rgba(248,198,74,0.06) !important;
-  backdrop-filter: blur(12px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
 }
 
 /* ─── Gold accent spine at top (matching slate check / line movers) ─── */
@@ -6767,8 +6764,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 4px 16px rgba(0,0,0,0.3),
     0 0 18px rgba(248,198,74,0.03) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .fighter-row:not(.expanded):hover {
   border-color: rgba(248,198,74,0.20) !important;
@@ -6890,8 +6885,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 32px rgba(0,0,0,0.4),
     0 0 20px rgba(248,198,74,0.04) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
   transition: all 0.2s ease !important;
 }
 .learning-diagnostics-strip:hover {
@@ -7053,8 +7046,6 @@ html { scroll-behavior: smooth; }
     0 8px 32px rgba(0,0,0,0.45),
     0 0 1px rgba(248,198,74,0.1) !important;
   border: 1px solid rgba(248,198,74,0.08) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 /* Gold accent spine — same gradient as header, synced timing */
 .slate-banner::before {
@@ -7082,8 +7073,6 @@ html { scroll-behavior: smooth; }
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
     0 4px 16px rgba(0,0,0,0.3) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   transition: all 0.2s ease !important;
 }
 .qa-panel:hover {
@@ -7171,8 +7160,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 32px rgba(0,0,0,0.4),
     0 0 24px rgba(248,198,74,0.05) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 /* Per-stat radial wash — uniform gold across all three */
 .model-health-strip::before {
@@ -7312,8 +7299,6 @@ html { scroll-behavior: smooth; }
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 32px rgba(0,0,0,0.4),
     0 0 18px rgba(248,198,74,0.03) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 /* ─── Header: gold glass with shimmer accent ─── */
@@ -12805,8 +12790,6 @@ a:not([class]):hover { color: #6fe3dd; }
 
 /* --- Backtest stat cards: glass depth + hover --- */
 .bt-stat-card {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .bt-stat-card:hover {
@@ -13686,7 +13669,6 @@ div[style*="height:4px;background:rgba(255,255,255,0.05)"] {
 
 /* --- Backtesting: sparkline panel glass --- */
 .bt-spark-panel {
-  backdrop-filter: blur(6px);
   border: 1px solid rgba(125,145,190,0.06);
   transition: border-color 0.2s ease;
 }
@@ -13696,7 +13678,6 @@ div[style*="height:4px;background:rgba(255,255,255,0.05)"] {
 
 /* --- Backtesting: bankroll panel glass --- */
 .bt-bankroll-panel {
-  backdrop-filter: blur(6px);
   border: 1px solid rgba(125,145,190,0.06);
   transition: border-color 0.2s ease;
 }
@@ -14996,8 +14977,6 @@ div[style*="border-left:2px solid"]:hover {
 
 /* --- Movement summary grid: glass + gold top accent --- */
 .movement-summary-grid {
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   background: rgba(14,18,30,0.85);
   border-color: rgba(255,255,255,0.06);
   box-shadow: 0 6px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
@@ -15133,8 +15112,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Country mini-badge: glass depth --- */
 .fighter-avatar-country {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .fighter-row:hover .fighter-avatar-country {
@@ -15267,8 +15244,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Betr inputs: glass depth + focus glow by type --- */
 .betr-input {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .betr-input:focus {
@@ -15479,8 +15454,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Sort/trend trigger: glass depth --- */
 .sort-trend-trigger {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
@@ -15590,8 +15563,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Model health strip: deeper glass frost --- */
 .model-health-strip {
-  backdrop-filter: blur(10px) saturate(1.2);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
   position: relative;
   overflow: hidden;
 }
@@ -15619,8 +15590,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Source toggles: glass pills --- */
 .source-toggle {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: all 0.15s ease;
 }
 .source-toggle.active {
@@ -15638,8 +15607,6 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- QA panel: glass backdrop --- */
 .qa-panel {
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   position: relative;
   overflow: hidden;
 }
@@ -15654,14 +15621,10 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 
 /* --- Slate banner: deeper glass --- */
 .slate-banner {
-  backdrop-filter: blur(8px) saturate(1.15);
-  -webkit-backdrop-filter: blur(8px) saturate(1.15);
 }
 
 /* --- Learning drilldown: glass interiors + hover --- */
 .learning-diagnostics-strip {
-  backdrop-filter: blur(8px) saturate(1.15);
-  -webkit-backdrop-filter: blur(8px) saturate(1.15);
   transition: box-shadow 0.2s ease;
 }
 .learning-diagnostics-strip:hover {
@@ -26233,7 +26196,6 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.3);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   font-size: 11px; color: var(--text2);
 }
 .visit-briefing::before {
