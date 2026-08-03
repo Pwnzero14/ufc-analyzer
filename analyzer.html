@@ -28583,6 +28583,194 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: none !important;
 }
 .line-cell:hover .line-source-tag[class*="src-"] { color: var(--text) !important; }
+
+/* ══ GLOW-UP 201: LINE MOVERS five-level pass ═════════════════════════════
+   The board listed moves and stopped there — no roll-up, a silent top-20 cut,
+   no filters, and no statement of what a move did to a number you actually
+   lean. Colour follows the canonical mapping: direction owns green/red, so
+   BETTER/WORSE are green/red and the book chips stay neutral. */
+
+/* Mini roll-up in the title bar — survives collapse. Non-interactive, so it
+   doesn't fight the header's click-to-collapse handler. */
+.movement-summary-mini {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.04);
+  white-space: nowrap;
+}
+
+/* L1 — command header */
+.mvs-cmd {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 0 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.mvs-cmd-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mvs-stat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.03);
+  white-space: nowrap;
+}
+.mvs-stat b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mvs-stat.mvs-c-rise b   { color: var(--green); }
+.mvs-stat.mvs-c-drop b   { color: var(--red); }
+.mvs-stat.mvs-c-steam    { border-color: rgba(255,106,61,0.34); }
+.mvs-stat.mvs-c-steam b  { color: #ff6a3d; }
+.mvs-stat.mvs-c-rlm      { border-color: rgba(146,125,255,0.34); }
+.mvs-stat.mvs-c-rlm b    { color: var(--stat-ft); }
+.mvs-stat.mvs-c-better   { border-color: rgba(0,232,122,0.34); }
+.mvs-stat.mvs-c-better b { color: var(--green); }
+.mvs-stat.mvs-c-worse    { border-color: rgba(255,91,120,0.34); }
+.mvs-stat.mvs-c-worse b  { color: var(--red); }
+/* "n/a" — the measurement can't be made on this slate, which is a different
+   statement from a count of zero. Muted so it reads as absent, not as caution:
+   --amber would claim there is something to act on. */
+.mvs-stat.mvs-c-na       { border-style: dashed; opacity: 0.72; }
+.mvs-stat.mvs-c-na b     { color: var(--text3); font-weight: 600; }
+.mvs-top {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.mvs-top b { color: var(--gold); font-weight: 700; }
+
+/* L3 — filter chips. Re-click clears, same convention as the slate chips. */
+.mvs-filters { display: flex; flex-wrap: wrap; gap: 5px; }
+.mvs-filter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--text3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.mvs-filter:hover { color: var(--text); border-color: var(--text3); }
+.mvs-filter.on {
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.45);
+  background: rgba(248,198,74,0.10);
+}
+.mvs-more {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
+  font-weight: 700;
+  color: var(--text3);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+}
+.mvs-more:hover { color: var(--text); border-color: var(--text3); }
+.mvs-empty {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  padding: 12px 2px;
+  text-align: center;
+}
+
+/* L2 — what the move did to the price of the side you lean. Direction colours:
+   this is favourable/unfavourable, which outranks any stat identity. */
+.mvs-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.mvs-price-better { color: var(--green); background: rgba(0,232,122,0.10); }
+.mvs-price-worse  { color: var(--red);   background: rgba(255,91,120,0.10); }
+
+/* L4 — stats added to the board. R1 SS is SS-family, so it carries the SS hue.
+   KD has no --stat-* identity and gets none invented for it: per the canonical
+   mapping a chip with no family stays neutral rather than borrowing a hue that
+   already means something else. The wider min-width is for the "R1 SS" label,
+   which overflowed the 24px sized for two-letter stats.
+
+   The `!important` is not decoration. An earlier gold-glass pass declared
+   `.movement-summary-stat { color: … !important }`, which outranks a plain
+   `.movement-summary-stat.mvs-ss` however far down the sheet it sits — so the
+   FP/SS/TD/FT family colours have been dead on this board ever since, and the
+   three stats added here would have been dead on arrival. Restored at matching
+   weight. Hover still wins: `.movement-summary-row:hover .movement-summary-stat`
+   is more specific, so the gold hover accent is unaffected.
+
+   Values come from the --stat-* variables rather than the literals they
+   replace (#d7dcf0 FP, #f0c040 TD), per the canonical mapping — that mapping
+   moved TD off the gold hex precisely because a TD chip read as a warning. */
+.movement-summary-stat { min-width: 40px; }
+.movement-summary-stat.mvs-fp    { color: var(--stat-fp) !important; }
+.movement-summary-stat.mvs-ss    { color: var(--stat-ss) !important; }
+.movement-summary-stat.mvs-td    { color: var(--stat-td) !important; }
+.movement-summary-stat.mvs-ft    { color: var(--stat-ft) !important; }
+.movement-summary-stat.mvs-ss_r1 { color: var(--stat-ss) !important; opacity: 0.82; }
+.movement-summary-stat.mvs-ctrl  { color: var(--stat-ctrl) !important; }
+.movement-summary-stat.mvs-kd    { color: var(--text2) !important; }
+
+/* L5 — add-to-slip. Pushed to the row end and always faintly visible rather
+   than hover-only, per the GLOW-UP 196 L4 / 198 L5 finding that a hidden
+   per-row control reads as no control at all. */
+.mvs-slate-btn {
+  margin-left: auto;
+  flex: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+}
+.movement-summary-row:hover .mvs-slate-btn { opacity: 1; }
+.mvs-slate-btn:hover { color: var(--gold); border-color: rgba(248,198,74,0.45); }
+.mvs-slate-btn.on {
+  opacity: 1;
+  color: var(--gold);
+  border-color: rgba(248,198,74,0.45);
+  background: rgba(248,198,74,0.10);
+}
 </style>
 </head>
 <body>
@@ -28870,6 +29058,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 <div id="lineMovementSummary" class="movement-summary-grid" style="display:none">
   <div class="movement-summary-header" id="movementSummaryHeader">
     <span class="movement-summary-title">LINE MOVERS</span>
+    <span class="movement-summary-mini" id="movementSummaryMini" title="Board roll-up — stays readable while the panel is collapsed"></span>
     <span class="movement-summary-time" id="movementSummaryTime"></span>
     <span class="movement-summary-toggle" id="movementSummaryToggle">▼</span>
   </div>

@@ -11675,17 +11675,104 @@ function openingLineKey(platform: string, stat: string, name: string): string {
 
 // Maximum plausible line movement per stat type. Anything beyond this is a
 // stale/corrupt baseline and should be discarded rather than displayed.
-const MAX_PLAUSIBLE_DELTA: Record<string, number> = { fp: 12, ss: 15, td: 3, ft: 5, ctrl: 4 };
+const MAX_PLAUSIBLE_DELTA: Record<string, number> = { fp: 12, ss: 15, ss_r1: 6, td: 3, ft: 5, ctrl: 4, kd: 1 };
 
 /** Returns true when a stored opening value is plausible for its stat type. */
 function isPlausibleBaseline(stat: string, value: number): boolean {
   if (!Number.isFinite(value) || value < 0) return false;
-  if (stat === 'ft'   && value > 25)  return false;   // FT lines are 0–25 min
-  if (stat === 'td'   && value > 15)  return false;   // TD lines are 0–15
-  if (stat === 'ss'   && value > 250) return false;   // SS lines are 0–~200
-  if (stat === 'fp'   && value > 250) return false;   // FP lines are 0–~200
-  if (stat === 'ctrl' && value > 25)  return false;   // CTRL lines are 0–25 min (theoretical max in a 5R fight)
+  if (stat === 'ft'    && value > 25)  return false;   // FT lines are 0–25 min
+  if (stat === 'td'    && value > 15)  return false;   // TD lines are 0–15
+  if (stat === 'ss'    && value > 250) return false;   // SS lines are 0–~200
+  if (stat === 'ss_r1' && value > 60)  return false;   // R1 SS is a single round — 0–~40
+  if (stat === 'fp'    && value > 250) return false;   // FP lines are 0–~200
+  if (stat === 'ctrl'  && value > 25)  return false;   // CTRL lines are 0–25 min (theoretical max in a 5R fight)
+  if (stat === 'kd'    && value > 3)   return false;   // KD lines are 0.5–1.5 in practice
   return true;
+}
+
+/**
+ * The single platform×stat inventory used by every baseline path: opening
+ * capture, delta-0 baseline repair, the RESET-LINES re-anchor, the fighter-card
+ * sharp-move scan and the Line Movers board. This was four near-identical
+ * literals that had already drifted (the fighter-card copy never learned about
+ * any stat added after FT), so a new prop silently tracked on some paths and not
+ * others. Add a line here and every path picks it up.
+ *
+ * CTRL / R1 SS / KD joined in GLOW-UP 201 — CTRL is Best-Picks-eligible as of
+ * MODEL v16 and R1 SS / KD are lean sources, so their movement is actionable.
+ * Body/leg lines are deliberately absent: no lean reads them, so their movement
+ * has nothing to confirm or contradict.
+ */
+const LINE_STAT_ACCESSORS: Array<[string, string, (f: AnalyzerFighter) => number | null | undefined]> = [
+  ['p6',   'fp',    f => f.line_p6],
+  ['p6',   'ss',    f => f.line_p6_ss],
+  ['p6',   'td',    f => f.line_p6_td],
+  ['p6',   'ft',    f => f.line_p6_ft],
+  ['p6',   'ctrl',  f => f.line_p6_ctrl],
+  ['ud',   'fp',    f => f.line_ud],
+  ['ud',   'ss',    f => f.line_ud_ss],
+  ['ud',   'ss_r1', f => f.line_ud_ss_r1],
+  ['ud',   'td',    f => f.line_ud_td],
+  ['ud',   'ft',    f => f.line_ud_ft],
+  ['ud',   'ctrl',  f => f.line_ud_ctrl],
+  ['pp',   'fp',    f => f.line_pp],
+  ['pp',   'ss',    f => f.line_pp_ss],
+  ['pp',   'ss_r1', f => f.line_pp_ss_r1],
+  ['pp',   'td',    f => f.line_pp_td],
+  ['pp',   'ft',    f => f.line_pp_ft],
+  ['pp',   'ctrl',  f => f.line_pp_ctrl],
+  ['pp',   'kd',    f => f.line_pp_kd],
+  ['betr', 'fp',    f => f.line_betr],
+  ['betr', 'ss',    f => f.line_betr_ss],
+  ['betr', 'td',    f => f.line_betr_td],
+  ['betr', 'ft',    f => f.line_betr_ft],
+  ['betr', 'ctrl',  f => f.line_betr_ctrl],
+  ['dk',   'ss',    f => f.line_dk_ss],
+  ['dk',   'ss_r1', f => f.line_dk_ss_r1],
+  ['dk',   'td',    f => f.line_dk_td],
+  ['dk',   'ft',    f => f.line_dk_ft],
+  ['dk',   'ctrl',  f => f.line_dk_ctrl],
+];
+
+/**
+ * LINE_STAT_ACCESSORS regrouped stat-first, for the paths that iterate by stat
+ * rather than by platform (line-history recording, the Line Movers board).
+ * Derived rather than written out so it can't fall behind the flat list.
+ */
+type StatPlatAccessors = Array<[string, (f: AnalyzerFighter) => number | null | undefined]>;
+const LINE_STAT_BY_STAT: Array<[string, StatPlatAccessors]> = (() => {
+  const order: string[] = [];
+  const byStat = new Map<string, StatPlatAccessors>();
+  for (const [plat, stat, get] of LINE_STAT_ACCESSORS) {
+    let bucket = byStat.get(stat);
+    if (!bucket) { bucket = []; byStat.set(stat, bucket); order.push(stat); }
+    bucket.push([plat, get]);
+  }
+  return order.map(s => [s, byStat.get(s) as StatPlatAccessors] as [string, StatPlatAccessors]);
+})();
+
+/** Book label for a LINE_STAT_ACCESSORS platform key. */
+function statPlatLabel(plat: string): string {
+  return plat === 'p6' ? 'P6' : plat === 'ud' ? 'UD' : plat === 'pp' ? 'PP' : plat === 'dk' ? 'DK' : 'BT';
+}
+
+/** Display label for a LINE_STAT_ACCESSORS stat key ('ss_r1' → 'R1 SS'). */
+function statDisplayLabel(stat: string): string {
+  return stat === 'ss_r1' ? 'R1 SS' : stat.toUpperCase();
+}
+
+/** The sub-lean a given stat key is scored by, or null when the stat has none. */
+function leanForStat(f: AnalyzerFighter, stat: string): LeanResult | null {
+  switch (stat) {
+    case 'fp':    return f.lean ?? null;
+    case 'ss':    return f.lean_ss ?? null;
+    case 'ss_r1': return f.lean_ss_r1 ?? null;
+    case 'td':    return f.lean_td ?? null;
+    case 'ft':    return f.lean_ft ?? null;
+    case 'ctrl':  return f.lean_ctrl ?? null;
+    case 'kd':    return f.lean_kd ?? null;
+    default:      return null;
+  }
 }
 
 /** Returns null if delta exceeds plausible range for the stat type. */
@@ -11911,27 +11998,7 @@ function snapshotOpeningLines(): void {
     _openingLinesEventKey = eventKey;
   }
 
-  const platformStats: Array<[string, string, (f: AnalyzerFighter) => number | null | undefined]> = [
-    ['p6',   'fp', f => f.line_p6],
-    ['p6',   'ss', f => f.line_p6_ss],
-    ['p6',   'td', f => f.line_p6_td],
-    ['p6',   'ft', f => f.line_p6_ft],
-    ['ud',   'fp', f => f.line_ud],
-    ['ud',   'ss', f => f.line_ud_ss],
-    ['ud',   'td', f => f.line_ud_td],
-    ['ud',   'ft', f => f.line_ud_ft],
-    ['pp',   'fp', f => f.line_pp],
-    ['pp',   'ss', f => f.line_pp_ss],
-    ['pp',   'td', f => f.line_pp_td],
-    ['pp',   'ft', f => f.line_pp_ft],
-    ['betr', 'fp', f => f.line_betr],
-    ['betr', 'ss', f => f.line_betr_ss],
-    ['betr', 'td', f => f.line_betr_td],
-    ['betr', 'ft', f => f.line_betr_ft],
-    ['dk',   'ss', f => f.line_dk_ss],
-    ['dk',   'td', f => f.line_dk_td],
-    ['dk',   'ft', f => f.line_dk_ft],
-  ];
+  const platformStats = LINE_STAT_ACCESSORS;
 
   // Collect current fighter names (full-form) to detect orphaned abbreviated-name keys
   const currentNames = new Set(allFighters.map(f => f.name.toLowerCase().trim()));
@@ -11971,18 +12038,7 @@ function snapshotOpeningLines(): void {
 // Then updates _prevRefreshLines to the new values for the next cycle.
 function detectAndRecordMovements(): void {
   if (allFighters.length === 0) return;
-  const platformStats: Array<[string, string, (f: AnalyzerFighter) => number | null | undefined]> = [
-    ['p6',   'fp', f => f.line_p6],   ['p6',   'ss', f => f.line_p6_ss],
-    ['p6',   'td', f => f.line_p6_td], ['p6',   'ft', f => f.line_p6_ft],
-    ['ud',   'fp', f => f.line_ud],   ['ud',   'ss', f => f.line_ud_ss],
-    ['ud',   'td', f => f.line_ud_td], ['ud',   'ft', f => f.line_ud_ft],
-    ['pp',   'fp', f => f.line_pp],   ['pp',   'ss', f => f.line_pp_ss],
-    ['pp',   'td', f => f.line_pp_td], ['pp',   'ft', f => f.line_pp_ft],
-    ['betr', 'fp', f => f.line_betr], ['betr', 'ss', f => f.line_betr_ss],
-    ['betr', 'td', f => f.line_betr_td], ['betr', 'ft', f => f.line_betr_ft],
-    ['dk',   'ss', f => f.line_dk_ss], ['dk',   'td', f => f.line_dk_td],
-    ['dk',   'ft', f => f.line_dk_ft],
-  ];
+  const platformStats = LINE_STAT_ACCESSORS;
   let baselineRepaired = false;
   for (const fighter of allFighters) {
     for (const [plat, stat, getVal] of platformStats) {
@@ -12153,19 +12209,12 @@ function snapshotLineHistory(): void {
   _lineHistory.eventKey = eventKey;
   _lineHistory.forBetrEventDate = _currentBetrEventDate;
 
-  const statGetters: Array<[string, (f: AnalyzerFighter) => Array<[string, number | null | undefined]>]> = [
-    ['fp', f => [['p6', f.line_p6], ['ud', f.line_ud], ['pp', f.line_pp], ['betr', f.line_betr]]],
-    ['ss', f => [['p6', f.line_p6_ss], ['ud', f.line_ud_ss], ['pp', f.line_pp_ss], ['betr', f.line_betr_ss], ['dk', f.line_dk_ss]]],
-    ['td', f => [['p6', f.line_p6_td], ['ud', f.line_ud_td], ['pp', f.line_pp_td], ['betr', f.line_betr_td], ['dk', f.line_dk_td]]],
-    ['ft', f => [['p6', f.line_p6_ft], ['ud', f.line_ud_ft], ['pp', f.line_pp_ft], ['betr', f.line_betr_ft], ['dk', f.line_dk_ft]]],
-  ];
-
   let changed = false;
   for (const fighter of allFighters) {
-    for (const [stat, getVals] of statGetters) {
-      const vals = getVals(fighter);
+    for (const [stat, plats] of LINE_STAT_BY_STAT) {
       const platVals: Record<string, number> = {};
-      for (const [plat, val] of vals) {
+      for (const [plat, get] of plats) {
+        const val = get(fighter);
         if (val != null) platVals[plat] = val;
       }
       if (Object.keys(platVals).length === 0) continue;
@@ -18773,13 +18822,8 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   const SHARP_THRESHOLD = 1.0;
   type MoveEntry = { platLabel: string; statLabel: string; delta: number; opening: number; current: number };
   const sharpMoves: MoveEntry[] = [];
-  const _allStatLines: Array<[string, string, number | null | undefined]> = [
-    ['p6',   'fp', f.line_p6],    ['p6',   'ss', f.line_p6_ss],  ['p6',   'td', f.line_p6_td],  ['p6',   'ft', f.line_p6_ft],
-    ['ud',   'fp', f.line_ud],    ['ud',   'ss', f.line_ud_ss],  ['ud',   'td', f.line_ud_td],  ['ud',   'ft', f.line_ud_ft],
-    ['pp',   'fp', f.line_pp],    ['pp',   'ss', f.line_pp_ss],  ['pp',   'td', f.line_pp_td],  ['pp',   'ft', f.line_pp_ft],
-    ['betr', 'fp', f.line_betr],  ['betr', 'ss', f.line_betr_ss],['betr', 'td', f.line_betr_td],['betr', 'ft', f.line_betr_ft],
-    ['dk',   'ss', f.line_dk_ss], ['dk',   'td', f.line_dk_td],  ['dk',   'ft', f.line_dk_ft],
-  ];
+  const _allStatLines: Array<[string, string, number | null | undefined]> =
+    LINE_STAT_ACCESSORS.map(([plat, stat, get]) => [plat, stat, get(f)]);
   for (const [plat, stat, current] of _allStatLines) {
     if (current == null) continue;
     const _smKey = openingLineKey(plat, stat, f.name);
@@ -18788,9 +18832,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     const openDeltaRaw = parseFloat((current - opening).toFixed(1));
     const openDelta = sanitizeDelta(stat, openDeltaRaw) ?? 0;
     if (Math.abs(openDelta) >= SHARP_THRESHOLD) {
-      const platLabel = plat === 'p6' ? 'P6' : plat === 'ud' ? 'UD' : plat === 'pp' ? 'PP' : plat === 'dk' ? 'DK' : 'BT';
-      const statLabel = stat.toUpperCase();
-      sharpMoves.push({ platLabel, statLabel, delta: openDelta, opening, current });
+      sharpMoves.push({ platLabel: statPlatLabel(plat), statLabel: statDisplayLabel(stat), delta: openDelta, opening, current });
     }
   }
   sharpMoves.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
@@ -21150,13 +21192,8 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
     let _matchCount = 0;
     let _prevMatchCount = 0;
     for (const fighter of allFighters) {
-      const _checks: Array<[string,string,number|null|undefined]> = [
-        ['p6','fp',fighter.line_p6],['p6','ss',fighter.line_p6_ss],['p6','td',fighter.line_p6_td],['p6','ft',fighter.line_p6_ft],
-        ['ud','fp',fighter.line_ud],['ud','ss',fighter.line_ud_ss],['ud','td',fighter.line_ud_td],['ud','ft',fighter.line_ud_ft],
-        ['pp','fp',fighter.line_pp],['pp','ss',fighter.line_pp_ss],['pp','td',fighter.line_pp_td],['pp','ft',fighter.line_pp_ft],
-        ['betr','fp',fighter.line_betr],['betr','ss',fighter.line_betr_ss],['betr','td',fighter.line_betr_td],['betr','ft',fighter.line_betr_ft],
-        ['dk','ss',fighter.line_dk_ss],['dk','td',fighter.line_dk_td],['dk','ft',fighter.line_dk_ft],
-      ];
+      const _checks: Array<[string,string,number|null|undefined]> =
+        LINE_STAT_ACCESSORS.map(([pl, st, get]) => [pl, st, get(fighter)]);
       for (const [pl,st,cur] of _checks) {
         if (cur == null) continue;
         const _dk = openingLineKey(pl, st, fighter.name);
@@ -21562,27 +21599,64 @@ function getSparklinePointsForPlat(
   return out;
 }
 
+// ── GLOW-UP 201 — LINE MOVERS ─────────────────────────────────────────────
+// The board reported that lines moved but never what the move was worth to YOU.
+// Every number below already existed: the deltas were computed, the sub-leans
+// were computed, they just never met. The one new concept is `priceMove`.
+type MoverFilter = 'all' | 'steam' | 'rlm' | 'lean' | 'better' | 'worse';
+let _moverFilter: MoverFilter = 'all';
+let _moversShowAll = false;
+const MOVERS_COLLAPSED_LIMIT = 20;
+
+// Minimum |delta| for a book to count as having moved, per stat. FP/SS/TD/FT
+// keep the flat 1.0 this board has always used — retuning them would silently
+// rewrite a surface that gets read every card. The stats added in GLOW-UP 201
+// sit on much smaller scales (KD lines are 0.5–1.5, CTRL is minutes), so a 1.0
+// floor would mean they never appeared at all.
+const MOVER_MIN_DELTA: Record<string, number> = {
+  fp: 1.0, ss: 1.0, td: 1.0, ft: 1.0, ss_r1: 1.0, ctrl: 0.5, kd: 0.5,
+};
+
+// The RLM heuristic's thresholds (±1.0 / ±2.0) were calibrated on FP/SS-sized
+// lines. Applying them to CTRL or KD would either never fire or fire on noise,
+// so reverse-line-movement stays scoped to the four stats it was built for.
+const RLM_STATS = new Set(['fp', 'ss', 'td', 'ft']);
+
+type SummaryEntry = {
+  name: string; stat: string; statLabel: string;
+  delta: number; open: number; close: number;
+  sourcePlat: string; sourcePlatKey: string;
+  platforms: string[];
+  isSteam: boolean;
+  rlm: 'under' | 'over' | null;
+  leanDir: 'over' | 'under' | null;
+  /**
+   * Whether the move helped or hurt the number you'd be taking, NOT whether the
+   * market agrees with you. A rising line makes the UNDER easier and the OVER
+   * harder — mechanical, no market-psychology claim attached. (The psychology
+   * read is what `rlm` already covers, and the two can point opposite ways.)
+   */
+  priceMove: 'better' | 'worse' | null;
+  slipKey: string | null;
+  slipClip: string;
+};
+
 function renderLineMovementSummary(): void {
   const container = document.getElementById('lineMovementSummary');
   const body = document.getElementById('movementSummaryBody');
   const timeEl = document.getElementById('movementSummaryTime');
+  const miniEl = document.getElementById('movementSummaryMini');
   if (!container || !body) return;
 
-  type SummaryEntry = { name: string; stat: string; delta: number; open: number; close: number; sourcePlat: string; sourcePlatKey: string; platforms: string[]; isSteam: boolean; rlm: 'under' | 'over' | null };
   const entries: SummaryEntry[] = [];
-  const platLabels: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
   // Pick-em platforms where "public hammers OVER" heuristic applies. DK is a
   // sportsbook with juice, so its moves don't fit the same public-default model.
   const PICKEM_PLATS = new Set(['p6', 'ud', 'pp', 'betr']);
 
   for (const f of allFighters) {
-    const statChecks: Array<{ stat: string; lines: Array<[string, number | null | undefined]> }> = [
-      { stat: 'FP', lines: [['p6', f.line_p6], ['ud', f.line_ud], ['pp', f.line_pp], ['betr', f.line_betr]] },
-      { stat: 'SS', lines: [['p6', f.line_p6_ss], ['ud', f.line_ud_ss], ['pp', f.line_pp_ss], ['betr', f.line_betr_ss], ['dk', f.line_dk_ss]] },
-      { stat: 'TD', lines: [['p6', f.line_p6_td], ['ud', f.line_ud_td], ['pp', f.line_pp_td], ['betr', f.line_betr_td], ['dk', f.line_dk_td]] },
-      { stat: 'FT', lines: [['p6', f.line_p6_ft], ['ud', f.line_ud_ft], ['pp', f.line_pp_ft], ['betr', f.line_betr_ft], ['dk', f.line_dk_ft]] },
-    ];
-    for (const { stat, lines } of statChecks) {
+    const effLean = getEffectiveLean(f);
+    for (const [stat, plats] of LINE_STAT_BY_STAT) {
+      const minDelta = MOVER_MIN_DELTA[stat] ?? 1.0;
       let maxDelta = 0;
       let maxOpen: number | null = null;
       let maxClose: number | null = null;
@@ -21591,15 +21665,16 @@ function renderLineMovementSummary(): void {
       const movedPlats: string[] = [];
       // RLM roll-up: count pick-em platforms moving against the public OVER flow.
       let pickemRise = 0, pickemDrop = 0, maxPickemRise = 0, maxPickemDrop = 0;
-      for (const [plat, current] of lines) {
+      for (const [plat, get] of plats) {
+        const current = get(f);
         if (current == null) continue;
-        const key = openingLineKey(plat, stat.toLowerCase(), f.name);
+        const key = openingLineKey(plat, stat, f.name);
         const opening = _openingLines.get(key);
         if (opening == null) continue;
         const deltaRaw = parseFloat((current - opening).toFixed(1));
-        const delta = sanitizeDelta(stat.toLowerCase(), deltaRaw);
-        if (delta != null && Math.abs(delta) >= 1.0) {
-          const platLabel = platLabels[plat] || plat;
+        const delta = sanitizeDelta(stat, deltaRaw);
+        if (delta != null && Math.abs(delta) >= minDelta) {
+          const platLabel = statPlatLabel(plat);
           movedPlats.push(platLabel);
           if (Math.abs(delta) > Math.abs(maxDelta)) {
             maxDelta = delta;
@@ -21609,21 +21684,51 @@ function renderLineMovementSummary(): void {
             maxPlatKey = plat;
           }
         }
-        if (delta != null && PICKEM_PLATS.has(plat)) {
+        if (delta != null && RLM_STATS.has(stat) && PICKEM_PLATS.has(plat)) {
           if (delta >= 1.0) { pickemRise++; if (delta > maxPickemRise) maxPickemRise = delta; }
           if (delta <= -2.0) { pickemDrop++; if (delta < maxPickemDrop) maxPickemDrop = delta; }
         }
       }
       let rlm: 'under' | 'over' | null = null;
-      // UNDER: line rose on any pick-em platform (against public OVER default).
-      // Stronger when multiple pick-em platforms agree on the rise.
-      if (pickemRise >= 1 && maxPickemRise >= 1.0) rlm = 'under';
-      // OVER: deep drop across ≥1 pick-em platform, plus magnitude meaningful.
-      else if (pickemDrop >= 1 && Math.abs(maxPickemDrop) >= 2.0) rlm = 'over';
+      // RLM is a claim that books moved AGAINST the public's OVER default. One
+      // book moving is not evidence of that — it's just a line moving, which the
+      // row already says. The old rule fired on a single book and on a
+      // single-book slate tagged EVERY mover, making the signal synonymous with
+      // "moved". Two pick-em books have to agree on the direction now.
+      // Consequence, and it is the correct one: when fewer than two pick-em
+      // books have posted, RLM cannot fire at all. The header says so rather
+      // than leaving a bare zero — see rlmUnavailableNote.
+      if (pickemRise >= 2 && maxPickemRise >= 1.0) rlm = 'under';
+      // OVER: deep drop agreed by ≥2 pick-em platforms, plus meaningful magnitude.
+      else if (pickemDrop >= 2 && Math.abs(maxPickemDrop) >= 2.0) rlm = 'over';
       if (movedPlats.length > 0 && maxOpen != null && maxClose != null) {
+        // L2 — the sub-lean scored on THIS stat, not the fighter's headline play.
+        // A fighter can lean FT-under overall while their SS line is the one that
+        // moved; reading the FT lean against an SS move would be a lie.
+        const statLean = leanForStat(f, stat);
+        const leanDir = statLean?.lean === 'over' || statLean?.lean === 'under' ? statLean.lean : null;
+        const priceMove: 'better' | 'worse' | null = leanDir == null
+          ? null
+          : (maxDelta > 0) === (leanDir === 'under') ? 'better' : 'worse';
+
+        // L5 — the slip button is offered ONLY when the moved stat is the play
+        // the rest of the app would actually hand you: the effective lean's
+        // source, which is already placeability-gated by _computeEffectiveLean.
+        // Building a pick out of any directional sub-lean would happily queue an
+        // unplaceable side that no book will take.
+        let slipKey: string | null = null;
+        let slipClip = '';
+        if ((effLean._source || 'fp') === stat && (effLean.lean === 'over' || effLean.lean === 'under')) {
+          const built = buildLeanSlatePick(f, effLean);
+          _leanSlateData.set(built.key, built.pick);
+          slipKey = built.key;
+          slipClip = built.pick.clip;
+        }
+
         entries.push({
           name: f.name,
           stat,
+          statLabel: statDisplayLabel(stat),
           delta: maxDelta,
           open: maxOpen,
           close: maxClose,
@@ -21632,6 +21737,10 @@ function renderLineMovementSummary(): void {
           platforms: movedPlats,
           isSteam: movedPlats.length >= 2 && Math.abs(maxDelta) >= 2.0,
           rlm,
+          leanDir,
+          priceMove,
+          slipKey,
+          slipClip,
         });
       }
     }
@@ -21639,15 +21748,77 @@ function renderLineMovementSummary(): void {
 
   if (entries.length === 0) {
     container.style.display = 'none';
+    if (miniEl) miniEl.textContent = '';
     return;
   }
 
   entries.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   container.style.display = '';
 
-  const top = entries.slice(0, 20);
-  const steamers = top.filter(e => e.delta > 0);
-  const drifters = top.filter(e => e.delta < 0);
+  // ── L1: roll-ups over the WHOLE set, not the visible slice ──────────────
+  const totalRise = entries.filter(e => e.delta > 0).length;
+  const totalDrop = entries.length - totalRise;
+  const steamCount = entries.filter(e => e.isSteam).length;
+  const rlmCount = entries.filter(e => e.rlm).length;
+  // How many pick-em books actually posted something RLM can read. Below two,
+  // the rule can never fire, and a bare "0 RLM" would read as a quiet slate
+  // rather than an unmeasurable one — same principle as GLOW-UP 199's empty
+  // states: say WHICH kind of zero this is.
+  const livePickem = [...PICKEM_PLATS].filter(p =>
+    LINE_STAT_ACCESSORS.some(([plat, stat, get]) =>
+      plat === p && RLM_STATS.has(stat) && allFighters.some(f => get(f) != null)));
+  const rlmBlocked = livePickem.length < 2;
+  const rlmNote = rlmBlocked
+    ? `Not measurable on this slate: reverse line movement means books disagreeing with public OVER flow, which needs two pick-em books to compare. ${livePickem.length === 1 ? `Only ${statPlatLabel(livePickem[0])} has posted.` : 'No pick-em book has posted.'}`
+    : 'Two or more pick-em books moved the same way against the public OVER default (FP/SS/TD/FT only — the thresholds are calibrated for those scales)';
+  const leanCount = entries.filter(e => e.leanDir).length;
+  const betterCount = entries.filter(e => e.priceMove === 'better').length;
+  const worseCount = entries.filter(e => e.priceMove === 'worse').length;
+  const biggest = entries[0];
+
+  const acceptsFilter = (e: SummaryEntry): boolean => {
+    switch (_moverFilter) {
+      case 'steam':  return e.isSteam;
+      case 'rlm':    return e.rlm != null;
+      case 'lean':   return e.leanDir != null;
+      case 'better': return e.priceMove === 'better';
+      case 'worse':  return e.priceMove === 'worse';
+      default:       return true;
+    }
+  };
+  const filtered = entries.filter(acceptsFilter);
+  const shown = _moversShowAll ? filtered : filtered.slice(0, MOVERS_COLLAPSED_LIMIT);
+  const risers = shown.filter(e => e.delta > 0);
+  const drifters = shown.filter(e => e.delta < 0);
+
+  const statChip = (cls: string, label: string, value: string, title: string): string =>
+    `<span class="mvs-stat ${cls}" title="${title.replace(/"/g, '&quot;')}"><b>${value}</b> ${label}</span>`;
+
+  const headerHtml = `<div class="mvs-cmd">
+    <div class="mvs-cmd-stats">
+      ${statChip('', 'movers', String(entries.length), 'Fighter/stat pairs whose line has moved from its opening baseline on at least one book')}
+      ${statChip('mvs-c-rise', '▲', String(totalRise), 'Lines that rose above their opening number')}
+      ${statChip('mvs-c-drop', '▼', String(totalDrop), 'Lines that dropped below their opening number')}
+      ${steamCount ? statChip('mvs-c-steam', 'steam', String(steamCount), 'Moved ≥2.0 on two or more books — books agreeing is a stronger signal than one book drifting') : ''}
+      ${rlmCount ? statChip('mvs-c-rlm', 'RLM', String(rlmCount), rlmNote)
+        : rlmBlocked ? statChip('mvs-c-na', 'RLM', 'n/a', rlmNote) : ''}
+      ${betterCount ? statChip('mvs-c-better', 'better', String(betterCount), 'Moves that improved the number on a stat you lean — you would now be taking a friendlier line than at open') : ''}
+      ${worseCount ? statChip('mvs-c-worse', 'worse', String(worseCount), 'Moves that eroded the number on a stat you lean — the good price is gone') : ''}
+      ${biggest ? `<span class="mvs-top" title="Largest absolute move on the board">TOP <b>${prettyName(biggest.name)}</b> ${biggest.statLabel} ${biggest.delta > 0 ? '▲' : '▼'}${Math.abs(biggest.delta)}</span>` : ''}
+    </div>
+    <div class="mvs-filters">
+      ${([
+        ['all', 'ALL', `Every mover (${entries.length})`],
+        ['steam', 'STEAM', `Multi-book agreement (${steamCount})`],
+        ['rlm', 'RLM', rlmBlocked ? rlmNote : `Reverse line movement (${rlmCount})`],
+        ['lean', 'MY LEANS', `Movement on a stat you actually lean (${leanCount})`],
+        ['better', '↑ BETTER', `Your number improved (${betterCount})`],
+        ['worse', '↓ WORSE', `Your number eroded (${worseCount})`],
+      ] as Array<[MoverFilter, string, string]>).map(([k, label, title]) =>
+        `<button class="mvs-filter${_moverFilter === k ? ' on' : ''}" data-mover-filter="${k}" title="${title.replace(/"/g, '&quot;')}${_moverFilter === k && k !== 'all' ? ' — click again to clear' : ''}">${label}</button>`
+      ).join('')}
+    </div>
+  </div>`;
 
   const rowHtml = (e: SummaryEntry): string => {
     const arrow = e.delta > 0 ? '▲' : '▼';
@@ -21656,19 +21827,28 @@ function renderLineMovementSummary(): void {
     const rlmTag = e.rlm
       ? `<span class="rlm-tag rlm-${e.rlm}" title="Reverse line movement — ${e.rlm === 'under' ? 'rising against public OVER default → sharp UNDER flow' : 'deep drop below open → heavy OVER action'}">RLM ${e.rlm.toUpperCase()}</span>`
       : '';
-    const sparkPoints = e.sourcePlatKey ? getSparklinePointsForPlat(e.name, e.stat.toLowerCase(), e.sourcePlatKey) : [];
+    // L2 — what the move did to the price of the side you lean.
+    const priceTag = e.priceMove
+      ? `<span class="mvs-price mvs-price-${e.priceMove}" title="You lean ${e.leanDir?.toUpperCase()} on ${e.statLabel}. The line ${e.delta > 0 ? 'rose' : 'dropped'} ${e.open}→${e.close}, which makes the ${e.leanDir?.toUpperCase()} ${e.priceMove === 'better' ? 'EASIER than it was at open — the move is in your favour' : 'HARDER than it was at open — you have missed the better number'}.">${e.priceMove === 'better' ? '↑ BETTER' : '↓ WORSE'}</span>`
+      : '';
+    const sparkPoints = e.sourcePlatKey ? getSparklinePointsForPlat(e.name, e.stat, e.sourcePlatKey) : [];
     const sparkHtml = sparkPoints.length >= 2
-      ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.stat} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length-1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
+      ? `<span class="movement-summary-spark" title="${e.sourcePlat} ${e.statLabel} — ${sparkPoints.length} points over ${Math.round((sparkPoints[sparkPoints.length-1].t - sparkPoints[0].t) / 60000)}m">${renderSparkline(sparkPoints, e.delta > 0 ? 'up' : 'down')}</span>`
       : '';
     const platChips = e.platforms.map(p => `<span class="mvp-chip mvp-${p.toLowerCase()}" title="Moved on ${p}">${p}</span>`).join('');
+    // L5 — same key and staging pathway as Best Picks and the slate view, so a pick
+    // added from here is the SAME slate entry and the surfaces dedupe.
+    const slipBtn = e.slipKey
+      ? `<button class="mvs-slate-btn${bestPicksSlate.has(e.slipKey) ? ' on' : ''}" data-slate-key="${e.slipKey.replace(/"/g, '&quot;')}" title="${bestPicksSlate.has(e.slipKey) ? 'Remove from My Slate' : `Add to My Slate — ${e.slipClip.replace(/"/g, '&quot;')}`}">${bestPicksSlate.has(e.slipKey) ? '✓' : '+'}</button>`
+      : '';
     return `<div class="movement-summary-row ${cls}" data-jump="${e.name}" title="Open fighter card">
       <span class="movement-summary-fighter">${prettyName(e.name)}</span>
-      <span class="movement-summary-stat mvs-${e.stat.toLowerCase()}">${e.stat}</span>
+      <span class="movement-summary-stat mvs-${e.stat}">${e.statLabel}</span>
       <span class="movement-summary-line">${e.sourcePlat} ${e.open}→${e.close}</span>
       <span class="movement-summary-delta ${cls}">${arrow}${Math.abs(e.delta)}</span>
       ${sparkHtml}
       <span class="movement-summary-platforms">${platChips}</span>
-      ${steamTag}${rlmTag}
+      ${priceTag}${steamTag}${rlmTag}${slipBtn}
     </div>`;
   };
 
@@ -21678,11 +21858,68 @@ function renderLineMovementSummary(): void {
       list.map(rowHtml).join('');
   };
 
-  body.innerHTML = sectionHtml('▲ Steamers', 'rise', steamers) + sectionHtml('▼ Drifters', 'drop', drifters);
+  // An empty state says WHICH kind of empty — a filter that matches nothing is a
+  // fact about the slate, and looks identical to a broken matcher otherwise.
+  const emptyHtml = `<div class="mvs-empty">No movers match this filter — ${entries.length} on the board overall.</div>`;
+  // L3 — the old board sliced to 20 with nothing saying so.
+  const moreHtml = filtered.length > MOVERS_COLLAPSED_LIMIT
+    ? `<button class="mvs-more" data-movers-toggle="1">${_moversShowAll ? `▲ SHOW TOP ${MOVERS_COLLAPSED_LIMIT}` : `▼ SHOW ALL ${filtered.length}`}</button>`
+    : '';
+
+  body.innerHTML = headerHtml
+    + (filtered.length === 0
+        ? emptyHtml
+        // "Steamers" collided with the STEAM badge: the section meant "the line
+        // rose", the badge means "≥2 books moved ≥2.0 together". A panel showing
+        // `0 steam` above a section headed STEAMERS 4 reads as a contradiction.
+        // The section is about direction, so it is named for direction.
+        : sectionHtml('▲ Risers', 'rise', risers) + sectionHtml('▼ Drifters', 'drop', drifters))
+    + moreHtml;
+
   body.querySelectorAll<HTMLElement>('.movement-summary-row[data-jump]').forEach(el => {
     el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
   });
+  body.querySelectorAll<HTMLElement>('.mvs-filter').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const next = (btn.dataset['moverFilter'] || 'all') as MoverFilter;
+      // Re-click clears, matching the GLOW-UP 198 L2 slate chips.
+      _moverFilter = _moverFilter === next ? 'all' : next;
+      _moversShowAll = false;
+      renderLineMovementSummary();
+    });
+  });
+  body.querySelector<HTMLElement>('.mvs-more')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    _moversShowAll = !_moversShowAll;
+    renderLineMovementSummary();
+  });
+  // stopPropagation matters: the row itself jumps to the fighter card.
+  body.querySelectorAll<HTMLElement>('.mvs-slate-btn').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const key = btn.dataset['slateKey'] || '';
+      if (bestPicksSlate.has(key)) {
+        bestPicksSlate.delete(key);
+      } else {
+        const d = _leanSlateData.get(key);
+        if (d) { if (!bestPicksSlate.size) bestPicksSlateOpen = true; bestPicksSlate.set(key, d); }
+      }
+      renderLineMovementSummary();
+      // My Slate's tray only exists on the Best Picks render path, so a pick
+      // added here needs that view refreshed or the count goes stale.
+      if (currentView === 'bestpicks') renderFighters();
+    });
+  });
   if (timeEl) timeEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  // Mini roll-up survives collapse — the header stays readable when the body is shut.
+  if (miniEl) {
+    const bits = [`${entries.length} movers`];
+    if (steamCount) bits.push(`${steamCount} steam`);
+    if (betterCount) bits.push(`${betterCount} better`);
+    if (worseCount) bits.push(`${worseCount} worse`);
+    miniEl.textContent = bits.join(' · ');
+  }
 }
 
 function renderLineMoveFeed(): void {
@@ -23129,13 +23366,7 @@ function initAnalyzerCore(): void {
     _openingLines.clear();
     _prevRefreshLines.clear();
     // Re-anchor baselines to current live values
-    const _psCombos: Array<[string, string, (f: AnalyzerFighter) => number | null | undefined]> = [
-      ['p6','fp',f=>f.line_p6],['p6','ss',f=>f.line_p6_ss],['p6','td',f=>f.line_p6_td],['p6','ft',f=>f.line_p6_ft],
-      ['ud','fp',f=>f.line_ud],['ud','ss',f=>f.line_ud_ss],['ud','td',f=>f.line_ud_td],['ud','ft',f=>f.line_ud_ft],
-      ['pp','fp',f=>f.line_pp],['pp','ss',f=>f.line_pp_ss],['pp','td',f=>f.line_pp_td],['pp','ft',f=>f.line_pp_ft],
-      ['betr','fp',f=>f.line_betr],['betr','ss',f=>f.line_betr_ss],['betr','td',f=>f.line_betr_td],['betr','ft',f=>f.line_betr_ft],
-      ['dk','ss',f=>f.line_dk_ss],['dk','td',f=>f.line_dk_td],['dk','ft',f=>f.line_dk_ft],
-    ];
+    const _psCombos = LINE_STAT_ACCESSORS;
     for (const fighter of allFighters) {
       for (const [plat, stat, getVal] of _psCombos) {
         const val = getVal(fighter);
