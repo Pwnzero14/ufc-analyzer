@@ -28641,6 +28641,32 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(248,198,74,0.10);
 }
 
+/* ══ GLOW-UP 203: correlation verdict on SHARED FIGHTS ════════════════════
+   The roll-up listed which picks share a fight but never whether they pull
+   together or against each other. calcPairCorrelation already decided that for
+   Parlay Lab; this puts its verdict on the Best Picks board.
+
+   Direction colours, per the canonical mapping: conflict is unfavourable (red),
+   synergy favourable (green), caution is the amber "act, but know this" band.
+   flex-shrink:0 because .bpfr-head is space-between and the fight NAME is the
+   element that should ellipsize, not the verdict. */
+.bpfr-corr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: help;
+}
+.bpfr-corr-conflict { color: var(--red);   background: rgba(255,91,120,0.10); }
+.bpfr-corr-caution  { color: var(--amber); background: rgba(248,198,74,0.10); }
+.bpfr-corr-synergy  { color: var(--green); background: rgba(0,232,122,0.10); }
+.bpfr-corr-neutral  { color: var(--text3); background: rgba(255,255,255,0.04); }
+
 /* ══ GLOW-UP 202: fighter cards join the gold-accent family ═══════════════
    Finishes GLOW-UP 111, which was committed 38 days ago and left "still off".
 
