@@ -9431,6 +9431,38 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const cards = multi.map(v => {
       const overN = v.picks.filter(p => p.dir === 'over').length;
       const underN = v.picks.length - overN;
+      // ── GLOW-UP 203 ──────────────────────────────────────────────────────
+      // The roll-up said WHICH picks share a fight but never whether they pull
+      // together or against each other — and calcPairCorrelation has answered
+      // exactly that all along, for Parlay Lab. A same-fight pair is not
+      // automatically a diversification problem OR automatically fine: an
+      // SS OVER opposite an FT UNDER is the house rule's named conflict (volume
+      // needs rounds, an FT under needs a finish), while an FT under opposite a
+      // volume under is mutually reinforcing. Reading it off the board beat
+      // hovering two badges and reasoning it out per fight.
+      // Worst pair wins the chip: with 3+ picks the cluster is only as sound as
+      // its most contradictory pairing.
+      const asLeg = (p: { f: AnalyzerFighter; m: BpMetric; dir: 'over' | 'under' }): ParlayLeg => ({
+        fighter: p.f.name,
+        opponent: p.f.opponent || '',
+        stat: (p.m.src || 'fp') as LeanSource,
+        direction: p.dir,
+        line: p.m.line ?? 0,
+        confidence: 0, tier: '', platform: '',
+      });
+      let worst: CorrelationAlert | null = null;
+      for (let i = 0; i < v.picks.length; i++) {
+        for (let j = i + 1; j < v.picks.length; j++) {
+          const alert = calcPairCorrelation(asLeg(v.picks[i]), v.picks[i].f, asLeg(v.picks[j]), v.picks[j].f);
+          if (alert && (!worst || alert.impact < worst.impact)) worst = alert;
+        }
+      }
+      const CORR_LABEL: Record<string, string> = {
+        synergy: '✓ SYNERGY', conflict: '⚠ CONFLICT', caution: '⚠ CAUTION', neutral: '· NEUTRAL',
+      };
+      const corrChip = worst
+        ? `<span class="bpfr-corr bpfr-corr-${worst.type}" title="${worst.message.replace(/"/g, '&quot;')}">${CORR_LABEL[worst.type]} ${worst.impact > 0 ? '+' : ''}${worst.impact.toFixed(2)}</span>`
+        : '';
       const legs = v.picks.map(p => {
         const stat = EFFECTIVE_LEAN_STAT_LABEL[p.m.src] || p.m.src.toUpperCase();
         return `<button class="bpfr-leg ${p.dir}" data-jump="${p.f.name}" title="${prettyName(p.f.name)} ${p.dir.toUpperCase()} ${stat} ${p.m.line ?? ''} — click to open the card">`
@@ -9438,7 +9470,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       }).join('');
       const heavy = v.picks.length >= 3;
       return `<div class="bpfr-fight${heavy ? ' heavy' : ''}">
-        <div class="bpfr-head"><span class="bpfr-name">${v.label}</span><span class="bpfr-count" title="${v.picks.length} of the ${shown.length} picks on the board ride on this one fight (${overN} over, ${underN} under)">${heavy ? '⚠ ' : ''}${v.picks.length} picks</span></div>
+        <div class="bpfr-head"><span class="bpfr-name">${v.label}</span>${corrChip}<span class="bpfr-count" title="${v.picks.length} of the ${shown.length} picks on the board ride on this one fight (${overN} over, ${underN} under)">${heavy ? '⚠ ' : ''}${v.picks.length} picks</span></div>
         <div class="bpfr-legs">${legs}</div>
       </div>`;
     }).join('');
@@ -10524,15 +10556,41 @@ function calcPairCorrelation(
       }
     }
 
-    // FT in same fight
+    // FT in same fight. FT is the fight's DURATION, so it couples to every
+    // stat that accumulates while the fight runs — all four quadrants of
+    // (FT direction × volume direction) carry a signal, not just the two that
+    // were here. The missing two returned null, i.e. "independent", which is
+    // the one thing they are definitely not.
+    //
+    // ss_r1 and kd are deliberately NOT duration-coupled stats: R1 SS is capped
+    // by a single round regardless of how long the fight runs, and a knockdown
+    // tends to END fights, so it moves opposite to the others.
     if (leg1.stat === 'ft' || leg2.stat === 'ft') {
       const ftLeg = leg1.stat === 'ft' ? leg1 : leg2;
       const otherLeg = leg1.stat === 'ft' ? leg2 : leg1;
-      if (ftLeg.direction === 'over' && otherLeg.direction === 'over' && (otherLeg.stat === 'ss' || otherLeg.stat === 'fp')) {
-        return { type: 'synergy', leg1: leg1.fighter, leg2: leg2.fighter, message: `Over FT + ${otherLeg.fighter} Over ${otherLeg.stat.toUpperCase()} — longer fight = more counting stats`, impact: 0.12 };
+      const DURATION_COUPLED = ['ss', 'fp', 'td', 'ctrl'];
+      const vol = DURATION_COUPLED.includes(otherLeg.stat);
+      const S = otherLeg.stat.toUpperCase();
+      if (vol && ftLeg.direction === 'over' && otherLeg.direction === 'over') {
+        return { type: 'synergy', leg1: leg1.fighter, leg2: leg2.fighter, message: `Over FT + ${otherLeg.fighter} Over ${S} — longer fight = more counting stats`, impact: 0.12 };
       }
-      if (ftLeg.direction === 'under' && otherLeg.direction === 'over' && (otherLeg.stat === 'ss' || otherLeg.stat === 'fp')) {
-        return { type: 'conflict', leg1: leg1.fighter, leg2: leg2.fighter, message: `Under FT + ${otherLeg.fighter} Over ${otherLeg.stat.toUpperCase()} — quick finish cuts counting time`, impact: -0.18 };
+      if (vol && ftLeg.direction === 'under' && otherLeg.direction === 'over') {
+        return { type: 'conflict', leg1: leg1.fighter, leg2: leg2.fighter, message: `Under FT + ${otherLeg.fighter} Over ${S} — quick finish cuts counting time`, impact: -0.18 };
+      }
+      // NEW: the two quadrants that used to fall through.
+      if (vol && ftLeg.direction === 'over' && otherLeg.direction === 'under') {
+        // Rounds keep accruing, so staying UNDER a volume line gets harder the
+        // longer the fight runs. Rated softer than its mirror above on purpose:
+        // a quick finish HARD-CAPS volume, whereas a long fight only tends to
+        // raise it — a grindy control-heavy decision can run long and still
+        // finish under on strikes.
+        return { type: 'conflict', leg1: leg1.fighter, leg2: leg2.fighter, message: `Over FT + ${otherLeg.fighter} Under ${S} — more rounds means more time to clear the ${S} line`, impact: -0.14 };
+      }
+      if (vol && ftLeg.direction === 'under' && otherLeg.direction === 'under') {
+        // A finish suppresses duration and volume together — these want the
+        // same fight. Slightly stronger than the over/over case because the cap
+        // is hard rather than a tendency.
+        return { type: 'synergy', leg1: leg1.fighter, leg2: leg2.fighter, message: `Under FT + ${otherLeg.fighter} Under ${S} — a finish suppresses duration and ${S} together`, impact: 0.15 };
       }
     }
 

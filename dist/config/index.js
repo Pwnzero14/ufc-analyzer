@@ -355,7 +355,18 @@ export const NAME_ALIASES = {
 //   end alone. This is the first model change here validated against ACTUAL RESULTS
 //   rather than posted lines, which cannot separate "model is wrong" from "book
 //   shaded it".
-export const MODEL_VERSION = 16;
+// v17 — same-fight FT correlation completed. calcPairCorrelation's FT branch
+//   scored only two of the four (FT direction x volume direction) quadrants;
+//   over-FT+under-volume and under-FT+under-volume returned null, i.e. were
+//   scored as INDEPENDENT. They are not: FT is the fight's duration, so every
+//   stat that accrues while the clock runs is coupled to it. Added
+//   over-FT+under-volume = conflict (-0.14, softer than its under-FT+over-volume
+//   mirror because a finish hard-caps volume while a long fight only tends to
+//   raise it) and under-FT+under-volume = synergy (+0.15). Volume set also
+//   widened from {ss,fp} to {ss,fp,td,ctrl}; ss_r1 and kd stay out — R1 SS is
+//   capped by one round regardless of duration, and a knockdown tends to END
+//   fights, so it moves opposite the rest.
+export const MODEL_VERSION = 17;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
