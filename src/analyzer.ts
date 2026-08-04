@@ -9861,8 +9861,30 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     btn.addEventListener('click', () => { bestPicksEvOnly = !bestPicksEvOnly; bpRerender(); });
   });
   // GLOW-UP 192 handlers
+  /**
+   * CLEAN / FLAGGED / 2+ CAVEATS all filter the SAME axis (how many caveats a
+   * pick carries), so any two of them together describe an impossible pick and
+   * blank the board — which reads as the app being broken, not as an empty
+   * intersection. Selecting one clears the others; clicking the active one
+   * turns it off. This also fixes the pre-existing CLEAN + FLAGGED dead end,
+   * which could strand you on an empty board with no hint why.
+   */
+  const setCaveatView = (which: 'clean' | 'flagged' | 'severe'): void => {
+    const wasOn = which === 'clean' ? bestPicksCleanOnly
+      : which === 'flagged' ? bestPicksFlaggedOnly
+      : bestPicksSevereOnly;
+    bestPicksCleanOnly = false;
+    bestPicksFlaggedOnly = false;
+    bestPicksSevereOnly = false;
+    if (!wasOn) {
+      if (which === 'clean') bestPicksCleanOnly = true;
+      else if (which === 'flagged') bestPicksFlaggedOnly = true;
+      else bestPicksSevereOnly = true;
+    }
+    bpRerender();
+  };
   container.querySelectorAll<HTMLElement>('[data-bp-cleanonly]').forEach(btn => {
-    btn.addEventListener('click', () => { bestPicksCleanOnly = !bestPicksCleanOnly; bpRerender(); });
+    btn.addEventListener('click', () => setCaveatView('clean'));
   });
   // GLOW-UP 200 L4 — cut rows jump to the fighter's card.
   container.querySelectorAll<HTMLElement>('[data-bpnm-jump]').forEach(row => {
@@ -9872,16 +9894,10 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     });
   });
   container.querySelectorAll<HTMLElement>('[data-bp-flaggedonly]').forEach(btn => {
-    btn.addEventListener('click', () => { bestPicksFlaggedOnly = !bestPicksFlaggedOnly; bpRerender(); });
+    btn.addEventListener('click', () => setCaveatView('flagged'));
   });
   container.querySelectorAll<HTMLElement>('[data-bp-severeonly]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      bestPicksSevereOnly = !bestPicksSevereOnly;
-      // Mutually exclusive with CLEAN — asking for 2+ caveats and zero caveats
-      // at once always yields nothing, which reads as a broken filter.
-      if (bestPicksSevereOnly) bestPicksCleanOnly = false;
-      bpRerender();
-    });
+    btn.addEventListener('click', () => setCaveatView('severe'));
   });
   container.querySelectorAll<HTMLElement>('[data-bp-bybook]').forEach(btn => {
     btn.addEventListener('click', () => { bestPicksByBook = !bestPicksByBook; bpRerender(); });
