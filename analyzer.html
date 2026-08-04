@@ -28662,6 +28662,23 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   flex-shrink: 0;
   cursor: help;
 }
+/* ══ GLOW-UP 205: 2+ CAVEATS filter ═══════════════════════════════════════
+   FLAGGED is a binary OR of three caveats, so it widens to nearly the whole
+   board once real prices post (this card: CLEAN 7 -> 1, FLAGGED 5 -> 13 as the
+   books came in). This chip isolates the picks whose objections COMPOUND.
+   Red rather than amber: FLAGGED already owns amber, and two stacked caveats is
+   a stronger statement than one — direction colour, per the canonical mapping.
+   Only rendered when the count is non-zero, so it never sits there reading 0. */
+.bpc-chip.bpc-severe {
+  border-color: rgba(255,91,120,0.35);
+  color: var(--red);
+}
+.bpc-chip.bpc-severe.on {
+  background: rgba(255,91,120,0.14);
+  color: var(--red);
+  border-color: rgba(255,91,120,0.55);
+}
+
 /* GLOW-UP 204 — a same-fight pair the engine rates as REINFORCING. Still
    demoted for concentration, so it is not green (that would read "good"); it is
    neutral, to separate "these rise together" from the red "these fight each
