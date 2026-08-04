@@ -354,6 +354,11 @@ let bestPicksCleanOnly = false;
 // needsRounds / negative EV) and shown per-row, but there was no way to isolate
 // them: you could hide the flagged picks, never review only them.
 let bestPicksFlaggedOnly = false;
+// GLOW-UP 205 — FLAGGED is a binary OR of three caveats, so it degrades to "the
+// whole board" exactly when it matters most: once real prices post, negative EV
+// alone flags a third of the picks. This isolates the picks carrying TWO OR MORE
+// caveats — the ones where the objections compound rather than stand alone.
+let bestPicksSevereOnly = false;
 // GLOW-UP 192 (L5): entry-plan view — the board regrouped by the app you'd
 // actually enter each pick in.
 let bestPicksByBook = false;
@@ -8835,7 +8840,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   const bpViewMetric = (f: AnalyzerFighter, dir: 'over' | 'under'): {
     src: string; ev: number | null; conf: number;
     book: SourcePlatformKey | null; line: number | null;
-    projConflict: boolean; needsRounds: boolean; clean: boolean;
+    projConflict: boolean; needsRounds: boolean; clean: boolean; caveats: number;
     proj: number | null; edge: number | null;
   } => {
     const el = getBestPickLeanForDir(f, dir) || getBestPickLean(f);
@@ -8855,7 +8860,15 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const needsRounds = durationCoupledMap.has(f.name);
     const ev = evd ? evd.ev : null;
     // Unknown EV isn't a caveat — only a negative one is.
-    const clean = !projConflict && !needsRounds && !(ev != null && ev < 0);
+    const negEv = ev != null && ev < 0;
+    // GLOW-UP 205 — the three caveats were OR'd into one bit, so a pick that is
+    // merely -EV looked identical to one that is -EV AND arguing against its own
+    // projection AND needing rounds it may not get. Fine while few picks carried
+    // anything; useless once real prices land. On this card CLEAN went 7 -> 1 and
+    // FLAGGED 5 -> 13 as the books posted, i.e. the "review queue" became the
+    // whole board. Counting them restores the ranking the OR threw away.
+    const caveats = (projConflict ? 1 : 0) + (needsRounds ? 1 : 0) + (negEv ? 1 : 0);
+    const clean = caveats === 0;
     // GLOW-UP 196 L1 — the projection and its gap to the line were already computed
     // but only ever reached the UI inside prose ("edges the line by 12.1"), so rows
     // weren't numerically comparable. Signed so positive ALWAYS means favourable,
@@ -8868,7 +8881,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     return {
       src: el._source || 'fp', ev, conf: Number(el.conf) || 0,
       book: book ?? getSourceActivePlatformKey(f, el._source) ?? null,
-      line, projConflict, needsRounds, clean, proj, edge,
+      line, projConflict, needsRounds, clean, caveats, proj, edge,
     };
   };
   const overMetrics = new Map(overs.map(f => [f.name, bpViewMetric(f, 'over')] as const));
@@ -8882,6 +8895,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       if (bestPicksEvOnly && !(m.ev != null && m.ev > 0)) return false;
       if (bestPicksCleanOnly && !m.clean) return false;
       if (bestPicksFlaggedOnly && m.clean) return false;
+      if (bestPicksSevereOnly && m.caveats < 2) return false;
       return true;
     });
     if (bestPicksSortMode === 'ev') {
@@ -8953,6 +8967,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   for (const m of underMetrics.values()) bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
   const bpEvPosCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.ev != null && m.ev > 0).length;
   const bpCleanCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.clean).length;
+  const bpSevereCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.caveats >= 2).length;
   const bpChipsHtml = Object.keys(BP_SRC_CHIP)
     .filter(s => (bpSrcCounts.get(s) || 0) > 0)
     .map(s => `<button class="bpc-chip${bestPicksStatFilter === s ? ' on' : ''}" data-bp-stat="${s}" title="Show only ${BP_SRC_CHIP[s]} picks (click again for all)">${BP_SRC_CHIP[s]} <i>${bpSrcCounts.get(s)}</i></button>`)
@@ -8971,7 +8986,8 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       ${bpChipsHtml}
       <button class="bpc-chip bpc-ev${bestPicksEvOnly ? ' on' : ''}" data-bp-evonly="1" title="Only picks whose calibrated EV clears breakeven">+EV <i>${bpEvPosCount}</i></button>
       <button class="bpc-chip bpc-clean${bestPicksCleanOnly ? ' on' : ''}" data-bp-cleanonly="1" title="Only picks carrying no caveat — no ⚠ PROJ SAYS (projection opposes its own lean), no ⚠ NEEDS ROUNDS (volume over against a finisher), and not negative EV. The picks that need no explanation.">CLEAN <i>${bpCleanCount}</i></button>
-      <button class="bpc-chip bpc-flagged${bestPicksFlaggedOnly ? ' on' : ''}" data-bp-flaggedonly="1" title="Only picks carrying a caveat — ⚠ PROJ SAYS, ⚠ NEEDS ROUNDS, or negative EV. The review queue: exactly the picks that need a second look before you lock them.">FLAGGED <i>${(overs.length + unders.length) - bpCleanCount}</i></button>
+      <button class="bpc-chip bpc-flagged${bestPicksFlaggedOnly ? ' on' : ''}" data-bp-flaggedonly="1" title="Only picks carrying at least one caveat — ⚠ PROJ SAYS, ⚠ NEEDS ROUNDS, or negative EV. Note this widens sharply once real prices post (negative EV alone can flag a third of the board); when it does, use 2+ CAVEATS for the picks whose objections actually compound.">FLAGGED <i>${(overs.length + unders.length) - bpCleanCount}</i></button>
+      ${bpSevereCount > 0 ? `<button class="bpc-chip bpc-severe${bestPicksSevereOnly ? ' on' : ''}" data-bp-severeonly="1" title="Picks carrying TWO OR MORE caveats at once — e.g. negative EV AND the projection arguing against its own lean, or a volume over that needs rounds against a finisher AND prices badly. One objection is a note; two stacking is the actual review queue. Hidden when nothing on the board qualifies.">⚠⚠ 2+ CAVEATS <i>${bpSevereCount}</i></button>` : ''}
     </span>
     <span class="bpc-group">
       <span class="bpc-label">VIEW</span>
@@ -9858,6 +9874,15 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   container.querySelectorAll<HTMLElement>('[data-bp-flaggedonly]').forEach(btn => {
     btn.addEventListener('click', () => { bestPicksFlaggedOnly = !bestPicksFlaggedOnly; bpRerender(); });
   });
+  container.querySelectorAll<HTMLElement>('[data-bp-severeonly]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bestPicksSevereOnly = !bestPicksSevereOnly;
+      // Mutually exclusive with CLEAN — asking for 2+ caveats and zero caveats
+      // at once always yields nothing, which reads as a broken filter.
+      if (bestPicksSevereOnly) bestPicksCleanOnly = false;
+      bpRerender();
+    });
+  });
   container.querySelectorAll<HTMLElement>('[data-bp-bybook]').forEach(btn => {
     btn.addEventListener('click', () => { bestPicksByBook = !bestPicksByBook; bpRerender(); });
   });
@@ -9880,6 +9905,8 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       bestPicksStatFilter = 'all';
       bestPicksEvOnly = false;
       bestPicksCleanOnly = false;
+      bestPicksFlaggedOnly = false;
+      bestPicksSevereOnly = false;
       bpRerender();
     });
   });
