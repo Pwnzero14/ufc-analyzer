@@ -28662,6 +28662,21 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   flex-shrink: 0;
   cursor: help;
 }
+/* GLOW-UP 204 — a same-fight pair the engine rates as REINFORCING. Still
+   demoted for concentration, so it is not green (that would read "good"); it is
+   neutral, to separate "these rise together" from the red "these fight each
+   other" that .best-pick-conflict carries by default. */
+.best-pick-conflict.bp-corr-pair {
+  color: var(--text2) !important;
+  /* NOT optional: the base rule sets -webkit-text-fill-color !important, which
+     overrides `color` in Blink. Without this the chip would keep the amber
+     warning text no matter what colour is declared here. */
+  -webkit-text-fill-color: var(--text2) !important;
+  border-color: var(--border2) !important;
+  background: rgba(255,255,255,0.05) !important;
+  box-shadow: none !important;
+}
+
 .bpfr-corr-conflict { color: var(--red);   background: rgba(255,91,120,0.10); }
 .bpfr-corr-caution  { color: var(--amber); background: rgba(248,198,74,0.10); }
 .bpfr-corr-synergy  { color: var(--green); background: rgba(0,232,122,0.10); }

@@ -8722,6 +8722,24 @@ function renderBestPicks(container, renderSeq = 0) {
         // GLOW-UP 168: per-render pick payloads for the slate toggle — built while
         // rows render (all display values in scope), consumed by the click handler.
         const slateRowData = new Map();
+        /**
+         * DISPLAY ONLY — the correlation engine's read on a same-fight pair, built at
+         * render time on purpose. Nothing here feeds buildCorrPenalties, bestPickSort
+         * or the dedupe, so it cannot move a pick. (A previous attempt wired this into
+         * the demotion instead and silently dropped a pick from the board; the two
+         * concerns are kept apart deliberately.)
+         */
+        const bpLegFor = (f, dir) => {
+            const el = getBestPickLeanForDir(f, dir) || getBestPickLean(f);
+            return {
+                fighter: f.name,
+                opponent: f.opponent || '',
+                stat: (el._source || 'fp'),
+                direction: dir,
+                line: lineForLeanSource(f, el._source, el._platform) ?? 0,
+                confidence: 0, tier: '', platform: '',
+            };
+        };
         function buildSection(fighters, type) {
             if (!fighters.length)
                 return '';
@@ -8829,12 +8847,34 @@ function renderBestPicks(container, renderSeq = 0) {
                     .replace(/\(avg ([\d.]+m?)\)/, '(avg <b class="bpr-key">$1</b>)')
                     .replace(/by ([\d.]+m?)/, 'by <b class="bpr-key">$1</b>')
                     .replace(/is ([\d.]+m?) (above|below)/, 'is <b class="bpr-key">$1</b> $2');
-                // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts show ⚡ corr
+                // Correlation tag: penalized fighters show ⬇ corr, remaining conflicts ↔ corr.
+                //
+                // GLOW-UP 204 — the old text read "correlated slate risk" for EVERY
+                // same-fight pair, which says "these fight each other". For two same-fight
+                // SS OVERs that is simply wrong, and once GLOW-UP 203 put the engine's
+                // verdict on the SHARED FIGHTS card the board visibly contradicted itself:
+                // "✓ SYNERGY +0.18 — action fight benefits both strikers" above two rows
+                // reading "⬇ corr". They were answering different questions:
+                //
+                //   engine verdict → CAN both hit?      (yes — they rise together)
+                //   the demotion   → how much of the board rides on one fight?
+                //
+                // Both are true at once, so the row now names which one it means. The
+                // demotion itself is untouched — this is a wording fix, not a scoring one.
                 const corrPenalty = corrPenaltyMap.get(f.name) || 0;
+                const corrPartner = f.opponent
+                    ? fighters.find(o => o.name.toLowerCase() === (f.opponent || '').toLowerCase())
+                    : undefined;
+                const corrVerdict = corrPartner
+                    ? calcPairCorrelation(bpLegFor(f, type), f, bpLegFor(corrPartner, type), corrPartner)
+                    : null;
+                const corrReinforces = !!corrVerdict && corrVerdict.impact >= 0;
                 const conflictTag = corrPenalty > 0
-                    ? ` <span class="best-pick-conflict" title="Opponent picked same direction — demoted ${corrPenalty}pts (correlated slate risk)">⬇ corr</span>`
+                    ? (corrReinforces
+                        ? ` <span class="best-pick-conflict bp-corr-pair" title="${corrVerdict.message.replace(/"/g, '&quot;')} — these two rise together, so this is NOT a contradiction. Still demoted ${corrPenalty}pts because two picks ride one fight: that is concentration, not conflict.">↔ pair −${corrPenalty}</span>`
+                        : ` <span class="best-pick-conflict" title="${corrVerdict ? `${corrVerdict.message.replace(/"/g, '&quot;')} — ` : 'Opponent picked same direction — '}demoted ${corrPenalty}pts (correlated slate risk)">⬇ corr</span>`)
                     : conflictFighters.has(f.name)
-                        ? ` <span class="best-pick-conflict" title="Opponent also picked in same direction — correlated picks">↔ corr</span>`
+                        ? ` <span class="best-pick-conflict${corrReinforces ? ' bp-corr-pair' : ''}" title="${corrVerdict ? `${corrVerdict.message.replace(/"/g, '&quot;')}${corrReinforces ? ' — these two rise together' : ''}` : 'Opponent also picked in same direction — correlated picks'}">${corrReinforces ? '↔ pair' : '↔ corr'}</span>`
                         : '';
                 // GLOW-UP 169: same-fight tag + fight key for hover cross-highlight.
                 // ⇄ DUAL = this fighter appears in the other column on another stat;
