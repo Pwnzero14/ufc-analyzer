@@ -10673,8 +10673,13 @@ function renderParlayLab(container) {
     const health = selectedLegs.length >= 2
         ? analyzeParlayHealth(selectedLegs, visibleFighters)
         : null;
-    // Suggest parlays
-    const suggestions = suggestParlays(visibleFighters, 3, 3);
+    // Suggest parlays. Ask for a WIDER candidate set than we display: suggestParlays
+    // ranks purely on health (confidence + correlation + legs + spread), which is
+    // EV-blind, so the top 3 by health can all be priced below breakeven while a
+    // profitable combination sits at #5. Re-ranked against price below — see
+    // GLOW-UP 206 L2. Fetching 3 and reordering them could only shuffle the same
+    // three losers.
+    const suggestionPool = suggestParlays(visibleFighters, 3, 12);
     // ── Render ──
     // Live slip guards: flag pool legs that would CONTRADICT the current slip
     // before they're clicked. FT is a shared stat (one fight, one duration), so
@@ -10767,6 +10772,34 @@ function renderParlayLab(container) {
         evRows.sort((a, b) => b.ev - a.ev);
         return { n: nn, combined, evRows, best: evRows[0] || null, anyCorr, maxPosCorr: maxPos, anyRecal };
     };
+    // ── GLOW-UP 206 L2 ────────────────────────────────────────────────────────
+    // suggestParlays ranks on health.score then avgConfidence. Health is
+    // avgConfidence + correlation + legCount + diversity — it never sees price, so
+    // the board could recommend a beautifully correlated ticket priced at -50% and
+    // grade it "excellent" purely for being well built. Suggestions are what the
+    // app actively pushes at you, so this is the one place that EV blindness is
+    // not just mislabelling.
+    //
+    // Price is a GATE, not a new ranking axis: any suggestion that clears
+    // breakeven outranks any that doesn't, and within each group the existing
+    // health order is preserved untouched. That deliberately avoids inventing a
+    // weighting between "well built" and "well priced" — there is no evidence for
+    // what that trade should be, and health remains the tiebreak it always was.
+    const suggestionsRanked = [...suggestionPool].sort((a, b) => {
+        const ea = analyzeSlipLegs(a.legs)?.best?.ev ?? null;
+        const eb = analyzeSlipLegs(b.legs)?.best?.ev ?? null;
+        const pa = ea != null && ea >= 0 ? 1 : 0;
+        const pb = eb != null && eb >= 0 ? 1 : 0;
+        if (pa !== pb)
+            return pb - pa; // +EV first
+        if (b.health.score !== a.health.score)
+            return b.health.score - a.health.score;
+        return b.health.avgConfidence - a.health.avgConfidence;
+    });
+    const suggestions = suggestionsRanked.slice(0, 3);
+    // If nothing on the board clears breakeven, say so rather than quietly serving
+    // the three least-bad losers under an "excellent" badge.
+    const anySuggestionPositive = suggestionsRanked.some(s => (analyzeSlipLegs(s.legs)?.best?.ev ?? -1) >= 0);
     // GLOW-UP 177: apply the command-strip view (filter then sort) to the pool
     // only — selection, conflict checks, health, suggestions all still see the
     // full availableLegs, so hiding a leg here never changes the math.
@@ -11048,10 +11081,28 @@ function renderParlayLab(container) {
       ${bd.legs !== 0 ? `<span class="ph-bd ${bd.legs > 0 ? 'pos' : 'neg'}" title="${bd.legs > 0 ? '2-4 legs is the sweet spot — enough payout without stacking too much that must all land.' : 'Six or more legs is penalised: every extra leg multiplies the ways the slip dies.'}">legs <b>${bd.legs > 0 ? '+' : ''}${bd.legs}</b></span>` : ''}
       ${bd.diversity !== 0 ? `<span class="ph-bd pos" title="Every leg comes from a different fight, so no single fight going wrong takes out more than one leg.">spread <b>+${bd.diversity}</b></span>` : ''}
     </div>` : '';
+        // ── GLOW-UP 206 L1 ───────────────────────────────────────────────────
+        // The health score is avgConfidence + correlation + legCount + diversity.
+        // EV is nowhere in it, yet the grade renders as a bare "EXCELLENT" — so a
+        // slip priced at -26% read EXCELLENT, sitting directly above its own
+        // negative number. The score is not wrong, it is just answering a narrower
+        // question than its label implies: is this well BUILT, not is it worth
+        // backing. Both verdicts now sit side by side, same split Best Picks
+        // already uses with LEAN ✓ · VALUE ✗.
+        // `A` above is scoped to the slip-summary block, so re-derive here. Same
+        // pure function, so the two can't disagree.
+        const hb = analyzeSlipLegs(selectedLegs)?.best ?? null;
+        const slipEv = hb ? hb.ev : null;
+        const valueHtml = (hb && slipEv != null)
+            ? `<span class="ph-value ${slipEv >= 0 ? 'pos' : 'neg'}" title="${slipEv >= 0
+                ? `Priced at ${hb.label} ${hb.mult}x this slip clears breakeven. The health score beside it grades STRUCTURE — leg confidence, correlation, spread — and does not include price. Both good is the case you want.`
+                : `The health score grades STRUCTURE only — leg confidence, correlation and spread — and does not include price. This slip is well BUILT but priced below breakeven on every payout table available (best is ${hb.label} ${hb.mult}x at ${slipEv}%). Fine as a pick-em ticket you want for other reasons; it is not a value play.`}">VALUE ${slipEv >= 0 ? '✓' : '✗'} <b>${slipEv >= 0 ? '+' : ''}${slipEv}%</b></span>`
+            : '';
         healthHtml = `<div class="parlay-health">
       <div class="parlay-health-title">PARLAY HEALTH</div>
       <span class="parlay-health-score ${health.grade}">${health.score}</span>
-      <span class="parlay-health-label">${health.grade.toUpperCase()} — ${health.legCount} legs, avg conf ${Math.round(health.avgConfidence)}%</span>
+      <span class="parlay-health-label">${health.grade.toUpperCase()} STRUCTURE — ${health.legCount} legs, avg conf ${Math.round(health.avgConfidence)}%</span>
+      ${valueHtml}
       ${bdHtml}
       ${alertsHtml ? `<div class="parlay-corr-list">${alertsHtml}</div>` : ''}
     </div>`;
@@ -11090,8 +11141,11 @@ function renderParlayLab(container) {
             const diffChip = selectedLegs.length
                 ? `<span class="psg-diff${isExactMatch ? ' same' : ''}" title="How this suggestion compares to the slip you've built: ${shared} leg${shared === 1 ? '' : 's'} you already have, ${fresh} new${dropped > 0 ? `, and it drops ${dropped} of yours` : ''}. Loading it replaces your current selection.">${diffLabel}</span>`
                 : '';
-            return `<div class="parlay-suggest-card grade-${s.health.grade}" data-suggest-legs="${legsDataAttr}" title="Click to load these ${legKeys.length} legs into your slip (replaces the current selection)">
-        <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade})<span class="psg-load">LOAD →</span></div>
+            // GLOW-UP 206 L2 — the score grades STRUCTURE. Saying "(excellent)" beside
+            // a ticket priced at -50% reads as an endorsement of the bet.
+            const sNeg = !!sa?.best && sa.best.ev < 0;
+            return `<div class="parlay-suggest-card grade-${s.health.grade}${sNeg ? ' psg-negev' : ''}" data-suggest-legs="${legsDataAttr}" title="Click to load these ${legKeys.length} legs into your slip (replaces the current selection)">
+        <div class="parlay-suggest-label">#${i + 1} — Score: ${s.health.score} (${s.health.grade} structure)${sNeg ? '<span class="psg-negtag" title="Well built, but priced below breakeven at every payout table available. Ranked below any suggestion that clears it.">✗ VALUE</span>' : ''}<span class="psg-load">LOAD →</span></div>
         <div class="parlay-suggest-legs">${legsText}</div>
         <div class="parlay-suggest-meta">${combChip}${evChip}${diffChip}</div>
         <div class="parlay-suggest-score">Avg confidence: ${Math.round(s.health.avgConfidence)}%${tags ? ` · ${tags}` : ''}</div>
@@ -11099,6 +11153,9 @@ function renderParlayLab(container) {
         }).join('');
         suggestHtml = `<div class="parlay-suggest-section">
       <div class="parlay-suggest-title">AI SUGGESTED PARLAYS</div>
+      ${!anySuggestionPositive
+            ? `<div class="psg-none-positive" title="These are ranked on STRUCTURE — leg confidence, correlation, spread — because nothing available clears breakeven on price. They are the best-BUILT combinations on the board, not profitable ones. Shown so you can see what the model likes; the honest read is that this slate does not offer a priced parlay.">⚠ Nothing on this board clears breakeven — these are the best-built, not the best-priced</div>`
+            : ''}
       ${cards}
     </div>`;
     }
@@ -11114,6 +11171,16 @@ function renderParlayLab(container) {
             const bothSelected = sel1 && sel2;
             const avgConf = Math.round((p.leg1.confidence + p.leg2.confidence) / 2);
             const impactPct = `+${(p.alert.impact * 100).toFixed(0)}%`;
+            // GLOW-UP 206 L3 — these cards said the two legs move together and nothing
+            // about whether backing them pays. "+18% health · avg 63%" is an argument
+            // for correlation, and correlation is not edge: a perfectly synergistic
+            // pair priced below breakeven is still a losing ticket, and this section
+            // was the one place you could build one without ever seeing a price.
+            // Same analyzeSlipLegs the slip and the suggestions use.
+            const pb = analyzeSlipLegs([p.leg1, p.leg2])?.best ?? null;
+            const pairEvHtml = pb
+                ? `<span class="synergy-pair-ev ${pb.ev >= 0 ? 'pos' : 'neg'}" title="Best-priced book for this pair as a 2-leg ticket (${pb.label} ${pb.mult}x), correlation-adjusted — the same pipeline as your slip. Synergy is about whether they hit TOGETHER; this is whether the pair is worth backing at all.">${pb.label} ${pb.mult}x <b>${pb.ev >= 0 ? '+' : ''}${pb.ev}%</b></span>`
+                : '';
             return `<div class="synergy-pair-card${bothSelected ? ' synergy-active' : ''}" data-synergy-key1="${key1}" data-synergy-key2="${key2}">
         <div class="synergy-pair-legs">
           <span class="synergy-pair-leg"><span class="parlay-leg-name">${prettyName(p.leg1.fighter)}</span> <span class="parlay-leg-dir ${p.leg1.direction}">${p.leg1.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg1.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg1.line}</span></span>
@@ -11121,7 +11188,7 @@ function renderParlayLab(container) {
           <span class="synergy-pair-leg"><span class="parlay-leg-name">${prettyName(p.leg2.fighter)}</span> <span class="parlay-leg-dir ${p.leg2.direction}">${p.leg2.direction.toUpperCase()}</span> <span class="parlay-leg-stat">${p.leg2.stat.toUpperCase()}</span> <span class="parlay-leg-line">${p.leg2.line}</span></span>
         </div>
         <div class="synergy-pair-reason">${p.alert.message}</div>
-        <div class="synergy-pair-meta"><span class="synergy-pair-impact">${impactPct} health</span><span class="synergy-pair-conf">avg ${avgConf}%</span>${bothSelected ? '<span class="synergy-pair-added">IN SLIP</span>' : ''}</div>
+        <div class="synergy-pair-meta"><span class="synergy-pair-impact">${impactPct} health</span><span class="synergy-pair-conf">avg ${avgConf}%</span>${pairEvHtml}${bothSelected ? '<span class="synergy-pair-added">IN SLIP</span>' : ''}</div>
       </div>`;
         }).join('');
         synergyHtml = `<div class="synergy-pairs-section">
