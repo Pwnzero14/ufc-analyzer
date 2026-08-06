@@ -390,7 +390,7 @@ export const NAME_ALIASES = {
 //   side is the bad one; ordinary shading sits nowhere near half. Kept at 18
 //   rather than bumping again: 18 was never pushed, so no released build ever
 //   carried the 3-book behaviour.)
-export const MODEL_VERSION = 19;
+export const MODEL_VERSION = 20;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
