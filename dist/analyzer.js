@@ -20253,10 +20253,19 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
     // real ones. The usable signal is the OTHER BOOKS. Books shade lines against
     // each other; they do not disagree by half.
     //
-    // Deliberately conservative: needs THREE or more books before it will judge
-    // anything (two books disagreeing has no majority), and only drops a value
-    // below half the median. A lone book's line is never touched, so a genuinely
-    // thin market is left alone rather than silently emptied.
+    // Fires at TWO or more books. The first cut required three, reasoning that
+    // two disagreeing have no majority — wrong frame, and it let an identical bug
+    // through on the same board: Louie Sutherland had Pick6 SS 5 against UD 17.5
+    // with no third book, and reached #4 at +16% EV on the same phantom discount.
+    // The asymmetry is what matters: junk scrapes are always LOW (badges,
+    // multipliers — the McGregor precedent was "SS OVER 1" against a real 53.5),
+    // so with two books the low side is overwhelmingly the bad one. A book at 5
+    // against a book at 17.5 is not a market disagreement, it is one wrong value.
+    // Ordinary shading (13.5 vs 15.5) stays far inside the half-median test.
+    //
+    // A LONE book is still never touched — with nothing to compare against there
+    // is no evidence, and emptying a genuinely thin market would be worse than
+    // carrying a suspect line.
     {
         const OUTLIER_STATS = [
             { fields: ['line_p6_ss', 'line_ud_ss', 'line_pp_ss', 'line_betr_ss', 'line_dk_ss'], label: 'SS' },
@@ -20267,7 +20276,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
                 const present = fields
                     .map(k => ({ k, v: entry[k] }))
                     .filter((x) => typeof x.v === 'number' && Number.isFinite(x.v));
-                if (present.length < 3)
+                if (present.length < 2)
                     continue;
                 const sorted = [...present].map(x => x.v).sort((a, b) => a - b);
                 const mid = sorted.length >> 1;

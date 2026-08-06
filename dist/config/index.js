@@ -382,8 +382,14 @@ export const NAME_ALIASES = {
 //   carried the pick to #1 TOP PICK at Δ+17.2. Raising the floor was rejected:
 //   plausibleSs's own comment records a real 5.5 line, so any floor catching
 //   this rejects legitimate ones. Now a value below HALF THE MEDIAN of the other
-//   books is dropped, requiring 3+ books before judging anything. Bumped because
+//   books is dropped, requiring 2+ books before judging anything. Bumped because
 //   it changes which lines exist, hence which picks reach the archived snapshot.
+//   (First cut required 3+ books and immediately let an identical bug through on
+//   the same board — Louie Sutherland, Pick6 SS 5 against UD 17.5 with no third
+//   book, #4 at +16% EV. Junk scrapes are always LOW, so with two books the low
+//   side is the bad one; ordinary shading sits nowhere near half. Kept at 18
+//   rather than bumping again: 18 was never pushed, so no released build ever
+//   carried the 3-book behaviour.)
 export const MODEL_VERSION = 18;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
