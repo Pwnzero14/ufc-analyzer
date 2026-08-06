@@ -20309,7 +20309,21 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
     {
         const OUTLIER_STATS = [
             { fields: ['line_p6_ss', 'line_ud_ss', 'line_pp_ss', 'line_betr_ss', 'line_dk_ss'], label: 'SS' },
-            { fields: ['line_p6_td', 'line_ud_td', 'line_pp_td', 'line_betr_td', 'line_dk_td'], label: 'TD' },
+            // TD REMOVED (MODEL v19, 2026-08-06). The half-median test cannot work on a
+            // stat quantized to 0.5/1.5/2.5/3.5. DraftKings' standard takedown market is
+            // "will he land ANY takedown" = 0.5, while the pick'em books post 1.5+. Half
+            // of 1.5 is 0.75, so a DK 0.5 can NEVER survive whenever two pick'em books
+            // sit at 1.5 or higher — it is dropped for being correct. Measured on the
+            // Gamrot/Salkilld card: Elkins (P6 1.5 / UD 1.5 / DK 0.5) and Salkilld
+            // (1.5 / 1.5 / 0.5) both lost a real DK line carrying real odds (+200/-280),
+            // while Ferreira/Quarantillo/Lemos/Del Valle kept theirs ONLY because DK was
+            // their lone TD book and the 2-book minimum skipped them. Same value, different
+            // neighbours — which is the tell that the rule, not the data, was wrong.
+            //
+            // Every case that motivated v18 was SS (Elkins SS 5, Sutherland SS 5, McGregor
+            // "SS OVER 1"); TD was folded in by symmetry, never from an observed TD failure.
+            // TD keeps its isolation bound via plausibleTd (0 <= v < 20), which already
+            // catches the SS-magnitude-in-a-td-field case the guard was cited for.
         ];
         for (const entry of Object.values(map)) {
             for (const { fields, label } of OUTLIER_STATS) {
