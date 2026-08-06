@@ -11765,7 +11765,47 @@ async function loadOpeningLines() {
     const baselineStale = !!data?.lines && isStale(data.forBetrEventDate);
     const historyStale = !!historyRaw?.series && Object.keys(historyRaw.series).length > 0
         && isStale(historyRaw.forBetrEventDate);
-    if (baselineStale || historyStale) {
+    // ── FIRST-BETR MIGRATION (2026-08-06) ──────────────────────────────────
+    // The tag only exists once manual Betr lines do: analyzer.ts ~21231 stamps
+    // betr_event_date with the card's date "whenever manual Betr lines exist".
+    // So on a card where Betr hasn't been entered yet, baselines are written with
+    // an EMPTY tag — and the moment the user enters Betr mid-week the tag flips
+    // from "" to the card date, every baseline reads as stale, and lines_open_v1
+    // AND line_history_v1 are both destroyed. That is exactly what happened here:
+    // adding Betr lines wiped a week of movement for the SAME event, and Line
+    // Movers went silent right before lock-in.
+    //
+    // An empty prior tag is the precise signature of "Betr data first appeared",
+    // NOT of an event change — a real event change carries a non-empty OLD date.
+    // So migrate in place instead of wiping. Where the event name is known it has
+    // to agree too; where it isn't known yet the empty-tag signal stands alone.
+    //
+    // Risk direction is deliberate: the failure mode of migrating wrongly is
+    // visibly bogus movement, which is correctable. The failure mode of wiping
+    // wrongly is permanent loss of data that cannot be re-derived.
+    const prevTag = data?.forBetrEventDate;
+    const prevHistTag = historyRaw?.forBetrEventDate;
+    const tagWasEmpty = (t) => t === '' || t === undefined || t === null;
+    const curEventKey = normalizeEventKey(upcomingEventName || inferredEventNameFromLines || '');
+    const baseEventKey = normalizeEventKey(data?.eventKey || '');
+    const eventContradicts = !!curEventKey && curEventKey !== 'unknown'
+        && !!baseEventKey && baseEventKey !== 'unknown'
+        && baseEventKey !== curEventKey;
+    const firstBetrOnly = !!_currentBetrEventDate
+        && tagWasEmpty(prevTag) && tagWasEmpty(prevHistTag)
+        && !eventContradicts;
+    if ((baselineStale || historyStale) && firstBetrOnly) {
+        console.log(`[LineMovement] Betr tag "" -> "${_currentBetrEventDate}" on the SAME event ("${baseEventKey || 'unknown'}") — migrating tags, KEEPING ${Object.keys(data?.lines || {}).length} baselines`);
+        if (data)
+            data.forBetrEventDate = _currentBetrEventDate;
+        if (historyRaw)
+            historyRaw.forBetrEventDate = _currentBetrEventDate;
+        await storageSet({
+            lines_open_v1: data ?? null,
+            [STORAGE_LINE_HISTORY_KEY]: historyRaw ?? null,
+        });
+    }
+    else if (baselineStale || historyStale) {
         console.log(`[LineMovement] Stale (baseline=${baselineStale}, history=${historyStale}, currentBetrDate="${_currentBetrEventDate}") — wiping lines_open_v1 + line_history_v1`);
         await storageSet({ lines_open_v1: null, [STORAGE_LINE_HISTORY_KEY]: null });
         _lineHistory = { eventKey: '', updatedAt: 0, forBetrEventDate: _currentBetrEventDate, series: {} };
