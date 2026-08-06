@@ -1933,6 +1933,13 @@ async function autoBackupOnStartup() {
 })();
 // ── AUTO-SCRAPE ORCHESTRATION ──────────────────────────────────────────
 // Opens tabs for each platform, triggers scraping, closes tabs
+// Per-event Pick6 view that actually carries the full stat-tab set (including the
+// Time parent tab holding Fight Time / Control Time). Only reachable with a
+// pickGroup appended — bare /category/N redirects to the homepage. DK has rotated
+// this between category/46, category/47 and category/129 over the past months, so
+// if Pick6 breaks, check what URL a logged-out browser lands on for the current
+// card and update here.
+const PICK6_CATEGORY_URL = 'https://pick6.draftkings.com/category/129?sport=MMA';
 const AUTO_SCRAPE_URLS = {
     pick6: [
         // 2026-05-15: DK consolidated UFC under unified MMA category (category/129).
@@ -3370,10 +3377,24 @@ async function autoScrapeAllPlatforms() {
                     const cached = await new Promise((res) => chrome.storage.local.get(['pick6_active_pick_group'], (r) => res(r || {})));
                     const pg = cached.pick6_active_pick_group;
                     if (pg && /^\d+$/.test(String(pg))) {
-                        urls = urls.map((u) => u.includes('/category/') && !u.includes('pickGroup=')
-                            ? `${u}&pickGroup=${pg}`
-                            : u);
-                        console.log(`[UFC Auto-Scrape] Pick6 using cached pickGroup=${pg}`);
+                        // The injection used to require the URL to ALREADY contain /category/,
+                        // but CONFIG.platforms.pick6.url is the bare `?sport=UFC` homepage — so
+                        // the guard never matched, the pickGroup was never appended, and every
+                        // auto-fetch landed on the homepage and scraped during its slow SPA
+                        // redirect. That is the state where the Time → Control Time sub-tabs
+                        // have not rendered yet, which is why CTRL kept coming back empty while
+                        // a manual visit worked. Upgrade the bare URL to the per-event category
+                        // view when we have a pickGroup; keep the homepage as-is when we don't,
+                        // so a missing pickGroup degrades to the old behaviour rather than a
+                        // URL that redirects away.
+                        urls = urls.map((u) => {
+                            if (u.includes('pickGroup='))
+                                return u;
+                            if (u.includes('/category/'))
+                                return `${u}&pickGroup=${pg}`;
+                            return `${PICK6_CATEGORY_URL}&pickGroup=${pg}`;
+                        });
+                        console.log(`[UFC Auto-Scrape] Pick6 using cached pickGroup=${pg} → ${urls.join(', ')}`);
                     }
                     else {
                         console.warn('[UFC Auto-Scrape] Pick6 has no cached pickGroup — open a Pick6 UFC URL once to populate it');
