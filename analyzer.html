@@ -28662,6 +28662,13 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   flex-shrink: 0;
   cursor: help;
 }
+/* The line-shop badge reads "🏪 best of 5 · 9.5" (book count · spread). Without
+   nowrap it breaks after the "·", stranding the SPREAD on its own line directly
+   above the pick's reason text — where it reads as a stray SS line and makes the
+   row look like it is quoting two different numbers. Reported as a visual bug on
+   Elkins, where "9.5" appeared to be a line he does not have. */
+.best-pick-lineshop { white-space: nowrap; }
+
 /* ══ GLOW-UP 206: Parlay Lab — structure vs value ═════════════════════════
    The health score is avgConfidence + correlation + legCount + spread. It never
    sees price, but rendered a bare "EXCELLENT" above the slip's own negative EV.
