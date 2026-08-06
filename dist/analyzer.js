@@ -5174,6 +5174,34 @@ function calcKDLean(name, db, line_kd, oppDB) {
         type: 'kd',
     };
 }
+// MODEL v20 (2026-08-06) — evaluate a TD lean at the BEST posted line, not at
+// whichever book wins a fixed precedence order.
+//
+// The books do not post shaded versions of one market here, they post DIFFERENT
+// QUESTIONS. DraftKings' takedown line is "lands ANY takedown" = 0.5; the pick'em
+// books ask "lands two or more" = 1.5+. The old p6-first order judged Darren
+// Elkins at 1.5 — projection 1.2, just under, so NO LEAN — while his record
+// against DK's 0.5 was 24 of 30 with L5 5/5 and the opponent allowing it in 2 of
+// 4. Answering only the pick'em question hid a real edge behind a shrug.
+//
+// So ask every question that is actually posted and keep the strongest answer.
+// Falls back to the precedence line when no line produces a lean, so a no-lean
+// row still renders its "NO LEAN at X" verdict instead of vanishing.
+//
+// KNOWN TRADE-OFF — this is a best-of-N selection, so it is mildly optimistic by
+// construction: scanning several lines and keeping the best finds a favourable
+// framing more often than judging one line would. The confidence recalibration
+// pass (per source-type x bucket, against realized accuracy) is what corrects
+// that over time; do not "fix" it by re-narrowing to one book.
+function bestTdLean(name, db, oppDB, dkLine, availableLines, moneyline, fallbackLine) {
+    let best = null;
+    for (const candidate of [...new Set(availableLines)]) {
+        const r = calcTDLean(name, db, candidate, oppDB, dkLine, availableLines, moneyline);
+        if (r && r.lean !== 'none' && (!best || r.conf > best.conf))
+            best = r;
+    }
+    return best ?? calcTDLean(name, db, fallbackLine, oppDB, dkLine, availableLines, moneyline);
+}
 function calcTDLean(name, db, line_td, oppDB, dkLine, availableLines = [], moneyline = null) {
     if (!line_td || !db || !db.loaded)
         return null;
@@ -20538,7 +20566,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const ssR1LinesA = [f.line_pp_ss_r1, f.line_ud_ss_r1, f.line_dk_ss_r1].filter((value) => value != null);
         const leanSSA = calcSSLean(f.name, dbA, ssLineA, dbB, f.line_dk_ss ?? null, ssLinesA, moneylineA);
         const leanSSR1A = calcSSR1Lean(f.name, dbA, ssR1LinesA, dbB, moneylineA);
-        const leanTDA = calcTDLean(f.name, dbA, tdLineA, dbB, f.line_dk_td ?? null, tdLinesA, moneylineA);
+        const leanTDA = bestTdLean(f.name, dbA, dbB, f.line_dk_td ?? null, tdLinesA, moneylineA, tdLineA);
         const leanFTA = calcFTLean(f.name, dbA, ftLineA, dbB, f.line_dk_ft ?? null, ftLinesA, moneylineA);
         const leanCTRLA = calcCTRLLean(f.name, dbA, ctrlLineA, dbB, f.line_dk_ctrl ?? null, ctrlLinesA, moneylineA, f.ctrl_under_available ?? null);
         const leanKDA = calcKDLean(f.name, dbA, f.line_pp_kd ?? null, dbB);
@@ -20555,7 +20583,7 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             const ssR1LinesB = [opp.line_pp_ss_r1, opp.line_ud_ss_r1, opp.line_dk_ss_r1].filter((value) => value != null);
             const leanSSB = calcSSLean(opp.name, dbB, ssLineB, dbA, opp.line_dk_ss ?? null, ssLinesB, moneylineB);
             const leanSSR1B = calcSSR1Lean(opp.name, dbB, ssR1LinesB, dbA, moneylineB);
-            const leanTDB = calcTDLean(opp.name, dbB, tdLineB, dbA, opp.line_dk_td ?? null, tdLinesB, moneylineB);
+            const leanTDB = bestTdLean(opp.name, dbB, dbA, opp.line_dk_td ?? null, tdLinesB, moneylineB, tdLineB);
             const leanFTB = calcFTLean(opp.name, dbB, ftLineB, dbA, opp.line_dk_ft ?? null, ftLinesB, moneylineB);
             const leanCTRLB = calcCTRLLean(opp.name, dbB, ctrlLineB, dbA, opp.line_dk_ctrl ?? null, ctrlLinesB, moneylineB, opp.ctrl_under_available ?? null);
             const leanKDB = calcKDLean(opp.name, dbB, opp.line_pp_kd ?? null, dbA);
