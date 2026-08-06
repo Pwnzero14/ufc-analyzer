@@ -384,6 +384,16 @@ async function scrapePick6AllStats() {
     // Require FP/SS/TD breadth; CTRL is optional (Pick6 only offers it on some cards / some events).
     const hasEnoughCoverage = (c) => c.total >= 8 && c.fpCount >= 4 && c.ssCount >= 4 && c.tdCount >= 2;
 
+    // CTRL is excluded from hasEnoughCoverage on purpose, but that same predicate
+    // used to gate an early `break` placed BEFORE the Control Time pass below — so
+    // whenever the first scrape already had FP/SS/TD breadth, the loop exited and
+    // CTRL was never even ATTEMPTED. "Optional" silently became "never". Observed
+    // 2026-08-06: Aug 1 captured ctrl=13/28, Aug 5 and Aug 6 both stored ZERO, with
+    // line_ctrl absent from every row rather than null. Track whether the CTRL pass
+    // has run so the early exit can only fire once CTRL has had its shot — that
+    // keeps the speed win on the second attempt without dropping the stat.
+    let ctrlAttempted = false;
+
     // 2026-05-15: DK consolidated UFC under MMA category/129. The page has a
     // Featured | UFC | MVP sub-tab row — click UFC first to filter to UFC fighters.
     // Idempotent if already active.
@@ -397,7 +407,7 @@ async function scrapePick6AllStats() {
       sendInterim();
 
       let coverage = getStatCoverage(merged);
-      if (hasEnoughCoverage(coverage)) break;
+      if (ctrlAttempted && hasEnoughCoverage(coverage)) break;
 
       if (coverage.fpCount < 4 && await clickButtonByLabels('pick6', ['fantasy points', 'fight score', 'fantasy score', 'fantasy point', 'fantasy pts', 'fight pts', 'score', 'popular'], 700)) {
         await scrollToLoadAll({ timeoutMs: 600, intervalMs: 200 });
@@ -431,6 +441,7 @@ async function scrapePick6AllStats() {
       // missed, and the whole CTRL pass was skipped.
       await clickButtonByLabelsWhenReady('pick6', ['time'], 1000, 6000);
       const ctrlClicked = await clickButtonByLabelsWhenReady('pick6', ['control time', 'control mins', 'control minutes'], 1200, 6000);
+      ctrlAttempted = true;
       if (ctrlClicked) {
         log('pick6', 'Clicked Control Time pill, scraping');
         await scrollToLoadAll({ timeoutMs: 1200, intervalMs: 200 });
