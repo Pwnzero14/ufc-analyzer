@@ -59,9 +59,19 @@ async function scrollToLoadAll(options = {}) {
       }
     }, intervalMs);
 
+    // Timeout path. This used to resolve INSTANTLY with the page still pinned at
+    // document.body.scrollHeight (the interval's last act) and no settle delay, so
+    // the caller scraped a bottom-scrolled, mid-render grid. Reaching the settled
+    // path above costs 4 ticks + 500ms ≈ 1300ms, so any caller passing a shorter
+    // timeout ALWAYS lost that race — the Control Time pass (timeoutMs 1200) never
+    // once took the clean exit, which is why it captured only the last two cards on
+    // a 10-card board (2026-08-06). Mirror the settled path: return to the top and
+    // let layout settle before resolving, so a timeout degrades to "less scrolling"
+    // rather than "scrape the wrong part of the page".
     setTimeout(() => {
       clearInterval(interval);
-      resolve();
+      window.scrollTo(0, 0);
+      setTimeout(resolve, 300);
     }, timeoutMs);
   });
 }
@@ -444,7 +454,11 @@ async function scrapePick6AllStats() {
       ctrlAttempted = true;
       if (ctrlClicked) {
         log('pick6', 'Clicked Control Time pill, scraping');
-        await scrollToLoadAll({ timeoutMs: 1200, intervalMs: 200 });
+        // 1200ms could never reach scrollToLoadAll's settled exit (4 ticks + 500ms
+        // settle ≈ 1300ms), so this pass always took the timeout path. Give it room
+        // to settle properly — the Control Time board is the last tab clicked and
+        // needs the most time for React to re-render every card, not the least.
+        await scrollToLoadAll({ timeoutMs: 3000, intervalMs: 200 });
         mergeInto(scrapePick6());
         sendInterim();
         coverage = getStatCoverage(merged);

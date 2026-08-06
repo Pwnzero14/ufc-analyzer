@@ -1908,13 +1908,14 @@ async function autoBackupOnStartup(): Promise<void> {
 // ── AUTO-SCRAPE ORCHESTRATION ──────────────────────────────────────────
 // Opens tabs for each platform, triggers scraping, closes tabs
 
-// Per-event Pick6 view that actually carries the full stat-tab set (including the
-// Time parent tab holding Fight Time / Control Time). Only reachable with a
-// pickGroup appended — bare /category/N redirects to the homepage. DK has rotated
-// this between category/46, category/47 and category/129 over the past months, so
-// if Pick6 breaks, check what URL a logged-out browser lands on for the current
-// card and update here.
-const PICK6_CATEGORY_URL = 'https://pick6.draftkings.com/category/129?sport=MMA';
+// Per-event Pick6 view that actually carries the full stat-tab set (Significant
+// Strikes | Knockouts | Fantasy Points | Takedowns | Time, with Time holding the
+// Fight Time / Control Time sub-pills). DK has rotated this between category/46,
+// category/47 and category/129 over the past months; confirmed 2026-08-06 from a
+// logged-out browser that /category/46 is the live UFC board and renders the full
+// tab row. If Pick6 breaks again, check what URL a logged-out browser actually
+// lands on for the current card and update here.
+const PICK6_CATEGORY_URL = 'https://pick6.draftkings.com/category/46';
 
 const AUTO_SCRAPE_URLS: Record<'pick6'|'underdog'|'prizepicks'|'draftkings_sportsbook', string[]> = {
   pick6: [
@@ -3372,10 +3373,13 @@ async function autoScrapeAllPlatforms(): Promise<any> {
             // view when we have a pickGroup; keep the homepage as-is when we don't,
             // so a missing pickGroup degrades to the old behaviour rather than a
             // URL that redirects away.
+            // Query-aware join: PICK6_CATEGORY_URL may or may not already carry a
+            // query string depending on which category DK is serving this month.
+            const withPickGroup = (u: string) => `${u}${u.includes('?') ? '&' : '?'}pickGroup=${pg}`;
             urls = urls.map((u) => {
               if (u.includes('pickGroup=')) return u;
-              if (u.includes('/category/')) return `${u}&pickGroup=${pg}`;
-              return `${PICK6_CATEGORY_URL}&pickGroup=${pg}`;
+              if (u.includes('/category/')) return withPickGroup(u);
+              return withPickGroup(PICK6_CATEGORY_URL);
             });
             console.log(`[UFC Auto-Scrape] Pick6 using cached pickGroup=${pg} → ${urls.join(', ')}`);
           } else {
