@@ -387,7 +387,17 @@ export const NAME_ALIASES: Record<string, string> = {
 //   widened from {ss,fp} to {ss,fp,td,ctrl}; ss_r1 and kd stay out — R1 SS is
 //   capped by one round regardless of duration, and a knockdown tends to END
 //   fights, so it moves opposite the rest.
-export const MODEL_VERSION = 17;
+// v18 — cross-book outlier guard on SS/TD lines. plausibleSs/plausibleTd bound
+//   each book in isolation, so they catch absurd values but not merely WRONG
+//   ones. Darren Elkins (2026-08-06) stored Pick6 SS 5 against UD 14.5 / PP 13.5
+//   / BT 13.5 / DK 14.5; 5 clears the `>= 4` floor, and since the lowest line
+//   wins for an OVER the line-shop selected it — a fake 9.5-point discount that
+//   carried the pick to #1 TOP PICK at Δ+17.2. Raising the floor was rejected:
+//   plausibleSs's own comment records a real 5.5 line, so any floor catching
+//   this rejects legitimate ones. Now a value below HALF THE MEDIAN of the other
+//   books is dropped, requiring 3+ books before judging anything. Bumped because
+//   it changes which lines exist, hence which picks reach the archived snapshot.
+export const MODEL_VERSION = 18;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
