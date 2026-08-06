@@ -19396,7 +19396,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : '',
         f.lean_td ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td || '—'} · UD: ${f.line_ud_td || '—'} · PP: ${f.line_pp_td || '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
+          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
           ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : '',
