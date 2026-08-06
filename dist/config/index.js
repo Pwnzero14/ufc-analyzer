@@ -226,6 +226,14 @@ export const NAME_ALIASES = {
     // the same card (Fiziev/Torres) stay distinct fighters.
     'Sharabutdin Magomedov': 'Shara Magomedov',
     'Abusupiyan Magomedov': 'Abus Magomedov',
+    // 2026-08-06 (Gamrot vs Salkilld card): DK Sportsbook posts his full legal name
+    // "Carlos Diego Ferreira"; UFCStats + the card use "Diego Ferreira". Three
+    // tokens vs two, so namesMatch (surname-token based) can't bridge them and the
+    // DK SS prop failed to attach — instead of landing on his card it spawned a
+    // PHANTOM fighter row with its own PRELIM section, opponent Billy Quarantillo,
+    // no record and no history. That is the tell for a missing alias on a
+    // book-only line: a duplicate fight card carrying exactly one book's prop.
+    'Carlos Diego Ferreira': 'Diego Ferreira',
 };
 // ── MODEL VERSION ───────────────────────────────────────────────────────
 // Bump on ANY change to lean scoring, tiering, correlation passes, or EV math.
