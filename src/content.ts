@@ -159,7 +159,20 @@ function scrapePick6() {
       }
 
       // Control Time — minutes. Accepts "2:30 Control" or "2.5 Control Time".
-      const ctrlMMSS = cardText.match(/(\d+):(\d{2})\s*\n?\s*Control(?:\s*Time)?/i);
+      //
+      // Pick6 renders this value with an ANIMATED ODOMETER: alongside the plain
+      // "06:30" the DOM also carries one element per character, so innerText comes
+      // back as "06:30 \n 0 \n 6 \n : \n 3 \n 0 \n Control Time". Those loose digits
+      // sit between the value and the label and break the adjacency the pattern
+      // below requires, so ONLY cards whose odometer happened to render the value
+      // plainly twice ever matched. Measured on the live board 2026-08-06: 10 cards
+      // carried Control Time, 4 matched, and CTRL landed for 2 after the merge.
+      // Collapsing whitespace normalises both renderings to "<value><value>Control
+      // Time", so one pattern covers each. mm is bounded to two digits because the
+      // greedy form swallows the doubled value ("06:3006:30" -> mm=3006), which then
+      // fails the < 25 sanity check below and silently drops the line.
+      const ctrlCompact = cardText.replace(/\s+/g, '').match(/(\d{1,2}):(\d{2})Control(?:Time)?/i);
+      const ctrlMMSS = ctrlCompact || cardText.match(/(\d+):(\d{2})\s*\n?\s*Control(?:\s*Time)?/i);
       const ctrlDec  = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Control(?:\s*Time)?/i);
       let ctrlLine = null;
       if (ctrlMMSS) {
