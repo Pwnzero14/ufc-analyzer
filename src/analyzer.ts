@@ -19775,6 +19775,16 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
         })()}
         ${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}
+        ${(() => {
+          // v21 drops lines priced against a fighter who left the card. Without this
+          // badge the only trace is a console line and one fewer chip — which reads
+          // as "the book never posted it" rather than "we removed it, and here is why".
+          const drop = _staleLineDrops.get((normalizeName(f.name) || f.name).toLowerCase());
+          if (!drop) return '';
+          const books = drop.books.map(b => b.toUpperCase()).join(', ');
+          const opp = drop.opponent.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+          return `<div class="stale-line-badge" title="Dropped ${drop.books.length} line source(s) — ${books} — priced against ${opp}, who is no longer on this card. Those numbers were set for a different matchup, so the model ignores them — the book simply has not repriced yet. If this appears on MANY fighters at once, suspect a stale or mis-paired card rather than the books.">⊘ STALE ${books}</div>`;
+        })()}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
         ${lean.rivalryDissent ? `<div class="conflict-warn" style="background:rgba(255,184,77,0.10);border-color:rgba(255,184,77,0.35);color:#ffbe6b" title="Rival models disagree with the main lean — ${String(lean.rivalryDissent).replace(/"/g, '&quot;')}">⚔ Rival models dissent</div>` : ''}
@@ -20515,6 +20525,12 @@ function createMergedLineEntry(name: string): MergedLineEntry {
   };
 }
 
+// What the v21 stale-opponent guard removed on the last merge, keyed by
+// normalized fighter name. The guard discards those rows, so without this record
+// a dropped line is indistinguishable on screen from a book never posting one —
+// the board just shows fewer chips and says nothing. Rebuilt every merge.
+const _staleLineDrops = new Map<string, { books: string[]; opponent: string }>();
+
 async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineFighter[], betrFighters: RawLineFighter[], ppFighters: RawLineFighter[] = [], dkFighters: RawLineFighter[] = []): Promise<void> {
   debugLog(`P6 fighters (${(p6Fighters||[]).length}): ${(p6Fighters||[]).map((f) => f.name).join(', ')}`);
   debugLog(`UD fighters (${(udFighters||[]).length}): ${(udFighters||[]).map((f) => f.name).join(', ')}`);
@@ -20593,6 +20609,7 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
   // name token (>2 chars, so "da"/"de" don't count) with any current card
   // fighter means the opponent is still there and the line stays.
   let staleOppDropped = 0;
+  _staleLineDrops.clear();
   const nameTokens = (s: string): Set<string> =>
     new Set(((normalizeName(s) || s).toLowerCase().match(/[a-z]+/g) || []).filter(t => t.length > 2));
   const opponentStillOnCard = (rowOpp: string): boolean => {
@@ -20612,6 +20629,12 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     if (!findOpponentFromUpcomingCard(f.name)) return false; // card doesn't know the fighter
     if (opponentStillOnCard(String(f.opponent))) return false;
     staleOppDropped++;
+    // Record it so the card can SAY it was dropped rather than just showing one
+    // fewer chip. Keyed the same way the merged entry is, so the render can find it.
+    const dropKey = (normalizeName(f.name) || f.name).toLowerCase();
+    const prev = _staleLineDrops.get(dropKey);
+    if (prev) { if (!prev.books.includes(book)) prev.books.push(book); }
+    else _staleLineDrops.set(dropKey, { books: [book], opponent: String(f.opponent) });
     debugLog(`Stale line dropped (${book}): ${f.name} priced vs "${f.opponent}", who is no longer on the card`);
     return true;
   };
