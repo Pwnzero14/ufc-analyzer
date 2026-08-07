@@ -3275,6 +3275,39 @@ body {
 }
 .line-cell { min-width: 42px; flex-shrink: 0; }
 
+/* ── CHIP RAIL: OWN FULL-WIDTH ROW (wide layout only) ─────────────────────
+   Measured on the live board: clientWidth 81px on EVERY rail, against 501-862px
+   of chips — ratios of 6.2:1 to 10.6:1, up to 14 chips in an 81px window. An
+   off-screen Betr or PrizePicks chip then reads as "that book posted no line",
+   which is how a PrizePicks chip got misread as Pick6.
+
+   Re-weighting the tracks cannot fix this. The rail already carries the LARGEST
+   weight in the row (1.65fr vs 1.15/1.3/0.95) and still lands at 81px, which
+   means every track is pinned at its minimum and there is no free space to
+   distribute: two cards sit side by side in a fight pair, and 192px of name +
+   180px of stats + 150px of lean + gaps consumes each half. The rail has to
+   leave the fixed row.
+
+   So it gets its own row spanning the full card. Costs one line of height per
+   card; buys ~900px for what needed 862px, i.e. no scrolling at all.
+
+   Scoped to min-width 1101px ON PURPOSE. Below that the two existing overrides
+   already give the rail room — @media (max-width:1100px) flattens .fighter-main
+   to two columns, and @media (max-width:900px) drops the pair to one column and
+   hands the rail a full 1fr. Applying this there would fight both. */
+@media (min-width: 1101px) {
+  .fight-pair .fighter-main {
+    grid-template-columns: minmax(192px, 1.15fr) minmax(180px, 1.3fr) minmax(150px, 0.95fr) 22px;
+  }
+  /* Explicit placement is required: with an auto-flowing grid a 1/-1 item would
+     push stats/lean/expand onto a third row instead of staying beside the name. */
+  .fight-pair .fighter-main > .fighter-info    { grid-row: 1; grid-column: 1; }
+  .fight-pair .fighter-main > .stats-mini      { grid-row: 1; grid-column: 2; }
+  .fight-pair .fighter-main > .lean-cell       { grid-row: 1; grid-column: 3; }
+  .fight-pair .fighter-main > .row-expand-slot { grid-row: 1; grid-column: 4; }
+  .fight-pair .fighter-main > .platform-lines  { grid-row: 2; grid-column: 1 / -1; }
+}
+
 
 /* ── VIEW TABS (bottom bar) ── */
 .view-tabs {
