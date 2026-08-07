@@ -19414,7 +19414,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     // full-slate / 50%-zoom workflow.
     const leanPanelsHtml = [
         f.lean_ss ? `<div class="detail-panel">
-          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss || '—'} · UD: ${f.line_ud_ss || '—'} · PP: ${f.line_pp_ss || '—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}</div>
+          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss ?? '—'} · UD: ${f.line_ud_ss ?? '—'} · PP: ${f.line_pp_ss ?? '—'} · BT: ${f.line_betr_ss ?? '—'} · DK: ${f.line_dk_ss ?? '—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : '',
@@ -19424,12 +19424,12 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : '',
         f.lean_td ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
+          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · BT: ${f.line_betr_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
           ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : '',
         f.lean_ft ? `<div class="detail-panel">
-          <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft || '—'} · UD: ${f.line_ud_ft || '—'} · PP: ${f.line_pp_ft || '—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}</div>
+          <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft ?? '—'} · UD: ${f.line_ud_ft ?? '—'} · PP: ${f.line_pp_ft ?? '—'} · BT: ${f.line_betr_ft ?? '—'} · DK: ${f.line_dk_ft ?? '—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>` : '',
@@ -19438,7 +19438,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         // is stated ON the panel rather than left implicit: when the model lands on
         // UNDER, the honest answer is "no play", not a pick you can't enter.
         f.lean_ctrl ? `<div class="detail-panel">
-          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl || '—'} · UD: ${f.line_ud_ctrl || '—'} · PP: ${f.line_pp_ctrl || '—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}</div>
+          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl ?? '—'} · UD: ${f.line_ud_ctrl ?? '—'} · PP: ${f.line_pp_ctrl ?? '—'} · BT: ${f.line_betr_ctrl ?? '—'} · DK: ${f.line_dk_ctrl ?? '—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}</div>
           <div class="ctrl-overonly-note" title="Control-time props are More-only in practice — Pick6 is the primary CTRL book and posts no Less button, and no other book reliably offers the under. So CTRL contributes OVER picks to the board and nothing else; an under lean is information, not a play.">⚠ OVER-ONLY market — the under side isn't offered, so only an OVER can become a pick.</div>
           ${buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean)}
           <div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>
