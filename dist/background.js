@@ -2339,15 +2339,33 @@ function parsePrizePicksApiFighters(data) {
             || p.relationships?.player?.data?.id
             || null;
         const player = playerRelId ? playerById.get(String(playerRelId)) : null;
+        // `attrs.description` is the OPPONENT (see below), never this fighter — using
+        // it as a name fallback files the line under the wrong fighter entirely. Fall
+        // back to display_name instead, which is the same person.
         const rawName = String(player?.attributes?.name
-            || attrs.description
+            || player?.attributes?.display_name
             || '').trim();
         // Skip team/game descriptors and keep likely fighter names only.
         const name = rawName.replace(/\s*-\s*[A-Z]$/i, '').trim();
         if (!name || name.split(' ').length < 2 || /\d/.test(name))
             continue;
-        const opponentRaw = String(player?.attributes?.opponent || '').trim();
-        const opponent = opponentRaw && opponentRaw.split(' ').length >= 2 ? opponentRaw : null;
+        // PrizePicks carries the opponent on the PROJECTION as `description`, not on
+        // the player record — `new_player.attributes` has no `opponent` field at all,
+        // which is why the old read returned null on 18 of 18 rows and left PrizePicks
+        // invisible to the v21 stale-opponent guard.
+        //
+        // Verified against the live payload 2026-08-07: the Jessie Rosas Significant
+        // Strikes projection (line_score 26.5) carries description "Miles Johns", and
+        // PP's own board renders that card as "Jessie Rosas vs Miles Johns · 26.5".
+        // PP models each fighter as their own one-person "team" (team: "Jessie Rosas",
+        // event_type: "team"), so description is the opposing side = the opponent.
+        //
+        // Same 2-word / no-digit guard as before: a malformed or team-style descriptor
+        // yields null, and the stale-opponent guard fails open on null.
+        const opponentRaw = String(attrs.description || player?.attributes?.opponent || '').trim();
+        const opponent = opponentRaw && opponentRaw.split(/\s+/).length >= 2 && !/\d/.test(opponentRaw)
+            ? opponentRaw
+            : null;
         if (lineType === 'kd') {
             // A fighter can have BOTH a standard KD card (More+Less) and demon/goblin variants.
             // The standard card's line wins; the flag records whether Less exists at all.
