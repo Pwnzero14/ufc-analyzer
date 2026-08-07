@@ -19783,7 +19783,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
           if (!drop) return '';
           const books = drop.books.map(b => b.toUpperCase()).join(', ');
           const opp = drop.opponent.replace(/"/g, '&quot;').replace(/</g, '&lt;');
-          return `<div class="stale-line-badge" title="Dropped ${drop.books.length} line source(s) — ${books} — priced against ${opp}, who is no longer on this card. Those numbers were set for a different matchup, so the model ignores them — the book simply has not repriced yet. If this appears on MANY fighters at once, suspect a stale or mis-paired card rather than the books.">⊘ STALE <i class="slb-books">${books}</i></div>`;
+          return `<div class="stale-line-badge" title="Dropped ${drop.books.length} line source(s) — ${books} — priced against ${opp}, who is no longer on this card. Those numbers were set for a different matchup, so the model ignores them — the book simply has not repriced yet. If this appears on MANY fighters at once, suspect a stale or mis-paired card rather than the books."><b class="slb-mark">⊘</b>STALE <i class="slb-books">${books}</i></div>`;
         })()}
         ${hasCrossStatConflict(f) ? `<div class="conflict-warn" title="FP leans ${lean.lean?.toUpperCase()} but SS and TD both lean the opposite — grappling/striking split. Lower confidence.">⚠ Stat split</div>` : ''}
         ${hasConsensusLean(f) ? `<div class="consensus-lean" title="FP, SS, and TD all lean ${hasConsensusLean(f)?.toUpperCase()} — strong multi-stat alignment">⚡ consensus</div>` : ''}
