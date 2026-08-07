@@ -3238,10 +3238,41 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(150,150,170,0.25) transparent;
 }
-.platform-lines::-webkit-scrollbar { height: 4px; }
-.platform-lines::-webkit-scrollbar-thumb { background: rgba(150,150,170,0.25); border-radius: 2px; }
-.platform-lines::-webkit-scrollbar-thumb:hover { background: rgba(150,150,170,0.45); }
-.platform-lines::-webkit-scrollbar-track { background: transparent; }
+/* The rail is DELIBERATELY the squeezed track (GLOW-UP 159: col 2 is
+   minmax(0, 1.65fr) and "absorbs the loss"), so overflow is by design — but the
+   only cue was a 4px scrollbar at 0.25 alpha, i.e. none. Measured on the live
+   board: 343-609px of chips in the visible window. The cost is real: a Betr/
+   PrizePicks chip sitting off-screen reads as "that book has no line", and a
+   partially-scrolled rail was misread as Pick6 when it was PrizePicks.
+   Fix is legibility, not space — do NOT widen the track or flip back to
+   flex-wrap, both of which undo 159 on purpose. */
+.platform-lines::-webkit-scrollbar { height: 6px; }
+.platform-lines::-webkit-scrollbar-thumb { background: rgba(165,170,200,0.42); border-radius: 3px; }
+.platform-lines::-webkit-scrollbar-thumb:hover { background: rgba(185,190,220,0.72); }
+.platform-lines::-webkit-scrollbar-track { background: rgba(255,255,255,0.045); border-radius: 3px; }
+/* Self-hiding edge shadows — the four-layer local/scroll technique, and it needs
+   all four. The two COVER layers are background-attachment:local so they travel
+   with the content and sit over the shadow when that end is reached; the two
+   SHADOW layers are attachment:scroll so they stay pinned to the element. Net
+   effect: the right-hand shade shows only while there is more rail to the right
+   and vanishes at the end, so a two-chip fighter shows nothing extra while an
+   eight-chip one shows where to look.
+   Dropping the cover layers leaves both shadows permanently on, which on a
+   near-empty rail paints a dark smudge at the track edges that reads as a
+   rendering artifact — the reason this is not just two radials.
+   Cover colour is var(--card), the row's base; the row lays a ~2% white gradient
+   over it, so the match is off by an imperceptible amount. Pure CSS: no overflow
+   measurement, no JS, no markup change, no effect on row height. */
+.platform-lines {
+  background:
+    linear-gradient(to right, var(--card) 40%, rgba(15,22,39,0)) left center,
+    linear-gradient(to left,  var(--card) 40%, rgba(15,22,39,0)) right center,
+    radial-gradient(farthest-side at 0 50%,    rgba(0,0,0,0.42), rgba(0,0,0,0)) left center,
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.42), rgba(0,0,0,0)) right center;
+  background-repeat: no-repeat;
+  background-size: 26px 100%, 26px 100%, 13px 100%, 13px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
 .line-cell { min-width: 42px; flex-shrink: 0; }
 
 
