@@ -403,7 +403,7 @@ export const NAME_ALIASES: Record<string, string> = {
 //   side is the bad one; ordinary shading sits nowhere near half. Kept at 18
 //   rather than bumping again: 18 was never pushed, so no released build ever
 //   carried the 3-book behaviour.)
-export const MODEL_VERSION = 21;
+export const MODEL_VERSION = 22;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
