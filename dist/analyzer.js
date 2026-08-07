@@ -20055,11 +20055,79 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
     const plausibleSsPart = (v) => (v != null && Number.isFinite(v) && v >= 2 && v < 200) ? v : null;
     // Knockdown lines are tightly bounded (0.5, occasionally 1.5).
     const plausibleKd = (v) => (v != null && Number.isFinite(v) && v > 0 && v < 5) ? v : null;
+    // ── STALE-OPPONENT GUARD (MODEL v21, 2026-08-07) ───────────────────────
+    // A prop line is priced against a SPECIFIC opponent. When a fighter is
+    // replaced mid-week the books do not all reprice at once, so a store can
+    // still hold a line set against the fighter who withdrew — while the
+    // projection underneath it has already switched to the replacement. Line
+    // from one fight, projection from another, and the gap between them reads
+    // as edge.
+    //
+    // Live case (2026-08-07, Gamrot/Salkilld card): Jessie Rosas withdrew and
+    // Gianni Vazquez replaced her. Pick6 reposted Miles Johns' fantasy line for
+    // the new fight (66.5 -> 65.5), but Underdog SS 32.5 / FT 14.99, Betr SS 30.5
+    // and PrizePicks SS 30.5 were all still the Rosas numbers. The board then
+    // surfaced "Johns OVER SS 30.5 @ PrizePicks · EV +32% · TOP EDGE 78%" — an
+    // edge manufactured entirely by the mismatch.
+    //
+    // FAILS OPEN on purpose. Only a POSITIVE disagreement drops a row: the card
+    // must know this fighter, AND the row must name an opponent, AND the two must
+    // fail to reconcile. No card entry, no stored opponent (PrizePicks writes
+    // null), or an unreadable name all KEEP the line — dropping a real line is
+    // worse than carrying a suspect one, and the audit path already surfaces
+    // suspect lines.
+    //
+    // IN-MEMORY ONLY. This filters what mergeAndEnrich builds; it never writes to
+    // the platform stores. A hand-entered Betr row therefore survives in storage
+    // and returns on its own if the CARD was the thing that was stale.
+    // The test is NOT "does the row's opponent equal the card's opponent" — that
+    // comparison drops good lines. Simulated against real stored rows it flagged
+    // `Yadier Delvalle` vs `Yadier del Valle` and `Jose Montanha Da Silva` vs
+    // `Jose Montanha`: books write long-form legal names, the card writes short
+    // ones, and neither string nor last-token equality survives that.
+    //
+    // The actual signal for a pullout is narrower and much safer: the fighter the
+    // line was priced against is NO LONGER ON THE CARD AT ALL. Rosas withdrew, so
+    // nothing named Rosas remains; del Valle and Montanha never left. Any shared
+    // name token (>2 chars, so "da"/"de" don't count) with any current card
+    // fighter means the opponent is still there and the line stays.
+    let staleOppDropped = 0;
+    const nameTokens = (s) => new Set(((normalizeName(s) || s).toLowerCase().match(/[a-z]+/g) || []).filter(t => t.length > 2));
+    const opponentStillOnCard = (rowOpp) => {
+        if (isUpcomingCardFighter(rowOpp))
+            return true;
+        const want = nameTokens(rowOpp);
+        if (!want.size)
+            return true; // unreadable — fail open
+        for (const pair of upcomingCardPairs) {
+            for (const cardName of [pair.f1, pair.f2]) {
+                for (const t of nameTokens(cardName))
+                    if (want.has(t))
+                        return true;
+            }
+        }
+        return false;
+    };
+    const isStaleLineRow = (f, book) => {
+        if (!f.name || !f.opponent)
+            return false; // PrizePicks writes null — fail open
+        if (!upcomingCardPairs.length)
+            return false; // no card loaded — fail open
+        if (!findOpponentFromUpcomingCard(f.name))
+            return false; // card doesn't know the fighter
+        if (opponentStillOnCard(String(f.opponent)))
+            return false;
+        staleOppDropped++;
+        debugLog(`Stale line dropped (${book}): ${f.name} priced vs "${f.opponent}", who is no longer on the card`);
+        return true;
+    };
     (p6Fighters || []).forEach((f) => {
         if (!isValidFighterName(f.name))
             return;
         const n = normalizeName(f.name);
         if (!n)
+            return;
+        if (isStaleLineRow(f, 'pick6'))
             return;
         if (!map[n])
             map[n] = createMergedLineEntry(n);
@@ -20128,6 +20196,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const n = normalizeName(f.name);
         if (!n)
             return;
+        if (isStaleLineRow(f, 'underdog'))
+            return;
         const entry = findOrCreateEntry(n);
         entry.line_ud = f.line_fp ?? f.line ?? null;
         entry.line_ud_ss = plausibleSs(f.line_ss);
@@ -20174,6 +20244,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const n = normalizeName(f.name);
         if (!n)
             return;
+        if (isStaleLineRow(f, 'betr'))
+            return;
         const entry = findOrCreateEntry(n);
         entry.line_betr = f.line_fp ?? f.line ?? null;
         entry.line_betr_ss = plausibleSs(f.line_ss);
@@ -20204,6 +20276,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         const n = normalizeName(f.name);
         if (!n)
             return;
+        if (isStaleLineRow(f, 'prizepicks'))
+            return;
         const entry = findOrCreateEntry(n);
         entry.line_pp = f.line_fp ?? f.line ?? null;
         entry.line_pp_ss = plausibleSs(f.line_ss);
@@ -20224,6 +20298,8 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             return;
         const n = normalizeName(f.name);
         if (!n)
+            return;
+        if (isStaleLineRow(f, 'dk'))
             return;
         const entry = findOrCreateEntry(n);
         entry.line_dk_ss = plausibleSs(f.line_ss);
@@ -20308,6 +20384,12 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
             entry.opponent = canonical;
         }
     });
+    // Loud on purpose: a stale-opponent drop removes real numbers from the board,
+    // so it must never be silent. If this count is high, suspect the CARD (a stale
+    // or mis-paired upcoming_ufc_card) before suspecting the books.
+    if (staleOppDropped > 0) {
+        console.log(`[UFC Lines] Stale-opponent guard dropped ${staleOppDropped} line row(s) — priced against a fighter no longer in that matchup`);
+    }
     // ── CROSS-BOOK OUTLIER GUARD ───────────────────────────────────────────
     // plausibleSs/plausibleTd bound each book's line in ISOLATION, so they only
     // catch absurd values. They cannot catch a number that is merely WRONG:
