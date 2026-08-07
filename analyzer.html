@@ -5149,29 +5149,42 @@ body.loading {
 .stale-line-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: linear-gradient(135deg, rgba(154,142,214,0.13), rgba(154,142,214,0.04));
-  border: 1px solid rgba(154,142,214,0.30);
-  color: #b3aade;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(135deg, rgba(167,139,250,0.26), rgba(167,139,250,0.07));
+  border: 1px solid rgba(167,139,250,0.58);
+  color: #ddd0ff;
+  text-shadow: 0 0 8px rgba(167,139,250,0.45);
+  box-shadow: 0 0 12px rgba(167,139,250,0.22), inset 0 1px 0 rgba(255,255,255,0.07);
   white-space: nowrap;
   cursor: help;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .stale-line-badge:hover {
-  border-color: rgba(154,142,214,0.52);
-  background: linear-gradient(135deg, rgba(154,142,214,0.19), rgba(154,142,214,0.07));
+  border-color: rgba(167,139,250,0.85);
+  background: linear-gradient(135deg, rgba(167,139,250,0.34), rgba(167,139,250,0.11));
+  box-shadow: 0 0 18px rgba(167,139,250,0.36), inset 0 1px 0 rgba(255,255,255,0.10);
 }
+/* The ⊘ carries the glow — it is the part the eye lands on first. */
+.stale-line-badge .slb-mark {
+  font-size: 11px;
+  line-height: 1;
+  color: #c4b0ff;
+  text-shadow: 0 0 10px rgba(167,139,250,0.8);
+}
+/* Struck through so the chip SHOWS the removal, not just describes it. */
 .stale-line-badge .slb-books {
   font-style: normal;
+  font-weight: 700;
   text-decoration: line-through;
-  text-decoration-color: rgba(179,170,222,0.6);
-  opacity: 0.82;
+  text-decoration-color: rgba(221,208,255,0.8);
+  text-decoration-thickness: 1.5px;
+  opacity: 0.92;
 }
 
 /* ── WEIGHT-MISS BADGE ── */
