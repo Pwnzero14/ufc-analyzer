@@ -5170,6 +5170,34 @@ body.loading {
   background: linear-gradient(135deg, rgba(167,139,250,0.34), rgba(167,139,250,0.11));
   box-shadow: 0 0 18px rgba(167,139,250,0.36), inset 0 1px 0 rgba(255,255,255,0.10);
 }
+/* No UFCStats history: the averages are blanked rather than shown as 0.0.
+   Dimmed and non-numeric so the eye reads "nothing here" instead of "zero". */
+.stat-nodata { color: rgba(160,170,190,0.45) !important; font-weight: 600 !important; letter-spacing: 0.08em; }
+/* Companion badge. Slate-cyan: it is a data-provenance note, not a warning and
+   not a direction — same reasoning that put the STALE chip on violet. */
+.nodata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(135deg, rgba(94,205,225,0.22), rgba(94,205,225,0.06));
+  border: 1px solid rgba(94,205,225,0.52);
+  color: #b8ecf7;
+  text-shadow: 0 0 8px rgba(94,205,225,0.40);
+  box-shadow: 0 0 12px rgba(94,205,225,0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+  white-space: nowrap;
+  cursor: help;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.nodata-badge:hover {
+  border-color: rgba(94,205,225,0.82);
+  box-shadow: 0 0 18px rgba(94,205,225,0.32), inset 0 1px 0 rgba(255,255,255,0.09);
+}
 /* The ⊘ carries the glow — it is the part the eye lands on first. */
 .stale-line-badge .slb-mark {
   font-size: 11px;

@@ -18493,7 +18493,21 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ? parseFloat((displayTD * roundNormFactor).toFixed(1))
         : null;
     const finalDisplayTD = normDisplayTD ?? displayTD;
-    const ssDelta = (finalDisplaySS != null && primarySSLine != null) ? finalDisplaySS - primarySSLine : null;
+    // ── NO-HISTORY FIGHTERS ────────────────────────────────────────────────────
+    // A fighter with an empty UFCStats log carries slpm 0 and an empty history, so
+    // every average computes to 0.0 — and 0.0 renders identically to a real
+    // measurement of zero. It is not a zero, it is an ABSENCE, and the delta built
+    // on it is arithmetic on nothing: the further the line sits above zero, the
+    // more confident the UNDER looks. Measured on the 2026-08-08 card: Richie
+    // Miranda (0 fights) showed `SS AVG 0.0 · LINE 26.5 · −26.5` and a ▼ UNDER 71%
+    // at ~EV +36%; Gigi Canuto (0 fights) showed ▼ UNDER 59%. Same shape as the
+    // phantom-line bug — a meaningless number presenting as the best bet on the
+    // board rather than as an error.
+    //
+    // Display-side only. This suppresses the FAKE PRECISION; it does not touch the
+    // lean, which is a separate call the user has not made.
+    const hasNoHistory = !f.db || !Array.isArray(f.db.history) || f.db.history.length === 0;
+    const ssDelta = (finalDisplaySS != null && primarySSLine != null && !hasNoHistory) ? finalDisplaySS - primarySSLine : null;
     const ssDeltaText = ssDelta == null ? '—' : `${ssDelta > 0 ? '+' : ''}${ssDelta.toFixed(1)}`;
     const ssDeltaClass = ssDelta == null ? '' : ssDelta >= 0 ? 'delta-plus' : 'delta-minus';
     // ── SS variance band ───────────────────────────────────────────────────────
@@ -19308,7 +19322,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
             ${roundNormTag ? `<span class="round-norm-tag">${roundNormTag}</span>` : ''}
           </div>
           <div class="stat-card-big">
-            <span class="stat-card-num">${normDisplayFP != null ? normDisplayFP.toFixed(1) : projFP != null ? projFP.toFixed(1) : mlAdjFP != null ? mlAdjFP.toFixed(1) : (platformAvgFP != null ? platformAvgFP.toFixed(1) : '...')}</span>
+            <span class="stat-card-num${hasNoHistory ? ' stat-nodata' : ''}">${hasNoHistory ? '—' : normDisplayFP != null ? normDisplayFP.toFixed(1) : projFP != null ? projFP.toFixed(1) : mlAdjFP != null ? mlAdjFP.toFixed(1) : (platformAvgFP != null ? platformAvgFP.toFixed(1) : '...')}</span>
             <span class="stat-card-meta">${avgFPPercentileLabel}${projFP != null && !normDisplayFP ? `<span class="opp-allows-badge" title="Opponent allows ${oppAvgFPAllowed} FP avg">(${oppAvgFPAllowed})</span>` : ''}${mlAdjShift != null && Math.abs(mlAdjShift) >= 3 && !normDisplayFP && !projFP ? `<span class="ml-adj-badge ${mlAdjShift > 0 ? 'pos' : 'neg'}">${mlAdjShift > 0 ? '+' : ''}${mlAdjShift.toFixed(1)}</span>` : ''}${trendChip(fpTrend, `${_twLabel} avg: ${fpTrend.recentAvg} · Career: ${fpTrend.careerAvg}`)}</span>
           </div>
           ${fpProvHtml}
@@ -19321,7 +19335,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           </div>
           <div class="stat-row" title="${normDisplaySS != null ? `Round-normalized (${roundNormTag}): ${displaySS.toFixed(1)} × ${roundNormFactor.toFixed(2)} = ${normDisplaySS}.` : projSS != null ? `Opp-adjusted projection: (your avg ${avgSS.toFixed(1)} + opp allows ${oppAvgSSAllowed.toFixed(1)}) ÷ 2 = ${projSS.toFixed(1)}.${ssSpreadTip ? ' | ' + ssSpreadTip : ''}` : ssSpreadTip || 'Average significant strikes landed per fight'}">
             <span class="stat-row-label">${projSS != null ? 'proj' : 'avg'}</span>
-            <span class="stat-row-val">${finalDisplaySS != null ? finalDisplaySS.toFixed(1) : '...'}${ssSpreadLabel ? `<span class="ss-spread-inline" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor !== 1.0 ? `±${(parseFloat(ssSpreadLabel.slice(1)) * roundNormFactor).toFixed(1)}` : ssSpreadLabel}</span>` : ''}${projSS != null && !normDisplaySS ? `<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>` : ''}${trendChip(ssTrend, `SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</span>
+            <span class="stat-row-val${hasNoHistory ? ' stat-nodata' : ''}">${hasNoHistory ? '—' : finalDisplaySS != null ? finalDisplaySS.toFixed(1) : '...'}${hasNoHistory ? '' : ssSpreadLabel ? `<span class="ss-spread-inline" style="color:${ssSpreadColor}" title="${ssSpreadTip}">${roundNormFactor !== 1.0 ? `±${(parseFloat(ssSpreadLabel.slice(1)) * roundNormFactor).toFixed(1)}` : ssSpreadLabel}</span>` : ''}${projSS != null && !normDisplaySS ? `<span class="opp-allows-badge" title="Opponent allows ${oppAvgSSAllowed} SS avg">(${oppAvgSSAllowed})</span>` : ''}${trendChip(ssTrend, `SS ${_twLabel} avg: ${ssTrend.recentAvg} · Career: ${ssTrend.careerAvg}`)}</span>
           </div>
           ${ssProvHtml}
           <div class="stat-row" title="Current active platform SS betting line">
@@ -19346,6 +19360,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         return `<button class="weight-miss-badge weight-miss-${wm.severity}" data-news-fighter="${f.name}" title="${tip}">⚖ MISS${lbsLabel ? ' ' + lbsLabel : ''}</button>`;
     })()}
         ${_newsAlertFighters.has(f.name.toLowerCase()) ? `<button class="news-warn-badge" data-news-fighter="${f.name}" title="Recent injury/withdrawal news detected — click for headlines">⚠ NEWS</button>` : ''}
+        ${hasNoHistory ? `<div class="nodata-badge" title="No UFCStats fight history for this fighter — every striking/grappling average computes to 0.0 from an empty log. The averages and deltas above are therefore blank rather than zero, because a zero here would be a measurement and this is an absence. Any lean shown is built WITHOUT a personal baseline: it can only be reading the line, the opponent and the matchup. Treat its confidence with suspicion.">⌀ NO HISTORY</div>` : ''}
         ${(() => {
         // v21 drops lines priced against a fighter who left the card. Without this
         // badge the only trace is a console line and one fewer chip — which reads
