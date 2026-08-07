@@ -5137,6 +5137,11 @@ body.loading {
 
 /* ── NEWS BADGE & MODAL ── */
 .news-warn-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(255,170,60,0.14); color: #ffb24a; border: 1px solid rgba(255,170,60,0.32); cursor: pointer; white-space: nowrap; }
+/* v21 stale-opponent guard removed a line source for this fighter. Deliberately
+   MUTED rather than alarm-coloured: nothing is wrong with the fighter or the
+   model, a book simply has not repriced after an opponent change. Reads as a
+   note, not a warning — the warning palette belongs to NEWS and MISS. */
+.stale-line-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; background: rgba(150,160,180,0.10); color: #9aa4b8; border: 1px solid rgba(150,160,180,0.28); white-space: nowrap; cursor: help; }
 
 /* ── WEIGHT-MISS BADGE ── */
 /* Severity-tiered: small/moderate are clear negatives (drained, no upside),
