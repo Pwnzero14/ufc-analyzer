@@ -11205,6 +11205,10 @@ html { scroll-behavior: smooth; }
 .hm-wl i { font-style: normal; font-weight: 600; opacity: 0.55; font-size: 8px; }
 .hm-wl.w { color: var(--green); background: rgba(32,223,143,0.10); border: 1px solid rgba(32,223,143,0.24); }
 .hm-wl.l { color: var(--red);   background: rgba(255,91,120,0.10); border: 1px solid rgba(255,91,120,0.24); }
+/* Nothing on this side of the ledger. Muted and dashed rather than absent, so
+   "no losses to split" cannot be mistaken for "the chip failed to render" —
+   which is exactly how the first cut read on a 4-0 fighter. */
+.hm-wl.empty { color: var(--text3); background: transparent; border: 1px dashed rgba(150,160,180,0.30); font-weight: 600; }
 
 .hist-res { width: 4px; height: 4px; border-radius: 50%; flex: none; }
 .hist-res.w { background: var(--green); box-shadow: 0 0 3px rgba(32,223,143,0.55); }

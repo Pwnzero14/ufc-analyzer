@@ -18347,19 +18347,30 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         // Pair values with results BEFORE filtering: `values` above drops nulls and
         // loses the row alignment, so it cannot be zipped back to results afterwards.
         //
-        // Rendered ONLY when both sides have samples. For an unbeaten fighter the
-        // "W avg" IS the average, so showing it twice adds noise and implies a
-        // comparison that does not exist. Opponent-side panels (OPP x SCORED VS y)
-        // carry no result/method at all and fall through the same guard.
+        // Rendered whenever the sample carries ANY result. An earlier cut hid the
+        // split unless BOTH sides had fights, reasoning that for an unbeaten fighter
+        // "W avg" merely repeats "avg". That was wrong in practice: on this card
+        // Thainara (4-0), Salkilld (6-0), Ty Miller (2-0) and Sousa (2-0) all showed
+        // nothing, and a silently absent chip reads as BROKEN rather than as
+        // "there is nothing to split". An empty side now renders as a muted dash
+        // with its zero count, so the panel states which kind of empty it is.
+        //
+        // Opponent-side panels (OPP x SCORED VS y) carry no result/method at all —
+        // those still render nothing, because there is no outcome to report.
         const wlPairs = recentRows
             .map(h => ({ v: valFn(h), r: (h.result || '').toLowerCase() }))
             .filter((x) => typeof x.v === 'number' && Number.isFinite(x.v));
         const winVals = wlPairs.filter(x => x.r === 'win').map(x => x.v);
         const lossVals = wlPairs.filter(x => x.r === 'loss').map(x => x.v);
         const meanOf = (a) => a.reduce((s2, v) => s2 + v, 0) / a.length;
-        const wlHTML = (winVals.length > 0 && lossVals.length > 0)
-            ? `<span class="hm-wl w" title="Average across the ${winVals.length} fight${winVals.length === 1 ? '' : 's'} this fighter WON. Compare against the losses figure: a wide gap means the stat is outcome-driven, so the projection is really a bet on the result.">W ${fmtVal(meanOf(winVals))}<i>${winVals.length}</i></span>`
-                + `<span class="hm-wl l" title="Average across the ${lossVals.length} fight${lossVals.length === 1 ? '' : 's'} this fighter LOST.">L ${fmtVal(meanOf(lossVals))}<i>${lossVals.length}</i></span>`
+        const wlChip = (cls, label, vals, tip) => `<span class="hm-wl ${cls}${vals.length ? '' : ' empty'}" title="${tip}">${label} ${vals.length ? fmtVal(meanOf(vals)) : '—'}<i>${vals.length}</i></span>`;
+        const wlHTML = wlPairs.some(x => x.r === 'win' || x.r === 'loss')
+            ? wlChip('w', 'W', winVals, winVals.length
+                ? `Average across the ${winVals.length} fight${winVals.length === 1 ? '' : 's'} this fighter WON. Compare against the losses figure: a wide gap means the stat is outcome-driven, so the projection is really a bet on the result.`
+                : 'No wins in this sample.')
+                + wlChip('l', 'L', lossVals, lossVals.length
+                    ? `Average across the ${lossVals.length} fight${lossVals.length === 1 ? '' : 's'} this fighter LOST.`
+                    : 'No losses in this sample — every fight on record is a win, so the W average IS the overall average and there is nothing to split.')
             : '';
         let metaHTML = '';
         if (line != null && line > 0) {
