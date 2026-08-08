@@ -18338,6 +18338,29 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         const escAttr = (x) => x.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         // Panel meta header: hit rate vs line + sample average (with avg marker in bars)
         const avg = values.reduce((s2, v) => s2 + v, 0) / values.length;
+        // ── WIN/LOSS SPLIT OF THE SAME SAMPLES ────────────────────────────────
+        // A single career average blends two different fighters. Steven Asplund
+        // averages 101.8 FP overall, but that is 134.1 across his wins and 37.2 in
+        // his loss — and which of those the projection should resemble depends on
+        // whether he is expected to win. The blended number describes neither.
+        //
+        // Pair values with results BEFORE filtering: `values` above drops nulls and
+        // loses the row alignment, so it cannot be zipped back to results afterwards.
+        //
+        // Rendered ONLY when both sides have samples. For an unbeaten fighter the
+        // "W avg" IS the average, so showing it twice adds noise and implies a
+        // comparison that does not exist. Opponent-side panels (OPP x SCORED VS y)
+        // carry no result/method at all and fall through the same guard.
+        const wlPairs = recentRows
+            .map(h => ({ v: valFn(h), r: (h.result || '').toLowerCase() }))
+            .filter((x) => typeof x.v === 'number' && Number.isFinite(x.v));
+        const winVals = wlPairs.filter(x => x.r === 'win').map(x => x.v);
+        const lossVals = wlPairs.filter(x => x.r === 'loss').map(x => x.v);
+        const meanOf = (a) => a.reduce((s2, v) => s2 + v, 0) / a.length;
+        const wlHTML = (winVals.length > 0 && lossVals.length > 0)
+            ? `<span class="hm-wl w" title="Average across the ${winVals.length} fight${winVals.length === 1 ? '' : 's'} this fighter WON. Compare against the losses figure: a wide gap means the stat is outcome-driven, so the projection is really a bet on the result.">W ${fmtVal(meanOf(winVals))}<i>${winVals.length}</i></span>`
+                + `<span class="hm-wl l" title="Average across the ${lossVals.length} fight${lossVals.length === 1 ? '' : 's'} this fighter LOST.">L ${fmtVal(meanOf(lossVals))}<i>${lossVals.length}</i></span>`
+            : '';
         let metaHTML = '';
         if (line != null && line > 0) {
             const overs = values.filter(v => v > line).length;
@@ -18353,7 +18376,12 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
                 const l5Cls = l5Overs / 5 >= 0.6 ? 'over' : l5Overs / 5 <= 0.4 ? 'under' : 'mixed';
                 l5HTML = `<span class="hm-rate hm-l5 ${l5Cls}" title="Hit rate over the 5 most recent fights — when this disagrees with the career rate, the profile is shifting">L5 ${l5Overs}/5</span>`;
             }
-            metaHTML = `<div class="hist-meta"><span class="hm-rate ${chipCls}">${overs}/${values.length} over line</span>${l5HTML}<span class="hm-track" title="${ratePct}% of fights cleared the line"><i style="width:${ratePct}%"></i></span><span class="hm-avg">avg ${fmtVal(avg)}</span></div>`;
+            metaHTML = `<div class="hist-meta"><span class="hm-rate ${chipCls}">${overs}/${values.length} over line</span>${l5HTML}<span class="hm-track" title="${ratePct}% of fights cleared the line"><i style="width:${ratePct}%"></i></span><span class="hm-avg">avg ${fmtVal(avg)}</span>${wlHTML}</div>`;
+        }
+        else if (wlHTML) {
+            // No line posted for this stat, so no hit-rate row — but the win/loss split
+            // still says something, and previously the whole meta header vanished.
+            metaHTML = `<div class="hist-meta"><span class="hm-avg">avg ${fmtVal(avg)}</span>${wlHTML}</div>`;
         }
         // (Rematch grouping was tried and reverted by request — every meeting
         // renders as its own row so each fight's number stays visible in place.)
@@ -18391,6 +18419,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           ${linePct != null ? `<div class="line-marker" style="left:${linePct}%"></div>` : ''}
         </div>
         <span class="hist-yr" title="${escAttr(h.date || '')}">${yr ? `'${yr.slice(2)}` : ''}</span>
+        ${resCls ? `<span class="hist-outcome ${resCls}" title="${escAttr(resText)}${h.method ? ' — ' + escAttr(h.method) : ''}">${resCls === 'w' ? 'W' : 'L'}${methodAbbr ? `<i>${methodAbbr}</i>` : ''}</span>` : '<span class="hist-outcome empty"></span>'}
         <div class="history-bar-val">${displayVal}</div>
       </div>`;
         };
