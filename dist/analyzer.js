@@ -6840,6 +6840,13 @@ async function renderQAPanel() {
         const d = now - prev;
         return `<span class="qa-cov-delta ${d > 0 ? 'up' : 'down'}" title="${label} coverage moved ${prev}→${now} since the last check">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
     };
+    // Did the last run actually reach the books? Auto-fetch clears a platform's
+    // store before fetching and only writes on success, so "returned nothing" and
+    // "never attempted" both end up with no store — indistinguishable on their own.
+    // The other books settle it: if they captured, this one was asked too.
+    // Defined ONCE and shared with the staleness check below, because the coverage
+    // chip and the issue list disagreeing is the exact defect this pass is fixing.
+    const anyAutoFetched = platformInfo.some(p => !p.manual && p.key !== 'lines_draftkings_sportsbook' && p.ageMin != null);
     // GLOW-UP 163 (level-up 4): coverage strip — per-book freshness + line
     // coverage, always visible so even a clean slate reports its state.
     const covChips = platformInfo.map(p => {
@@ -6848,9 +6855,15 @@ async function renderQAPanel() {
             // Never captured. For a MANUAL book that is not a failure and not something
             // a fetch can fix — it is waiting on you, and saying "no data" next to a
             // "run AUTO-FETCH" directive points at the wrong action entirely.
-            return p.manual
-                ? `<span class="qa-cov qa-cov-nopost" title="${p.label}: nothing entered yet. This book is MANUAL — Auto-Fetch does not touch it. Use ✎ BETR LINES when the book posts."><b>${p.label}</b><i>not entered</i></span>`
-                : `<span class="qa-cov qa-cov-none" title="${p.label}: never captured — no store at all. This one IS a fetch away.${isDk ? ' DK posts props progressively; often absent early in fight week.' : ''}"><b>${p.label}</b><i>not fetched</i></span>`;
+            if (p.manual) {
+                return `<span class="qa-cov qa-cov-nopost" title="${p.label}: nothing entered yet. This book is MANUAL — Auto-Fetch does not touch it. Use ✎ BETR LINES when the book posts."><b>${p.label}</b><i>not entered</i></span>`;
+            }
+            // No store — but the other books captured, so this one WAS asked and had
+            // nothing. Saying "not fetched" here would contradict the issue list, which
+            // has already decided this is not a fetch problem.
+            return anyAutoFetched
+                ? `<span class="qa-cov qa-cov-nopost" title="${p.label}: asked in the last run and returned nothing — the book has not posted these props yet, so another fetch will not help.${isDk ? ' DK posts fighter props progressively; absence early in fight week is normal.' : ' Check the book itself before suspecting the scraper.'}"><b>${p.label}</b><i>none posted</i></span>`
+                : `<span class="qa-cov qa-cov-none" title="${p.label}: never captured, and no other book captured either — nothing has been fetched yet. This one IS a fetch away."><b>${p.label}</b><i>not fetched</i></span>`;
         }
         const covered = covNow[p.label] ?? 0;
         const warnAt = p.manual ? 720 : 15;
@@ -6933,11 +6946,10 @@ async function renderQAPanel() {
     const stalePlatforms = autoPlatforms.filter(p => p.key !== 'lines_draftkings_sportsbook');
     // A never-captured book is only a FETCH problem if we have not fetched AT ALL.
     // When the other books captured fine in the same run, that book was asked and
-    // returned nothing — which is "has not posted", not "stale". Same distinction
-    // the coverage chips now draw; the issue list has to agree with them or the
-    // strip and the verdict tell different stories.
-    const anyFetched = stalePlatforms.some(p => p.ageMin != null);
-    const staleErr = stalePlatforms.filter(p => (p.ageMin == null ? !anyFetched : p.ageMin >= 60));
+    // returned nothing — "has not posted", not "stale". Uses the SAME shared
+    // `anyAutoFetched` the coverage chips read, so the strip and the verdict cannot
+    // tell different stories about the same book.
+    const staleErr = stalePlatforms.filter(p => (p.ageMin == null ? !anyAutoFetched : p.ageMin >= 60));
     const staleWarn = stalePlatforms.filter(p => p.ageMin != null && p.ageMin >= 15 && p.ageMin < 60);
     if (staleErr.length) {
         const names = staleErr.map(p => p.ageMin == null ? `${p.label} (not fetched)` : `${p.label} (${p.ageMin}m)`).join(', ');
