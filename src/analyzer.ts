@@ -7192,17 +7192,38 @@ async function renderQAPanel(): Promise<void> {
   const covChips = platformInfo.map(p => {
     const isDk = p.key === 'lines_draftkings_sportsbook';
     if (p.ageMin == null) {
-      return `<span class="qa-cov qa-cov-none" title="${p.label}: no captured lines${isDk ? ' — DK posts props progressively; often absent early in fight week' : ''}"><b>${p.label}</b><i>no data</i></span>`;
+      // Never captured. For a MANUAL book that is not a failure and not something
+      // a fetch can fix — it is waiting on you, and saying "no data" next to a
+      // "run AUTO-FETCH" directive points at the wrong action entirely.
+      return p.manual
+        ? `<span class="qa-cov qa-cov-nopost" title="${p.label}: nothing entered yet. This book is MANUAL — Auto-Fetch does not touch it. Use ✎ BETR LINES when the book posts."><b>${p.label}</b><i>not entered</i></span>`
+        : `<span class="qa-cov qa-cov-none" title="${p.label}: never captured — no store at all. This one IS a fetch away.${isDk ? ' DK posts props progressively; often absent early in fight week.' : ''}"><b>${p.label}</b><i>not fetched</i></span>`;
     }
     const covered = covNow[p.label] ?? 0;
     const warnAt = p.manual ? 720 : 15;
     const errAt  = p.manual ? 1440 : 60;
     const freshCls: 'ok'|'warn'|'err' = p.ageMin >= errAt ? 'err' : p.ageMin >= warnAt ? 'warn' : 'ok';
+    // ── "NOTHING POSTED" IS NOT "NOTHING FETCHED" ─────────────────────────
+    // A book we captured SUCCESSFULLY that yields zero fighters on this card has
+    // nothing posted — running Auto-Fetch again cannot conjure lines the book has
+    // not published. Treating that as a coverage warning sends you chasing a
+    // scraper bug that does not exist: on 2026-08-11 PrizePicks read `0/24` and
+    // cost an hour before the answer turned out to be that PP had only DWCS
+    // standard props plus demon/goblin UFC 330 props — i.e. correct behaviour.
+    // It gets its own neutral state, distinct from a partial gap you can act on.
+    const nonePosted = covered === 0 && !isDk;
     // DK partial coverage is expected (progressive posting) — freshness only.
-    const covCls: 'ok'|'warn' = (isDk || covered >= totalFighters) ? 'ok' : 'warn';
-    const state = freshCls === 'err' ? 'err' : (freshCls === 'warn' || covCls === 'warn') ? 'warn' : 'ok';
+    const covCls: 'ok'|'warn'|'nopost' = (isDk || covered >= totalFighters) ? 'ok' : nonePosted ? 'nopost' : 'warn';
+    const state = freshCls === 'err' ? 'err'
+                : freshCls === 'warn' ? 'warn'
+                : covCls === 'warn' ? 'warn'
+                : covCls === 'nopost' ? 'nopost'
+                : 'ok';
     const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin / 60)}h`;
-    return `<span class="qa-cov qa-cov-${state}" title="${p.label}: captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${covered}/${totalFighters}</span>${covDelta(p.label)}</span>`;
+    const covTip = nonePosted
+      ? `captured ${ageLabel} ago and returned NOTHING for this card — the book has not posted these props yet, so another fetch will not help.${p.manual ? ' Manual book: enter rows when it posts.' : ' Check the book itself before suspecting the scraper.'}`
+      : `captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}`;
+    return `<span class="qa-cov qa-cov-${state}" title="${p.label}: ${covTip}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${nonePosted ? 'none posted' : `${covered}/${totalFighters}`}</span>${covDelta(p.label)}</span>`;
   }).join('');
   const covStrip = `<div class="qa-cov-strip">${covChips}</div>`;
 
@@ -7398,7 +7419,11 @@ async function renderQAPanel(): Promise<void> {
   const nextRow = (text: string, btn = ''): string =>
     `<div class="qa-next"><span class="qa-next-label">NEXT</span><span class="qa-next-text">${text}</span>${btn}</div>`;
   const nextHtml = staleBlocker
-    ? nextRow('Run AUTO-FETCH — stale or missing books are blocking the slate', `<button class="qa-fix" data-fix="fetch">⚡ FETCH</button>`)
+    // Says STALE, not "stale or missing". This branch only fires on a freshness
+    // error, and conflating the two sent the eye to books that had simply not
+    // posted — which no amount of fetching fixes. Missing coverage has its own
+    // branch below ("wait for props to post"), which is the honest instruction.
+    ? nextRow('Run AUTO-FETCH — book data is stale', `<button class="qa-fix" data-fix="fetch">⚡ FETCH</button>`)
     : betrBlocker
     ? nextRow(`Enter the ${totalFighters - manualRowCount} missing Betr row${totalFighters - manualRowCount === 1 ? '' : 's'} — or ACK if they can't be entered yet`, `<button class="qa-fix" data-fix="betr">✎ BETR</button>`)
     : missingWarns.length
