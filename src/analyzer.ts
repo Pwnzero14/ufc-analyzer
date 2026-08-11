@@ -7274,14 +7274,30 @@ async function renderQAPanel(): Promise<void> {
 
   // Manual platforms (Betr) don't auto-scrape — excluded from the top stale/missing blocker.
   const autoPlatforms = platformInfo.filter(p => !p.manual);
-  const staleErr  = autoPlatforms.filter(p => p.ageMin == null || p.ageMin >= 60);
-  const staleWarn = autoPlatforms.filter(p => p.ageMin != null && p.ageMin >= 15 && p.ageMin < 60);
+  // DK is excluded here for the same reason it is already excluded from the
+  // missing-lines check and the freshness SCORE: it posts fighter props
+  // progressively across the week, so "DK has nothing" four days out is normal.
+  // Left in, it became a BLOCKER whose prescribed fix was a fetch that cannot
+  // conjure props DK has not published — the panel read NOT READY and pointed at
+  // the wrong action (observed 2026-08-11, T-4d).
+  const stalePlatforms = autoPlatforms.filter(p => p.key !== 'lines_draftkings_sportsbook');
+  // A never-captured book is only a FETCH problem if we have not fetched AT ALL.
+  // When the other books captured fine in the same run, that book was asked and
+  // returned nothing — which is "has not posted", not "stale". Same distinction
+  // the coverage chips now draw; the issue list has to agree with them or the
+  // strip and the verdict tell different stories.
+  const anyFetched = stalePlatforms.some(p => p.ageMin != null);
+  const staleErr  = stalePlatforms.filter(p => (p.ageMin == null ? !anyFetched : p.ageMin >= 60));
+  const staleWarn = stalePlatforms.filter(p => p.ageMin != null && p.ageMin >= 15 && p.ageMin < 60);
   if (staleErr.length) {
-    const names = staleErr.map(p => p.ageMin == null ? `${p.label} (no data)` : `${p.label} (${p.ageMin}m)`).join(', ');
+    const names = staleErr.map(p => p.ageMin == null ? `${p.label} (not fetched)` : `${p.label} (${p.ageMin}m)`).join(', ');
     const chip = staleErr.length === 1
-      ? `${staleErr[0].label} ${staleErr[0].ageMin == null ? 'no data' : 'stale'}`
+      ? `${staleErr[0].label} ${staleErr[0].ageMin == null ? 'not fetched' : 'stale'}`
       : `${staleErr.length} books stale`;
-    issues.push({ level: 'err', text: `Platform lines stale/missing: ${names}`, chip, action: 'fetch' });
+    // "stale/missing" conflated two things with different fixes. This row now
+    // only ever holds books a fetch can actually help — genuinely aged data, or
+    // a run where nothing was captured at all.
+    issues.push({ level: 'err', text: `Platform lines stale: ${names}`, chip, action: 'fetch' });
   }
   if (staleWarn.length) {
     const names = staleWarn.map(p => `${p.label} (${p.ageMin}m)`).join(', ');
