@@ -224,12 +224,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // redirect to the DK homepage without pickGroup). Updates only if changed to avoid noise.
         const pg = String(request.pickGroup || '').trim();
         if (pg && /^\d+$/.test(pg)) {
-            chrome.storage.local.get(['pick6_active_pick_group'], (res) => {
-                if (res?.pick6_active_pick_group !== pg) {
-                    chrome.storage.local.set({ pick6_active_pick_group: pg }, () => {
-                        console.log(`[UFC] Cached Pick6 pickGroup=${pg} from ${request.url}`);
-                    });
+            // Store the URL that actually WORKED alongside the pickGroup, stamped with
+            // the card it belongs to. Both additions fix a real failure:
+            //
+            // 1. No event stamp meant the pickGroup outlived its card. 151702 belonged
+            //    to Gamrot vs Salkilld (2026-08-08) and was still being injected on
+            //    2026-08-11 for UFC 330, pointing DK at a finished event — every
+            //    auto-fetch landed on "SOMETHING WENT WRONG" and Pick6 read `no data`.
+            // 2. No stored URL meant auto-fetch rebuilt one from a hardcoded category
+            //    and sport param, both of which DK rotates. By 08-11 `category/129` and
+            //    `sport=MMA` were BOTH stale; the live board was the bare `?sport=UFC`.
+            //    Replaying the URL the content script was actually on removes that
+            //    guesswork permanently.
+            chrome.storage.local.get(['pick6_active_pick_group', 'upcoming_ufc_card'], (res) => {
+                const cardRaw = res?.upcoming_ufc_card;
+                const card = typeof cardRaw === 'string' ? (() => { try {
+                    return JSON.parse(cardRaw);
                 }
+                catch {
+                    return null;
+                } })() : cardRaw;
+                const ev = String(card?.event || '').trim();
+                const url = String(request.url || '').trim();
+                chrome.storage.local.set({
+                    pick6_active_pick_group: pg,
+                    pick6_active_url: url,
+                    pick6_pick_group_event: ev,
+                }, () => {
+                    console.log(`[UFC] Cached Pick6 pickGroup=${pg} for "${ev || 'unknown event'}" from ${url}`);
+                });
             });
         }
     }
@@ -1933,19 +1956,24 @@ async function autoBackupOnStartup() {
 })();
 // ── AUTO-SCRAPE ORCHESTRATION ──────────────────────────────────────────
 // Opens tabs for each platform, triggers scraping, closes tabs
-// Per-event Pick6 view that actually carries the full stat-tab set (including the
-// Time parent tab holding Fight Time / Control Time). Only reachable with a
-// pickGroup appended — bare /category/N redirects to the homepage. DK has rotated
-// this between category/46, category/47 and category/129 over the past months, so
-// if Pick6 breaks, check what URL a logged-out browser lands on for the current
-// card and update here.
-const PICK6_CATEGORY_URL = 'https://pick6.draftkings.com/category/129?sport=MMA';
+// NO HARDCODED PICK6 CATEGORY URL. There used to be one here, rotated by hand
+// between category/46, /47 and /129 as DK moved things — and it went stale
+// silently every time. On 2026-08-11 the constant read `category/129?sport=MMA`
+// while the live board was plainly `?sport=UFC`: wrong category AND wrong sport
+// param, so every auto-fetch hit "SOMETHING WENT WRONG" and Pick6 read `no data`
+// for days. The replacement is `pick6_active_url` — the URL the content script
+// was actually on when it saw a pickGroup, stamped with its event. Replay beats
+// reconstruction; do not reintroduce a hand-maintained URL constant here.
 const AUTO_SCRAPE_URLS = {
     pick6: [
-        // 2026-05-15: DK consolidated UFC under unified MMA category (category/129).
-        // category/46 (Fight Score) and category/47 (Takedowns) no longer exist under
-        // ?sport=UFC; the MMA homepage SPA-navigates to category/129?sport=MMA&pickGroup=...
-        // and the scraper clicks stat tabs from there.
+        // The DEFAULT only. Verified live 2026-08-11: `?sport=UFC` renders the full UFC
+        // board (fight chips + Significant Strikes / Takedowns tabs) with no category
+        // and no pickGroup, and the scraper clicks stat tabs from there.
+        //
+        // Superseded at fetch time by `pick6_active_url` whenever one is cached for the
+        // CURRENT card — see the replay block below. That is deliberate: the 2026-05-15
+        // note here used to claim UFC lived at category/129?sport=MMA, and by 08-11 both
+        // halves of that were wrong. A URL DK can rotate does not belong in source.
         CONFIG.platforms.pick6.url,
     ],
     underdog: [
@@ -3392,30 +3420,48 @@ async function autoScrapeAllPlatforms() {
             // tabs land on the per-event view that has Time→Control Time tabs.
             if (platform === 'pick6') {
                 try {
-                    const cached = await new Promise((res) => chrome.storage.local.get(['pick6_active_pick_group'], (r) => res(r || {})));
-                    const pg = cached.pick6_active_pick_group;
-                    if (pg && /^\d+$/.test(String(pg))) {
-                        // The injection used to require the URL to ALREADY contain /category/,
-                        // but CONFIG.platforms.pick6.url is the bare `?sport=UFC` homepage — so
-                        // the guard never matched, the pickGroup was never appended, and every
-                        // auto-fetch landed on the homepage and scraped during its slow SPA
-                        // redirect. That is the state where the Time → Control Time sub-tabs
-                        // have not rendered yet, which is why CTRL kept coming back empty while
-                        // a manual visit worked. Upgrade the bare URL to the per-event category
-                        // view when we have a pickGroup; keep the homepage as-is when we don't,
-                        // so a missing pickGroup degrades to the old behaviour rather than a
-                        // URL that redirects away.
-                        urls = urls.map((u) => {
-                            if (u.includes('pickGroup='))
-                                return u;
-                            if (u.includes('/category/'))
-                                return `${u}&pickGroup=${pg}`;
-                            return `${PICK6_CATEGORY_URL}&pickGroup=${pg}`;
-                        });
-                        console.log(`[UFC Auto-Scrape] Pick6 using cached pickGroup=${pg} → ${urls.join(', ')}`);
+                    const cached = await new Promise((res) => chrome.storage.local.get(['pick6_active_pick_group', 'pick6_active_url', 'pick6_pick_group_event', 'upcoming_ufc_card'], (r) => res(r || {})));
+                    const cardRaw = cached.upcoming_ufc_card;
+                    const card = typeof cardRaw === 'string' ? (() => { try {
+                        return JSON.parse(cardRaw);
+                    }
+                    catch {
+                        return null;
+                    } })() : cardRaw;
+                    const curEvent = String(card?.event || '').trim();
+                    const capturedEvent = String(cached.pick6_pick_group_event || '').trim();
+                    const storedUrl = String(cached.pick6_active_url || '').trim();
+                    const sameCard = !!curEvent && !!capturedEvent && curEvent === capturedEvent;
+                    if (sameCard && /^https:\/\/pick6\.draftkings\.com\//i.test(storedUrl)) {
+                        // Replay the exact URL the content script was last on for THIS card.
+                        // Beats reconstructing one: DK rotates the category id and the sport
+                        // param, and on 2026-08-11 both hardcoded values were stale while the
+                        // live board was simply `?sport=UFC`.
+                        urls = [storedUrl];
+                        console.log(`[UFC Auto-Scrape] Pick6 replaying known-good URL for "${curEvent}": ${storedUrl}`);
+                    }
+                    else if (capturedEvent && !sameCard) {
+                        // The cache belongs to a DIFFERENT (usually finished) card. Injecting it
+                        // sends DK to a dead event and the scrape returns nothing at all, which
+                        // is how Pick6 sat at `no data` for three days. Fall back to the plain
+                        // configured URL, which is a live board rather than a dead one.
+                        console.warn(`[UFC Auto-Scrape] Pick6 cache is for "${capturedEvent}" but the card is "${curEvent}" — ignoring it and using ${urls.join(', ')}. Open the Pick6 UFC board once to refresh.`);
                     }
                     else {
-                        console.warn('[UFC Auto-Scrape] Pick6 has no cached pickGroup — open a Pick6 UFC URL once to populate it');
+                        const pg = cached.pick6_active_pick_group;
+                        if (pg && /^\d+$/.test(String(pg))) {
+                            // The injection used to require the URL to ALREADY contain /category/,
+                            // but CONFIG.platforms.pick6.url is the bare `?sport=UFC` homepage — so
+                            // Legacy cache, written before the URL+event stamp existed. It cannot
+                            // say which card the pickGroup belongs to, so it does the least harmful
+                            // thing and leaves the configured URL alone. Rebuilding one from a
+                            // hardcoded category + sport param is precisely what produced the dead
+                            // `category/129?sport=MMA` request — both values had rotated.
+                            console.warn(`[UFC Auto-Scrape] Pick6 has an untagged pickGroup=${pg} (pre-upgrade cache) — using ${urls.join(', ')} unchanged. Open the Pick6 UFC board once to re-cache it against this card.`);
+                        }
+                        else {
+                            console.warn(`[UFC Auto-Scrape] Pick6 has no cached URL for this card — using ${urls.join(', ')}. Open the Pick6 UFC board once to cache a known-good URL.`);
+                        }
                     }
                 }
                 catch (e) {
