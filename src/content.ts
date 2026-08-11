@@ -132,7 +132,36 @@ function scrapePick6() {
         }
       }
 
-      const ssMatch = cardText.match(/([\d]+\.?\d*)\s*\n?\s*Significant Strikes/i);
+      // ── SS: the same animated odometer that broke Control Time ────────────
+      // Pick6 renders the value twice — once plainly, once as one element per
+      // character — so innerText reads "59.5 \n 5 \n 9 \n . \n 5 \n Significant
+      // Strikes". The old pattern required the number to sit adjacent to the
+      // label, so it captured only the trailing character. EVERY Pick6 SS line
+      // ends in .5, which is why every phantom was exactly 5: Elkins 14.5→5,
+      // Sutherland 17.5→5, Wells 14.5→5. Measured on the live board 2026-08-11,
+      // all 8 sampled cards extracted 5.
+      //
+      // Collapsing whitespace gives "<value><value>SignificantStrikes". Do NOT
+      // then match a bounded digit run — tested and it fails: on "59.559.5"
+      // a greedy \d{1,3} takes "559" across the value boundary and yields 559.5,
+      // corrupt in a new direction. Capture the whole numeric run instead and
+      // exploit the structure: if it is an exact doubling, the value is one half.
+      //
+      // The >= 4 floor on the half guards the integer case — a genuine "11"
+      // rendered once is an exact doubling of "1", and 1 is not a real SS line,
+      // so it falls through to the run itself. Verified against all 8 live
+      // strings plus a plain-render and an integer control: 10/10.
+      const ssCompact = cardText.replace(/\s+/g, '');
+      const ssRun = (ssCompact.match(/([\d.]+)SignificantStrikes/i) || [])[1];
+      let ssParsed: number | null = null;
+      if (ssRun) {
+        const ssHalf = ssRun.length % 2 === 0 ? ssRun.slice(0, ssRun.length / 2) : '';
+        const ssHalfNum = (ssHalf && ssHalf === ssRun.slice(ssRun.length / 2)) ? parseFloat(ssHalf) : NaN;
+        ssParsed = Number.isFinite(ssHalfNum) && ssHalfNum >= 4 ? ssHalfNum : parseFloat(ssRun);
+      }
+      const ssMatch = ssParsed != null && Number.isFinite(ssParsed)
+        ? [String(ssParsed), String(ssParsed)]
+        : cardText.match(/([\d]+\.?\d*)\s*\n?\s*Significant Strikes/i);
       if (ssMatch) {
         const line = parseFloat(ssMatch[1]);
         if (line > 0 && line < 400) {
