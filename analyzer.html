@@ -28314,6 +28314,42 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
    status chip to the centre; pinning the status right keeps the original
    title-left / status-right reading and lets ✕ sit just past it. */
 .plp-head .plg-status { margin-left: auto; }
+
+/* ── Two-sided add-to-slate on the lean panels ────────────────────────────
+   ▲/▼ pair. The model's side gets a solid tint; the opposite side stays an
+   outline so the panel still READS as a recommendation rather than a neutral
+   choice — the point is to make the other side reachable, not equal-weighted.
+   A side no book takes is dashed rather than hidden: still queueable (the user
+   may have it somewhere the scraper cannot see), but visibly not shoppable. */
+.side-pick { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.side-pick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.4;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: var(--text3);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.side-pick-btn.over:hover  { color: #6ee7a8; border-color: rgba(38,208,124,0.55); background: rgba(38,208,124,0.12); }
+.side-pick-btn.under:hover { color: #ff8fa3; border-color: rgba(255,91,120,0.55); background: rgba(255,91,120,0.12); }
+/* The model's side — tinted so the recommendation still leads. */
+.side-pick-btn.is-lean.over  { color: #6ee7a8; border-color: rgba(38,208,124,0.40); background: rgba(38,208,124,0.10); }
+.side-pick-btn.is-lean.under { color: #ff8fa3; border-color: rgba(255,91,120,0.40); background: rgba(255,91,120,0.10); }
+/* No book takes it — reachable, but say so. */
+.side-pick-btn.noBook { border-style: dashed; opacity: 0.72; }
+/* Queued. */
+.side-pick-btn.on { box-shadow: inset 0 0 0 1px currentColor; }
+.side-pick-btn.on.over  { color: #6ee7a8; border-color: rgba(38,208,124,0.75); background: rgba(38,208,124,0.20); }
+.side-pick-btn.on.under { color: #ff8fa3; border-color: rgba(255,91,120,0.75); background: rgba(255,91,120,0.20); }
+.side-pick-btn i { font-style: normal; font-size: 8px; }
 /* Destructive, so it stays quiet until hovered — the ledger is for reading, not
    for accidental clicks. Red only on hover, matching the confirm that follows. */
 .plp-remove {
