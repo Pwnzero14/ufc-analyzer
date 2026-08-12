@@ -15805,6 +15805,34 @@ function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: 
   return { book: best.bk, line: best.val };
 }
 
+/**
+ * Build a slate pick for an EXPLICIT stat + side, rather than for whatever the
+ * model happens to lean. Every add-to-slate entry point used to derive its
+ * direction from the lean, so the opposite side of a prop was simply unreachable:
+ * Donte Johnson SS 34.5 leans UNDER, and there was no control anywhere that
+ * produced the OVER. The user's read is allowed to disagree with the model's.
+ *
+ * `leanBestBook` is already direction-aware (lowest line wins an OVER, highest
+ * wins an UNDER), so asking it for the other side returns the correct entry —
+ * nothing about line selection needed changing, only the ability to ask.
+ */
+function buildSlatePickFor(
+  f: AnalyzerFighter,
+  source: string,
+  dir: 'over' | 'under',
+  fallbackLine: number | null = null,
+): { key: string; pick: BestPicksSlatePick } {
+  const { book, line } = leanBestBook(f, source, dir);
+  const finalLine = line ?? fallbackLine ?? null;
+  const statLabel = EFFECTIVE_LEAN_STAT_LABEL[source] || 'FP';
+  const bookLabel = book ? (LEAN_BOOK_LABEL[book] || book) : 'No book';
+  const clip = `${prettyName(f.name)} ${dir.toUpperCase()} ${finalLine ?? ''} ${statLabel}${book ? ` @ ${bookLabel}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`.replace(/\s+/g, ' ').trim();
+  return {
+    key: `${f.name}|${dir}|${source}`,
+    pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
+  };
+}
+
 function buildLeanSlatePick(f: AnalyzerFighter, lean: EffectiveLean): { key: string; pick: BestPicksSlatePick } {
   const source = lean._source || 'fp';
   const dir = lean.lean;
@@ -15819,6 +15847,37 @@ function buildLeanSlatePick(f: AnalyzerFighter, lean: EffectiveLean): { key: str
     key: `${f.name}|${dir}|${source}`,
     pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
   };
+}
+
+/**
+ * Two-sided add-to-slate control for ONE stat. Renders ▲ and ▼ side by side and
+ * registers BOTH directions in `_leanSlateData`, so the click handler can resolve
+ * whichever the user picks.
+ *
+ * Why both sides are always offered, including the one no book takes: the model's
+ * lean is an opinion, not a constraint, and the user frequently wants the other
+ * side of a prop the board is leaning. Placeability is still REPORTED — a side no
+ * book will take is marked `noBook` and says so on hover — but it is no longer
+ * enforced by omission. The ✔/⛔ placement chip beside this still gives the
+ * per-book truth; this only decides what you can queue.
+ *
+ * The model's own side carries `is-lean` so the panel still reads as a
+ * recommendation at a glance rather than a neutral pair of buttons.
+ */
+function buildSidePicker(f: AnalyzerFighter, source: string, leanDir: string | null | undefined): string {
+  const one = (dir: 'over' | 'under'): string => {
+    const { key, pick } = buildSlatePickFor(f, source, dir);
+    _leanSlateData.set(key, pick);
+    const inSlate = bestPicksSlate.has(key);
+    const isLean = dir === leanDir;
+    const best = leanBestBook(f, source, dir);
+    const where = best.book
+      ? `${LEAN_BOOK_LABEL[best.book] || best.book} ${best.line}`
+      : 'no book posts this side — queue it anyway and enter it wherever you have it';
+    const tip = `${inSlate ? 'Remove from' : 'Add to'} My Slate: ${prettyName(f.name)} ${dir.toUpperCase()} ${pick.line ?? '—'} ${pick.statLabel} · ${where}${isLean ? ' · model leans THIS side' : ' · opposite the model lean'}`;
+    return `<button class="side-pick-btn ${dir}${inSlate ? ' on' : ''}${isLean ? ' is-lean' : ''}${best.book ? '' : ' noBook'}" data-slate-key="${key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}">${dir === 'over' ? '▲' : '▼'}${inSlate ? '<i>✓</i>' : ''}</button>`;
+  };
+  return `<span class="side-pick" title="Queue either side of this prop — the model's lean is highlighted, but you can take the other side">${one('over')}${one('under')}</span>`;
 }
 
 // ── GLOW-UP 198 — ALL FIGHTERS full-slate pass ────────────────────────────
@@ -20015,23 +20074,31 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // the expanded card, gated behind a per-card SIGNAL-ONLY toggle for the
   // full-slate / 50%-zoom workflow.
   const leanPanelsHtml = [
+    // FP has no lean panel of its own — its verdict lives on the row's play pill,
+    // which only ever shows the EFFECTIVE lean. So whenever the effective lean is
+    // some other stat, fantasy points had no home in the panel stack and no way to
+    // be queued from either side. Minimal by design: per-book FP lines plus a side
+    // picker, no factor block — the FP rationale is already the row's main verdict.
+    (f.line_p6 != null || f.line_ud != null || f.line_pp != null || f.line_betr != null) ? `<div class="detail-panel">
+          <div class="detail-panel-title">FP Lines (P6: ${f.line_p6??'—'} · UD: ${f.line_ud??'—'} · PP: ${f.line_pp??'—'} · BT: ${f.line_betr??'—'})${buildSidePicker(f, 'fp', lean && lean._source === 'fp' ? lean.lean : null)}</div>
+        </div>` : '',
     f.lean_ss ? `<div class="detail-panel">
-          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss??'—'} · UD: ${f.line_ud_ss??'—'} · PP: ${f.line_pp_ss??'—'} · BT: ${f.line_betr_ss??'—'} · DK: ${f.line_dk_ss??'—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}</div>
+          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss??'—'} · UD: ${f.line_ud_ss??'—'} · PP: ${f.line_pp_ss??'—'} · BT: ${f.line_betr_ss??'—'} · DK: ${f.line_dk_ss??'—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}${buildSidePicker(f, 'ss', f.lean_ss.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
           <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
         </div>` : '',
     f.lean_ss_r1 ? `<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1||'—'} · UD: ${f.line_ud_ss_r1||'—'} · DK: ${f.line_dk_ss_r1||'—'})${buildPlacementChip(f, 'ss_r1', f.lean_ss_r1.lean)}</div>
+          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1||'—'} · UD: ${f.line_ud_ss_r1||'—'} · DK: ${f.line_dk_ss_r1||'—'})${buildPlacementChip(f, 'ss_r1', f.lean_ss_r1.lean)}${buildSidePicker(f, 'ss_r1', f.lean_ss_r1.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
           <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
         </div>` : '',
     f.lean_td ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td??'—'} · UD: ${f.line_ud_td??'—'} · PP: ${f.line_pp_td??'—'} · BT: ${f.line_betr_td??'—'} · DK: ${f.line_dk_td??'—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}</div>
+          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td??'—'} · UD: ${f.line_ud_td??'—'} · PP: ${f.line_pp_td??'—'} · BT: ${f.line_betr_td??'—'} · DK: ${f.line_dk_td??'—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}${buildSidePicker(f, 'td', f.lean_td.lean)}</div>
           ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
           <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
         </div>` : '',
     f.lean_ft ? `<div class="detail-panel">
-          <div class="detail-panel-title">FT Lean${f.lean_ft.lean!=='push'?` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean==='over'?'▲ OVER':'▼ UNDER'} ${f.lean_ft.conf}%</span>`:''} · P6: ${f.line_p6_ft??'—'} · UD: ${f.line_ud_ft??'—'} · PP: ${f.line_pp_ft??'—'} · BT: ${f.line_betr_ft??'—'} · DK: ${f.line_dk_ft??'—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}</div>
+          <div class="detail-panel-title">FT Lean${f.lean_ft.lean!=='push'?` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean==='over'?'▲ OVER':'▼ UNDER'} ${f.lean_ft.conf}%</span>`:''} · P6: ${f.line_p6_ft??'—'} · UD: ${f.line_ud_ft??'—'} · PP: ${f.line_pp_ft??'—'} · BT: ${f.line_betr_ft??'—'} · DK: ${f.line_dk_ft??'—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}${buildSidePicker(f, 'ft', f.lean_ft.lean)}</div>
           ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
           <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
         </div>` : '',
@@ -20040,7 +20107,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     // is stated ON the panel rather than left implicit: when the model lands on
     // UNDER, the honest answer is "no play", not a pick you can't enter.
     f.lean_ctrl ? `<div class="detail-panel">
-          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl??'—'} · UD: ${f.line_ud_ctrl??'—'} · PP: ${f.line_pp_ctrl??'—'} · BT: ${f.line_betr_ctrl??'—'} · DK: ${f.line_dk_ctrl??'—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}</div>
+          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl??'—'} · UD: ${f.line_ud_ctrl??'—'} · PP: ${f.line_pp_ctrl??'—'} · BT: ${f.line_betr_ctrl??'—'} · DK: ${f.line_dk_ctrl??'—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}${buildSidePicker(f, 'ctrl', f.lean_ctrl.lean)}</div>
           <div class="ctrl-overonly-note" title="Control-time props are More-only in practice — Pick6 is the primary CTRL book and posts no Less button, and no other book reliably offers the under. So CTRL contributes OVER picks to the board and nothing else; an under lean is information, not a play.">⚠ OVER-ONLY market — the under side isn't offered, so only an OVER can become a pick.</div>
           ${buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean)}
           <div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>
@@ -20212,6 +20279,34 @@ function expandRowDetailPanel(row: HTMLElement): void {
     _pendingDetailBuilders.delete(row);
     // GLOW-UP 193 L5 — SIGNAL-ONLY toggle: collapse reference/history panels to
     // just the actionable leans section.
+    // Two-sided add-to-slate. Deliberately does NOT call renderFighters() the way
+    // the other slate buttons do — a full re-render rebuilds every row and would
+    // slam this expanded card shut on each click, which is unusable when queueing
+    // several sides off one fighter. Updates its own button in place instead, and
+    // toasts, because My Slate's tray only exists in the Best Picks render path
+    // (see GLOW-UP 198 L5 — an add from a view with no tray reads as broken).
+    detail.querySelectorAll<HTMLElement>('.side-pick-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.dataset['slateKey'] || '';
+        if (!key) return;
+        if (bestPicksSlate.has(key)) {
+          bestPicksSlate.delete(key);
+          btn.classList.remove('on');
+          btn.querySelector('i')?.remove();
+          showToast(`Removed from My Slate (${bestPicksSlate.size})`);
+        } else {
+          const d = _leanSlateData.get(key);
+          if (!d) return;
+          if (!bestPicksSlate.size) bestPicksSlateOpen = true;
+          bestPicksSlate.set(key, d);
+          btn.classList.add('on');
+          if (!btn.querySelector('i')) btn.insertAdjacentHTML('beforeend', '<i>✓</i>');
+          showToast(`+ ${d.clip} · My Slate (${bestPicksSlate.size})`);
+        }
+      });
+    });
+
     const sigToggle = detail.querySelector('[data-signal-toggle]') as HTMLButtonElement | null;
     const grid = detail.querySelector('.detail-grid') as HTMLElement | null;
     if (sigToggle && grid) {
