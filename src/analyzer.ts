@@ -459,6 +459,35 @@ async function persistPlacedParlay(legs: PlacedParlayLeg[]): Promise<'placed' | 
   } catch { return 'err'; }
 }
 
+/**
+ * Remove one placed parlay by id. The mirror of persistPlacedParlay, which had
+ * no counterpart — a slip placed by mistake, or VOIDED BY THE BOOK when a fight
+ * falls off the card, was permanent and kept being graded. Individual placed legs
+ * always had their ● PLACED toggle; parlays had nothing.
+ *
+ * Live case (2026-08-12): Ochoa withdrew from UFC 330, so the two-leg slips
+ * carrying Charles Johnson and Jose Ochoa SS void at the book — but the ledger
+ * would still resolve them leg-by-leg and stamp a BUST that never happened,
+ * polluting the cashed record the same way a voided single would.
+ *
+ * Deletes the event key entirely when its last slip goes, so the ledger does not
+ * render an empty event heading.
+ */
+async function removePlacedParlay(evKey: string, id: string): Promise<boolean> {
+  try {
+    const payload = await storageGet<Record<string, unknown>>([STORAGE_PARLAY_PLACED_KEY]);
+    const raw = payload[STORAGE_PARLAY_PLACED_KEY];
+    const all: Record<string, PlacedParlay[]> =
+      raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, PlacedParlay[]>) } : {};
+    const list = Array.isArray(all[evKey]) ? all[evKey] : [];
+    const next = list.filter(p => String(p.id) !== String(id));
+    if (next.length === list.length) return false;   // nothing matched — no-op
+    if (next.length) all[evKey] = next; else delete all[evKey];
+    await storageSet({ [STORAGE_PARLAY_PLACED_KEY]: all });
+    return true;
+  } catch { return false; }
+}
+
 // GLOW-UP 180: module-level cache so the synchronous Parlay Lab render can
 // read the personal record without a storage round-trip; refreshed async
 // and signature-gated so it re-renders exactly once when the data changes.
@@ -13255,7 +13284,14 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           const st = x.outcome === 'hit' ? '<span class="plp-mini hit">✓</span>' : x.outcome === 'miss' ? '<span class="plp-mini miss">✗</span>' : '<span class="plp-mini pending">○</span>';
           return `<span class="plp-leg">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat">${x.l.statLabel}</i></span>`;
         }).join('');
-        return `<div class="plp-parlay"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${statusChip}</div><div class="plp-legs">${legRows}</div></div>`;
+        // Plain-text summary for the confirm dialog — the user should see exactly
+        // which slip they are about to drop, not just "this parlay".
+        const legSummary = (p.legs || [])
+          .map(l => `${prettyName(l.fighter)} ${l.dir} ${l.line ?? '—'} ${l.statLabel}`)
+          .join('  +  ');
+        const esc = (x: string): string => String(x).replace(/"/g, '&quot;');
+        const removeBtn = `<button class="plp-remove" data-plp-ev="${esc(e.evKey)}" data-plp-id="${esc(String(p.id))}" data-plp-sum="${esc(legSummary)}" title="Remove this parlay from the ledger — use when the book voided it (a fight falling off the card) or it was placed by mistake. Re-place from Parlay Lab if needed.">✕</button>`;
+        return `<div class="plp-parlay"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
     }).join('');
@@ -14499,6 +14535,23 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // Pred rows: avatar hydration + jump-to-card
   hydrateAvatarImgs(container);
+  // Parlay Ledger ✕ — the counterpart to the ● PLACED toggle that single legs
+  // always had. Confirms first: a slip is several legs and rebuilding it means
+  // reconstructing the whole thing in Parlay Lab, so this is more costly to undo
+  // than un-placing one leg.
+  container.querySelectorAll<HTMLElement>('.plp-remove').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const evKey = btn.dataset.plpEv || '';
+      const id = btn.dataset.plpId || '';
+      const summary = btn.dataset.plpSum || 'this parlay';
+      if (!confirm(`Remove this placed parlay?\n\n${summary}\n\nIt leaves the Parlay Ledger and stops being graded. Re-place it from Parlay Lab if this was a mistake.`)) return;
+      const ok = await removePlacedParlay(evKey, id);
+      showToast(ok ? '✕ Parlay removed from ledger' : 'Could not remove that parlay');
+      if (ok) void renderArchivePanel(container);
+    });
+  });
+
   container.querySelectorAll<HTMLElement>('.pred-row[data-jump]').forEach(el => {
     el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
   });
