@@ -20555,6 +20555,35 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // history/model panel. Hoist them into a conviction-first section at the TOP of
   // the expanded card, gated behind a per-card SIGNAL-ONLY toggle for the
   // full-slate / 50%-zoom workflow.
+  // ── GLOW-UP 213 — KD lean panel ──────────────────────────────────────────
+  // Knockdowns have had a lean since MODEL v8 (calcKDLean) and it already feeds
+  // Best Picks and Parlay Lab — but there was no panel, making KD the only stat
+  // that could put you on a pick with no way to see the reasoning behind it.
+  //
+  // The market rule IS the headline here, so it's stated on the panel rather than
+  // left implicit: knockdowns are PrizePicks-only, and PP's odds_type decides
+  // everything. A standard projection posts More AND Less and is Best-Picks
+  // eligible; a demon/goblin is More-only on a non-standard payout, which makes
+  // NEITHER side an ordinary pick-em play — the same rule parlayUnrankableReason
+  // enforces, said out loud where the user is looking at the prop.
+  const kdStandard = f.kd_under_available === true;
+  const kdDir = f.lean_kd && (f.lean_kd.lean === 'over' || f.lean_kd.lean === 'under') ? f.lean_kd.lean : null;
+  const kdPanel = (f.lean_kd || f.line_pp_kd != null)
+    ? `<div class="detail-panel">
+          <div class="detail-panel-title">KD Lean${kdDir ? ` <span class="lean-verdict ${kdDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${kdDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_kd?.conf ?? 0}%</span>` : ''} · PP: ${f.line_pp_kd ?? '—'}${kdStandard && kdDir ? buildPlacementChip(f, 'kd', kdDir) : ''}${buildSidePicker(f, 'kd', kdDir)}</div>
+          ${kdStandard
+            ? ''
+            : `<div class="ctrl-overonly-note" title="PrizePicks prices this knockdowns prop More-only (a demon or goblin projection). Those carry non-standard payouts, so neither side is a normal pick-em play and the board keeps KD display-only here — the lean below is information, not a play.">⚠ MORE-ONLY (demon/goblin) — non-standard payout, so neither side is Best-Picks eligible.</div>`}
+          ${f.lean_kd ? buildLeanFactorBlock(f.lean_kd.reasons, f.lean_kd.lean) : ''}
+          ${f.lean_kd ? `<div class="lean-verdict ${f.lean_kd.lean}">${f.lean_kd.verdict}</div>` : ''}
+          ${!kdStandard
+            ? '<div class="ctrl-noplay">Display-only on this card — PrizePicks is More-only here, so this fighter contributes no KD pick.</div>'
+            : !kdDir
+              ? '<div class="ctrl-noplay">No KD edge either way.</div>'
+              : ''}
+        </div>`
+    : '';
+
   const leanPanelsHtml = [
     // FP has no lean panel of its own — its verdict lives on the row's play pill,
     // which only ever shows the EFFECTIVE lean. So whenever the effective lean is
@@ -20599,6 +20628,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
                 : 'No CTRL edge either way.'}</div>`
             : ''}
         </div>` : '',
+    kdPanel,
   ].filter(Boolean).join('');
 
   _pendingDetailBuilders.set(row, () => `<div class="detail-grid">
