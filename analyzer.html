@@ -29541,6 +29541,101 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .lineshop-table th { text-shadow: 0 0 10px rgba(255,255,255,0.06); }
 
+
+/* ══ GLOW-UP 217: LINE SHOPPING DIFF — the ultimate form ══════════════════
+   216 gave it presence. This pass removes the last places the eye stalls: the
+   dead band between a row's cells and its take chip, three stat zones that
+   looked identical, a track that read as a stray line, and flat modal chrome. */
+
+/* ── U1 · leader lines close the gap ───────────────────────────────────── */
+.ls-lead {
+  flex: 1 1 auto; min-width: 10px; height: 1px; margin: 0 7px;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.16) 34%, transparent 0);
+  background-size: 5px 1px; background-repeat: repeat-x;
+  opacity: 0.5; transition: opacity 0.18s;
+}
+.ls-row:hover .ls-lead { opacity: 0.9; }
+.ls-take-mini { margin-left: 0; }
+
+/* ── U2 · stat zones own a hue ─────────────────────────────────────────── */
+.ls-th { text-align: left !important; padding-bottom: 6px !important; }
+.ls-th-label {
+  display: block; font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em;
+}
+.ls-th-sub {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 7px; letter-spacing: 0.12em; color: var(--text4); margin-top: 1px;
+  text-transform: uppercase;
+}
+.ls-th.src-fp .ls-th-label { color: rgba(255,255,255,0.82); text-shadow: 0 0 12px rgba(255,255,255,0.16); }
+.ls-th.src-ss .ls-th-label { color: rgba(44,212,208,0.95); text-shadow: 0 0 12px rgba(44,212,208,0.3); }
+.ls-th.src-td .ls-th-label { color: rgba(240,192,64,0.95); text-shadow: 0 0 12px rgba(240,192,64,0.3); }
+.ls-th::after {
+  content: ''; display: block; height: 2px; margin-top: 5px; border-radius: 2px;
+  background: linear-gradient(90deg, currentColor, transparent 70%); opacity: 0.35;
+}
+.ls-th.src-fp::after { color: rgba(255,255,255,0.7); }
+.ls-th.src-ss::after { color: rgba(44,212,208,0.9); }
+.ls-th.src-td::after { color: rgba(240,192,64,0.9); }
+
+/* ── U3 · the track reads as a gauge, not a stray rule ─────────────────── */
+.ls-track { height: 9px; margin: 4px 3px 1px; }
+.ls-track-rail {
+  top: 3px; height: 4px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(38,208,124,0.55), rgba(255,255,255,0.07) 58%, rgba(255,58,96,0.3));
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.4), 0 0 10px rgba(38,208,124,0.1);
+}
+.ls-track.good-hi .ls-track-rail {
+  background: linear-gradient(90deg, rgba(255,58,96,0.3), rgba(255,255,255,0.07) 42%, rgba(38,208,124,0.55));
+}
+.ls-dot { top: 1px; width: 7px; height: 7px; box-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+.ls-dot.is-best {
+  width: 10px; height: 10px; top: -0.5px;
+  box-shadow: 0 0 0 2px rgba(38,208,124,0.6), 0 0 12px rgba(38,208,124,0.65);
+}
+
+/* ── U4 · materials: glass, grain, sheen ───────────────────────────────── */
+.lineshop-modal-box {
+  backdrop-filter: blur(22px) saturate(1.25);
+  background:
+    radial-gradient(120% 70% at 12% -8%, rgba(248,198,74,0.07), transparent 62%),
+    linear-gradient(180deg, rgba(22,26,38,0.96), rgba(12,15,23,0.985));
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: 0 34px 90px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.lineshop-modal-box .modal-head {
+  background: linear-gradient(180deg, rgba(18,22,32,0.98) 74%, rgba(18,22,32,0));
+}
+.lineshop-table th { background: rgba(16,20,29,0.97); }
+/* Sheen that sweeps the primary tile once on open — the panel announces its
+   headline instead of just displaying it. */
+@keyframes lsSheen { 0% { transform: translateX(-130%); } 60%, 100% { transform: translateX(230%); } }
+.ls-hero-tile.is-primary::before,
+.ls-hero-tile.is-top::before {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 38%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.16), transparent);
+  animation: lsSheen 1.5s ease-out 0.15s both; pointer-events: none;
+}
+.ls-hero-tile.is-top::before { animation-delay: 0.32s; }
+@media (prefers-reduced-motion: reduce) {
+  .ls-hero-tile.is-primary::before, .ls-hero-tile.is-top::before { animation: none; opacity: 0; }
+}
+
+/* ── U5 · final polish ─────────────────────────────────────────────────── */
+.ls-controls, .ls-bias-strip {
+  backdrop-filter: blur(8px);
+  border-color: rgba(255,255,255,0.08);
+}
+.ls-row td:first-child { position: relative; }
+/* The fold stops being a table row and becomes a section rule. */
+.ls-fold-row { padding-top: 10px !important; }
+.ls-fold {
+  width: 100%; text-align: left;
+  border-style: dashed; border-color: rgba(255,255,255,0.12);
+}
+.ls-empty-row { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+
 </style>
 </head>
 <body>
