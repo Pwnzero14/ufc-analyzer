@@ -5195,7 +5195,7 @@ body.loading {
 .archive-stat-badge.archive-stat-empty { border-left-color:var(--text4,#555); opacity:0.5; }
 .asb-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
 .asb-val { font-size:13px; font-weight:700; }
-.ls-lean-chip { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; }
+.ls-lean-chip { display: inline-block; font-size: 7.5px; font-weight: 700; padding: 1px 5px; border-radius: 7px; white-space: nowrap; }
 .ls-lean-over  { background: rgba(0,232,122,0.12); color: #00e87a; }
 .ls-lean-under { background: rgba(255,58,96,0.12); color: #ff3a60; }
 
@@ -29224,7 +29224,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* ── V1 · command strip ────────────────────────────────────────────────── */
 .ls-controls {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  padding: 9px 12px; margin-bottom: 12px;
+  padding: 6px 10px; margin-bottom: 8px;
   background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
   border: 1px solid var(--border2); border-radius: 9px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
@@ -29237,7 +29237,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .ls-btn, .ls-chip {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
-  padding: 4px 9px; border-radius: 5px; cursor: pointer;
+  padding: 3px 8px; border-radius: 5px; cursor: pointer;
   background: rgba(255,255,255,0.035);
   border: 1px solid var(--border2); color: var(--text3);
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
@@ -29263,7 +29263,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* ── V5 · platform bias ────────────────────────────────────────────────── */
 .ls-bias-strip {
   display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-  margin-bottom: 12px; padding: 9px 12px;
+  margin-bottom: 8px; padding: 6px 10px;
   background: linear-gradient(135deg, rgba(248,198,74,0.055), rgba(248,198,74,0.01));
   border: 1px solid rgba(248,198,74,0.12);
   border-left: 3px solid rgba(248,198,74,0.5);
@@ -29274,8 +29274,8 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   letter-spacing: 0.14em; margin-right: 4px; cursor: help;
 }
 .ls-bias-chip {
-  font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
-  padding: 4px 8px; border-radius: 5px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  padding: 2px 6px; border-radius: 5px; cursor: pointer;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(248,198,74,0.14); color: var(--text2);
   transition: border-color 0.15s, background 0.15s, transform 0.12s;
@@ -29302,7 +29302,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   color: var(--text4); font-weight: 800; border-bottom: 1px solid var(--border2);
 }
 .lineshop-table td {
-  padding: 5px 8px; vertical-align: middle;
+  padding: 4px 7px; vertical-align: middle;
   background: rgba(255,255,255,0.018);
   border-top: 1px solid rgba(255,255,255,0.05);
   border-bottom: 1px solid rgba(0,0,0,0.25);
@@ -29319,11 +29319,13 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* V5 — focus: hovering a row quiets the others instead of just lighting one. */
 .lineshop-table tbody:hover tr.ls-row:not(:hover) { opacity: 0.45; transition: opacity 0.18s; }
 
-.lineshop-fighter-name { text-align: left !important; min-width: 150px; width: 150px; }
-.ls-name-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lineshop-fighter-name { text-align: left !important; min-width: 176px; width: 176px; }
+.ls-name-line { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
+.ls-meta-line { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; margin-top: 2px; }
 .ls-name {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 11.5px; font-weight: 700; color: var(--text); letter-spacing: 0.01em;
+  font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 118px;
 }
 .ls-rank {
   display: inline-flex; align-items: center; justify-content: center;
@@ -29332,10 +29334,10 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: rgba(248,198,74,0.16); color: var(--gold);
   border: 1px solid rgba(248,198,74,0.4); cursor: help;
 }
-.ls-vs { font-size: 8.5px; color: var(--text4); margin-top: 1px; }
+.ls-vs { font-size: 8px; color: var(--text4); white-space: nowrap; }
 .ls-row-gain {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800;
-  color: #6ee7a8; cursor: help; margin-left: auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
+  color: #6ee7a8; cursor: help; flex-shrink: 0;
 }
 
 /* ── V4 · book identity on the cells ───────────────────────────────────── */
