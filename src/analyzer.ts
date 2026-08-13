@@ -12346,6 +12346,41 @@ function sanitizeDelta(stat: string, delta: number | null): number | null {
 
 // Builds the persistence payload for lines_open_v1, stamped with the current
 // Betr event-date tag so loadOpeningLines can detect cross-event staleness.
+/**
+ * GLOW-UP 210 — has `_currentBetrEventDate` actually been READ from storage in
+ * this page lifetime? It starts '' and was only ever populated by
+ * loadOpeningLines, so every baseline written before that ran — or after
+ * betr_event_date changed mid-session — got stamped with an empty tag it had no
+ * business claiming. That drift is what defects 1–4 kept turning into a wipe.
+ */
+let _betrEventDateLoaded = false;
+
+/** Read betr_event_date into `_currentBetrEventDate` once per page lifetime. */
+async function ensureBetrEventDateLoaded(): Promise<void> {
+  if (_betrEventDateLoaded) return;
+  const stored = await storageGet<{ betr_event_date?: string }>(['betr_event_date']);
+  setCurrentBetrEventDate(typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '');
+}
+
+/** The ONLY way `_currentBetrEventDate` changes — keeps the loaded flag honest. */
+function setCurrentBetrEventDate(value: string): void {
+  _currentBetrEventDate = value;
+  _betrEventDateLoaded = true;
+}
+
+/**
+ * GLOW-UP 210 — every write of lines_open_v1 goes through here, and every write
+ * therefore knows the real tag. Previously each call site did
+ * `void storageSet({ lines_open_v1: buildOpeningLinesRecord() })` directly, which
+ * stamps whatever `_currentBetrEventDate` happens to hold — '' on any path that
+ * runs before loadOpeningLines (clicking ✏ BETR LINES is the reproducible one:
+ * its open handler re-snapshots) or after betr_event_date changed mid-session.
+ */
+async function persistOpeningLines(overrideLines?: Record<string, number>): Promise<void> {
+  await ensureBetrEventDateLoaded();
+  await storageSet({ lines_open_v1: buildOpeningLinesRecord(overrideLines) });
+}
+
 function buildOpeningLinesRecord(overrideLines?: Record<string, number>): { eventKey: string; betrSeedHash: string; forBetrEventDate: string; capturedAt: number; lines: Record<string, number> } {
   let lines: Record<string, number>;
   if (overrideLines) {
@@ -12414,7 +12449,7 @@ async function loadOpeningLines(): Promise<void> {
     betr_event_date?: string;
     [STORAGE_LINE_HISTORY_KEY]?: { eventKey?: string; series?: Record<string, Array<{ t: number; v: Record<string, number> }>> } | null;
   }>(['lines_open_v1', 'betr_seed_hash', 'betr_event_date', STORAGE_LINE_HISTORY_KEY]);
-  _currentBetrEventDate = typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '';
+  setCurrentBetrEventDate(typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '');
   const data = stored.lines_open_v1;
   const historyRaw = stored[STORAGE_LINE_HISTORY_KEY];
 
@@ -12539,7 +12574,7 @@ async function loadOpeningLines(): Promise<void> {
         for (const [k, v] of Object.entries(reconstructed)) {
           _openingLines.set(k, v);
         }
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord(reconstructed) });
+        void persistOpeningLines(reconstructed);
         console.log(`[LineMovement] Reconstructed ${Object.keys(reconstructed).length} baselines from line history`);
       }
     }
@@ -12578,7 +12613,7 @@ async function loadOpeningLines(): Promise<void> {
         for (const [k, v] of Object.entries(reconstructed)) {
           _openingLines.set(k, v);
         }
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord(reconstructed) });
+        void persistOpeningLines(reconstructed);
         console.log(`[LineMovement] Reconstructed ${Object.keys(reconstructed).length} baselines from history`);
       }
     }
@@ -12613,7 +12648,7 @@ async function loadOpeningLines(): Promise<void> {
     for (const [k, v] of Object.entries(data.lines)) {
       if (!k.startsWith('betr|')) cleaned[k] = v;
     }
-    void storageSet({ lines_open_v1: buildOpeningLinesRecord(cleaned) });
+    void persistOpeningLines(cleaned);
   }
 }
 
@@ -12700,7 +12735,7 @@ function snapshotOpeningLines(): void {
 
   if (changed || _openingLines.size > 0) {
     if (_baselineCapturedAt === 0) _baselineCapturedAt = Date.now();
-    void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+    void persistOpeningLines();
   }
 }
 // Post-merge movement detection: called AFTER mergeAndEnrich() with the NEW allFighters.
@@ -12737,7 +12772,7 @@ function detectAndRecordMovements(): void {
   if (baselineRepaired) {
     // Persist repaired baselines to storage
     if (_baselineCapturedAt === 0) _baselineCapturedAt = Date.now();
-    void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+    void persistOpeningLines();
   }
 }
 
@@ -17678,7 +17713,7 @@ async function resetFighterBaseline(name: string): Promise<void> {
   }
   _lineHistory.updatedAt = Date.now();
   await Promise.all([
-    storageSet({ lines_open_v1: buildOpeningLinesRecord() }),
+    persistOpeningLines(),
     storageSet({ [STORAGE_LINE_HISTORY_KEY]: _lineHistory }),
   ]);
   renderFighters();
@@ -21993,6 +22028,11 @@ async function loadData(): Promise<void> {
           if (curMeta['betr_event_date'] !== cardDateIso) {
             await storageSet({ betr_event_date: cardDateIso });
           }
+          // GLOW-UP 210: mirror it in memory in the same breath. This is the
+          // moment the tag flips '' -> card date; leaving `_currentBetrEventDate`
+          // stale here is how a snapshot later in the SAME session still stamped
+          // a baseline '' after storage already knew better.
+          setCurrentBetrEventDate(cardDateIso);
         }
       }
 
@@ -24357,7 +24397,10 @@ function initAnalyzerCore(): void {
         chrome.storage.local.get(['betr_event_date'], res)
       );
       const raw = typeof betrMeta['betr_event_date'] === 'string' ? betrMeta['betr_event_date'] : '';
-      _currentBetrEventDate = raw;
+      // GLOW-UP 210: through the setter, so this read also counts as "loaded"
+      // — it is a genuine storage read, and RESET LINES runs before any of the
+      // re-anchor snapshots below.
+      setCurrentBetrEventDate(raw);
       if (raw) {
         const seedEventMs = new Date(`${raw}T23:59:59`).getTime();
         if (Number.isFinite(seedEventMs) && Date.now() <= seedEventMs) eventOver = false;
@@ -24389,7 +24432,7 @@ function initAnalyzerCore(): void {
     }
     // Persist with fresh timestamp
     _baselineCapturedAt = Date.now();
-    void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+    void persistOpeningLines();
     const _oc = document.getElementById('openingLinesCount');
     if (_oc) _oc.textContent = ` · 📍re-anchored ${_openingLines.size} baselines`;
     showToast(eventOver
