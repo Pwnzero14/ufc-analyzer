@@ -18684,36 +18684,36 @@ function generateLineShopModal() {
         // The lit end is the side the lean wants — lowest for an OVER, highest for
         // an UNDER — so "good" is always a direction, never a colour to decode.
         const goodEnd = sv.dir === 'under' ? 'hi' : 'lo';
-        return `<div class="ls-track good-${goodEnd}" title="Every book on this prop, placed on its own ${sv.lo}–${sv.hi} range. The lit end is the side your lean wants.">
-      <i class="ls-track-rail"></i><span class="ls-track-lo">${sv.lo}</span>${dots}<span class="ls-track-hi">${sv.hi}</span>
+        // No end labels: every value is already printed on the cells above, so
+        // repeating the range only collided with the dots and cost a line of height.
+        return `<div class="ls-track good-${goodEnd}" title="Every book on this prop placed across its ${sv.lo}–${sv.hi} range. The lit end is the side your lean wants.">
+      <i class="ls-track-rail"></i>${dots}
     </div>`;
     };
-    // V2 — the take stops being a sentence and becomes an object, with the GAIN as
-    // the hero: it is the only number on the row that is money rather than context.
-    const renderTakeCard = (sv) => {
+    // V2 — the take, compressed to a single inline chip that sits on the SAME line
+    // as the cells. The first cut gave it its own full-width card, which read well
+    // in isolation and turned every row into three stacked bands — 14 rows ran off
+    // the page and the panel had to be zoomed out to use, which is worse than the
+    // wall it replaced. The gain stays the hero; everything else moves to the
+    // tooltip, where it costs no height.
+    const renderTake = (sv) => {
         if (!sv.cells.some(c => c.val != null))
             return '';
-        if (sv.spread === 0)
-            return `<div class="ls-take-card is-flat">books agree</div>`;
         const bestTag = sv.best ? (LS_TAG[sv.best.bk] || sv.best.bk) : '—';
         const defTag = sv.defBook ? (LS_TAG[sv.defBook] || sv.defBook) : null;
-        const dCtx = `<span class="ls-delta" title="Widest disagreement between books on this prop, best vs worst.">Δ${sv.spread}</span>`;
+        if (sv.spread === 0) {
+            return `<span class="ls-take-mini is-flat" title="Every book posting this prop has the same number — nothing to shop.">=</span>`;
+        }
         if (sv.dir === 'none') {
-            // No lean is not an apology — the spread is still real information about
-            // where this prop is soft, so it stays legible instead of greyed to death.
-            return `<div class="ls-take-card is-nolean" title="No model lean on this prop, so there is no side to take — but the books still disagree by ${sv.spread}, which is worth knowing if you have your own read.">${dCtx}<span class="ls-tc-note">no lean · spread only</span></div>`;
+            return `<span class="ls-take-mini is-nolean" title="No model lean on this prop, so there is no side to take — but the books disagree by ${sv.spread}, which is worth knowing if you have your own read.">Δ${sv.spread}</span>`;
         }
         if (sv.blocked) {
-            return `<div class="ls-take-card is-blocked" title="Every book that posts this prop refuses this side for this fighter, so the best line on the board is not a bargain you can act on.">${dCtx}<span class="ls-tc-note">⛔ nowhere to place</span></div>`;
+            return `<span class="ls-take-mini is-blocked" title="Every book that posts this prop refuses the ${sv.dir.toUpperCase()} side for this fighter — the best line on the board is not one you can act on.">⛔</span>`;
         }
         if (sv.gain > 0) {
-            return `<div class="ls-take-card is-take" title="Taking ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best.bk] || bestTag}${defTag ? ` instead of ${defTag} ${sv.defVal}` : ''} is worth ${sv.gain} points on this prop.">
-        <span class="ls-tc-gain">+${sv.gain}</span>
-        <span class="ls-tc-body"><b class="ls-tc-book plat-${sv.best.bk}">${bestTag}</b><span class="ls-tc-line">${sv.best?.val}</span>${defTag ? `<span class="ls-tc-vs">vs ${defTag} ${sv.defVal}</span>` : ''}</span>
-        ${dCtx}
-      </div>`;
+            return `<span class="ls-take-mini is-take" title="Take ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best.bk] || bestTag} at ${sv.best?.val}${defTag ? ` instead of ${defTag} ${sv.defVal}` : ''} — worth ${sv.gain} points. Spread across all books is ${sv.spread}."><b>+${sv.gain}</b> ${bestTag} ${sv.best?.val}</span>`;
         }
-        return `<div class="ls-take-card is-none" title="Your default book already holds the best side here — the spread is real, but shopping gains you nothing.">${dCtx}<span class="ls-tc-note">your book is best</span></div>`;
+        return `<span class="ls-take-mini is-none" title="Your default book (${defTag} ${sv.defVal}) already holds the best side — the ${sv.spread} spread is real, but shopping gains you nothing.">✓ best</span>`;
     };
     // V1/V5 — the row gets a hierarchy and a spine. The fighter is the heading,
     // the gain is the badge that earns attention, and a left accent rail keyed to
@@ -18723,10 +18723,11 @@ function generateLineShopModal() {
         const leanChip = r.leanDir !== 'none'
             ? `<span class="ls-lean-chip ls-lean-${r.leanDir}">${r.leanDir === 'over' ? '▲' : '▼'} ${r.leanDir.toUpperCase()}${r.conf > 0 ? ` ${r.conf}%` : ''}</span>`
             : '';
+        // Two bands per stat, not three: cells + take on one line, the track as a
+        // sliver beneath. Keeps the whole panel on one screen at 100% zoom.
         const cols = statsOf(r).map(sv => `<td class="ls-stat-td">
-        <div class="lineshop-stat-group">${sv.cells.map(c => renderCell(f, sv, c)).join('')}</div>
+        <div class="ls-cellrow">${sv.cells.map(c => renderCell(f, sv, c)).join('')}${renderTake(sv)}</div>
         ${renderTrack(sv)}
-        ${renderTakeCard(sv)}
       </td>`).join('');
         const topGain = rowGain(r);
         const heat = topGain >= 8 ? 'heat-3' : topGain >= 4 ? 'heat-2' : topGain > 0 ? 'heat-1' : 'heat-0';
@@ -18735,9 +18736,9 @@ function generateLineShopModal() {
         <div class="ls-name-line">
           ${rank <= 3 && topGain > 0 ? `<span class="ls-rank" title="One of the three biggest shopping gains on the card right now.">${rank}</span>` : ''}
           <span class="ls-name">${prettyName(f.name)}</span>${leanChip}
+          ${topGain > 0 ? `<span class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book.">+${topGain}</span>` : ''}
         </div>
         ${f.opponent ? `<div class="ls-vs">vs ${prettyName(f.opponent)}</div>` : ''}
-        ${topGain > 0 ? `<div class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book — the sum of what the columns to the right are worth at their best.">+${topGain} <em>best shop</em></div>` : ''}
       </td>${cols}
     </tr>`;
     };
