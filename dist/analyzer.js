@@ -10243,6 +10243,42 @@ let parlayPoolShowOffBoard = false;
 function parlayLegKey(fighter, stat, dir) {
     return `${fighter}|${stat}|${dir}`;
 }
+/**
+ * GLOW-UP 208 — why the RANKED pool won't score this (stat, side). Null means it
+ * will.
+ *
+ * One source of truth for BOTH leg collectors. `renderParlayLab` and
+ * `suggestParlays` build near-identical pools independently, and drift between
+ * them is exactly how R1 SS, CTRL and KD stayed unrankable in the Lab long after
+ * the board had adopted them — so the rule lives in one place now.
+ *
+ * It doubles as the off-board tier's explanation text, which means a leg's flag
+ * can never disagree with the rule that demoted it.
+ *
+ * Mirrors renderBestPicks' `isCandidateUsable`: R1 SS needs no side gating
+ * (calcSSR1Lean's confidence gating does that upstream), KD is standard-projection
+ * only, CTRL is over-only. The board and the Lab now agree family for family.
+ */
+function parlayUnrankableReason(f, stat, dir) {
+    // FP placeability (no-ops for every other stat): a dog's FP UNDER is Underdog-
+    // only, and Betr prices a dog's OVER at +money rather than true pick-em.
+    if (shouldSkipFpSideForFighter(f, stat, dir)) {
+        return 'No book posts this FP side for this fighter — a dog’s FP UNDER is Underdog-only, and Betr prices a dog’s OVER at +money rather than true pick-em value.';
+    }
+    // Knockdowns are PrizePicks-only. A standard projection posts More AND Less;
+    // demon/goblin cards are More-only on a non-standard payout, so NEITHER side is
+    // an ordinary pick-em play — the board keeps those display-only.
+    if (stat === 'kd' && f.kd_under_available !== true) {
+        return 'PrizePicks prices this knockdowns prop More-only (demon/goblin) — the non-standard payout means neither side is a normal pick-em play, so it stays off the ranked board.';
+    }
+    // Control time is an over-only market (MODEL v16): Pick6 is the primary CTRL
+    // book and gives these props no Less button, so an under lean is information
+    // rather than a play.
+    if (stat === 'ctrl' && dir !== 'over') {
+        return 'Control time is an OVER-only market — Pick6 is the primary CTRL book and posts no Less button, so an under lean is information, not a play.';
+    }
+    return null;
+}
 function areSameFight(f1, f2) {
     if (!f1.opponent || !f2.opponent)
         return false;
@@ -10658,7 +10694,7 @@ function suggestParlays(fighters, maxLegs = 3, count = 3) {
                 return;
             if ((lean.conf || 0) < 55)
                 return; // skip low confidence
-            if (shouldSkipFpSideForFighter(f, stat, lean.lean))
+            if (parlayUnrankableReason(f, stat, lean.lean))
                 return;
             available.push({
                 leg: {
@@ -10674,10 +10710,16 @@ function suggestParlays(fighters, maxLegs = 3, count = 3) {
                 fighter: f,
             });
         };
+        // GLOW-UP 208: same seven families the pool ranks. Suggestions drawing from a
+        // NARROWER set than the list they sit beside was the older half of the same
+        // bug — a leg could rank #2 in the pool and still be unreachable to the engine.
         addLeg(f.lean, 'fp');
         addLeg(f.lean_ss, 'ss');
+        addLeg(f.lean_ss_r1, 'ss_r1');
         addLeg(f.lean_td, 'td');
         addLeg(f.lean_ft, 'ft');
+        addLeg(f.lean_ctrl, 'ctrl');
+        addLeg(f.lean_kd, 'kd');
     }
     // Sort by confidence descending
     available.sort((a, b) => b.leg.confidence - a.leg.confidence);
@@ -10761,7 +10803,7 @@ function renderParlayLab(container) {
             const line = getSourceActiveLine(f, stat);
             if (line == null)
                 return;
-            if (shouldSkipFpSideForFighter(f, stat, lean.lean))
+            if (parlayUnrankableReason(f, stat, lean.lean))
                 return;
             availableLegs.push({
                 leg: {
@@ -10777,10 +10819,19 @@ function renderParlayLab(container) {
                 fighter: f,
             });
         };
+        // GLOW-UP 208: R1 SS, CTRL and KD are first-class ranked sources here now.
+        // Best Picks has scored all three for a while (R1 SS can even overrule FT
+        // there); Parlay Lab was the last surface still ranking four families, which
+        // is why a strong R1 SS read could be seen on the board and not parlayed.
+        // parlayUnrankableReason carries the market rules that keep them honest —
+        // CTRL over-only, KD standard-projections-only.
         addLeg(f.lean, 'fp');
         addLeg(f.lean_ss, 'ss');
+        addLeg(f.lean_ss_r1, 'ss_r1');
         addLeg(f.lean_td, 'td');
         addLeg(f.lean_ft, 'ft');
+        addLeg(f.lean_ctrl, 'ctrl');
+        addLeg(f.lean_kd, 'kd');
     }
     availableLegs.sort((a, b) => b.leg.confidence - a.leg.confidence);
     // ── GLOW-UP 207 — OFF-BOARD POOL ─────────────────────────────────────────
@@ -10802,7 +10853,6 @@ function renderParlayLab(container) {
     // prop with no lean sits at 50 — a coin flip is the honest prior, and it lands
     // where it should once EV prices the vig in.
     const PARLAY_ALL_STATS = ['fp', 'ss', 'ss_r1', 'td', 'ft', 'ctrl', 'kd'];
-    const RANKED_FAMILY = new Set(['fp', 'ss', 'td', 'ft']);
     const rankedKeys = new Set(availableLegs.map(a => parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)));
     const offBoardLegs = [];
     for (const f of visibleFighters) {
@@ -10826,28 +10876,32 @@ function renderParlayLab(container) {
                 if (line == null)
                     continue;
                 const statLbl = statDisplayLabel(stat);
+                // The market rule that would keep this side off the ranked board, if any.
+                // Same call the pool builder gates on, so the flag and the demotion can
+                // never tell different stories.
+                const marketBlock = parlayUnrankableReason(f, stat, dir);
                 let conf;
                 let reason;
                 if (leanDir && leanDir !== dir) {
                     conf = Math.max(1, 100 - leanConf);
                     reason = `Model leans ${leanDir.toUpperCase()} here at ${leanConf}% — this is the other side, so it carries the complement (${conf}%). Your read is allowed to disagree with the board's.`;
                 }
-                else if (leanDir === dir && !RANKED_FAMILY.has(stat)) {
-                    conf = leanConf;
-                    reason = `${statLbl} isn't one of the families the ranked pool scores (FP / SS / TD / FT) — the model does lean ${dir.toUpperCase()} ${leanConf}% here, it just has never been rankable in Parlay Lab.`;
-                }
                 else if (leanDir === dir) {
-                    // Same stat, same side as the lean, yet not in the ranked pool: the
-                    // ranked builder dropped it on placeability (a dog's FP UNDER is
-                    // Underdog-only) or had no line on the ACTIVE book while another book
-                    // posts one. Either way the model is on this side — say so.
+                    // Same stat, same side as the lean, yet not ranked: either a market rule
+                    // blocks the side (CTRL under, a demon/goblin KD, an unplaceable FP
+                    // side) or the ACTIVE book has no line for it while another book does.
+                    // Either way the model is ON this side — say so before the caveat.
                     conf = leanConf;
-                    reason = `Model leans ${dir.toUpperCase()} ${leanConf}% here, but the ranked pool dropped this side — the active book doesn't post it for this fighter. Still yours to take.`;
+                    reason = marketBlock
+                        ? `Model leans ${dir.toUpperCase()} ${leanConf}% here, but the ranked board can't carry this side.`
+                        : `Model leans ${dir.toUpperCase()} ${leanConf}% here, but the ranked pool dropped this side — the active book doesn't post it for this fighter. Still yours to take.`;
                 }
                 else {
                     conf = 50;
                     reason = `No model lean on this ${statLbl} prop either way — 50% is the honest prior, not a read. EV prices the vig against it.`;
                 }
+                if (marketBlock)
+                    reason += ` · ${marketBlock}`;
                 if (!bb.book)
                     reason += ' · No book posts this side that the scraper can see — queue it anyway if you have it somewhere.';
                 offBoardLegs.push({
@@ -11166,7 +11220,7 @@ function renderParlayLab(container) {
         <span class="pob-caret">${parlayPoolShowOffBoard ? '▾' : '▸'}</span>
         OFF-BOARD PROPS <span class="parlay-count-pill">${displayOffLegs.length}${displayOffLegs.length !== offBoardLegs.length ? `/${offBoardLegs.length}` : ''}</span>
       </button>
-      <div class="parlay-offboard-note">These didn't make the ranked pool — the model leans the other side, has no read on the prop, or the stat family (R1 SS · CTRL · KD) has never been ranked here. They're fully parlayable: confidence is the model's own complement (or 50% with no read), EV and slip health price them exactly like any other leg, so they simply sort low. ${parlayPoolShowOffBoard ? '' : 'Open to build off them.'}</div>
+      <div class="parlay-offboard-note">These didn't make the ranked pool — the model leans the other side, has no read on the prop, or the market itself won't carry the side (CTRL is over-only, a demon/goblin KD is More-only, a dog's FP UNDER is Underdog-only). They're fully parlayable: confidence is the model's own complement (or 50% with no read), EV and slip health price them exactly like any other leg, so they simply sort low. Hover any <b>off-board</b> flag for that leg's own reason. ${parlayPoolShowOffBoard ? '' : 'Open to build off them.'}</div>
       ${offRows}
     </div>` : '';
     const parlayLegClip = (l, lf) => {
