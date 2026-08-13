@@ -29121,6 +29121,55 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
     0 0 24px rgba(248,198,74,0.10),
     0 0 0 1px rgba(248,198,74,0.18) !important;
 }
+
+/* ══ GLOW-UP 207: Parlay Lab — the off-board pool ═════════════════════════
+   Every side of every prop is now parlayable, but the ranked list stays the
+   thing the view is about. So the second tier is deliberately QUIETER, not
+   just later: dimmer rows, a neutral flag, no confidence colour lane. It reads
+   as "available" rather than "recommended", which is exactly its status. */
+.parlay-offboard {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(120,132,168,0.30);
+}
+.parlay-offboard-head {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; cursor: pointer;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border2); border-radius: 6px;
+  padding: 6px 9px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em;
+  color: var(--text2);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.parlay-offboard-head:hover { background: rgba(255,255,255,0.05); color: var(--text); border-color: rgba(120,132,168,0.45); }
+.parlay-offboard-head.open { color: var(--text); border-color: rgba(120,132,168,0.45); }
+.pob-caret { font-size: 9px; opacity: 0.75; }
+.parlay-offboard-note {
+  font-size: 9.5px; line-height: 1.5; color: var(--text3);
+  padding: 6px 4px 2px; max-width: 62ch;
+}
+/* The row itself: same geometry as a ranked leg (it's the same control), one
+   step back in contrast. Hover and selection return it to full strength —
+   once you've picked it, it is a leg like any other. */
+.parlay-leg-row.off-board { opacity: 0.72; }
+.parlay-leg-row.off-board:hover,
+.parlay-leg-row.off-board.selected { opacity: 1; }
+.parlay-leg-off {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.06em;
+  color: #9aa4c4; background: rgba(154,164,196,0.09);
+  border: 1px solid rgba(154,164,196,0.30); border-radius: 3px;
+  padding: 1px 4px; margin-left: 4px; white-space: nowrap; cursor: help;
+}
+/* A side no book posts. Same slot as the book chip, so the row never loses a
+   column — "we looked and found nothing" instead of a silent gap. */
+.parlay-leg-plat.plat-none {
+  color: #8b93ad; border-color: rgba(139,147,173,0.28);
+  background: rgba(139,147,173,0.06); border-style: dashed;
+}
+.parlay-slip-leg.off-board .parlay-leg-name { color: var(--text2); }
 </style>
 </head>
 <body>
