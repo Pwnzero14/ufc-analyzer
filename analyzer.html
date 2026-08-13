@@ -29203,6 +29203,145 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   font-size: 8.5px; letter-spacing: 0.08em;
 }
 .fpbk .side-pick { margin-left: 2px; }
+
+/* ══ GLOW-UP 214: LINE SHOPPING DIFF — five-level pass ════════════════════
+   The panel showed WHO disagrees and coloured the extremes. It never said what
+   to do, what shopping was worth against the book you'd actually have used, or
+   whether the "best" line was even placeable — and none of it was clickable.
+   These styles carry that: a command strip, a verdict line per stat, cells as
+   controls, and a bias strip that filters instead of just informing. */
+.lineshop-modal-box { max-width: 1120px; }
+
+/* L1 — command strip. Same visual language as Parlay Lab's plq-controls so the
+   two command surfaces in the app read as one idea. */
+.ls-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border2); border-radius: 7px;
+}
+.ls-ctl-group { display: inline-flex; align-items: center; gap: 4px; }
+.ls-ctl-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; letter-spacing: 0.16em; color: var(--text4);
+  margin-right: 2px;
+}
+.ls-btn, .ls-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border2); color: var(--text3);
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.ls-chip { border-radius: 10px; }
+.ls-btn:hover, .ls-chip:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+.ls-btn.on, .ls-chip.on {
+  background: rgba(248,198,74,0.12); border-color: rgba(248,198,74,0.40);
+  color: var(--gold); text-shadow: 0 0 8px rgba(248,198,74,0.25);
+}
+.ls-reset-inline {
+  font-size: 9px; color: var(--text3); background: none; border: none;
+  text-decoration: underline; cursor: pointer; padding: 2px 4px;
+}
+.ls-reset-inline:hover { color: var(--gold); }
+.ls-legend-inline {
+  display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin-left: auto; font-size: 9px; color: var(--text4);
+}
+.ls-legend-inline em { font-style: normal; opacity: 0.75; margin-left: 4px; }
+.ls-legend-swatch { transform: scale(0.85); }
+
+/* L5 — platform bias: was a wall of inline styles with a tooltip. Now a real
+   control — each chip filters the table to rows that book actually wins. */
+.ls-bias-strip {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px; padding: 8px 10px;
+  background: linear-gradient(135deg, rgba(248,198,74,0.05), rgba(248,198,74,0.01));
+  border: 1px solid rgba(248,198,74,0.10);
+  border-left: 3px solid rgba(248,198,74,0.45);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.15);
+}
+.ls-bias-head {
+  font-size: 9px; color: rgba(248,198,74,0.75); text-transform: uppercase;
+  letter-spacing: 0.10em; margin-right: 4px; cursor: help;
+}
+.ls-bias-chip {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 3px 7px; border-radius: 4px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border: 1px solid rgba(248,198,74,0.12); color: var(--text2);
+  transition: border-color 0.14s, background 0.14s;
+}
+.ls-bias-chip:hover { border-color: rgba(248,198,74,0.35); background: rgba(248,198,74,0.07); }
+.ls-bias-chip.on { border-color: rgba(248,198,74,0.6); background: rgba(248,198,74,0.14); }
+.ls-bias-plat { color: rgba(248,198,74,0.65); }
+.ls-bias-stat { font-weight: 700; }
+.ls-bias-val { font-weight: 700; }
+.ls-bias-val.pos { color: var(--green); }
+.ls-bias-val.neg { color: var(--red); }
+.ls-filter-note {
+  font-size: 10px; color: var(--text3); margin-bottom: 8px;
+  padding: 5px 9px; border-radius: 5px;
+  background: rgba(248,198,74,0.06); border: 1px solid rgba(248,198,74,0.18);
+}
+
+/* L3 — cells are buttons now. Reset the UA button styling so they keep the
+   exact geometry the read-only spans had. */
+button.ls-cell-val {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.1s, box-shadow 0.14s, border-color 0.14s;
+}
+button.ls-cell-val:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.22); }
+.ls-cell-val.ls-take {
+  box-shadow: 0 0 0 1px rgba(72,199,142,0.45), 0 0 10px rgba(72,199,142,0.18);
+}
+.ls-cell-val.ls-on {
+  box-shadow: 0 0 0 1px rgba(248,198,74,0.6), 0 0 10px rgba(248,198,74,0.22);
+}
+.ls-check { font-style: normal; font-size: 8px; margin-left: 2px; color: var(--gold); }
+/* A best line the book won't take — the trap this panel used to walk you into. */
+.ls-cell-val.ls-blocked {
+  border-style: dashed !important; border-color: rgba(255,100,100,0.45) !important;
+  opacity: 0.6; box-shadow: none;
+}
+
+/* L2 — the verdict line: spread as context, the call as the point. */
+.ls-stat-td { min-width: 190px; }
+.ls-verdict {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+}
+.ls-v-spread {
+  color: var(--text4); letter-spacing: 0.04em; cursor: help;
+  padding: 1px 5px; border-radius: 8px; background: rgba(255,255,255,0.04);
+}
+.ls-v-take { color: #6ee7a8; cursor: help; }
+.ls-v-take b { color: #8ff0c0; font-weight: 800; }
+.ls-v-blocked { color: #ff8fa3; cursor: help; }
+.ls-v-none, .ls-v-note { color: var(--text4); cursor: help; }
+.ls-v-flat { color: var(--text4); opacity: 0.5; }
+
+/* Row-level: the biggest single gain available on this fighter. */
+.ls-row-gain {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 800;
+  color: #6ee7a8; background: rgba(38,208,124,0.10);
+  border: 1px solid rgba(38,208,124,0.30); border-radius: 8px; padding: 1px 5px;
+  cursor: help;
+}
+.lineshop-table tr.ls-row-hot td { background: rgba(38,208,124,0.035); }
+
+/* L4 — the fold for rows with nothing to shop. */
+.ls-fold-row { text-align: left !important; padding: 4px 8px !important; }
+.ls-fold {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em;
+  color: var(--text3); background: none; border: none; cursor: pointer; padding: 4px 2px;
+}
+.ls-fold:hover { color: var(--text); }
+.ls-flat-body tr:not(:first-child) td { opacity: 0.55; }
+.ls-empty-row { text-align: center !important; color: var(--text3); font-size: 11px; padding: 18px !important; }
 </style>
 </head>
 <body>
