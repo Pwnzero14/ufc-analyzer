@@ -10222,6 +10222,10 @@ const parlaySelectedLegs = new Set(); // "fighter|stat|dir" keys
 let parlayPoolSort = 'conf';
 let parlayPoolStat = 'all';
 let parlayPoolDir = 'all';
+// GLOW-UP 207: off-board section is collapsed by default — it is deliberately
+// the LONGER of the two lists (every side of every prop), and expanding it by
+// default would bury the ranked pool the view is built around.
+let parlayPoolShowOffBoard = false;
 function parlayLegKey(fighter, stat, dir) {
     return `${fighter}|${stat}|${dir}`;
 }
@@ -10765,11 +10769,108 @@ function renderParlayLab(container) {
         addLeg(f.lean_ft, 'ft');
     }
     availableLegs.sort((a, b) => b.leg.confidence - a.leg.confidence);
+    // ── GLOW-UP 207 — OFF-BOARD POOL ─────────────────────────────────────────
+    // The ranked pool above is the model's own lean side on FP/SS/TD/FT. Everything
+    // else on the board was unreachable from this view: the OTHER side of a leaned
+    // prop, a prop the model has no read on, and the R1 SS / CTRL / KD families,
+    // which the pool has never ranked. A parlay is the user's build, and the
+    // model's silence on a prop is information, not a lock — so every remaining
+    // side is collected here, priced honestly, and shown BELOW the ranked list
+    // under a flag saying why it didn't make it.
+    //
+    // Nothing above this line changes. `availableLegs` stays the ranked pool, so
+    // the suggestions, the weakest-leg swap, the synergy scan and the header count
+    // all see exactly what they saw before.
+    //
+    // Confidence for the other side is `100 - conf` and that is not an
+    // approximation: evWinProb reads `conf` AS the win probability (it divides by
+    // 100), so the complement is the model's own number for the opposite side. A
+    // prop with no lean sits at 50 — a coin flip is the honest prior, and it lands
+    // where it should once EV prices the vig in.
+    const PARLAY_ALL_STATS = ['fp', 'ss', 'ss_r1', 'td', 'ft', 'ctrl', 'kd'];
+    const RANKED_FAMILY = new Set(['fp', 'ss', 'td', 'ft']);
+    const rankedKeys = new Set(availableLegs.map(a => parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)));
+    const offBoardLegs = [];
+    for (const f of visibleFighters) {
+        if (!f.db?.loaded)
+            continue;
+        for (const stat of PARLAY_ALL_STATS) {
+            const lean = leanForStat(f, stat);
+            const leanDir = (lean && lean.lean !== 'none' && lean.lean !== 'push') ? lean.lean : null;
+            const leanConf = lean?.conf || 0;
+            for (const dir of ['over', 'under']) {
+                const key = parlayLegKey(f.name, stat, dir);
+                if (rankedKeys.has(key))
+                    continue;
+                // Direction-aware line + book: leanBestBook already knows an OVER wants
+                // the lowest line and an UNDER the highest, and already drops books that
+                // don't post the side. A side no book takes still gets a leg (the active
+                // line), flagged — placeability is REPORTED here, never enforced, the same
+                // call the two-sided slate picker makes.
+                const bb = leanBestBook(f, stat, dir);
+                const line = bb.line ?? getSourceActiveLine(f, stat);
+                if (line == null)
+                    continue;
+                const statLbl = statDisplayLabel(stat);
+                let conf;
+                let reason;
+                if (leanDir && leanDir !== dir) {
+                    conf = Math.max(1, 100 - leanConf);
+                    reason = `Model leans ${leanDir.toUpperCase()} here at ${leanConf}% — this is the other side, so it carries the complement (${conf}%). Your read is allowed to disagree with the board's.`;
+                }
+                else if (leanDir === dir && !RANKED_FAMILY.has(stat)) {
+                    conf = leanConf;
+                    reason = `${statLbl} isn't one of the families the ranked pool scores (FP / SS / TD / FT) — the model does lean ${dir.toUpperCase()} ${leanConf}% here, it just has never been rankable in Parlay Lab.`;
+                }
+                else if (leanDir === dir) {
+                    // Same stat, same side as the lean, yet not in the ranked pool: the
+                    // ranked builder dropped it on placeability (a dog's FP UNDER is
+                    // Underdog-only) or had no line on the ACTIVE book while another book
+                    // posts one. Either way the model is on this side — say so.
+                    conf = leanConf;
+                    reason = `Model leans ${dir.toUpperCase()} ${leanConf}% here, but the ranked pool dropped this side — the active book doesn't post it for this fighter. Still yours to take.`;
+                }
+                else {
+                    conf = 50;
+                    reason = `No model lean on this ${statLbl} prop either way — 50% is the honest prior, not a read. EV prices the vig against it.`;
+                }
+                if (!bb.book)
+                    reason += ' · No book posts this side that the scraper can see — queue it anyway if you have it somewhere.';
+                offBoardLegs.push({
+                    leg: {
+                        fighter: f.name,
+                        opponent: f.opponent || '?',
+                        stat,
+                        direction: dir,
+                        line,
+                        confidence: conf,
+                        tier: conf >= 72 ? 'High' : conf >= 58 ? 'Med' : 'Low',
+                        platform: activePlatformLabel(f),
+                        offBoard: true,
+                        offReason: reason,
+                        bookKey: bb.book,
+                    },
+                    fighter: f,
+                });
+            }
+        }
+    }
+    offBoardLegs.sort((a, b) => b.leg.confidence - a.leg.confidence);
+    // Both tiers, for everything that must see a leg the user can actually click:
+    // EV, selection, the slip. Ranking, suggestions and swaps stay on availableLegs.
+    const poolLegs = [...availableLegs, ...offBoardLegs];
+    // Which book a leg's line came from. Off-board legs resolved theirs
+    // direction-aware in leanBestBook; ranked legs use the active platform as before.
+    const parlayLegBook = (l, lf) => (l.offBoard
+        // leanBestBook types its book as a plain string; the values are the same
+        // platform keys every other book lookup here uses.
+        ? (l.bookKey ?? null)
+        : (getSourceActivePlatformKey(lf, l.stat) ?? null));
     // GLOW-UP 177: per-leg EV via the same computeDetailedEV pipeline the board
     // uses, so the pool's EV sort can never disagree with Best Picks. Synthesize
     // a minimal EffectiveLean from the leg's direction/stat/confidence.
     const parlayLegEv = new Map();
-    for (const a of availableLegs) {
+    for (const a of poolLegs) {
         const el = { lean: a.leg.direction, _source: a.leg.stat, conf: a.leg.confidence };
         parlayLegEv.set(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction), computeDetailedEV(a.fighter, el)?.ev ?? null);
     }
@@ -10777,7 +10878,7 @@ function renderParlayLab(container) {
     // platform-key lookups on slip rows)
     const selectedLegs = [];
     const selectedPairs = [];
-    for (const a of availableLegs) {
+    for (const a of poolLegs) {
         const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
         if (parlaySelectedLegs.has(key)) {
             selectedLegs.push(a.leg);
@@ -10920,18 +11021,27 @@ function renderParlayLab(container) {
     // full availableLegs, so hiding a leg here never changes the math.
     const evOf = (a) => parlayLegEv.get(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)) ?? null;
     const tierRank = (t) => (t === 'High' ? 0 : t === 'Med' ? 1 : 2);
-    let displayLegs = availableLegs.filter(a => (parlayPoolStat === 'all' || a.leg.stat === parlayPoolStat)
-        && (parlayPoolDir === 'all' || a.leg.direction === parlayPoolDir));
-    if (parlayPoolSort === 'ev') {
-        displayLegs = [...displayLegs].sort((a, b) => (evOf(b) ?? -Infinity) - (evOf(a) ?? -Infinity));
-    }
-    else if (parlayPoolSort === 'tier') {
-        displayLegs = [...displayLegs].sort((a, b) => tierRank(a.leg.tier) - tierRank(b.leg.tier) || b.leg.confidence - a.leg.confidence);
-    } // 'conf' keeps the base confidence-desc order
+    // GLOW-UP 207: the same view (filter + sort) is applied to BOTH tiers, so the
+    // off-board section obeys the command strip exactly like the ranked one and
+    // "sorted by EV" means one thing on the page, not two.
+    const applyPoolView = (legs) => {
+        const out = legs.filter(a => (parlayPoolStat === 'all' || a.leg.stat === parlayPoolStat)
+            && (parlayPoolDir === 'all' || a.leg.direction === parlayPoolDir));
+        if (parlayPoolSort === 'ev') {
+            return [...out].sort((a, b) => (evOf(b) ?? -Infinity) - (evOf(a) ?? -Infinity));
+        }
+        if (parlayPoolSort === 'tier') {
+            return [...out].sort((a, b) => tierRank(a.leg.tier) - tierRank(b.leg.tier) || b.leg.confidence - a.leg.confidence);
+        }
+        return out; // 'conf' keeps the base confidence-desc order
+    };
+    const displayLegs = applyPoolView(availableLegs);
+    const displayOffLegs = applyPoolView(offBoardLegs);
     // Stat-family chips built from the pool (only families actually present).
-    const PL_STAT_LABEL = { fp: 'FP', ss: 'SS', td: 'TD', ft: 'FT' };
+    // Counts span both tiers because the chips filter both.
+    const PL_STAT_LABEL = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL', kd: 'KD' };
     const plStatCounts = new Map();
-    for (const a of availableLegs)
+    for (const a of poolLegs)
         plStatCounts.set(a.leg.stat, (plStatCounts.get(a.leg.stat) || 0) + 1);
     const plStatChips = Object.keys(PL_STAT_LABEL)
         .filter(s => (plStatCounts.get(s) || 0) > 0)
@@ -10946,7 +11056,7 @@ function renderParlayLab(container) {
     </span>
     <span class="plq-group">
       <span class="plq-label">SHOW</span>
-      <button class="plq-chip${parlayPoolStat === 'all' ? ' on' : ''}" data-plq-stat="all" title="All stat families">ALL <i>${availableLegs.length}</i></button>
+      <button class="plq-chip${parlayPoolStat === 'all' ? ' on' : ''}" data-plq-stat="all" title="All stat families — ranked pool plus off-board">ALL <i>${poolLegs.length}</i></button>
       ${plStatChips}
     </span>
     <span class="plq-group">
@@ -10978,7 +11088,7 @@ function renderParlayLab(container) {
         const withLeg = analyzeParlayHealth([...selectedLegs, leg], visibleFighters);
         return withLeg.score - baseHealthScore;
     };
-    const poolRows = displayLegs.map(a => {
+    const renderPoolRow = (a) => {
         const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
         const sel = parlaySelectedLegs.has(key);
         const mDelta = sel ? null : marginalDelta(a.leg);
@@ -10996,8 +11106,15 @@ function renderParlayLab(container) {
         const synergy = (sel || conflict) ? null : synergyWithSlip(a.leg, a.fighter);
         const legEv = evOf(a);
         const confClass = a.leg.confidence >= 72 ? 'conf-high' : a.leg.confidence >= 58 ? 'conf-med' : 'conf-low';
-        const pk = getSourceActivePlatformKey(a.fighter, a.leg.stat);
-        const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(a.fighter, a.leg.stat)}">${platformKeyShort(pk)}</span>` : '';
+        const pk = parlayLegBook(a.leg, a.fighter);
+        const platChip = pk
+            ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${a.leg.offBoard ? `${PL_BOOK_NAME[pk] || pk} ${a.leg.line} — best book for this SIDE` : formatSourcePlatformLabel(a.fighter, a.leg.stat)}">${platformKeyShort(pk)}</span>`
+            // GLOW-UP 207: an off-board side no book posts still gets a row (placeability
+            // is reported, not enforced — same call the two-sided slate picker makes).
+            : (a.leg.offBoard ? '<span class="parlay-leg-plat plat-none" title="No book the scraper can see posts this side. The line shown is the prop\'s active line; queue it anyway if you have it somewhere else.">NO BK</span>' : '');
+        const offTag = a.leg.offBoard
+            ? `<span class="parlay-leg-off" title="${(a.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>`
+            : '';
         const warnTag = conflict ? `<span class="parlay-leg-warn" title="${conflict.replace(/"/g, '&quot;')}">✗ vs slip</span>` : '';
         const synTag = synergy ? `<span class="parlay-leg-syn" title="${synergy.replace(/"/g, '&quot;')}">🔗 synergy</span>` : '';
         // EV was already computed for the pool's EV sort but never shown — the sort
@@ -11005,10 +11122,10 @@ function renderParlayLab(container) {
         const evTag = legEv != null
             ? `<span class="parlay-leg-ev ${legEv > 0 ? 'pos' : legEv < 0 ? 'neg' : ''}" title="Calibrated EV for this leg as a single pick — same pipeline as the Best Picks board. Parlay EV is the slip deck on the right; this prices the leg on its own.">${legEv > 0 ? '+' : ''}${legEv}%</span>`
             : '';
-        return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
+        return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
-      ${vsTag}${warnTag}${synTag}
+      ${vsTag}${offTag}${warnTag}${synTag}
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
@@ -11017,14 +11134,29 @@ function renderParlayLab(container) {
       ${evTag}${mTag}
       <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
     </div>`;
-    }).join('');
+    };
     // GLOW-UP 178: slip-ready clip text for a parlay leg — same shape as the
     // Best Picks ⧉ payload so a leg copied here reads identically to one copied
     // from the board.
     const PL_STAT_CLIP = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL', kd: 'KD' };
     const PL_BOOK_NAME = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
+    // Rendered here (not at the map above) so the row can name its book via
+    // PL_BOOK_NAME without tripping over the const's temporal dead zone.
+    const poolRows = displayLegs.map(renderPoolRow).join('');
+    const offRows = parlayPoolShowOffBoard ? displayOffLegs.map(renderPoolRow).join('') : '';
+    // GLOW-UP 207: the off-board section header. Always present when there is
+    // anything down there — the note has to be readable BEFORE expanding, or the
+    // rows read as a second ranked list rather than the model's leftovers.
+    const offBoardHtml = displayOffLegs.length ? `<div class="parlay-offboard">
+      <button class="parlay-offboard-head${parlayPoolShowOffBoard ? ' open' : ''}" data-plq-offboard title="${parlayPoolShowOffBoard ? 'Hide' : 'Show'} the props that didn't make the ranked pool">
+        <span class="pob-caret">${parlayPoolShowOffBoard ? '▾' : '▸'}</span>
+        OFF-BOARD PROPS <span class="parlay-count-pill">${displayOffLegs.length}${displayOffLegs.length !== offBoardLegs.length ? `/${offBoardLegs.length}` : ''}</span>
+      </button>
+      <div class="parlay-offboard-note">These didn't make the ranked pool — the model leans the other side, has no read on the prop, or the stat family (R1 SS · CTRL · KD) has never been ranked here. They're fully parlayable: confidence is the model's own complement (or 50% with no read), EV and slip health price them exactly like any other leg, so they simply sort low. ${parlayPoolShowOffBoard ? '' : 'Open to build off them.'}</div>
+      ${offRows}
+    </div>` : '';
     const parlayLegClip = (l, lf) => {
-        const pk = getSourceActivePlatformKey(lf, l.stat);
+        const pk = parlayLegBook(l, lf);
         const oppOk = l.opponent && l.opponent !== '?';
         return `${prettyName(l.fighter)} ${l.direction.toUpperCase()} ${l.line} ${PL_STAT_CLIP[l.stat] || l.stat.toUpperCase()}${pk ? ` @ ${PL_BOOK_NAME[pk] || pk}` : ''}${oppOk ? ` (vs ${prettyName(l.opponent)})` : ''}`;
     };
@@ -11035,12 +11167,21 @@ function renderParlayLab(container) {
     const slipFightKey = (l) => [legNorm(l.fighter), legNorm(l.opponent)].sort().join('|');
     const renderSlipLeg = ({ leg: l, fighter: lf }) => {
         const key = parlayLegKey(l.fighter, l.stat, l.direction);
-        const pk = getSourceActivePlatformKey(lf, l.stat);
-        const platChip = pk ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>` : '';
+        const pk = parlayLegBook(l, lf);
+        const platChip = pk
+            ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${l.offBoard ? `${PL_BOOK_NAME[pk] || pk} ${l.line} — best book for this SIDE` : formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>`
+            : (l.offBoard ? '<span class="parlay-leg-plat plat-none" title="No book the scraper can see posts this side — enter it wherever you have it.">NO BK</span>' : '');
+        // The off-board flag rides along into the slip: once a leg is in the
+        // ticket its row no longer says which tier it came from, and "this leg is
+        // the side the model is against" is exactly what you want visible while
+        // reading a built slip.
+        const offTag = l.offBoard
+            ? `<span class="parlay-leg-off" title="${(l.offReason || '').replace(/"/g, '&quot;')}">off-board</span>`
+            : '';
         const clip = parlayLegClip(l, lf);
-        return `<div class="parlay-slip-leg">
+        return `<div class="parlay-slip-leg${l.offBoard ? ' off-board' : ''}">
           <span class="parlay-slip-remove" data-parlay-remove="${key}" title="Remove leg">✕</span>
-          <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>
+          <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${l.fighter}" alt="" /></span><span class="parlay-leg-name" style="flex:1">${prettyName(l.fighter)}</span>${offTag}
           <span class="parlay-leg-dir ${l.direction}">${l.direction.toUpperCase()}</span>
           <span class="parlay-leg-stat src-${l.stat}">${l.stat === 'ss_r1' ? 'R1 SS' : l.stat.toUpperCase()}</span>
           <span class="parlay-leg-line">${l.line}</span>
@@ -11316,7 +11457,7 @@ function renderParlayLab(container) {
     <div class="parlay-lab-header">
       <div>
         <div class="parlay-lab-title">PARLAY LAB</div>
-        <div class="parlay-lab-subtitle">Build multi-leg parlays with correlation analysis · ${availableLegs.length} available legs</div>
+        <div class="parlay-lab-subtitle">Build multi-leg parlays with correlation analysis · ${availableLegs.length} ranked legs${offBoardLegs.length ? ` · ${offBoardLegs.length} off-board` : ''}</div>
       </div>
       <div class="parlay-selected-chip${selectedLegs.length >= 2 ? ' ready' : ''}">
         ${selectedLegs.length} leg${selectedLegs.length !== 1 ? 's' : ''} selected
@@ -11324,9 +11465,14 @@ function renderParlayLab(container) {
     </div>
     <div class="parlay-lab-cols">
       <div class="parlay-pool">
-        <div class="parlay-pool-title">AVAILABLE LEGS <span class="parlay-count-pill">${displayLegs.length !== availableLegs.length ? `${displayLegs.length}/${availableLegs.length}` : availableLegs.length}</span></div>
-        ${availableLegs.length ? parlayPoolControls : ''}
-        ${poolRows || (availableLegs.length ? '<div class="parlay-slip-empty">No legs match the current filter — <button class="plq-reset">reset</button></div>' : '<div class="parlay-slip-empty">No leans calculated yet</div>')}
+        <div class="parlay-pool-title">RANKED LEGS <span class="parlay-count-pill">${displayLegs.length !== availableLegs.length ? `${displayLegs.length}/${availableLegs.length}` : availableLegs.length}</span></div>
+        ${poolLegs.length ? parlayPoolControls : ''}
+        ${poolRows || (availableLegs.length
+        ? '<div class="parlay-slip-empty">No ranked legs match the current filter — <button class="plq-reset">reset</button></div>'
+        // The ranked pool being empty is no longer the end of the view: the
+        // off-board section below can still have every side of every prop.
+        : `<div class="parlay-slip-empty">No leans calculated yet${offBoardLegs.length ? ' — the off-board props below are still parlayable' : ''}</div>`)}
+        ${offBoardHtml}
       </div>
       <div>
         <div class="parlay-builder">
@@ -11418,6 +11564,14 @@ function renderParlayLab(container) {
             renderParlayLab(container);
         });
     });
+    // GLOW-UP 207: expand/collapse the off-board section. Session-scoped like the
+    // rest of the command strip — it changes what's drawn, never what's selected.
+    container.querySelectorAll('[data-plq-offboard]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            parlayPoolShowOffBoard = !parlayPoolShowOffBoard;
+            renderParlayLab(container);
+        });
+    });
     container.querySelectorAll('.plq-reset').forEach(btn => {
         btn.addEventListener('click', () => {
             parlayPoolSort = 'conf';
@@ -11454,7 +11608,7 @@ function renderParlayLab(container) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const legs = selectedPairs.map(({ leg: l, fighter: lf }) => {
-                const pk = getSourceActivePlatformKey(lf, l.stat);
+                const pk = parlayLegBook(l, lf);
                 return {
                     fighter: l.fighter,
                     opponent: (l.opponent && l.opponent !== '?') ? l.opponent : null,
