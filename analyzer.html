@@ -29204,41 +29204,49 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 .fpbk .side-pick { margin-left: 2px; }
 
-/* ══ GLOW-UP 214: LINE SHOPPING DIFF — five-level pass ════════════════════
-   The panel showed WHO disagrees and coloured the extremes. It never said what
-   to do, what shopping was worth against the book you'd actually have used, or
-   whether the "best" line was even placeable — and none of it was clickable.
-   These styles carry that: a command strip, a verdict line per stat, cells as
-   controls, and a bias strip that filters instead of just informing. */
-.lineshop-modal-box { max-width: 1120px; }
+/* ══ GLOW-UP 215: LINE SHOPPING DIFF — visual rework ══════════════════════
+   214's logic survives untouched (gain vs your default, placeability gating,
+   click-to-queue, filters). Its LOOK did not: one type size, one weight, and a
+   grey verdict line meant the money number and the scaffolding were rendered
+   with equal emphasis, so the panel read as a wall. Five visual levels:
+   V1 hierarchy · V2 the take as an object · V3 magnitude as position ·
+   V4 book identity · V5 depth and focus. */
+.lineshop-modal-box { max-width: 1180px; }
 
-/* L1 — command strip. Same visual language as Parlay Lab's plq-controls so the
-   two command surfaces in the app read as one idea. */
+/* ── V5 · modal chrome ─────────────────────────────────────────────────── */
+.lineshop-modal-box .modal-head {
+  position: sticky; top: 0; z-index: 4;
+  background: linear-gradient(180deg, var(--bg2) 72%, rgba(0,0,0,0));
+  padding-bottom: 10px;
+}
+#lineShopContent { padding-top: 2px; }
+
+/* ── V1 · command strip ────────────────────────────────────────────────── */
 .ls-controls {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  padding: 8px 10px; margin-bottom: 10px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--border2); border-radius: 7px;
+  padding: 9px 12px; margin-bottom: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
+  border: 1px solid var(--border2); border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 .ls-ctl-group { display: inline-flex; align-items: center; gap: 4px; }
 .ls-ctl-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8px; letter-spacing: 0.16em; color: var(--text4);
-  margin-right: 2px;
+  font-size: 8px; letter-spacing: 0.18em; color: var(--text4);
 }
 .ls-btn, .ls-chip {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
-  padding: 3px 8px; border-radius: 4px; cursor: pointer;
-  background: rgba(255,255,255,0.03);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
+  padding: 4px 9px; border-radius: 5px; cursor: pointer;
+  background: rgba(255,255,255,0.035);
   border: 1px solid var(--border2); color: var(--text3);
-  transition: background 0.14s, color 0.14s, border-color 0.14s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.ls-chip { border-radius: 10px; }
-.ls-btn:hover, .ls-chip:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+.ls-chip { border-radius: 11px; }
+.ls-btn:hover, .ls-chip:hover { background: rgba(255,255,255,0.08); color: var(--text); }
 .ls-btn.on, .ls-chip.on {
-  background: rgba(248,198,74,0.12); border-color: rgba(248,198,74,0.40);
-  color: var(--gold); text-shadow: 0 0 8px rgba(248,198,74,0.25);
+  background: rgba(248,198,74,0.14); border-color: rgba(248,198,74,0.45);
+  color: var(--gold); box-shadow: 0 0 12px rgba(248,198,74,0.15);
 }
 .ls-reset-inline {
   font-size: 9px; color: var(--text3); background: none; border: none;
@@ -29249,104 +29257,214 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap;
   margin-left: auto; font-size: 9px; color: var(--text4);
 }
-.ls-legend-inline em { font-style: normal; opacity: 0.75; margin-left: 4px; }
-.ls-legend-swatch { transform: scale(0.85); }
+.ls-legend-inline em { font-style: normal; opacity: 0.7; margin-left: 4px; }
+.ls-legend-swatch { transform: scale(0.8); }
 
-/* L5 — platform bias: was a wall of inline styles with a tooltip. Now a real
-   control — each chip filters the table to rows that book actually wins. */
+/* ── V5 · platform bias ────────────────────────────────────────────────── */
 .ls-bias-strip {
   display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-  margin-bottom: 10px; padding: 8px 10px;
-  background: linear-gradient(135deg, rgba(248,198,74,0.05), rgba(248,198,74,0.01));
-  border: 1px solid rgba(248,198,74,0.10);
-  border-left: 3px solid rgba(248,198,74,0.45);
-  border-radius: 6px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.15);
+  margin-bottom: 12px; padding: 9px 12px;
+  background: linear-gradient(135deg, rgba(248,198,74,0.055), rgba(248,198,74,0.01));
+  border: 1px solid rgba(248,198,74,0.12);
+  border-left: 3px solid rgba(248,198,74,0.5);
+  border-radius: 8px;
 }
 .ls-bias-head {
-  font-size: 9px; color: rgba(248,198,74,0.75); text-transform: uppercase;
-  letter-spacing: 0.10em; margin-right: 4px; cursor: help;
+  font-size: 8.5px; color: rgba(248,198,74,0.8); text-transform: uppercase;
+  letter-spacing: 0.14em; margin-right: 4px; cursor: help;
 }
 .ls-bias-chip {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
-  padding: 3px 7px; border-radius: 4px; cursor: pointer;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-  border: 1px solid rgba(248,198,74,0.12); color: var(--text2);
-  transition: border-color 0.14s, background 0.14s;
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+  padding: 4px 8px; border-radius: 5px; cursor: pointer;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(248,198,74,0.14); color: var(--text2);
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
 }
-.ls-bias-chip:hover { border-color: rgba(248,198,74,0.35); background: rgba(248,198,74,0.07); }
-.ls-bias-chip.on { border-color: rgba(248,198,74,0.6); background: rgba(248,198,74,0.14); }
-.ls-bias-plat { color: rgba(248,198,74,0.65); }
+.ls-bias-chip:hover { border-color: rgba(248,198,74,0.4); background: rgba(248,198,74,0.08); transform: translateY(-1px); }
+.ls-bias-chip.on { border-color: rgba(248,198,74,0.65); background: rgba(248,198,74,0.16); }
+.ls-bias-plat { color: rgba(248,198,74,0.7); }
 .ls-bias-stat { font-weight: 700; }
-.ls-bias-val { font-weight: 700; }
+.ls-bias-val { font-weight: 800; }
 .ls-bias-val.pos { color: var(--green); }
 .ls-bias-val.neg { color: var(--red); }
 .ls-filter-note {
-  font-size: 10px; color: var(--text3); margin-bottom: 8px;
-  padding: 5px 9px; border-radius: 5px;
-  background: rgba(248,198,74,0.06); border: 1px solid rgba(248,198,74,0.18);
+  font-size: 10px; color: var(--text3); margin-bottom: 9px;
+  padding: 6px 10px; border-radius: 6px;
+  background: rgba(248,198,74,0.06); border: 1px solid rgba(248,198,74,0.2);
 }
 
-/* L3 — cells are buttons now. Reset the UA button styling so they keep the
-   exact geometry the read-only spans had. */
-button.ls-cell-val {
-  font-family: inherit; font-size: inherit; cursor: pointer;
-  border: 1px solid transparent;
-  /* A <button> inherits the UA `buttonface` fill — light grey — which rendered
-     every neutral cell as a white box with unreadable text. The span form had no
-     background at all, so the reset has to be explicit here. */
-  background: none; color: inherit; appearance: none; -webkit-appearance: none;
-  transition: transform 0.1s, box-shadow 0.14s, border-color 0.14s;
+/* ── V1 · table rhythm ─────────────────────────────────────────────────── */
+.lineshop-table { width: 100%; border-collapse: separate; border-spacing: 0 5px; }
+.lineshop-table th {
+  position: sticky; top: 58px; z-index: 3;
+  background: var(--bg2);
+  padding: 7px 10px; font-size: 8.5px; letter-spacing: 0.16em;
+  color: var(--text4); font-weight: 800; border-bottom: 1px solid var(--border2);
 }
-button.ls-neutral { background: rgba(255,255,255,0.03); color: var(--text2); }
-button.ls-cell-val:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.22); }
-.ls-cell-val.ls-take {
-  box-shadow: 0 0 0 1px rgba(72,199,142,0.45), 0 0 10px rgba(72,199,142,0.18);
+.lineshop-table td {
+  padding: 9px 10px; vertical-align: top;
+  background: rgba(255,255,255,0.018);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(0,0,0,0.25);
+  transition: background 0.15s;
 }
-.ls-cell-val.ls-on {
-  box-shadow: 0 0 0 1px rgba(248,198,74,0.6), 0 0 10px rgba(248,198,74,0.22);
-}
-.ls-check { font-style: normal; font-size: 8px; margin-left: 2px; color: var(--gold); }
-/* A best line the book won't take — the trap this panel used to walk you into. */
-.ls-cell-val.ls-blocked {
-  border-style: dashed !important; border-color: rgba(255,100,100,0.45) !important;
-  opacity: 0.6; box-shadow: none;
-}
+.lineshop-table tr.ls-row td:first-child { border-radius: 9px 0 0 9px; border-left: 3px solid transparent; }
+.lineshop-table tr.ls-row td:last-child { border-radius: 0 9px 9px 0; }
+/* Value heat on the spine — the table gains a shape you can skim. */
+.ls-row.heat-3 td:first-child { border-left-color: #26d07c; }
+.ls-row.heat-2 td:first-child { border-left-color: rgba(38,208,124,0.55); }
+.ls-row.heat-1 td:first-child { border-left-color: rgba(38,208,124,0.22); }
+.ls-row.heat-3 td { background: rgba(38,208,124,0.045); }
+.ls-row:hover td { background: rgba(255,255,255,0.05); }
+/* V5 — focus: hovering a row quiets the others instead of just lighting one. */
+.lineshop-table tbody:hover tr.ls-row:not(:hover) { opacity: 0.45; transition: opacity 0.18s; }
 
-/* L2 — the verdict line: spread as context, the call as the point. */
-.ls-stat-td { min-width: 190px; }
-.ls-verdict {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+.lineshop-fighter-name { text-align: left !important; min-width: 168px; }
+.ls-name-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ls-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: 0.01em;
 }
-.ls-v-spread {
-  color: var(--text4); letter-spacing: 0.04em; cursor: help;
-  padding: 1px 5px; border-radius: 8px; background: rgba(255,255,255,0.04);
+.ls-rank {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
+  background: rgba(248,198,74,0.16); color: var(--gold);
+  border: 1px solid rgba(248,198,74,0.4); cursor: help;
 }
-.ls-v-take { color: #6ee7a8; cursor: help; }
-.ls-v-take b { color: #8ff0c0; font-weight: 800; }
-.ls-v-blocked { color: #ff8fa3; cursor: help; }
-.ls-v-none, .ls-v-note { color: var(--text4); cursor: help; }
-.ls-v-flat { color: var(--text4); opacity: 0.5; }
-
-/* Row-level: the biggest single gain available on this fighter. */
+.ls-vs { font-size: 9px; color: var(--text4); margin-top: 2px; }
 .ls-row-gain {
-  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 800;
-  color: #6ee7a8; background: rgba(38,208,124,0.10);
-  border: 1px solid rgba(38,208,124,0.30); border-radius: 8px; padding: 1px 5px;
-  cursor: help;
+  display: inline-flex; align-items: baseline; gap: 4px; margin-top: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800;
+  color: #6ee7a8; cursor: help;
 }
-.lineshop-table tr.ls-row-hot td { background: rgba(38,208,124,0.035); }
+.ls-row-gain em {
+  font-style: normal; font-size: 7.5px; letter-spacing: 0.12em;
+  color: var(--text4); text-transform: uppercase;
+}
 
-/* L4 — the fold for rows with nothing to shop. */
-.ls-fold-row { text-align: left !important; padding: 4px 8px !important; }
-.ls-fold {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em;
-  color: var(--text3); background: none; border: none; cursor: pointer; padding: 4px 2px;
+/* ── V4 · book identity on the cells ───────────────────────────────────── */
+.lineshop-stat-group { display: flex; gap: 4px; justify-content: flex-start; flex-wrap: wrap; }
+.ls-cell-val {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 4px 8px 3px; border-radius: 6px; min-width: 40px; line-height: 1.2;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border2);
+  color: var(--text2);
 }
-.ls-fold:hover { color: var(--text); }
-.ls-flat-body tr:not(:first-child) td { opacity: 0.55; }
-.ls-empty-row { text-align: center !important; color: var(--text3); font-size: 11px; padding: 18px !important; }
+button.ls-cell-val {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  transition: transform 0.12s, box-shadow 0.16s, border-color 0.16s, background 0.16s;
+}
+button.ls-cell-val:hover { transform: translateY(-2px); }
+.ls-plat-tag {
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em;
+  opacity: 0.9; margin-bottom: 2px; line-height: 1;
+}
+.ls-cell-val.plat-pick6 .ls-plat-tag { color: #7cc4ff; }
+.ls-cell-val.plat-underdog .ls-plat-tag { color: #a8aeff; }
+.ls-cell-val.plat-prizepicks .ls-plat-tag { color: #5fe0dc; }
+.ls-cell-val.plat-betr .ls-plat-tag { color: #ffa06b; }
+.ls-cell-val.plat-draftkings_sportsbook .ls-plat-tag { color: #ffc75e; }
+/* Direction keeps its own meaning: green = the side you want, red = the worst
+   price. Book hue lives only on the tag, so the two systems never fight. */
+.ls-cell-val.ls-best {
+  background: rgba(38,208,124,0.14); border-color: rgba(38,208,124,0.5); color: #8ff0c0;
+}
+.ls-cell-val.ls-worst {
+  background: rgba(255,58,96,0.09); border-color: rgba(255,58,96,0.28); color: #ff9fb0;
+}
+.ls-cell-val.ls-take { box-shadow: 0 0 0 1px rgba(38,208,124,0.35), 0 4px 16px rgba(38,208,124,0.18); }
+.ls-cell-val.ls-on {
+  border-color: rgba(248,198,74,0.7) !important;
+  box-shadow: 0 0 0 1px rgba(248,198,74,0.5), 0 0 14px rgba(248,198,74,0.25);
+}
+.ls-check { font-style: normal; font-size: 8px; color: var(--gold); }
+.ls-cell-val.ls-blocked {
+  border-style: dashed !important; border-color: rgba(255,100,100,0.4) !important;
+  opacity: 0.5; box-shadow: none;
+}
+.ls-scale-mismatch { opacity: 0.35; font-style: italic; border-style: dashed !important; }
+.ls-empty { color: var(--text4); font-size: 10px; padding: 0 4px; }
+
+/* ── V3 · the range track ──────────────────────────────────────────────── */
+.ls-track { position: relative; height: 15px; margin: 7px 2px 3px; cursor: help; }
+.ls-track-rail {
+  position: absolute; left: 0; right: 0; top: 6px; height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(38,208,124,0.5), rgba(255,255,255,0.09) 55%, rgba(255,58,96,0.35));
+}
+.ls-track.good-hi .ls-track-rail {
+  background: linear-gradient(90deg, rgba(255,58,96,0.35), rgba(255,255,255,0.09) 45%, rgba(38,208,124,0.5));
+}
+.ls-dot {
+  position: absolute; top: 3px; width: 9px; height: 9px; border-radius: 50%;
+  transform: translateX(-50%); border: 1.5px solid var(--bg2);
+  background: var(--text3);
+}
+.ls-dot.plat-pick6 { background: #7cc4ff; }
+.ls-dot.plat-underdog { background: #a8aeff; }
+.ls-dot.plat-prizepicks { background: #5fe0dc; }
+.ls-dot.plat-betr { background: #ffa06b; }
+.ls-dot.plat-draftkings_sportsbook { background: #ffc75e; }
+.ls-dot.is-best {
+  width: 12px; height: 12px; top: 1px;
+  box-shadow: 0 0 0 2px rgba(38,208,124,0.5), 0 0 12px rgba(38,208,124,0.5);
+  z-index: 2;
+}
+.ls-track-lo, .ls-track-hi {
+  position: absolute; bottom: -2px; font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; color: var(--text4);
+}
+.ls-track-lo { left: 0; }
+.ls-track-hi { right: 0; }
+
+/* ── V2 · the take card ────────────────────────────────────────────────── */
+.ls-take-card {
+  display: flex; align-items: center; gap: 7px; margin-top: 7px;
+  padding: 5px 9px; border-radius: 7px; cursor: help;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border2);
+  color: var(--text3);
+}
+.ls-take-card.is-take {
+  background: linear-gradient(135deg, rgba(38,208,124,0.13), rgba(38,208,124,0.03));
+  border-color: rgba(38,208,124,0.35);
+}
+.ls-tc-gain {
+  font-size: 16px; font-weight: 800; line-height: 1; color: #6ee7a8;
+  text-shadow: 0 0 14px rgba(38,208,124,0.35);
+}
+.ls-tc-body { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.ls-tc-book { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; }
+.ls-tc-book.plat-pick6 { color: #7cc4ff; }
+.ls-tc-book.plat-underdog { color: #a8aeff; }
+.ls-tc-book.plat-prizepicks { color: #5fe0dc; }
+.ls-tc-book.plat-betr { color: #ffa06b; }
+.ls-tc-book.plat-draftkings_sportsbook { color: #ffc75e; }
+.ls-tc-line { font-size: 12px; font-weight: 700; color: var(--text); }
+.ls-tc-vs { font-size: 8px; color: var(--text4); }
+.ls-tc-note { font-size: 8.5px; letter-spacing: 0.04em; }
+.ls-delta {
+  margin-left: auto; font-size: 8px; color: var(--text4);
+  padding: 2px 6px; border-radius: 8px; background: rgba(255,255,255,0.05);
+}
+.ls-take-card.is-blocked { border-color: rgba(255,100,100,0.3); color: #ff9fb0; }
+.ls-take-card.is-nolean { opacity: 0.85; }
+.ls-take-card.is-flat, .ls-take-card.is-none { opacity: 0.5; }
+
+/* ── V5 · fold + empty states ──────────────────────────────────────────── */
+.ls-fold-row { text-align: left !important; padding: 6px 8px !important; background: none !important; border: none !important; }
+.ls-fold {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
+  color: var(--text3); background: rgba(255,255,255,0.03); cursor: pointer;
+  border: 1px solid var(--border2); border-radius: 6px; padding: 5px 10px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ls-fold:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+.ls-flat-body .ls-row td { opacity: 0.6; }
+.ls-empty-row { text-align: center !important; color: var(--text3); font-size: 11px; padding: 22px !important; }
+.ls-stat-td { min-width: 210px; }
 </style>
 </head>
 <body>
