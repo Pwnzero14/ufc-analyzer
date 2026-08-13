@@ -12364,6 +12364,27 @@ function buildOpeningLinesRecord(overrideLines?: Record<string, number>): { even
 }
 
 /**
+ * GLOW-UP 209 — is a stored record's Betr event tag stale? THE one copy.
+ *
+ * This predicate existed twice: once inside loadOpeningLines and once written
+ * out inline in loadLineHistory. Fixing the first left the second wiping
+ * line_history_v1 on its own, which is how a restore with a correct tag still
+ * came back empty. Both loaders call this now.
+ *
+ * NO REFERENCE, NO VERDICT: `_currentBetrEventDate` is '' whenever
+ * betr_event_date isn't in storage yet — Betr not entered on this card, or just
+ * a load pass that ran before the stamp was written. Comparing a real tag
+ * against '' and calling it a mismatch destroyed valid baselines; an unknown
+ * reference is not evidence of change.
+ */
+function isBetrTagStale(tag: unknown): boolean {
+  if (!_currentBetrEventDate) return false;                 // no reference yet
+  if (tag === undefined || tag === null) return true;       // migration — no tag
+  if (typeof tag !== 'string') return true;                 // corrupt
+  return tag !== _currentBetrEventDate;                     // real mismatch
+}
+
+/**
  * GLOW-UP 209 — how much of the CURRENT slate is already present in a stored
  * baseline set. The same evidence `snapshotOpeningLines` uses to tell a real
  * event change from a flickering event NAME, lifted so the staleness wipe can
@@ -12405,23 +12426,10 @@ async function loadOpeningLines(): Promise<void> {
   //   2. Event change: baseline's tag doesn't match the current seed's date.
   //   3. Same checks applied to line_history_v1 — otherwise the reconstruction
   //      path below resurrects stale history into fresh baselines.
-  const isStale = (tag: unknown): boolean => {
-    // GLOW-UP 209 — NO REFERENCE, NO VERDICT. `_currentBetrEventDate` is ''
-    // whenever betr_event_date isn't in storage yet: Betr not entered on this
-    // card, or simply a load pass that ran before the stamp was written. This
-    // function used to read '' as a mismatch against any real tag and wipe, so a
-    // single early pass could destroy baselines that were perfectly valid — it
-    // is exactly what ate the restored 2026-08-15 baselines on reload, and the
-    // firstBetrOnly migration below cannot rescue it because that path requires
-    // a non-empty current tag. An unknown reference is not evidence of change.
-    if (!_currentBetrEventDate) return false;
-    if (tag === undefined || tag === null) return true;       // migration — no tag
-    if (typeof tag !== 'string') return true;                 // corrupt
-    return tag !== _currentBetrEventDate;                     // tag mismatch
-  };
-  const baselineStale = !!data?.lines && isStale((data as { forBetrEventDate?: unknown }).forBetrEventDate);
+  // GLOW-UP 209: shared with loadLineHistory — see isBetrTagStale.
+  const baselineStale = !!data?.lines && isBetrTagStale((data as { forBetrEventDate?: unknown }).forBetrEventDate);
   const historyStale  = !!historyRaw?.series && Object.keys(historyRaw.series).length > 0
-                        && isStale((historyRaw as { forBetrEventDate?: unknown }).forBetrEventDate);
+                        && isBetrTagStale((historyRaw as { forBetrEventDate?: unknown }).forBetrEventDate);
 
   // ── FIRST-BETR MIGRATION (2026-08-06) ──────────────────────────────────
   // The tag only exists once manual Betr lines do: analyzer.ts ~21231 stamps
@@ -12737,7 +12745,7 @@ async function loadLineHistory(): Promise<void> {
   // Same forBetrEventDate staleness check as loadOpeningLines — if loadOpeningLines
   // didn't already wipe it (because its own check path was skipped), catch it here.
   const histTag = (data as { forBetrEventDate?: unknown }).forBetrEventDate;
-  if (histTag === undefined || histTag === null || typeof histTag !== 'string' || histTag !== _currentBetrEventDate) {
+  if (isBetrTagStale(histTag)) {
     console.log(`[LineMovement] loadLineHistory: stale (tag="${histTag}" ≠ current="${_currentBetrEventDate}") — clearing`);
     _lineHistory = { eventKey: '', updatedAt: 0, forBetrEventDate: _currentBetrEventDate, series: {} };
     await storageSet({ [STORAGE_LINE_HISTORY_KEY]: null });
