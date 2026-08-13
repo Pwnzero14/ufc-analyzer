@@ -24038,7 +24038,24 @@ async function generateReportCard() {
     for (const g of groups) {
         const rows = g.pair.map(f => {
             const el = getEffectiveLean(f);
-            const { line, src } = bestAvailableLine(f);
+            // ── GLOW-UP 219 F1 — the line must belong to the LEAN'S OWN STAT ──────
+            // bestAvailableLine only ever knew FP lines, with a single DK-SS fallback,
+            // so it had no idea what prop the lean was actually on. Eric McConico read
+            // "—" on an SS lean while Pick6 had him at 30.5, and any fighter holding
+            // both an FP line and an SS lean was shown the FP number beside SS
+            // reasoning — the wrong-line trap, on the export people read before
+            // locking entries. leanBestBook resolves the correct stat, is placeability
+            // aware, and shops FP within its scoring family (GLOW-UP 212).
+            const statKey = (el._source || 'fp');
+            const statLbl = EFFECTIVE_LEAN_STAT_LABEL[statKey] || statKey.toUpperCase();
+            const resolved = (el.lean === 'over' || el.lean === 'under')
+                ? leanBestBook(f, statKey, el.lean)
+                : { book: null, line: null };
+            const line = resolved.line ?? getSourceActiveLine(f, statKey);
+            const srcKey = resolved.book ?? getSourceActivePlatformKey(f, statKey);
+            const src = srcKey ? platformKeyShort(srcKey) : '';
+            // No book will take this side — the same flag the board and Parlay Lab use.
+            const unplaceable = (el.lean === 'over' || el.lean === 'under') && !resolved.book && line != null;
             const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : 'rc-none';
             const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : '—';
             // R3 — confidence carries visual weight. 43% and 81% rendered identically
@@ -24047,24 +24064,48 @@ async function generateReportCard() {
             const confEl = el.lean !== 'none'
                 ? `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${Math.min(100, Math.max(6, el.conf))}%"></u></i></span>`
                 : `<span class="rc-conf is-none">—</span>`;
-            const avgEl = f.db?.avgFP != null
-                ? `<span class="rc-avg">avg ${f.db.avgFP.toFixed(1)}</span>`
+            // F2 — the average has to be the average OF THAT STAT. `avgFP` was printed
+            // beside every line regardless, so an SS lean read "18.5 · avg 63.0" where
+            // the 63.0 was fantasy points — two different quantities side by side with
+            // nothing saying so. Labelled as well as matched.
+            const avgVal = statKey === 'ss' ? (f.db?.avgSigStr ?? null)
+                : statKey === 'td' ? (f.db?.avgTD ?? null)
+                    : (f.db?.avgFP ?? null);
+            const avgEl = avgVal != null
+                ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg ${avgVal.toFixed(1)} <i>${statLbl}</i></span>`
                 : `<span class="rc-avg"></span>`;
             const topReason = el.reasons?.[0]?.text ?? '';
+            const generic = !!topReason && isBoilerplate(topReason);
+            // F3 — the boilerplate repeated verbatim on a third of the card and told
+            // you nothing about the fighter. It is replaced by a short, honest line
+            // saying exactly that, instead of spending two clamped lines saying
+            // nothing. The original string stays on hover for anyone who wants it.
+            const reasonTxt = topReason;
             const lineStr = line != null ? line.toFixed(1) : '—';
             const srcEl = src ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
             return `<div class="rc-fighter-row${el.lean === 'none' ? ' is-noplay' : ''} tier-${tier}">
         <span class="rc-name">${prettyName(f.name)}</span>
         <span class="rc-lean-chip ${leanCls}">${leanLabel}</span>
-        <span class="rc-line">${lineStr}</span>
+        <span class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</span>
+        <span class="rc-line">${lineStr}${unplaceable ? '<i class="rc-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet.">⛔</i>' : ''}</span>
         ${srcEl}
         ${confEl}
         ${avgEl}
-        ${topReason ? `<span class="rc-reason${isBoilerplate(topReason) ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${topReason}</span>` : '<span class="rc-reason"></span>'}
+        ${reasonTxt ? `<span class="rc-reason${generic ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${generic ? 'no specific read — baseline model only' : reasonTxt}</span>` : '<span class="rc-reason"></span>'}
       </div>`;
         }).join('');
+        // F4 — each section reports itself. "Is the main card stronger than the
+        // prelims?" was a question you could only answer by reading 24 rows and
+        // doing the arithmetic in your head.
+        const secFighters = groups.filter(x => x.badge === g.badge).flatMap(x => x.pair);
+        const secLeans = secFighters.map(x => getEffectiveLean(x)).filter(l => l.lean !== 'none');
+        const secAvg = secLeans.length ? Math.round(secLeans.reduce((n, l) => n + l.conf, 0) / secLeans.length) : 0;
         const headHtml = g.badge !== lastBadge
-            ? `<div class="rc-section-head rc-badge-${g.badgeCls}"><span>${g.badge}</span><i></i></div>`
+            ? `<div class="rc-section-head rc-badge-${g.badgeCls}">
+          <span>${g.badge}</span>
+          ${secLeans.length ? `<b class="rc-sec-stat" title="${secLeans.length} actionable lean${secLeans.length === 1 ? '' : 's'} in this section, averaging ${secAvg}% confidence.">${secLeans.length} leans · ${secAvg}%</b>` : ''}
+          <i></i>
+        </div>`
             : '';
         lastBadge = g.badge;
         // The `Surname vs Surname` label was dropped: both names are already on the
