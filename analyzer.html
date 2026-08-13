@@ -29808,6 +29808,38 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-name { font-size: 11.5px; }
 .rc-reason { font-size: 8.5px; line-height: 1.32; }
 
+
+/* ══ GLOW-UP 219: report card — the last pass ═════════════════════════════
+   F1 names the prop, F2 matches the average to it, F3 kills the boilerplate,
+   F4 lets each section report itself, F5 flags what cannot be placed. */
+
+/* F1 — the stat the lean is actually on, in its own family colour. */
+.rc-fighter-row {
+  grid-template-columns: 148px 68px 34px 52px 24px 58px 74px minmax(0, 1fr);
+}
+.rc-stat-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.08em; text-align: center; cursor: help;
+  padding: 2px 0; border-radius: 4px; background: rgba(255,255,255,0.05);
+}
+.rc-stat-tag.src-fp { color: rgba(255,255,255,0.8); }
+.rc-stat-tag.src-ss, .rc-stat-tag.src-ss_r1 { color: rgba(44,212,208,0.95); }
+.rc-stat-tag.src-td { color: rgba(240,192,64,0.95); }
+.rc-stat-tag.src-ft { color: rgba(146,125,255,0.95); }
+.rc-stat-tag.src-ctrl, .rc-stat-tag.src-kd { color: rgba(255,160,107,0.95); }
+
+/* F5 — a lean no book will take, flagged the way the rest of the app does. */
+.rc-blocked { font-style: normal; font-size: 9px; margin-left: 3px; cursor: help; }
+
+/* F2 — the average carries its own unit so it can't be read as the line's. */
+.rc-avg i { font-style: normal; opacity: 0.55; font-size: 7.5px; letter-spacing: 0.06em; }
+
+/* F4 — section self-report. */
+.rc-sec-stat {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.06em; opacity: 0.75; cursor: help;
+}
+
 </style>
 </head>
 <body>
