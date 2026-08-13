@@ -19100,8 +19100,13 @@ function generateLineShopModal(): void {
     if (!sv.cells.some(c => c.val != null)) return '';
     const bestTag = sv.best ? (LS_TAG[sv.best.bk] || sv.best.bk) : '—';
     const defTag = sv.defBook ? (LS_TAG[sv.defBook] || sv.defBook) : null;
+    // GLOW-UP 217 U1 — one book posting a prop is not "the books agree", it is
+    // nothing to compare. Printing `=` there put a chip at the far right of an
+    // otherwise empty band and made the column look broken rather than quiet.
+    const posted = sv.cells.filter(c => c.val != null && !c.offFamily).length;
+    if (posted < 2) return '';
     if (sv.spread === 0) {
-      return `<span class="ls-take-mini is-flat" title="Every book posting this prop has the same number — nothing to shop.">=</span>`;
+      return `<span class="ls-take-mini is-flat" title="All ${posted} books posting this prop have the same number — nothing to shop.">=</span>`;
     }
     if (sv.dir === 'none') {
       return `<span class="ls-take-mini is-nolean" title="No model lean on this prop, so there is no side to take — but the books disagree by ${sv.spread}, which is worth knowing if you have your own read.">Δ${sv.spread}</span>`;
@@ -19130,7 +19135,14 @@ function generateLineShopModal(): void {
     // Two bands per stat, not three: cells + take on one line, the track as a
     // sliver beneath. Keeps the whole panel on one screen at 100% zoom.
     const cols = statsOf(r).map(sv => `<td class="ls-stat-td">
-        <div class="ls-cellrow">${sv.cells.map(c => renderCell(f, sv, c)).join('')}${renderTake(sv)}</div>
+        <div class="ls-cellrow">${sv.cells.map(c => renderCell(f, sv, c)).join('')}${(() => {
+          const take = renderTake(sv);
+          // U1 — a dotted leader carries the eye from the last cell to the take
+          // chip. Right-aligning the chips gives the table a clean vertical
+          // "take" column; the leader stops the gap it opens from reading as a
+          // hole in the row.
+          return take ? `<i class="ls-lead"></i>${take}` : '';
+        })()}</div>
         ${renderTrack(sv)}
       </td>`).join('');
     const topGain = rowGain(r);
@@ -19227,7 +19239,16 @@ function generateLineShopModal(): void {
       <thead><tr>
         <th style="text-align:left">FIGHTER + LEAN</th>
         ${(lsStatFilter === 'all' ? STAT_DEFS : STAT_DEFS.filter(d => d.key === lsStatFilter))
-          .map(d => `<th>${d.label} LINES · TAKE</th>`).join('')}
+          .map(d => {
+            // U2 — each stat owns a hue on this board (the app's existing
+            // stat-family lanes), so the three zones separate without a rule
+            // between them. Book hue stays on the chips; stat hue stays here.
+            const n = liveRows.filter(r => r.stats[d.key].gain > 0).length;
+            return `<th class="ls-th src-${d.key}" title="${n} fighter${n === 1 ? '' : 's'} with a ${d.label} line worth shopping right now.">
+              <span class="ls-th-label">${d.label}</span>
+              <span class="ls-th-sub">${n ? `${n} shoppable` : 'lines · take'}</span>
+            </th>`;
+          }).join('')}
       </tr></thead>
       <tbody>${rowsHtml || `<tr><td colspan="${(lsStatFilter === 'all' ? 3 : 1) + 1}" class="ls-empty-row">No shoppable disagreement under this filter — <button class="ls-reset-inline" data-ls-reset>reset</button></td></tr>`}</tbody>
       ${flatRows.length ? `<tbody class="ls-flat-body">
