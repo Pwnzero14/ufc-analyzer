@@ -12079,6 +12079,29 @@ function buildOpeningLinesRecord(overrideLines) {
         lines,
     };
 }
+/**
+ * GLOW-UP 209 — how much of the CURRENT slate is already present in a stored
+ * baseline set. The same evidence `snapshotOpeningLines` uses to tell a real
+ * event change from a flickering event NAME, lifted so the staleness wipe can
+ * use it too: fighters are the durable identity of a slate, event strings are not.
+ *
+ * `total === 0` means the fighters haven't loaded yet, which is NOT evidence of
+ * anything. Callers must treat it as "cannot judge" and keep the baselines —
+ * reading an unknown slate as a changed one is what destroys data.
+ */
+function baselineSlateOverlap(lines) {
+    if (!lines)
+        return { rate: 0, hits: 0, total: 0 };
+    let hits = 0, total = 0;
+    for (const fighter of allFighters) {
+        total++;
+        const hit = ['p6', 'ud', 'pp', 'betr'].some(plat => lines[openingLineKey(plat, 'fp', fighter.name)] != null
+            || lines[openingLineKey(plat, 'ss', fighter.name)] != null);
+        if (hit)
+            hits++;
+    }
+    return { rate: total > 0 ? hits / total : 0, hits, total };
+}
 async function loadOpeningLines() {
     const stored = await storageGet(['lines_open_v1', 'betr_seed_hash', 'betr_event_date', STORAGE_LINE_HISTORY_KEY]);
     _currentBetrEventDate = typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '';
@@ -12093,6 +12116,16 @@ async function loadOpeningLines() {
     //   3. Same checks applied to line_history_v1 — otherwise the reconstruction
     //      path below resurrects stale history into fresh baselines.
     const isStale = (tag) => {
+        // GLOW-UP 209 — NO REFERENCE, NO VERDICT. `_currentBetrEventDate` is ''
+        // whenever betr_event_date isn't in storage yet: Betr not entered on this
+        // card, or simply a load pass that ran before the stamp was written. This
+        // function used to read '' as a mismatch against any real tag and wipe, so a
+        // single early pass could destroy baselines that were perfectly valid — it
+        // is exactly what ate the restored 2026-08-15 baselines on reload, and the
+        // firstBetrOnly migration below cannot rescue it because that path requires
+        // a non-empty current tag. An unknown reference is not evidence of change.
+        if (!_currentBetrEventDate)
+            return false;
         if (tag === undefined || tag === null)
             return true; // migration — no tag
         if (typeof tag !== 'string')
@@ -12125,9 +12158,26 @@ async function loadOpeningLines() {
     const tagWasEmpty = (t) => t === '' || t === undefined || t === null;
     const curEventKey = normalizeEventKey(upcomingEventName || inferredEventNameFromLines || '');
     const baseEventKey = normalizeEventKey(data?.eventKey || '');
+    // GLOW-UP 209 — the name comparison alone was wrong, and it defeated this very
+    // guard on 2026-08-13. The baseline carried the event name INFERRED FROM LINES
+    // ("UFC Fight Night: Ian Machado Garry vs Islam Makhachev") while the card
+    // carried the UFCStats name ("UFC 330: Makhachev vs. Machado Garry"). One
+    // event, two strings, so `baseEventKey !== curEventKey` declared a contradiction,
+    // firstBetrOnly went false, and 83h of baselines plus 256 history points were
+    // wiped on the first Betr entry — the exact loss this migration exists to stop.
+    //
+    // Fighters are the durable identity of a slate; event strings flicker with
+    // whatever source named them. So a name disagreement only counts when the
+    // SLATE disagrees too. Same evidence snapshotOpeningLines already uses.
+    const slateOverlap = baselineSlateOverlap(data?.lines);
+    const slateAgrees = slateOverlap.total === 0 || slateOverlap.rate >= 0.2;
     const eventContradicts = !!curEventKey && curEventKey !== 'unknown'
         && !!baseEventKey && baseEventKey !== 'unknown'
-        && baseEventKey !== curEventKey;
+        && baseEventKey !== curEventKey
+        && !slateAgrees;
+    if (baseEventKey && curEventKey && baseEventKey !== curEventKey && slateAgrees) {
+        console.log(`[LineMovement] Event name differs ("${baseEventKey}" vs "${curEventKey}") but ${slateOverlap.hits}/${slateOverlap.total} of the slate matches the baseline — same event, NOT a contradiction`);
+    }
     const firstBetrOnly = !!_currentBetrEventDate
         && tagWasEmpty(prevTag) && tagWasEmpty(prevHistTag)
         && !eventContradicts;
