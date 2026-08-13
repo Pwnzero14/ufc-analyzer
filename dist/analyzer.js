@@ -12062,6 +12062,38 @@ function sanitizeDelta(stat, delta) {
 }
 // Builds the persistence payload for lines_open_v1, stamped with the current
 // Betr event-date tag so loadOpeningLines can detect cross-event staleness.
+/**
+ * GLOW-UP 210 — has `_currentBetrEventDate` actually been READ from storage in
+ * this page lifetime? It starts '' and was only ever populated by
+ * loadOpeningLines, so every baseline written before that ran — or after
+ * betr_event_date changed mid-session — got stamped with an empty tag it had no
+ * business claiming. That drift is what defects 1–4 kept turning into a wipe.
+ */
+let _betrEventDateLoaded = false;
+/** Read betr_event_date into `_currentBetrEventDate` once per page lifetime. */
+async function ensureBetrEventDateLoaded() {
+    if (_betrEventDateLoaded)
+        return;
+    const stored = await storageGet(['betr_event_date']);
+    setCurrentBetrEventDate(typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '');
+}
+/** The ONLY way `_currentBetrEventDate` changes — keeps the loaded flag honest. */
+function setCurrentBetrEventDate(value) {
+    _currentBetrEventDate = value;
+    _betrEventDateLoaded = true;
+}
+/**
+ * GLOW-UP 210 — every write of lines_open_v1 goes through here, and every write
+ * therefore knows the real tag. Previously each call site did
+ * `void storageSet({ lines_open_v1: buildOpeningLinesRecord() })` directly, which
+ * stamps whatever `_currentBetrEventDate` happens to hold — '' on any path that
+ * runs before loadOpeningLines (clicking ✏ BETR LINES is the reproducible one:
+ * its open handler re-snapshots) or after betr_event_date changed mid-session.
+ */
+async function persistOpeningLines(overrideLines) {
+    await ensureBetrEventDateLoaded();
+    await storageSet({ lines_open_v1: buildOpeningLinesRecord(overrideLines) });
+}
 function buildOpeningLinesRecord(overrideLines) {
     let lines;
     if (overrideLines) {
@@ -12127,7 +12159,7 @@ function baselineSlateOverlap(lines) {
 }
 async function loadOpeningLines() {
     const stored = await storageGet(['lines_open_v1', 'betr_seed_hash', 'betr_event_date', STORAGE_LINE_HISTORY_KEY]);
-    _currentBetrEventDate = typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '';
+    setCurrentBetrEventDate(typeof stored.betr_event_date === 'string' ? stored.betr_event_date : '');
     const data = stored.lines_open_v1;
     const historyRaw = stored[STORAGE_LINE_HISTORY_KEY];
     // Cross-event staleness wipe. The Betr seed's event date (written by
@@ -12256,7 +12288,7 @@ async function loadOpeningLines() {
                 for (const [k, v] of Object.entries(reconstructed)) {
                     _openingLines.set(k, v);
                 }
-                void storageSet({ lines_open_v1: buildOpeningLinesRecord(reconstructed) });
+                void persistOpeningLines(reconstructed);
                 console.log(`[LineMovement] Reconstructed ${Object.keys(reconstructed).length} baselines from line history`);
             }
         }
@@ -12299,7 +12331,7 @@ async function loadOpeningLines() {
                 for (const [k, v] of Object.entries(reconstructed)) {
                     _openingLines.set(k, v);
                 }
-                void storageSet({ lines_open_v1: buildOpeningLinesRecord(reconstructed) });
+                void persistOpeningLines(reconstructed);
                 console.log(`[LineMovement] Reconstructed ${Object.keys(reconstructed).length} baselines from history`);
             }
         }
@@ -12337,7 +12369,7 @@ async function loadOpeningLines() {
             if (!k.startsWith('betr|'))
                 cleaned[k] = v;
         }
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord(cleaned) });
+        void persistOpeningLines(cleaned);
     }
 }
 function normalizeEventKey(s) {
@@ -12427,7 +12459,7 @@ function snapshotOpeningLines() {
     if (changed || _openingLines.size > 0) {
         if (_baselineCapturedAt === 0)
             _baselineCapturedAt = Date.now();
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+        void persistOpeningLines();
     }
 }
 // Post-merge movement detection: called AFTER mergeAndEnrich() with the NEW allFighters.
@@ -12467,7 +12499,7 @@ function detectAndRecordMovements() {
         // Persist repaired baselines to storage
         if (_baselineCapturedAt === 0)
             _baselineCapturedAt = Date.now();
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+        void persistOpeningLines();
     }
 }
 // Legacy name kept for call sites — now a no-op since detection moved to post-merge.
@@ -17403,7 +17435,7 @@ async function resetFighterBaseline(name) {
     }
     _lineHistory.updatedAt = Date.now();
     await Promise.all([
-        storageSet({ lines_open_v1: buildOpeningLinesRecord() }),
+        persistOpeningLines(),
         storageSet({ [STORAGE_LINE_HISTORY_KEY]: _lineHistory }),
     ]);
     renderFighters();
@@ -21570,6 +21602,11 @@ async function loadData() {
                     if (curMeta['betr_event_date'] !== cardDateIso) {
                         await storageSet({ betr_event_date: cardDateIso });
                     }
+                    // GLOW-UP 210: mirror it in memory in the same breath. This is the
+                    // moment the tag flips '' -> card date; leaving `_currentBetrEventDate`
+                    // stale here is how a snapshot later in the SAME session still stamped
+                    // a baseline '' after storage already knew better.
+                    setCurrentBetrEventDate(cardDateIso);
                 }
             }
             const filteredPick6 = filterPayloadToUpcomingCard(result['lines_pick6'] || null);
@@ -23946,7 +23983,10 @@ function initAnalyzerCore() {
         try {
             const betrMeta = await new Promise(res => chrome.storage.local.get(['betr_event_date'], res));
             const raw = typeof betrMeta['betr_event_date'] === 'string' ? betrMeta['betr_event_date'] : '';
-            _currentBetrEventDate = raw;
+            // GLOW-UP 210: through the setter, so this read also counts as "loaded"
+            // — it is a genuine storage read, and RESET LINES runs before any of the
+            // re-anchor snapshots below.
+            setCurrentBetrEventDate(raw);
             if (raw) {
                 const seedEventMs = new Date(`${raw}T23:59:59`).getTime();
                 if (Number.isFinite(seedEventMs) && Date.now() <= seedEventMs)
@@ -23981,7 +24021,7 @@ function initAnalyzerCore() {
         }
         // Persist with fresh timestamp
         _baselineCapturedAt = Date.now();
-        void storageSet({ lines_open_v1: buildOpeningLinesRecord() });
+        void persistOpeningLines();
         const _oc = document.getElementById('openingLinesCount');
         if (_oc)
             _oc.textContent = ` · 📍re-anchored ${_openingLines.size} baselines`;
