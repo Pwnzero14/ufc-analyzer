@@ -24420,7 +24420,10 @@ async function generateReportCard(): Promise<void> {
     .sort((a, b) => b.el.conf - a.el.conf)[0];
   const overPct = leanFighters.length ? Math.round((overCount / leanFighters.length) * 100) : 0;
   const sections: string[] = [];
+  // The event header and headline stay pinned while the fights scroll beneath —
+  // otherwise the card's verdict scrolls away the moment you look at the prelims.
   sections.push(`
+    <div class="rc-sticky-top">
     <div class="rc-event-header">
       <div class="rc-event-name">${eventTitle}</div>
       <div class="rc-event-meta">Generated ${eventDate}</div>
@@ -24446,6 +24449,7 @@ async function generateReportCard(): Promise<void> {
         <span class="rc-hero-val">${topPick.el.conf}<em>%</em></span>
         <span class="rc-hero-sub">${prettyName(topPick.f.name)} · ${topPick.el.lean.toUpperCase()}</span>
       </div>` : ''}
+    </div>
     </div>
   `);
 
@@ -24491,10 +24495,10 @@ async function generateReportCard(): Promise<void> {
       ? `<div class="rc-section-head rc-badge-${g.badgeCls}"><span>${g.badge}</span><i></i></div>`
       : '';
     lastBadge = g.badge;
-    const [fa, fb] = g.pair;
-    const vsLabel = fa && fb ? `${prettyName(fa.name).split(' ').slice(-1)[0]} vs ${prettyName(fb.name).split(' ').slice(-1)[0]}` : '';
+    // The `Surname vs Surname` label was dropped: both names are already on the
+    // two rows directly beneath it, so it repeated the content of the block it
+    // headed and cost a line on all twelve fights.
     sections.push(`${headHtml}<div class="rc-fight-group rc-badge-${g.badgeCls}">
-      ${vsLabel ? `<div class="rc-vs-label">${vsLabel}</div>` : ''}
       <div class="rc-matchup">${rows}</div>
     </div>`);
   }
