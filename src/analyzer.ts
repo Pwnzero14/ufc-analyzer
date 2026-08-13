@@ -10537,8 +10537,19 @@ let parlayPoolDir: 'all' | 'over' | 'under' = 'all';
 // default would bury the ranked pool the view is built around.
 let parlayPoolShowOffBoard = false;
 
-function parlayLegKey(fighter: string, stat: LeanSource, dir: string): string {
-  return `${fighter}|${stat}|${dir}`;
+/**
+ * GLOW-UP 211 — `book` is part of the identity for FP only. FP lines aren't
+ * comparable across books, so Pick6 93.5 and Betr 85.5 are two different legs and
+ * must not share a key; every other stat IS line-shopped to one best book, so its
+ * key stays three-part. Session-scoped (`parlaySelectedLegs`), so widening it
+ * carries no migration cost.
+ */
+function parlayLegKey(fighter: string, stat: LeanSource, dir: string, book?: string | null): string {
+  return `${fighter}|${stat}|${dir}${book ? `|${book}` : ''}`;
+}
+/** The key for a leg, book-qualified when the stat needs it. */
+function parlayLegKeyOf(l: ParlayLeg): string {
+  return parlayLegKey(l.fighter, l.stat, l.direction, l.stat === 'fp' ? (l.bookKey ?? null) : null);
 }
 
 /**
@@ -11092,6 +11103,9 @@ function renderParlayLab(container: HTMLElement): void {
           confidence: lean.conf || 0,
           tier: (lean.conf || 0) >= 72 ? 'High' : (lean.conf || 0) >= 58 ? 'Med' : 'Low',
           platform: activePlatformLabel(f),
+          // GLOW-UP 211: FP legs carry their book, because FP is priced per book
+          // and the key has to distinguish Pick6 93.5 from Betr 85.5.
+          ...(stat === 'fp' ? { bookKey: getSourceActivePlatformKey(f, 'fp') ?? null } : {}),
         },
         fighter: f,
       });
@@ -11131,7 +11145,7 @@ function renderParlayLab(container: HTMLElement): void {
   // prop with no lean sits at 50 — a coin flip is the honest prior, and it lands
   // where it should once EV prices the vig in.
   const PARLAY_ALL_STATS: LeanSource[] = ['fp', 'ss', 'ss_r1', 'td', 'ft', 'ctrl', 'kd'];
-  const rankedKeys = new Set(availableLegs.map(a => parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)));
+  const rankedKeys = new Set(availableLegs.map(a => parlayLegKeyOf(a.leg)));
   const offBoardLegs: { leg: ParlayLeg; fighter: AnalyzerFighter }[] = [];
   for (const f of visibleFighters) {
     if (!f.db?.loaded) continue;
@@ -11140,17 +11154,32 @@ function renderParlayLab(container: HTMLElement): void {
       const leanDir = (lean && lean.lean !== 'none' && lean.lean !== 'push') ? lean.lean as 'over' | 'under' : null;
       const leanConf = lean?.conf || 0;
       for (const dir of ['over', 'under'] as const) {
-        const key = parlayLegKey(f.name, stat, dir);
+        // GLOW-UP 211 — FP gets ONE CANDIDATE PER BOOK, everything else one.
+        // Fantasy points are scored differently by each book, so Pick6 93.5 and
+        // Betr 85.5 are two distinct props and both have to be reachable; the
+        // ranked pool can only carry the one book it resolved to, which left the
+        // rest unparlayable. Every other stat IS line-shoppable, so leanBestBook
+        // picking a single best book stays correct there.
+        const candidates: Array<{ book: string | null; line: number | null }> = stat === 'fp'
+          ? (LEAN_STAT_FIELDS['fp'] || []).map(([bk]) => ({ book: bk, line: lineForBook(f, 'fp', bk) }))
+          : [leanBestBook(f, stat, dir)];
+        for (const cand of candidates) {
+        const key = parlayLegKey(f.name, stat, dir, stat === 'fp' ? cand.book : null);
         if (rankedKeys.has(key)) continue;
         // Direction-aware line + book: leanBestBook already knows an OVER wants
         // the lowest line and an UNDER the highest, and already drops books that
         // don't post the side. A side no book takes still gets a leg (the active
         // line), flagged — placeability is REPORTED here, never enforced, the same
         // call the two-sided slate picker makes.
-        const bb = leanBestBook(f, stat, dir);
-        const line = bb.line ?? getSourceActiveLine(f, stat);
+        const bb = stat === 'fp'
+          // For FP the "book" is the candidate itself; whether it takes this SIDE
+          // is a separate per-book question.
+          ? { book: (cand.line != null && !shouldSkipFpSideForFighter(f, 'fp', dir, cand.book as SourcePlatformKey)) ? cand.book : null, line: cand.line }
+          : cand;
+        const line = bb.line ?? cand.line ?? (stat === 'fp' ? null : getSourceActiveLine(f, stat));
         if (line == null) continue;
         const statLbl = statDisplayLabel(stat);
+        const bookLbl = stat === 'fp' && cand.book ? (LEAN_BOOK_LABEL[cand.book] || cand.book) : '';
         // The market rule that would keep this side off the ranked board, if any.
         // Same call the pool builder gates on, so the flag and the demotion can
         // never tell different stories.
@@ -11174,7 +11203,15 @@ function renderParlayLab(container: HTMLElement): void {
           reason = `No model lean on this ${statLbl} prop either way — 50% is the honest prior, not a read. EV prices the vig against it.`;
         }
         if (marketBlock) reason += ` · ${marketBlock}`;
-        if (!bb.book) reason += ' · No book posts this side that the scraper can see — queue it anyway if you have it somewhere.';
+        // FP says WHICH book, because the line only means anything paired with it.
+        if (stat === 'fp' && bookLbl) {
+          reason = `${bookLbl} FP ${line}. ${reason}`;
+        }
+        if (!bb.book) {
+          reason += stat === 'fp' && bookLbl
+            ? ` · ${bookLbl} does not offer this side — queue it anyway if you have it.`
+            : ' · No book posts this side that the scraper can see — queue it anyway if you have it somewhere.';
+        }
         offBoardLegs.push({
           leg: {
             fighter: f.name,
@@ -11187,10 +11224,13 @@ function renderParlayLab(container: HTMLElement): void {
             platform: activePlatformLabel(f),
             offBoard: true,
             offReason: reason,
-            bookKey: bb.book,
+            // FP keeps its candidate book even when that book won't take the side,
+            // so the row still says which line it is and the key stays unique.
+            bookKey: stat === 'fp' ? cand.book : bb.book,
           },
           fighter: f,
         });
+        }
       }
     }
   }
@@ -11201,12 +11241,13 @@ function renderParlayLab(container: HTMLElement): void {
 
   // Which book a leg's line came from. Off-board legs resolved theirs
   // direction-aware in leanBestBook; ranked legs use the active platform as before.
-  const parlayLegBook = (l: ParlayLeg, lf: AnalyzerFighter): SourcePlatformKey | null =>
-    (l.offBoard
-      // leanBestBook types its book as a plain string; the values are the same
-      // platform keys every other book lookup here uses.
-      ? ((l.bookKey ?? null) as SourcePlatformKey | null)
-      : (getSourceActivePlatformKey(lf, l.stat) ?? null));
+  const parlayLegBook = (l: ParlayLeg, lf: AnalyzerFighter): SourcePlatformKey | null => {
+    // A leg that named its own book wins — that's every FP leg now (GLOW-UP 211)
+    // and every off-board leg. leanBestBook types its book as a plain string; the
+    // values are the same platform keys every other book lookup here uses.
+    if (l.bookKey !== undefined) return (l.bookKey ?? null) as SourcePlatformKey | null;
+    return l.offBoard ? null : (getSourceActivePlatformKey(lf, l.stat) ?? null);
+  };
 
   // GLOW-UP 177: per-leg EV via the same computeDetailedEV pipeline the board
   // uses, so the pool's EV sort can never disagree with Best Picks. Synthesize
@@ -11214,7 +11255,7 @@ function renderParlayLab(container: HTMLElement): void {
   const parlayLegEv = new Map<string, number | null>();
   for (const a of poolLegs) {
     const el = { lean: a.leg.direction, _source: a.leg.stat, conf: a.leg.confidence } as unknown as EffectiveLean;
-    parlayLegEv.set(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction), computeDetailedEV(a.fighter, el)?.ev ?? null);
+    parlayLegEv.set(parlayLegKeyOf(a.leg), computeDetailedEV(a.fighter, el)?.ev ?? null);
   }
 
   // Determine which are selected (keep the fighter ref for render-time
@@ -11222,7 +11263,7 @@ function renderParlayLab(container: HTMLElement): void {
   const selectedLegs: ParlayLeg[] = [];
   const selectedPairs: { leg: ParlayLeg; fighter: AnalyzerFighter }[] = [];
   for (const a of poolLegs) {
-    const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
+    const key = parlayLegKeyOf(a.leg);
     if (parlaySelectedLegs.has(key)) { selectedLegs.push(a.leg); selectedPairs.push(a); }
   }
 
@@ -11353,7 +11394,7 @@ function renderParlayLab(container: HTMLElement): void {
   // only — selection, conflict checks, health, suggestions all still see the
   // full availableLegs, so hiding a leg here never changes the math.
   const evOf = (a: typeof availableLegs[number]): number | null =>
-    parlayLegEv.get(parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction)) ?? null;
+    parlayLegEv.get(parlayLegKeyOf(a.leg)) ?? null;
   const tierRank = (t: string): number => (t === 'High' ? 0 : t === 'Med' ? 1 : 2);
   // GLOW-UP 207: the same view (filter + sort) is applied to BOTH tiers, so the
   // off-board section obeys the command strip exactly like the ranked one and
@@ -11427,7 +11468,7 @@ function renderParlayLab(container: HTMLElement): void {
   };
 
   const renderPoolRow = (a: typeof availableLegs[number]): string => {
-    const key = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
+    const key = parlayLegKeyOf(a.leg);
     const sel = parlaySelectedLegs.has(key);
     const mDelta = sel ? null : marginalDelta(a.leg);
     const mTag = mDelta != null
@@ -11507,7 +11548,7 @@ function renderParlayLab(container: HTMLElement): void {
   // grouping every row would add chrome where there's no correlation to show.
   const slipFightKey = (l: ParlayLeg): string => [legNorm(l.fighter), legNorm(l.opponent)].sort().join('|');
   const renderSlipLeg = ({ leg: l, fighter: lf }: { leg: ParlayLeg; fighter: AnalyzerFighter }): string => {
-        const key = parlayLegKey(l.fighter, l.stat, l.direction);
+        const key = parlayLegKeyOf(l);
         const pk = parlayLegBook(l, lf);
         const platChip = pk
           ? `<span class="parlay-leg-plat plat-${pk}" title="Line source: ${l.offBoard ? `${PL_BOOK_NAME[pk] || pk} ${l.line} — best book for this SIDE` : formatSourcePlatformLabel(lf, l.stat)}">${platformKeyShort(pk)}</span>`
@@ -11603,7 +11644,7 @@ function renderParlayLab(container: HTMLElement): void {
     const A = analyzeSlipLegs(selectedLegs)!;
     const { n, combined, evRows, best, anyCorr, maxPosCorr, anyRecal } = A;
     const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
-    const weakestKey = parlayLegKey(weakest.fighter, weakest.stat, weakest.direction);
+    const weakestKey = parlayLegKeyOf(weakest);
     const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m): m is string => !!m) || null;
 
     // GLOW-UP 191 (L3): the weakest leg was a passive warning. Find the best
@@ -11611,9 +11652,9 @@ function renderParlayLab(container: HTMLElement): void {
     // confidence, not already selected, stronger than what it replaces, and not
     // conflicting with the REST of the slip. availableLegs is confidence-desc,
     // so the first match is the best one.
-    const restOfSlip = selectedLegs.filter((l) => parlayLegKey(l.fighter, l.stat, l.direction) !== weakestKey);
+    const restOfSlip = selectedLegs.filter((l) => parlayLegKeyOf(l) !== weakestKey);
     const swapCand = availableLegs.find((a) => {
-      const k = parlayLegKey(a.leg.fighter, a.leg.stat, a.leg.direction);
+      const k = parlayLegKeyOf(a.leg);
       if (parlaySelectedLegs.has(k)) return false;
       if (a.leg.confidence <= weakest.confidence) return false;
       return !conflictAgainst(a.leg, restOfSlip);
@@ -11621,7 +11662,7 @@ function renderParlayLab(container: HTMLElement): void {
     if (swapCand) {
       swapPlan = {
         fromKey: weakestKey,
-        toKey: parlayLegKey(swapCand.leg.fighter, swapCand.leg.stat, swapCand.leg.direction),
+        toKey: parlayLegKeyOf(swapCand.leg),
         toLabel: `${prettyName(swapCand.leg.fighter)} ${swapCand.leg.direction.toUpperCase()} ${swapCand.leg.stat === 'ss_r1' ? 'R1 SS' : swapCand.leg.stat.toUpperCase()} ${swapCand.leg.line} (${swapCand.leg.confidence}%)`,
       };
     }
@@ -11714,7 +11755,7 @@ function renderParlayLab(container: HTMLElement): void {
       const tag = alertCount > 0 ? `${alertCount} synerg${alertCount > 1 ? 'ies' : 'y'}` : '';
       const cTag = conflictCount > 0 ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : '';
       const tags = [tag, cTag].filter(Boolean).join(', ');
-      const legKeys = s.legs.map(l => parlayLegKey(l.fighter, l.stat, l.direction));
+      const legKeys = s.legs.map(l => parlayLegKeyOf(l));
       const legsDataAttr = legKeys.join(',');
       // GLOW-UP 191 (L4): price the suggestion with the SAME analysis the slip
       // uses, so "score 83" is no longer the only number — you can compare a
@@ -11763,8 +11804,8 @@ function renderParlayLab(container: HTMLElement): void {
   let synergyHtml = '';
   if (synergyPairs.length > 0) {
     const pairCards = synergyPairs.map(p => {
-      const key1 = parlayLegKey(p.leg1.fighter, p.leg1.stat, p.leg1.direction);
-      const key2 = parlayLegKey(p.leg2.fighter, p.leg2.stat, p.leg2.direction);
+      const key1 = parlayLegKeyOf(p.leg1);
+      const key2 = parlayLegKeyOf(p.leg2);
       const sel1 = parlaySelectedLegs.has(key1);
       const sel2 = parlaySelectedLegs.has(key2);
       const bothSelected = sel1 && sel2;
@@ -16156,19 +16197,44 @@ function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: 
  * wins an UNDER), so asking it for the other side returns the correct entry —
  * nothing about line selection needed changing, only the ability to ask.
  */
+/** One specific book's line for a stat, or null when that book hasn't posted it. */
+function lineForBook(f: AnalyzerFighter, source: string, book: string): number | null {
+  const entry = (LEAN_STAT_FIELDS[source] || []).find(([bk]) => bk === book);
+  if (!entry) return null;
+  const v = (f as unknown as Record<string, unknown>)[entry[1] as string] as number | null;
+  return v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+}
+
+/**
+ * GLOW-UP 211 — `bookOverride` targets ONE book instead of letting leanBestBook
+ * resolve it.
+ *
+ * Needed because FP is the one stat that cannot be line-shopped: each book scores
+ * fantasy points differently, so Pick6 93.5 and Betr 85.5 are not the same prop
+ * measured twice — they're two different props. leanBestBook therefore returns the
+ * FIRST PLACEABLE book by priority rather than a min/max, which is correct, but it
+ * left every other book's FP line unreachable: wanting Joel Alvarez's Betr OVER at
+ * 85.5 got you the Pick6 OVER at 93.5 and no way to ask for the other one.
+ *
+ * The key only gains a `|book` suffix when a book is explicitly named, so picks
+ * built the old way keep their exact key and still dedupe with Best Picks.
+ */
 function buildSlatePickFor(
   f: AnalyzerFighter,
   source: string,
   dir: 'over' | 'under',
   fallbackLine: number | null = null,
+  bookOverride?: string | null,
 ): { key: string; pick: BestPicksSlatePick } {
-  const { book, line } = leanBestBook(f, source, dir);
+  const { book, line } = bookOverride
+    ? { book: bookOverride, line: lineForBook(f, source, bookOverride) }
+    : leanBestBook(f, source, dir);
   const finalLine = line ?? fallbackLine ?? null;
   const statLabel = EFFECTIVE_LEAN_STAT_LABEL[source] || 'FP';
   const bookLabel = book ? (LEAN_BOOK_LABEL[book] || book) : 'No book';
   const clip = `${prettyName(f.name)} ${dir.toUpperCase()} ${finalLine ?? ''} ${statLabel}${book ? ` @ ${bookLabel}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`.replace(/\s+/g, ' ').trim();
   return {
-    key: `${f.name}|${dir}|${source}`,
+    key: `${f.name}|${dir}|${source}${bookOverride ? `|${bookOverride}` : ''}`,
     pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
   };
 }
@@ -16204,20 +16270,48 @@ function buildLeanSlatePick(f: AnalyzerFighter, lean: EffectiveLean): { key: str
  * The model's own side carries `is-lean` so the panel still reads as a
  * recommendation at a glance rather than a neutral pair of buttons.
  */
-function buildSidePicker(f: AnalyzerFighter, source: string, leanDir: string | null | undefined): string {
+function buildSidePicker(f: AnalyzerFighter, source: string, leanDir: string | null | undefined, bookOverride?: string | null): string {
   const one = (dir: 'over' | 'under'): string => {
-    const { key, pick } = buildSlatePickFor(f, source, dir);
+    const { key, pick } = buildSlatePickFor(f, source, dir, null, bookOverride);
     _leanSlateData.set(key, pick);
     const inSlate = bestPicksSlate.has(key);
     const isLean = dir === leanDir;
+    // With a book named, placeability is that BOOK's answer, not the best book's.
+    const takesIt = bookOverride
+      ? !shouldSkipFpSideForFighter(f, source as LeanSource, dir, bookOverride as SourcePlatformKey) && pick.line != null
+      : leanBestBook(f, source, dir).book != null;
     const best = leanBestBook(f, source, dir);
-    const where = best.book
-      ? `${LEAN_BOOK_LABEL[best.book] || best.book} ${best.line}`
-      : 'no book posts this side — queue it anyway and enter it wherever you have it';
+    const where = bookOverride
+      ? (takesIt
+          ? `${LEAN_BOOK_LABEL[bookOverride] || bookOverride} ${pick.line}`
+          : `${LEAN_BOOK_LABEL[bookOverride] || bookOverride} does not offer this side — queue it anyway if you have it`)
+      : best.book
+        ? `${LEAN_BOOK_LABEL[best.book] || best.book} ${best.line}`
+        : 'no book posts this side — queue it anyway and enter it wherever you have it';
     const tip = `${inSlate ? 'Remove from' : 'Add to'} My Slate: ${prettyName(f.name)} ${dir.toUpperCase()} ${pick.line ?? '—'} ${pick.statLabel} · ${where}${isLean ? ' · model leans THIS side' : ' · opposite the model lean'}`;
-    return `<button class="side-pick-btn ${dir}${inSlate ? ' on' : ''}${isLean ? ' is-lean' : ''}${best.book ? '' : ' noBook'}" data-slate-key="${key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}">${dir === 'over' ? '▲' : '▼'}${inSlate ? '<i>✓</i>' : ''}</button>`;
+    return `<button class="side-pick-btn ${dir}${inSlate ? ' on' : ''}${isLean ? ' is-lean' : ''}${takesIt ? '' : ' noBook'}" data-slate-key="${key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}">${dir === 'over' ? '▲' : '▼'}${inSlate ? '<i>✓</i>' : ''}</button>`;
   };
-  return `<span class="side-pick" title="Queue either side of this prop — the model's lean is highlighted, but you can take the other side">${one('over')}${one('under')}</span>`;
+  return `<span class="side-pick" title="${bookOverride ? `Queue either side of this book's line — ${LEAN_BOOK_LABEL[bookOverride] || bookOverride} specifically` : "Queue either side of this prop — the model's lean is highlighted, but you can take the other side"}">${one('over')}${one('under')}</span>`;
+}
+
+/**
+ * GLOW-UP 211 — the FP panel's per-book pickers. FP lines are NOT comparable
+ * across books (each scores fantasy points its own way), so there is no "best" FP
+ * line to shop for — only the book you intend to enter it on. Every book that has
+ * posted therefore gets its own ▲▼ pair, and the one the model resolved to is
+ * marked so the panel still reads as a recommendation.
+ */
+function buildFpBookPickers(f: AnalyzerFighter, leanDir: string | null | undefined): string {
+  const resolved = leanDir ? leanBestBook(f, 'fp', leanDir as 'over' | 'under').book : null;
+  const cells = (LEAN_STAT_FIELDS['fp'] || []).map(([bk, fld]) => {
+    const raw = (f as unknown as Record<string, unknown>)[fld as string] as number | null;
+    const label = LEAN_BOOK_LABEL[bk] || bk;
+    if (raw == null || !Number.isFinite(Number(raw))) {
+      return `<span class="fpbk empty" title="${label} has not posted an FP line for ${prettyName(f.name)}">${label} —</span>`;
+    }
+    return `<span class="fpbk${bk === resolved ? ' resolved' : ''}" title="${label} FP ${raw}${bk === resolved ? " — the book the model's pick resolves to" : ''}"><b>${label}</b> ${raw}${buildSidePicker(f, 'fp', leanDir, bk)}</span>`;
+  });
+  return `<span class="fpbk-rail">${cells.join('')}</span>`;
 }
 
 // ── GLOW-UP 198 — ALL FIGHTERS full-slate pass ────────────────────────────
@@ -20420,7 +20514,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     // be queued from either side. Minimal by design: per-book FP lines plus a side
     // picker, no factor block — the FP rationale is already the row's main verdict.
     (f.line_p6 != null || f.line_ud != null || f.line_pp != null || f.line_betr != null) ? `<div class="detail-panel">
-          <div class="detail-panel-title">FP Lines (P6: ${f.line_p6??'—'} · UD: ${f.line_ud??'—'} · PP: ${f.line_pp??'—'} · BT: ${f.line_betr??'—'})${buildSidePicker(f, 'fp', lean && lean._source === 'fp' ? lean.lean : null)}</div>
+          <div class="detail-panel-title">FP Lines${buildFpBookPickers(f, lean && lean._source === 'fp' ? lean.lean : null)}</div>
         </div>` : '',
     f.lean_ss ? `<div class="detail-panel">
           <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss??'—'} · UD: ${f.line_ud_ss??'—'} · PP: ${f.line_pp_ss??'—'} · BT: ${f.line_betr_ss??'—'} · DK: ${f.line_dk_ss??'—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}${buildSidePicker(f, 'ss', f.lean_ss.lean)}</div>
