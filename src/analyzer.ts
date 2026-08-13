@@ -18878,6 +18878,9 @@ let lsStatFilter: LsStatFilter = 'all';
 let lsBigOnly = false;
 let lsShowFlat = false;
 let lsBiasBook: string | null = null;
+/** GLOW-UP 216 G4 — the biggest single gain on the current card, so the chip
+ *  that carries it can be styled as THE opportunity rather than one of many. */
+let _lsTopGain = 0;
 
 /** Can this book actually take this side for this fighter? The line-shop panel's
  *  whole job is naming a book to use, so a "best" line the book won't take is a
@@ -19025,6 +19028,7 @@ function generateLineShopModal(): void {
   // 'card' keeps allFighters order untouched.
   // L4 — rows where nothing is shoppable are noise on a decision panel. Folded,
   // not dropped: a zero spread is still information when you go looking for it.
+  _lsTopGain = Math.max(0, ...rows.map(r => r.max_gain));
   const liveRows = sorted.filter(r => rowSpread(r) > 0);
   const flatRows = sorted.filter(r => rowSpread(r) === 0);
 
@@ -19033,7 +19037,11 @@ function generateLineShopModal(): void {
   // bookOverride path (GLOW-UP 211). Seeing the edge and taking it were two
   // different screens before this.
   const renderCell = (f: AnalyzerFighter, sv: LsStatView, c: LsCell): string => {
-    if (c.val == null) return `<span class="ls-empty">—</span>`;
+    // GLOW-UP 216 G3 — a book with no line for this prop renders NOTHING. The
+    // dashes were placeholders for books that mostly never post that stat on a
+    // given card, so half the FP column was punctuation. Each chip carries its
+    // own book tag, so nothing is lost by collapsing the gaps.
+    if (c.val == null) return '';
     const tag = LS_TAG[c.bk] || c.bk.toUpperCase();
     if (c.offFamily) {
       return `<span class="ls-cell-val ls-scale-mismatch" title="PrizePicks scores fantasy points differently — a separate prop, not a worse price, so it is excluded from the spread."><span class="ls-plat-tag">${tag}</span>~${c.val}</span>`;
@@ -19102,7 +19110,11 @@ function generateLineShopModal(): void {
       return `<span class="ls-take-mini is-blocked" title="Every book that posts this prop refuses the ${sv.dir.toUpperCase()} side for this fighter — the best line on the board is not one you can act on.">⛔</span>`;
     }
     if (sv.gain > 0) {
-      return `<span class="ls-take-mini is-take" title="Take ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best!.bk] || bestTag} at ${sv.best?.val}${defTag ? ` instead of ${defTag} ${sv.defVal}` : ''} — worth ${sv.gain} points. Spread across all books is ${sv.spread}."><b>+${sv.gain}</b> ${bestTag} ${sv.best?.val}</span>`;
+      // G4 — the single biggest edge on the card is the one thing worth drawing
+      // the eye first, so it gets its own treatment rather than being one green
+      // chip among fifteen identical green chips.
+      const isTop = _lsTopGain > 0 && sv.gain === _lsTopGain;
+      return `<span class="ls-take-mini is-take${isTop ? ' is-jewel' : ''}" title="Take ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best!.bk] || bestTag} at ${sv.best?.val}${defTag ? ` instead of ${defTag} ${sv.defVal}` : ''} — worth ${sv.gain} points. Spread across all books is ${sv.spread}.${isTop ? ' This is the biggest single edge on the card.' : ''}"><b>+${sv.gain}</b> ${bestTag} ${sv.best?.val}</span>`;
     }
     return `<span class="ls-take-mini is-none" title="Your default book (${defTag} ${sv.defVal}) already holds the best side — the ${sv.spread} spread is real, but shopping gains you nothing.">✓ best</span>`;
   };
@@ -19147,10 +19159,36 @@ function generateLineShopModal(): void {
   const sub = document.getElementById('lineShopSub');
   const sortWord = lsSort === 'spread' ? 'biggest discrepancy' : lsSort === 'conf' ? 'lean confidence' : 'card order';
   if (sub) {
-    sub.textContent = `${liveRows.length} shoppable · ${biggestSpreads} with spread ≥ 2.5 · ${totalGain} pts on the table · sorted by ${sortWord}`;
+    sub.textContent = `${liveRows.length} shoppable · ${biggestSpreads} with spread ≥ 2.5 · sorted by ${sortWord}`;
   }
 
+  // ── GLOW-UP 216 G1 — the headline ────────────────────────────────────────
+  // "38 pts on the table" was the most valuable sentence in this panel and it
+  // was set in 10px grey inside a subtitle. It is the reason to open the screen,
+  // so it gets tile treatment — the same shape Slate Check uses for CALIBRATED
+  // HIT RATE / TOP EDGE, so the app reads as one system.
+  const topRow = [...rows].filter(r => r.max_gain > 0).sort((a, b) => b.max_gain - a.max_gain)[0];
+  const topStat = topRow ? STAT_DEFS.map(d => topRow.stats[d.key]).filter(s => s.gain === topRow.max_gain)[0] : null;
+  const heroHtml = `<div class="ls-hero">
+      <div class="ls-hero-tile is-primary" title="Every point here is a better number available on a book you are not currently defaulting to. Summed across the card, best prop per fighter.">
+        <span class="ls-hero-label">ON THE TABLE</span>
+        <span class="ls-hero-val">${totalGain}<em>pts</em></span>
+        <span class="ls-hero-sub">across ${liveRows.length} fighters</span>
+      </div>
+      <div class="ls-hero-tile" title="Fighters where at least two books disagree by 2.5 or more on the same prop.">
+        <span class="ls-hero-label">WIDE SPREADS</span>
+        <span class="ls-hero-val">${biggestSpreads}</span>
+        <span class="ls-hero-sub">of ${rows.length} on the card</span>
+      </div>
+      ${topRow && topStat ? `<div class="ls-hero-tile is-top" title="The single biggest gain available right now: ${prettyName(topRow.f.name)} ${topStat.label} on ${LEAN_BOOK_LABEL[topStat.best?.bk || ''] || (LS_TAG[topStat.best?.bk || ''] || '')} at ${topStat.best?.val}, worth ${topRow.max_gain} points versus your default book.">
+        <span class="ls-hero-label">BIGGEST EDGE</span>
+        <span class="ls-hero-val">+${topRow.max_gain}<em>${LS_TAG[topStat.best?.bk || ''] || ''}</em></span>
+        <span class="ls-hero-sub">${prettyName(topRow.f.name)} · ${topStat.label}</span>
+      </div>` : ''}
+    </div>`;
+
   content.innerHTML = `
+    ${heroHtml}
     <div class="ls-controls">
       <span class="ls-ctl-group">
         <span class="ls-ctl-label">SORT</span>
