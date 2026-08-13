@@ -16163,27 +16163,57 @@ function dkSideChalk(f: AnalyzerFighter, source: string, dir: string): boolean {
   return odds != null && odds <= DK_CHALK_THRESHOLD;
 }
 
+/**
+ * GLOW-UP 212 — FP scoring families. Fantasy lines are comparable ONLY within a
+ * family, because comparing them means comparing the same underlying number.
+ * PrizePicks scores fantasy points differently from everyone else — the archive
+ * has always split it (`Fantasy` vs `Fantasy_PP`) — so a PP line is a different
+ * prop and can never be shopped against the others. Pick6, Underdog and Betr
+ * share one scoring system (confirmed by the user 2026-08-13), so those three ARE
+ * comparable, and the best line among them is real, free edge.
+ */
+const FP_SCORING_FAMILY: Record<string, string> = {
+  pick6: 'standard', underdog: 'standard', betr: 'standard', prizepicks: 'pp',
+};
+
 // Best entry book+line for a lean's stat/direction (over → lowest line, under →
 // highest), mirroring the card's best-shop logic for the add-to-slip payload.
 function leanBestBook(f: AnalyzerFighter, source: string, dir: string): { book: string | null; line: number | null } {
-  // FP is special: per-book scoring means FP lines are NOT cross-book comparable
-  // (no line-shopping), and FP-under placeability varies by book — a dog's FP UNDER
-  // is placeable ONLY on Underdog (Pick6/PP/Betr block it). Resolve to the first
-  // PLACEABLE book (active platform preferred) using the real placeability rule,
-  // never a naive min/max.
+  // FP-under placeability varies by book — a dog's FP UNDER is placeable ONLY on
+  // Underdog (Pick6/PP/Betr block it) — so candidates are filtered by the real
+  // placeability rule before any line comparison.
+  //
+  // GLOW-UP 212: FP is now line-shopped WITHIN its scoring family. This used to
+  // return the first placeable book by priority on the belief that FP lines were
+  // never comparable; that is only true of PrizePicks. Pick6/Underdog/Betr share
+  // scoring, so taking the first by priority quietly handed over real value —
+  // Joel Alvarez's FP OVER resolved to Pick6 93.5 while Betr had 85.5 on the same
+  // scoring, 8 points given away on one pick.
   if (source === 'fp') {
     const fpBooks: Array<[string, keyof AnalyzerFighter]> = [
       ['pick6', 'line_p6'], ['underdog', 'line_ud'], ['prizepicks', 'line_pp'], ['betr', 'line_betr'],
     ];
+    // Active platform first — now purely the TIE-BREAK, since reduce below keeps
+    // the earlier candidate when lines are equal.
     const ordered = fpBooks.slice().sort((a, b) =>
       (b[0] === currentPlatform ? 1 : 0) - (a[0] === currentPlatform ? 1 : 0));
-    for (const [bk, fld] of ordered) {
-      const v = (f as unknown as Record<string, unknown>)[fld as string] as number | null;
-      if (v == null || !Number.isFinite(v)) continue;
-      if (shouldSkipFpSideForFighter(f, 'fp' as LeanSource, dir as 'over' | 'under', bk as SourcePlatformKey)) continue;
-      return { book: bk, line: v };
-    }
-    return { book: null, line: null };
+    const placeable = ordered
+      .map(([bk, fld]) => ({ bk, val: Number((f as unknown as Record<string, unknown>)[fld as string]) , has: (f as unknown as Record<string, unknown>)[fld as string] != null }))
+      .filter(c => c.has && Number.isFinite(c.val)
+        && !shouldSkipFpSideForFighter(f, 'fp' as LeanSource, dir as 'over' | 'under', c.bk as SourcePlatformKey));
+    if (!placeable.length) return { book: null, line: null };
+    const familyOf = (bk: string): string => FP_SCORING_FAMILY[bk] || 'standard';
+    // Shop within the family the user is actually entering on. If the active
+    // platform's family has nothing placeable, fall back to the standard three
+    // rather than silently offering a PP line as if it were the same prop.
+    const activeFamily = familyOf(currentPlatform);
+    const inActive = placeable.filter(c => familyOf(c.bk) === activeFamily);
+    const inStandard = placeable.filter(c => familyOf(c.bk) === 'standard');
+    const cands = inActive.length ? inActive : (inStandard.length ? inStandard : placeable);
+    const best = dir === 'over'
+      ? cands.reduce((a, b) => (b.val < a.val ? b : a))
+      : cands.reduce((a, b) => (b.val > a.val ? b : a));
+    return { book: best.bk, line: best.val };
   }
   const fields = LEAN_STAT_FIELDS[source] || [];
   const cands = fields
