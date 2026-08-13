@@ -1696,7 +1696,7 @@ body {
 .fhr-right { text-align: right; }
 
 /* ── REPORT CARD MODAL ── */
-.report-modal-box { max-width: 820px; }
+.report-modal-box { max-width: 1000px; }
 .rc-event-header { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .rc-event-name { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--orange); letter-spacing: 0.06em; }
 .rc-event-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 3px; }
@@ -29635,6 +29635,138 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   border-style: dashed; border-color: rgba(255,255,255,0.12);
 }
 .ls-empty-row { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+
+
+/* ══ GLOW-UP 218: PRE-EVENT REPORT CARD — five-level pass ═════════════════
+   The card had the right content and no voice: a four-value summary run
+   together in one grey line, "MAIN CARD" printed five times, every confidence
+   rendered identically, and a rationale column that truncated mid-word on the
+   one string it repeated most. R1 headline · R2 sections and bouts ·
+   R3 confidence as weight · R4 rationale that reads · R5 alignment. */
+
+/* ── R1 · headline tiles ───────────────────────────────────────────────── */
+.rc-hero { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.rc-hero-tile {
+  flex: 1 1 128px; min-width: 116px; cursor: help; position: relative; overflow: hidden;
+  padding: 9px 13px; border-radius: 10px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
+  border: 1px solid var(--border2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 14px rgba(0,0,0,0.26);
+}
+.rc-hero-label {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.2em; color: var(--text4); margin-bottom: 3px;
+}
+.rc-hero-val {
+  display: block; font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px; font-weight: 800; line-height: 1; color: var(--text);
+}
+.rc-hero-val em {
+  font-style: normal; font-size: 10px; font-weight: 700; margin-left: 3px;
+  color: var(--text4); letter-spacing: 0.06em;
+}
+.rc-hero-sub { display: block; margin-top: 4px; font-size: 8.5px; color: var(--text4); }
+.rc-hero-val.rc-split { display: flex; align-items: baseline; gap: 3px; }
+.rc-hero-val.rc-split i { font-style: normal; font-size: 13px; color: var(--text4); }
+.rc-hero-bar {
+  display: block; margin-top: 6px; height: 4px; border-radius: 3px;
+  background: rgba(255,58,96,0.35); overflow: hidden;
+}
+.rc-hero-bar i { display: block; height: 100%; background: #26d07c; border-radius: 3px; }
+.rc-hero-tile.is-top {
+  background: linear-gradient(145deg, rgba(248,198,74,0.14), rgba(248,198,74,0.02));
+  border-color: rgba(248,198,74,0.34);
+}
+.rc-hero-tile.is-top .rc-hero-val { color: var(--gold); text-shadow: 0 0 24px rgba(248,198,74,0.35); }
+.rc-hero-tile.is-top .rc-hero-label { color: rgba(248,198,74,0.75); }
+
+/* ── R2 · one heading per section; bouts read as bouts ─────────────────── */
+.rc-section-head {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.2em;
+}
+.rc-section-head i { flex: 1 1 auto; height: 1px; background: currentColor; opacity: 0.18; }
+.rc-section-head.rc-badge-main-event { color: var(--orange); }
+.rc-section-head.rc-badge-co-main { color: #2dd4d0; }
+.rc-section-head.rc-badge-main-card { color: var(--text2); }
+.rc-section-head.rc-badge-prelim { color: var(--text3); }
+.rc-fight-group {
+  margin-bottom: 8px; padding: 7px 9px 5px; border-radius: 9px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid var(--border2);
+  border-left: 3px solid rgba(255,255,255,0.12);
+}
+.rc-fight-group.rc-badge-main-event { border-left-color: var(--orange); }
+.rc-fight-group.rc-badge-co-main { border-left-color: #2dd4d0; }
+.rc-vs-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px;
+  letter-spacing: 0.14em; color: var(--text4); margin-bottom: 3px;
+}
+
+/* ── R5 · the row becomes a grid so columns actually line up ───────────── */
+.rc-fighter-row {
+  display: grid;
+  grid-template-columns: 168px 74px 52px 30px 66px 74px minmax(0, 1fr);
+  align-items: center; gap: 9px;
+  padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+  border-radius: 5px; transition: background 0.15s;
+}
+.rc-fighter-row:hover { background: rgba(255,255,255,0.045); }
+.rc-fighter-row.is-noplay { opacity: 0.55; }
+.rc-name {
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rc-line { font-size: 12px; font-weight: 700; color: var(--text); text-align: right; }
+.rc-src { font-size: 8px; color: var(--text4); letter-spacing: 0.08em; }
+.rc-avg { font-size: 9px; color: var(--text4); }
+
+/* ── R3 · confidence carries weight ────────────────────────────────────── */
+.rc-conf { display: flex; flex-direction: column; gap: 2px; }
+.rc-conf b { font-size: 11px; font-weight: 800; line-height: 1; }
+.rc-conf-bar {
+  display: block; height: 3px; border-radius: 2px;
+  background: rgba(255,255,255,0.09); overflow: hidden;
+}
+.rc-conf-bar u { display: block; height: 100%; border-radius: 2px; }
+.rc-conf.tier-high b { color: #6ee7a8; }
+.rc-conf.tier-high .rc-conf-bar u { background: #26d07c; box-shadow: 0 0 8px rgba(38,208,124,0.5); }
+.rc-conf.tier-med b { color: var(--gold); }
+.rc-conf.tier-med .rc-conf-bar u { background: rgba(248,198,74,0.85); }
+.rc-conf.tier-low b { color: var(--text3); }
+.rc-conf.tier-low .rc-conf-bar u { background: rgba(255,255,255,0.28); }
+.rc-conf.is-none { color: var(--text4); }
+/* The strongest reads earn a lit spine so they surface out of a 24-row list. */
+.rc-fighter-row.tier-high { box-shadow: inset 2px 0 0 rgba(38,208,124,0.55); }
+
+/* ── R4 · rationale that reads instead of trailing off ─────────────────── */
+.rc-reason {
+  font-size: 9px; line-height: 1.4; color: var(--text3); cursor: help;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: normal;
+}
+/* The generic platform-baseline fallback says nothing fighter-specific and
+   repeats verbatim across the card — kept, but never competing with real
+   reasoning for attention. */
+.rc-reason.is-generic { opacity: 0.45; font-style: italic; }
+
+/* ── R5 · export actions + modal material ──────────────────────────────── */
+.report-modal-box {
+  backdrop-filter: blur(22px) saturate(1.2);
+  background:
+    radial-gradient(120% 70% at 12% -8%, rgba(248,198,74,0.06), transparent 62%),
+    linear-gradient(180deg, rgba(22,26,38,0.96), rgba(12,15,23,0.985));
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: 0 34px 90px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.rc-event-name {
+  font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 800;
+  color: var(--gold); letter-spacing: 0.01em;
+}
+.rc-event-meta { font-size: 9px; color: var(--text4); margin-top: 2px; }
+.rc-event-header { margin-bottom: 12px; }
 
 </style>
 </head>

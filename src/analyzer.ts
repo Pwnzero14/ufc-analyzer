@@ -24411,50 +24411,90 @@ async function generateReportCard(): Promise<void> {
     ? Math.round(leanFighters.reduce((s, f) => s + getEffectiveLean(f).conf, 0) / leanFighters.length)
     : 0;
 
+  // ── GLOW-UP 218 R1 — the headline ────────────────────────────────────────
+  // The summary was a run-on of four values in one grey line, so the card's own
+  // verdict carried no more weight than its punctuation. Tiles, matching the
+  // language Slate Check and the line-shop hero already use.
+  const topPick = leanFighters
+    .map(f => ({ f, el: getEffectiveLean(f) }))
+    .sort((a, b) => b.el.conf - a.el.conf)[0];
+  const overPct = leanFighters.length ? Math.round((overCount / leanFighters.length) * 100) : 0;
   const sections: string[] = [];
   sections.push(`
     <div class="rc-event-header">
       <div class="rc-event-name">${eventTitle}</div>
       <div class="rc-event-meta">Generated ${eventDate}</div>
     </div>
-    <div class="rc-summary">
-      <span class="rc-stat">${leanFighters.length} leans</span>
-      <span class="rc-dot">·</span>
-      <span class="rc-stat rc-over">${overCount} overs</span>
-      <span class="rc-dot">·</span>
-      <span class="rc-stat rc-under">${underCount} unders</span>
-      <span class="rc-dot">·</span>
-      <span class="rc-stat">avg conf: ${avgConf}%</span>
+    <div class="rc-hero">
+      <div class="rc-hero-tile" title="Fighters carrying an actionable lean — the rows below with a direction on them.">
+        <span class="rc-hero-label">ACTIONABLE</span>
+        <span class="rc-hero-val">${leanFighters.length}<em>leans</em></span>
+        <span class="rc-hero-sub">of ${allFighters.length} fighters</span>
+      </div>
+      <div class="rc-hero-tile" title="Direction split across the card: ${overCount} overs, ${underCount} unders. A heavily one-sided card is worth noticing before you build entries.">
+        <span class="rc-hero-label">DIRECTION</span>
+        <span class="rc-hero-val rc-split"><b class="rc-over">${overCount}</b><i>/</i><b class="rc-under">${underCount}</b></span>
+        <span class="rc-hero-bar"><i style="width:${overPct}%"></i></span>
+      </div>
+      <div class="rc-hero-tile" title="Mean model confidence across every lean on the card.">
+        <span class="rc-hero-label">AVG CONF</span>
+        <span class="rc-hero-val">${avgConf}<em>%</em></span>
+        <span class="rc-hero-sub">${avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
+      </div>
+      ${topPick ? `<div class="rc-hero-tile is-top" title="Highest-confidence lean on the card: ${prettyName(topPick.f.name)} ${topPick.el.lean.toUpperCase()} at ${topPick.el.conf}%.">
+        <span class="rc-hero-label">TOP PICK</span>
+        <span class="rc-hero-val">${topPick.el.conf}<em>%</em></span>
+        <span class="rc-hero-sub">${prettyName(topPick.f.name)} · ${topPick.el.lean.toUpperCase()}</span>
+      </div>` : ''}
     </div>
   `);
 
+  // R4 — the model's generic fallback rationale. It carries no fighter-specific
+  // information, repeats verbatim on a third of the card, and was the string
+  // that got truncated mid-word on every row. Detected so it can be demoted
+  // rather than compete with real reasoning.
+  const isBoilerplate = (t: string): boolean => /^Platform-aware FP baseline/i.test(t.trim());
+
+  // R2 — one heading per SECTION, not per fight. "MAIN CARD" printed five times
+  // and "PRELIM" five times, which read as five separate sections and buried the
+  // structure of the card.
+  let lastBadge = '';
   for (const g of groups) {
     const rows = g.pair.map(f => {
       const el = getEffectiveLean(f);
       const { line, src } = bestAvailableLine(f);
       const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : 'rc-none';
       const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : '—';
+      // R3 — confidence carries visual weight. 43% and 81% rendered identically
+      // before, so the card's strongest reads were invisible in a list.
+      const tier = el.conf >= 72 ? 'high' : el.conf >= 58 ? 'med' : 'low';
       const confEl = el.lean !== 'none'
-        ? `<span class="rc-conf">${el.conf}%</span>`
-        : `<span class="rc-conf" style="color:var(--text3)">—</span>`;
+        ? `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${Math.min(100, Math.max(6, el.conf))}%"></u></i></span>`
+        : `<span class="rc-conf is-none">—</span>`;
       const avgEl = f.db?.avgFP != null
         ? `<span class="rc-avg">avg ${f.db.avgFP.toFixed(1)}</span>`
         : `<span class="rc-avg"></span>`;
       const topReason = el.reasons?.[0]?.text ?? '';
       const lineStr = line != null ? line.toFixed(1) : '—';
-      const srcEl = src ? `<span class="rc-src">${src}</span>` : '';
-      return `<div class="rc-fighter-row">
-        <span class="rc-name">${f.name}</span>
+      const srcEl = src ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
+      return `<div class="rc-fighter-row${el.lean === 'none' ? ' is-noplay' : ''} tier-${tier}">
+        <span class="rc-name">${prettyName(f.name)}</span>
         <span class="rc-lean-chip ${leanCls}">${leanLabel}</span>
         <span class="rc-line">${lineStr}</span>
         ${srcEl}
         ${confEl}
         ${avgEl}
-        ${topReason ? `<span class="rc-reason">${topReason}</span>` : ''}
+        ${topReason ? `<span class="rc-reason${isBoilerplate(topReason) ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${topReason}</span>` : '<span class="rc-reason"></span>'}
       </div>`;
     }).join('');
-    sections.push(`<div class="rc-fight-group">
-      <span class="rc-fight-badge rc-badge-${g.badgeCls}">${g.badge}</span>
+    const headHtml = g.badge !== lastBadge
+      ? `<div class="rc-section-head rc-badge-${g.badgeCls}"><span>${g.badge}</span><i></i></div>`
+      : '';
+    lastBadge = g.badge;
+    const [fa, fb] = g.pair;
+    const vsLabel = fa && fb ? `${prettyName(fa.name).split(' ').slice(-1)[0]} vs ${prettyName(fb.name).split(' ').slice(-1)[0]}` : '';
+    sections.push(`${headHtml}<div class="rc-fight-group rc-badge-${g.badgeCls}">
+      ${vsLabel ? `<div class="rc-vs-label">${vsLabel}</div>` : ''}
       <div class="rc-matchup">${rows}</div>
     </div>`);
   }
