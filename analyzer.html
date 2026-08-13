@@ -29292,8 +29292,13 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 button.ls-cell-val {
   font-family: inherit; font-size: inherit; cursor: pointer;
   border: 1px solid transparent;
+  /* A <button> inherits the UA `buttonface` fill — light grey — which rendered
+     every neutral cell as a white box with unreadable text. The span form had no
+     background at all, so the reset has to be explicit here. */
+  background: none; color: inherit; appearance: none; -webkit-appearance: none;
   transition: transform 0.1s, box-shadow 0.14s, border-color 0.14s;
 }
+button.ls-neutral { background: rgba(255,255,255,0.03); color: var(--text2); }
 button.ls-cell-val:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.22); }
 .ls-cell-val.ls-take {
   box-shadow: 0 0 0 1px rgba(72,199,142,0.45), 0 0 10px rgba(72,199,142,0.18);
