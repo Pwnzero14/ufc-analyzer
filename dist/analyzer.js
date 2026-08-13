@@ -18599,6 +18599,8 @@ function generateLineShopModal() {
             // exists the verdict still names it, and the unplaceable cell renders
             // dashed on its own, which explains why the better-looking number lost.
             blocked: dir !== 'none' && comparable.length > 0 && placeablePool.length === 0,
+            lo: comparable.length ? Math.min(...comparable.map(c => c.val)) : null,
+            hi: comparable.length ? Math.max(...comparable.map(c => c.val)) : null,
         };
     };
     const rows = allFighters.map(f => {
@@ -18648,7 +18650,11 @@ function generateLineShopModal() {
         const isBest = sv.best?.bk === c.bk && sv.spread > 0;
         const isWorst = sv.worst?.bk === c.bk && sv.spread > 0;
         const blocked = sv.dir !== 'none' && !c.placeable;
-        const cls = `${isBest ? 'ls-best' : isWorst ? 'ls-worst' : 'ls-neutral'}${blocked ? ' ls-blocked' : ''}${isBest && !blocked ? ' ls-take' : ''}`;
+        // V4 — book identity. This is a multi-book comparison surface, the one place
+        // the colour system licenses hue-by-book, so the app's existing platform
+        // lanes are reused rather than invented (P6 blue, UD indigo, BT orange,
+        // PP teal, DK gold — same values as the Parlay Lab leg chips).
+        const cls = `plat-${c.bk} ${isBest ? 'ls-best' : isWorst ? 'ls-worst' : 'ls-neutral'}${blocked ? ' ls-blocked' : ''}${isBest && !blocked ? ' ls-take' : ''}`;
         if (sv.dir === 'none') {
             return `<span class="ls-cell-val ${cls}" title="${tag} ${sv.label} ${c.val} — no lean on this prop, so no side to take."><span class="ls-plat-tag">${tag}</span>${c.val}</span>`;
         }
@@ -18660,51 +18666,83 @@ function generateLineShopModal() {
             : `${inSlate ? 'Remove from' : 'Add to'} My Slate: ${prettyName(f.name)} ${sv.dir.toUpperCase()} ${c.val} ${sv.label} @ ${LEAN_BOOK_LABEL[c.bk] || tag}`;
         return `<button class="ls-cell-val ${cls}${inSlate ? ' ls-on' : ''}" data-ls-take="${built.key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}"><span class="ls-plat-tag">${tag}</span>${c.val}${inSlate ? '<i class="ls-check">✓</i>' : ''}</button>`;
     };
-    // L2 — the takeaway line under each stat. Spread is context; the call is which
-    // book and what it saves against the book you would otherwise have used.
-    const renderVerdict = (sv) => {
+    // V3 — magnitude as position. Two numbers and a subtraction is arithmetic the
+    // reader shouldn't have to do: every comparable book becomes a dot on the
+    // prop's own min→max axis, so the shape of the disagreement is seen at a
+    // glance and the good end is always the lit end.
+    const renderTrack = (sv) => {
+        if (sv.lo == null || sv.hi == null || sv.spread === 0)
+            return '';
+        const span = sv.hi - sv.lo;
+        const dots = sv.cells
+            .filter(c => c.val != null && !c.offFamily && c.val >= sv.lo && c.val <= sv.hi)
+            .map(c => {
+            const pct = span > 0 ? ((c.val - sv.lo) / span) * 100 : 50;
+            const isBest = sv.best?.bk === c.bk;
+            return `<b class="ls-dot plat-${c.bk}${isBest ? ' is-best' : ''}" style="left:${pct.toFixed(1)}%" title="${LS_TAG[c.bk] || c.bk} ${c.val}"></b>`;
+        }).join('');
+        // The lit end is the side the lean wants — lowest for an OVER, highest for
+        // an UNDER — so "good" is always a direction, never a colour to decode.
+        const goodEnd = sv.dir === 'under' ? 'hi' : 'lo';
+        return `<div class="ls-track good-${goodEnd}" title="Every book on this prop, placed on its own ${sv.lo}–${sv.hi} range. The lit end is the side your lean wants.">
+      <i class="ls-track-rail"></i><span class="ls-track-lo">${sv.lo}</span>${dots}<span class="ls-track-hi">${sv.hi}</span>
+    </div>`;
+    };
+    // V2 — the take stops being a sentence and becomes an object, with the GAIN as
+    // the hero: it is the only number on the row that is money rather than context.
+    const renderTakeCard = (sv) => {
         if (!sv.cells.some(c => c.val != null))
             return '';
         if (sv.spread === 0)
-            return `<div class="ls-verdict ls-v-flat">no disagreement</div>`;
+            return `<div class="ls-take-card is-flat">books agree</div>`;
         const bestTag = sv.best ? (LS_TAG[sv.best.bk] || sv.best.bk) : '—';
         const defTag = sv.defBook ? (LS_TAG[sv.defBook] || sv.defBook) : null;
-        const spreadBit = `<span class="ls-v-spread" title="Widest disagreement between books on this prop, best vs worst.">Δ${sv.spread}</span>`;
+        const dCtx = `<span class="ls-delta" title="Widest disagreement between books on this prop, best vs worst.">Δ${sv.spread}</span>`;
         if (sv.dir === 'none') {
-            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-note">no lean — nothing to take</span></div>`;
+            // No lean is not an apology — the spread is still real information about
+            // where this prop is soft, so it stays legible instead of greyed to death.
+            return `<div class="ls-take-card is-nolean" title="No model lean on this prop, so there is no side to take — but the books still disagree by ${sv.spread}, which is worth knowing if you have your own read.">${dCtx}<span class="ls-tc-note">no lean · spread only</span></div>`;
         }
         if (sv.blocked) {
-            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-blocked" title="The best line on the board is on a book that will not take this side, so it is not a bargain you can act on.">⛔ best line unplaceable</span></div>`;
+            return `<div class="ls-take-card is-blocked" title="Every book that posts this prop refuses this side for this fighter, so the best line on the board is not a bargain you can act on.">${dCtx}<span class="ls-tc-note">⛔ nowhere to place</span></div>`;
         }
-        if (sv.gain > 0 && defTag) {
-            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-take" title="Taking ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best.bk] || bestTag} instead of your default book (${defTag} ${sv.defVal}) is worth ${sv.gain} points on this prop.">take <b>${bestTag} ${sv.best?.val}</b> +${sv.gain} vs ${defTag}</span></div>`;
+        if (sv.gain > 0) {
+            return `<div class="ls-take-card is-take" title="Taking ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best.bk] || bestTag}${defTag ? ` instead of ${defTag} ${sv.defVal}` : ''} is worth ${sv.gain} points on this prop.">
+        <span class="ls-tc-gain">+${sv.gain}</span>
+        <span class="ls-tc-body"><b class="ls-tc-book plat-${sv.best.bk}">${bestTag}</b><span class="ls-tc-line">${sv.best?.val}</span>${defTag ? `<span class="ls-tc-vs">vs ${defTag} ${sv.defVal}</span>` : ''}</span>
+        ${dCtx}
+      </div>`;
         }
-        // No default resolved for this stat (nothing active), so there is no baseline
-        // to price the gain against — still name the book to use.
-        if (!defTag && sv.best) {
-            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-take" title="Best available ${sv.dir.toUpperCase()} line for this prop.">take <b>${bestTag} ${sv.best.val}</b></span></div>`;
-        }
-        return `<div class="ls-verdict">${spreadBit}<span class="ls-v-none" title="Your default book already has the best side here — the spread is real, but shopping gains you nothing.">your book is already best</span></div>`;
+        return `<div class="ls-take-card is-none" title="Your default book already holds the best side here — the spread is real, but shopping gains you nothing.">${dCtx}<span class="ls-tc-note">your book is best</span></div>`;
     };
-    const renderRow = (r) => {
+    // V1/V5 — the row gets a hierarchy and a spine. The fighter is the heading,
+    // the gain is the badge that earns attention, and a left accent rail keyed to
+    // value gives the table a rhythm so 14 rows stop reading as one grey block.
+    const renderRow = (r, rank) => {
         const { f } = r;
         const leanChip = r.leanDir !== 'none'
             ? `<span class="ls-lean-chip ls-lean-${r.leanDir}">${r.leanDir === 'over' ? '▲' : '▼'} ${r.leanDir.toUpperCase()}${r.conf > 0 ? ` ${r.conf}%` : ''}</span>`
             : '';
         const cols = statsOf(r).map(sv => `<td class="ls-stat-td">
         <div class="lineshop-stat-group">${sv.cells.map(c => renderCell(f, sv, c)).join('')}</div>
-        ${renderVerdict(sv)}
+        ${renderTrack(sv)}
+        ${renderTakeCard(sv)}
       </td>`).join('');
         const topGain = rowGain(r);
-        return `<tr${topGain >= 2.5 ? ' class="ls-row-hot"' : ''}>
+        const heat = topGain >= 8 ? 'heat-3' : topGain >= 4 ? 'heat-2' : topGain > 0 ? 'heat-1' : 'heat-0';
+        return `<tr class="ls-row ${heat}">
       <td class="lineshop-fighter-name">
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${prettyName(f.name)}${leanChip}${topGain > 0 ? `<span class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book.">+${topGain}</span>` : ''}</div>
-        ${f.opponent ? `<div style="font-size:9px;color:var(--text4)">vs ${prettyName(f.opponent)}</div>` : ''}
+        <div class="ls-name-line">
+          ${rank <= 3 && topGain > 0 ? `<span class="ls-rank" title="One of the three biggest shopping gains on the card right now.">${rank}</span>` : ''}
+          <span class="ls-name">${prettyName(f.name)}</span>${leanChip}
+        </div>
+        ${f.opponent ? `<div class="ls-vs">vs ${prettyName(f.opponent)}</div>` : ''}
+        ${topGain > 0 ? `<div class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book — the sum of what the columns to the right are worth at their best.">+${topGain} <em>best shop</em></div>` : ''}
       </td>${cols}
     </tr>`;
     };
-    const rowsHtml = liveRows.map(renderRow).join('');
-    const flatHtml = lsShowFlat ? flatRows.map(renderRow).join('') : '';
+    const rowsHtml = liveRows.map((r, i) => renderRow(r, i + 1)).join('');
+    const flatHtml = lsShowFlat ? flatRows.map(r => renderRow(r, 999)).join('') : '';
     const content = document.getElementById('lineShopContent');
     const modal = document.getElementById('lineShopModal');
     if (!content || !modal)
