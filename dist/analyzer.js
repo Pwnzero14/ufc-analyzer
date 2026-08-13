@@ -18735,10 +18735,10 @@ function generateLineShopModal() {
       <td class="lineshop-fighter-name">
         <div class="ls-name-line">
           ${rank <= 3 && topGain > 0 ? `<span class="ls-rank" title="One of the three biggest shopping gains on the card right now.">${rank}</span>` : ''}
-          <span class="ls-name">${prettyName(f.name)}</span>${leanChip}
+          <span class="ls-name">${prettyName(f.name)}</span>
           ${topGain > 0 ? `<span class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book.">+${topGain}</span>` : ''}
         </div>
-        ${f.opponent ? `<div class="ls-vs">vs ${prettyName(f.opponent)}</div>` : ''}
+        <div class="ls-meta-line">${leanChip}${f.opponent ? `<span class="ls-vs">vs ${prettyName(f.opponent).split(' ').slice(-1)[0]}</span>` : ''}</div>
       </td>${cols}
     </tr>`;
     };
@@ -18782,7 +18782,7 @@ function generateLineShopModal() {
     ${lsBiasBook ? `<div class="ls-filter-note">Showing only fighters where <b>${LS_TAG[lsBiasBook] || lsBiasBook}</b> holds the best line · <button class="ls-reset-inline" data-ls-reset>clear</button></div>` : ''}
     ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div class="ls-bias-strip">
       <span class="ls-bias-head" title="Historical settle data: how far each book's line sits from the result on average. A negative number means the book posts LOW, so its overs clear more easily than the field's.">Platform bias</span>
-      ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 8).map(b => {
+      ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 6).map(b => {
         const plat = PLAT_LABEL_MAP[b.platform] || b.platform.toUpperCase();
         const st = b.propType === 'FightTime' ? 'FT' : b.propType === 'Fantasy' ? 'FP' : b.propType === 'Fantasy_PP' ? 'FP·PP' : b.propType;
         const soft = b.avgEdge > 0 ? 'posts HIGH — its unders are the easier side' : 'posts LOW — its overs are the easier side';
