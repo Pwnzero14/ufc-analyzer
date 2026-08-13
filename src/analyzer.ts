@@ -12474,19 +12474,33 @@ async function loadOpeningLines(): Promise<void> {
   if (baseEventKey && curEventKey && baseEventKey !== curEventKey && slateAgrees) {
     console.log(`[LineMovement] Event name differs ("${baseEventKey}" vs "${curEventKey}") but ${slateOverlap.hits}/${slateOverlap.total} of the slate matches the baseline — same event, NOT a contradiction`);
   }
-  const firstBetrOnly = !!_currentBetrEventDate
-                     && tagWasEmpty(prevTag) && tagWasEmpty(prevHistTag)
-                     && !eventContradicts;
+  // GLOW-UP 209b — PER-STORE, not all-or-nothing. This was still ALL-or-nothing
+  // (`tagWasEmpty(prevTag) && tagWasEmpty(prevHistTag)`), and the two stores are
+  // written by different paths, so they drift: opening the Betr modal re-wrote
+  // lines_open_v1 stamped "" (buildOpeningLinesRecord stamps whatever
+  // `_currentBetrEventDate` holds, and it is '' until loadOpeningLines has run in
+  // that page lifetime) while line_history_v1 kept its correct "2026-08-15".
+  // One migratable store + one healthy store = `firstBetrOnly` false, and the
+  // wipe branch destroyed BOTH. Observed 2026-08-13 on a bare open-and-close of
+  // the modal with no edit: `Stale (baseline=true, history=false)`.
+  //
+  // Each store is now judged on its own tag. An empty tag is migratable; only a
+  // genuinely DIFFERENT non-empty date (a real event change) still wipes — and a
+  // real event change makes both stores stale together anyway.
+  const canMigrate = !!_currentBetrEventDate && !eventContradicts;
+  const migrateBaseline = baselineStale && canMigrate && tagWasEmpty(prevTag);
+  const migrateHistory  = historyStale  && canMigrate && tagWasEmpty(prevHistTag);
+  const trulyStale = (baselineStale && !migrateBaseline) || (historyStale && !migrateHistory);
 
-  if ((baselineStale || historyStale) && firstBetrOnly) {
-    console.log(`[LineMovement] Betr tag "" -> "${_currentBetrEventDate}" on the SAME event ("${baseEventKey || 'unknown'}") — migrating tags, KEEPING ${Object.keys(data?.lines || {}).length} baselines`);
-    if (data) (data as { forBetrEventDate?: string }).forBetrEventDate = _currentBetrEventDate;
-    if (historyRaw) (historyRaw as { forBetrEventDate?: string }).forBetrEventDate = _currentBetrEventDate;
+  if (!trulyStale && (migrateBaseline || migrateHistory)) {
+    console.log(`[LineMovement] Betr tag "" -> "${_currentBetrEventDate}" on the SAME event ("${baseEventKey || 'unknown'}") — migrating ${[migrateBaseline && 'baseline', migrateHistory && 'history'].filter(Boolean).join(' + ')}, KEEPING ${Object.keys(data?.lines || {}).length} baselines`);
+    if (migrateBaseline && data) (data as { forBetrEventDate?: string }).forBetrEventDate = _currentBetrEventDate;
+    if (migrateHistory && historyRaw) (historyRaw as { forBetrEventDate?: string }).forBetrEventDate = _currentBetrEventDate;
     await storageSet({
       lines_open_v1: data ?? null,
       [STORAGE_LINE_HISTORY_KEY]: historyRaw ?? null,
     });
-  } else if (baselineStale || historyStale) {
+  } else if (trulyStale) {
     console.log(`[LineMovement] Stale (baseline=${baselineStale}, history=${historyStale}, currentBetrDate="${_currentBetrEventDate}") — wiping lines_open_v1 + line_history_v1`);
     await storageSet({ lines_open_v1: null, [STORAGE_LINE_HISTORY_KEY]: null });
     _lineHistory = { eventKey: '', updatedAt: 0, forBetrEventDate: _currentBetrEventDate, series: {} };
