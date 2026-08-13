@@ -18494,44 +18494,31 @@ function buildLineTimelinePanel(f) {
     ${chartsHtml}
   </div>`;
 }
-// ── LINE SHOP MODAL ────────────────────────────────────────────────────────
+let lsSort = 'spread';
+let lsStatFilter = 'all';
+let lsBigOnly = false;
+let lsShowFlat = false;
+let lsBiasBook = null;
+/** Can this book actually take this side for this fighter? The line-shop panel's
+ *  whole job is naming a book to use, so a "best" line the book won't take is a
+ *  trap, not a bargain. Same rules the rest of the app gates picks on. */
+function lsPlaceable(f, stat, dir, book) {
+    if (stat === 'fp')
+        return !shouldSkipFpSideForFighter(f, 'fp', dir, book);
+    if (dir === 'under')
+        return statUnderBookOffered(f, stat, book);
+    return true;
+}
 function generateLineShopModal() {
     if (!allFighters.length) {
         showToast('No fighters loaded');
         return;
     }
-    const fmtCell = (val, vals, plat, leanDir, compatVals) => {
-        if (val == null)
-            return `<span class="ls-empty">—</span>`;
-        // If a compatible-vals set was supplied and this value isn't in it, it's a
-        // different scale (e.g. Underdog per-round vs. total-fight).  Show it muted.
-        if (compatVals && !compatVals.includes(val)) {
-            const mismatchTitle = plat === 'PP' ? 'PrizePicks uses different FP scoring — excluded from spread' : 'Different scale — excluded from spread';
-            return `<span class="ls-cell-val ls-scale-mismatch" title="${mismatchTitle}"><span class="ls-plat-tag">${plat}</span>~${val}</span>`;
-        }
-        let cls = 'ls-neutral';
-        if (vals.length >= 2) {
-            const mx = Math.max(...vals);
-            const mn = Math.min(...vals);
-            if (mx > mn) {
-                if (leanDir === 'over')
-                    cls = val === mn ? 'ls-best' : val === mx ? 'ls-worst' : 'ls-neutral';
-                else if (leanDir === 'under')
-                    cls = val === mx ? 'ls-best' : val === mn ? 'ls-worst' : 'ls-neutral';
-                // No lean: treat lowest line as best value (easiest over) — green/red like leaned props
-                else
-                    cls = val === mn ? 'ls-best' : val === mx ? 'ls-worst' : 'ls-neutral';
-            }
-        }
-        return `<span class="ls-cell-val ${cls}"><span class="ls-plat-tag">${plat}</span>${val}</span>`;
-    };
-    const spreadChip = (spread) => {
-        if (spread === 0)
-            return `<span class="ls-spread-low">—</span>`;
-        if (spread >= 2.5)
-            return `<span class="ls-spread-chip ls-spread-high">${spread}</span>`;
-        return `<span class="ls-spread-chip ls-spread-med">${spread}</span>`;
-    };
+    // GLOW-UP 214: fmtCell / spreadChip removed. Both were read-only formatters
+    // built around "colour the extremes, print the spread"; renderCell and
+    // renderVerdict replace them with a control and a decision, and the
+    // best/worst choice now runs off the per-stat analysis rather than being
+    // recomputed inline per cell.
     // Filter values that are on a compatible scale (within 3x of median).
     // Prevents a platform using per-round or differently-scoped props from
     // inflating the spread vs. platforms using total-fight stats.
@@ -18546,90 +18533,288 @@ function generateLineShopModal() {
         const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         return vals.filter(v => median > 0 && v >= median * 0.45 && v <= median * 2.2);
     };
+    // ── GLOW-UP 214 L2 — per-stat analysis ───────────────────────────────────
+    // The old panel computed a spread (best vs worst) and coloured cells. Spread
+    // answers "how much do these books disagree", which is interesting; it does not
+    // answer "what do I gain by shopping", which is the decision. Your default is
+    // whatever book the rest of the app resolves to, so the number that matters is
+    // best-vs-DEFAULT — shopping from a book you were never going to use is worth
+    // nothing. Both are kept: spread as context, gain as the call.
+    const LS_TAG = {
+        pick6: 'P6', underdog: 'UD', betr: 'BT', prizepicks: 'PP', draftkings_sportsbook: 'DK',
+    };
+    const STAT_DEFS = [
+        { key: 'fp', label: 'FP' }, { key: 'ss', label: 'SS' }, { key: 'td', label: 'TD' },
+    ];
+    const analyseStat = (f, key, dir) => {
+        const fields = LEAN_STAT_FIELDS[key] || [];
+        const raw = fields.map(([bk, fld]) => {
+            const v = f[fld];
+            const val = v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+            return {
+                bk, val,
+                // FP only compares within a scoring family — PrizePicks is a different
+                // prop, not a worse price (GLOW-UP 212).
+                offFamily: key === 'fp' && FP_SCORING_FAMILY[bk] !== 'standard',
+                placeable: val != null && dir !== 'none' ? lsPlaceable(f, key, dir, bk) : true,
+            };
+        });
+        // Fixed display order across every stat so the columns line up vertically —
+        // LEAN_STAT_FIELDS is keyed by book-priority, which differs per stat.
+        const ORDER = ['pick6', 'underdog', 'betr', 'prizepicks', 'draftkings_sportsbook'];
+        raw.sort((a, b) => ORDER.indexOf(a.bk) - ORDER.indexOf(b.bk));
+        const present = raw.filter(c => c.val != null && !c.offFamily);
+        // Scale guard stays: a book quoting a different scope would fake a spread.
+        const okVals = compatibleFilter(present.map(c => c.val));
+        const comparable = present.filter(c => okVals.includes(c.val));
+        const spread = comparable.length >= 2
+            ? parseFloat((Math.max(...comparable.map(c => c.val)) - Math.min(...comparable.map(c => c.val))).toFixed(1))
+            : 0;
+        const pickBest = (pool) => {
+            if (!pool.length)
+                return null;
+            return dir === 'under'
+                ? pool.reduce((a, b) => (b.val > a.val ? b : a))
+                : pool.reduce((a, b) => (b.val < a.val ? b : a)); // over AND no-lean: lowest
+        };
+        const bestAny = pickBest(comparable);
+        const placeablePool = comparable.filter(c => c.placeable);
+        const best = pickBest(placeablePool) || bestAny;
+        const worst = comparable.length >= 2
+            ? (dir === 'under'
+                ? comparable.reduce((a, b) => (b.val < a.val ? b : a))
+                : comparable.reduce((a, b) => (b.val > a.val ? b : a)))
+            : null;
+        const defBook = getSourceActivePlatformKey(f, key) ?? null;
+        const defCell = defBook ? comparable.find(c => c.bk === defBook) : undefined;
+        const defVal = defCell?.val ?? null;
+        const gain = (best?.val != null && defVal != null)
+            ? parseFloat((dir === 'under' ? best.val - defVal : defVal - best.val).toFixed(1))
+            : 0;
+        return {
+            key, label: key.toUpperCase(), dir, cells: raw, spread, best, worst, defBook, defVal,
+            gain: gain > 0 ? gain : 0,
+            // Blocked means there is NOWHERE to take this side — not merely that the
+            // sharpest line happens to be unplaceable. When a placeable alternative
+            // exists the verdict still names it, and the unplaceable cell renders
+            // dashed on its own, which explains why the better-looking number lost.
+            blocked: dir !== 'none' && comparable.length > 0 && placeablePool.length === 0,
+        };
+    };
     const rows = allFighters.map(f => {
-        const fps = [f.line_p6, f.line_ud, f.line_betr].filter(v => v != null); // PP excluded: different scoring system
-        const sss = [f.line_p6_ss, f.line_ud_ss, f.line_betr_ss, f.line_pp_ss, f.line_dk_ss].filter(v => v != null);
-        const tds = [f.line_p6_td, f.line_ud_td, f.line_betr_td, f.line_pp_td, f.line_dk_td].filter(v => v != null);
-        const fps_compat = compatibleFilter(fps);
-        const sss_compat = compatibleFilter(sss);
-        const tds_compat = compatibleFilter(tds);
-        const spread = (vals) => vals.length >= 2 ? parseFloat((Math.max(...vals) - Math.min(...vals)).toFixed(1)) : 0;
-        const fp_sp = spread(fps_compat), ss_sp = spread(sss_compat), td_sp = spread(tds_compat);
         const leanDir = (f.lean?.lean === 'over' || f.lean?.lean === 'under') ? f.lean.lean : 'none';
-        const ssLeanDir = (f.lean_ss?.lean === 'over' || f.lean_ss?.lean === 'under') ? f.lean_ss.lean : leanDir;
-        const tdLeanDir = (f.lean_td?.lean === 'over' || f.lean_td?.lean === 'under') ? f.lean_td.lean : leanDir;
-        return { f, fps, fps_compat, sss, sss_compat, tds, tds_compat, fp_sp, ss_sp, td_sp, max_sp: Math.max(fp_sp, ss_sp, td_sp), leanDir, ssLeanDir, tdLeanDir };
-    }).sort((a, b) => b.max_sp - a.max_sp);
-    const rowsHtml = rows.map(({ f, fps, fps_compat, sss, sss_compat, tds, tds_compat, fp_sp, ss_sp, td_sp, leanDir, ssLeanDir, tdLeanDir }) => {
-        const conf = f.lean?.conf || 0;
-        const leanChip = leanDir !== 'none'
-            ? `<span class="ls-lean-chip ls-lean-${leanDir}">${leanDir === 'over' ? '▲' : '▼'} ${leanDir.toUpperCase()}${conf > 0 ? ` ${conf}%` : ''}</span>`
+        const dirFor = (l) => (l?.lean === 'over' || l?.lean === 'under') ? l.lean : leanDir;
+        const stats = {
+            fp: analyseStat(f, 'fp', leanDir),
+            ss: analyseStat(f, 'ss', dirFor(f.lean_ss)),
+            td: analyseStat(f, 'td', dirFor(f.lean_td)),
+        };
+        const max_sp = Math.max(stats['fp'].spread, stats['ss'].spread, stats['td'].spread);
+        const max_gain = Math.max(stats['fp'].gain, stats['ss'].gain, stats['td'].gain);
+        return { f, stats, max_sp, max_gain, leanDir, conf: f.lean?.conf || 0 };
+    });
+    // L1 — the view. Sorting was hard-coded to spread while the sub-header claimed
+    // it as fact; now it is a control and the header reports what it actually did.
+    const statsOf = (r) => (lsStatFilter === 'all' ? STAT_DEFS.map(d => r.stats[d.key]) : [r.stats[lsStatFilter]]);
+    const rowSpread = (r) => Math.max(0, ...statsOf(r).map(s => s.spread));
+    const rowGain = (r) => Math.max(0, ...statsOf(r).map(s => s.gain));
+    let viewRows = rows.filter(r => statsOf(r).some(s => s.cells.some(c => c.val != null)));
+    if (lsBigOnly)
+        viewRows = viewRows.filter(r => rowSpread(r) >= 2.5);
+    // L5 — a bias chip becomes a filter: show only rows where that book wins.
+    if (lsBiasBook)
+        viewRows = viewRows.filter(r => statsOf(r).some(s => s.best?.bk === lsBiasBook));
+    const sorted = [...viewRows];
+    if (lsSort === 'spread')
+        sorted.sort((a, b) => rowSpread(b) - rowSpread(a) || rowGain(b) - rowGain(a));
+    else if (lsSort === 'conf')
+        sorted.sort((a, b) => b.conf - a.conf);
+    // 'card' keeps allFighters order untouched.
+    // L4 — rows where nothing is shoppable are noise on a decision panel. Folded,
+    // not dropped: a zero spread is still information when you go looking for it.
+    const liveRows = sorted.filter(r => rowSpread(r) > 0);
+    const flatRows = sorted.filter(r => rowSpread(r) === 0);
+    // L3 — cells are controls, not readouts. The panel's entire purpose is naming a
+    // book to use, so clicking that book queues exactly it into My Slate via the
+    // bookOverride path (GLOW-UP 211). Seeing the edge and taking it were two
+    // different screens before this.
+    const renderCell = (f, sv, c) => {
+        if (c.val == null)
+            return `<span class="ls-empty">—</span>`;
+        const tag = LS_TAG[c.bk] || c.bk.toUpperCase();
+        if (c.offFamily) {
+            return `<span class="ls-cell-val ls-scale-mismatch" title="PrizePicks scores fantasy points differently — a separate prop, not a worse price, so it is excluded from the spread."><span class="ls-plat-tag">${tag}</span>~${c.val}</span>`;
+        }
+        const isBest = sv.best?.bk === c.bk && sv.spread > 0;
+        const isWorst = sv.worst?.bk === c.bk && sv.spread > 0;
+        const blocked = sv.dir !== 'none' && !c.placeable;
+        const cls = `${isBest ? 'ls-best' : isWorst ? 'ls-worst' : 'ls-neutral'}${blocked ? ' ls-blocked' : ''}${isBest && !blocked ? ' ls-take' : ''}`;
+        if (sv.dir === 'none') {
+            return `<span class="ls-cell-val ${cls}" title="${tag} ${sv.label} ${c.val} — no lean on this prop, so no side to take."><span class="ls-plat-tag">${tag}</span>${c.val}</span>`;
+        }
+        const built = buildSlatePickFor(f, sv.key, sv.dir, c.val, c.bk);
+        _leanSlateData.set(built.key, built.pick);
+        const inSlate = bestPicksSlate.has(built.key);
+        const tip = blocked
+            ? `${tag} does not offer the ${sv.dir.toUpperCase()} side of this ${sv.label} prop for ${prettyName(f.name)} — queue it anyway if you have it somewhere.`
+            : `${inSlate ? 'Remove from' : 'Add to'} My Slate: ${prettyName(f.name)} ${sv.dir.toUpperCase()} ${c.val} ${sv.label} @ ${LEAN_BOOK_LABEL[c.bk] || tag}`;
+        return `<button class="ls-cell-val ${cls}${inSlate ? ' ls-on' : ''}" data-ls-take="${built.key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}"><span class="ls-plat-tag">${tag}</span>${c.val}${inSlate ? '<i class="ls-check">✓</i>' : ''}</button>`;
+    };
+    // L2 — the takeaway line under each stat. Spread is context; the call is which
+    // book and what it saves against the book you would otherwise have used.
+    const renderVerdict = (sv) => {
+        if (!sv.cells.some(c => c.val != null))
+            return '';
+        if (sv.spread === 0)
+            return `<div class="ls-verdict ls-v-flat">no disagreement</div>`;
+        const bestTag = sv.best ? (LS_TAG[sv.best.bk] || sv.best.bk) : '—';
+        const defTag = sv.defBook ? (LS_TAG[sv.defBook] || sv.defBook) : null;
+        const spreadBit = `<span class="ls-v-spread" title="Widest disagreement between books on this prop, best vs worst.">Δ${sv.spread}</span>`;
+        if (sv.dir === 'none') {
+            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-note">no lean — nothing to take</span></div>`;
+        }
+        if (sv.blocked) {
+            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-blocked" title="The best line on the board is on a book that will not take this side, so it is not a bargain you can act on.">⛔ best line unplaceable</span></div>`;
+        }
+        if (sv.gain > 0 && defTag) {
+            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-take" title="Taking ${sv.dir.toUpperCase()} on ${LEAN_BOOK_LABEL[sv.best.bk] || bestTag} instead of your default book (${defTag} ${sv.defVal}) is worth ${sv.gain} points on this prop.">take <b>${bestTag} ${sv.best?.val}</b> +${sv.gain} vs ${defTag}</span></div>`;
+        }
+        // No default resolved for this stat (nothing active), so there is no baseline
+        // to price the gain against — still name the book to use.
+        if (!defTag && sv.best) {
+            return `<div class="ls-verdict">${spreadBit}<span class="ls-v-take" title="Best available ${sv.dir.toUpperCase()} line for this prop.">take <b>${bestTag} ${sv.best.val}</b></span></div>`;
+        }
+        return `<div class="ls-verdict">${spreadBit}<span class="ls-v-none" title="Your default book already has the best side here — the spread is real, but shopping gains you nothing.">your book is already best</span></div>`;
+    };
+    const renderRow = (r) => {
+        const { f } = r;
+        const leanChip = r.leanDir !== 'none'
+            ? `<span class="ls-lean-chip ls-lean-${r.leanDir}">${r.leanDir === 'over' ? '▲' : '▼'} ${r.leanDir.toUpperCase()}${r.conf > 0 ? ` ${r.conf}%` : ''}</span>`
             : '';
-        return `<tr>
+        const cols = statsOf(r).map(sv => `<td class="ls-stat-td">
+        <div class="lineshop-stat-group">${sv.cells.map(c => renderCell(f, sv, c)).join('')}</div>
+        ${renderVerdict(sv)}
+      </td>`).join('');
+        const topGain = rowGain(r);
+        return `<tr${topGain >= 2.5 ? ' class="ls-row-hot"' : ''}>
       <td class="lineshop-fighter-name">
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${f.name}${leanChip}</div>
-        ${f.opponent ? `<div style="font-size:9px;color:var(--text4)">vs ${f.opponent}</div>` : ''}
-      </td>
-      <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6, fps_compat, 'P6', leanDir, fps_compat)}
-        ${fmtCell(f.line_ud, fps_compat, 'UD', leanDir, fps_compat)}
-        ${fmtCell(f.line_betr, fps_compat, 'BT', leanDir, fps_compat)}
-        ${fmtCell(f.line_pp, fps_compat, 'PP', leanDir, [])}
-      </div></td>
-      <td>${spreadChip(fp_sp)}</td>
-      <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6_ss, sss_compat, 'P6', ssLeanDir, sss_compat)}
-        ${fmtCell(f.line_ud_ss, sss_compat, 'UD', ssLeanDir, sss_compat)}
-        ${fmtCell(f.line_betr_ss, sss_compat, 'BT', ssLeanDir, sss_compat)}
-        ${fmtCell(f.line_pp_ss, sss_compat, 'PP', ssLeanDir, sss_compat)}
-        ${fmtCell(f.line_dk_ss, sss_compat, 'DK', ssLeanDir, sss_compat)}
-      </div></td>
-      <td>${spreadChip(ss_sp)}</td>
-      <td><div class="lineshop-stat-group">
-        ${fmtCell(f.line_p6_td, tds_compat, 'P6', tdLeanDir, tds_compat)}
-        ${fmtCell(f.line_ud_td, tds_compat, 'UD', tdLeanDir, tds_compat)}
-        ${fmtCell(f.line_betr_td, tds_compat, 'BT', tdLeanDir, tds_compat)}
-        ${fmtCell(f.line_pp_td, tds_compat, 'PP', tdLeanDir, tds_compat)}
-        ${fmtCell(f.line_dk_td, tds_compat, 'DK', tdLeanDir, tds_compat)}
-      </div></td>
-      <td>${spreadChip(td_sp)}</td>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${prettyName(f.name)}${leanChip}${topGain > 0 ? `<span class="ls-row-gain" title="Best single-prop gain available on this fighter by shopping away from your default book.">+${topGain}</span>` : ''}</div>
+        ${f.opponent ? `<div style="font-size:9px;color:var(--text4)">vs ${prettyName(f.opponent)}</div>` : ''}
+      </td>${cols}
     </tr>`;
-    }).join('');
+    };
+    const rowsHtml = liveRows.map(renderRow).join('');
+    const flatHtml = lsShowFlat ? flatRows.map(renderRow).join('') : '';
     const content = document.getElementById('lineShopContent');
     const modal = document.getElementById('lineShopModal');
     if (!content || !modal)
         return;
     const biggestSpreads = rows.filter(r => r.max_sp >= 2.5).length;
+    const totalGain = parseFloat(rows.reduce((n, r) => n + Math.max(0, r.max_gain), 0).toFixed(1));
     const sub = document.getElementById('lineShopSub');
-    if (sub)
-        sub.textContent = `${rows.length} fighters · ${biggestSpreads} with spread ≥ 2.5 · sorted by biggest discrepancy`;
+    const sortWord = lsSort === 'spread' ? 'biggest discrepancy' : lsSort === 'conf' ? 'lean confidence' : 'card order';
+    if (sub) {
+        sub.textContent = `${liveRows.length} shoppable · ${biggestSpreads} with spread ≥ 2.5 · ${totalGain} pts on the table · sorted by ${sortWord}`;
+    }
     content.innerHTML = `
-    <div class="lineshop-legend">
-      <span class="lineshop-legend-item"><span class="ls-cell-val ls-best" style="display:inline-flex;flex-direction:column;align-items:center;padding:3px 7px 2px;border-radius:3px"><span class="ls-plat-tag">P6</span>87.5</span> best book for lean</span>
-      <span class="lineshop-legend-item"><span class="ls-cell-val ls-worst" style="display:inline-flex;flex-direction:column;align-items:center;padding:3px 7px 2px;border-radius:3px"><span class="ls-plat-tag">UD</span>103.0</span> worst book</span>
-      <span class="lineshop-legend-item"><span class="ls-lean-chip ls-lean-over">▲ OVER 72%</span></span>
-      <span class="lineshop-legend-item"><span class="ls-lean-chip ls-lean-under">▼ UNDER 68%</span></span>
-      <span style="color:var(--text4);font-size:10px">OVER = lowest line is best · UNDER = highest line is best · no lean = green/red by value</span>
+    <div class="ls-controls">
+      <span class="ls-ctl-group">
+        <span class="ls-ctl-label">SORT</span>
+        <button class="ls-btn${lsSort === 'spread' ? ' on' : ''}" data-ls-sort="spread" title="Widest book disagreement first">SPREAD</button>
+        <button class="ls-btn${lsSort === 'conf' ? ' on' : ''}" data-ls-sort="conf" title="Highest model confidence first — shop the props you're most likely to actually play">CONF</button>
+        <button class="ls-btn${lsSort === 'card' ? ' on' : ''}" data-ls-sort="card" title="Card order — main event down">CARD</button>
+      </span>
+      <span class="ls-ctl-group">
+        <span class="ls-ctl-label">STAT</span>
+        <button class="ls-chip${lsStatFilter === 'all' ? ' on' : ''}" data-ls-stat="all" title="All stat families">ALL</button>
+        ${STAT_DEFS.map(d => `<button class="ls-chip${lsStatFilter === d.key ? ' on' : ''}" data-ls-stat="${d.key}" title="Only ${d.label} — the column widens (click again for all)">${d.label}</button>`).join('')}
+      </span>
+      <span class="ls-ctl-group">
+        <button class="ls-chip${lsBigOnly ? ' on' : ''}" data-ls-big title="Only props where the books disagree by 2.5 or more">Δ ≥ 2.5</button>
+        ${(lsSort !== 'spread' || lsStatFilter !== 'all' || lsBigOnly || lsBiasBook) ? '<button class="ls-reset-inline" data-ls-reset title="Back to the default view">reset</button>' : ''}
+      </span>
+      <span class="ls-legend-inline">
+        <span class="ls-cell-val ls-best ls-legend-swatch"><span class="ls-plat-tag">BT</span>80.5</span> take
+        <span class="ls-cell-val ls-worst ls-legend-swatch"><span class="ls-plat-tag">P6</span>92.5</span> worst
+        <span class="ls-cell-val ls-blocked ls-legend-swatch"><span class="ls-plat-tag">UD</span>—</span> won't take the side
+        <em>OVER wants the lowest line · UNDER the highest</em>
+      </span>
     </div>
-    ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:linear-gradient(135deg,rgba(248,198,74,0.05),rgba(248,198,74,0.01));border-radius:6px;border-left:3px solid rgba(248,198,74,0.45);border:1px solid rgba(248,198,74,0.10);border-left:3px solid rgba(248,198,74,0.45);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),0 2px 8px rgba(0,0,0,0.15)">
-      <span style="font-size:9px;color:rgba(248,198,74,0.75);text-transform:uppercase;letter-spacing:0.10em;margin-right:4px;align-self:center;text-shadow:0 0 8px rgba(248,198,74,0.1)">Platform Bias</span>
+    ${lsBiasBook ? `<div class="ls-filter-note">Showing only fighters where <b>${LS_TAG[lsBiasBook] || lsBiasBook}</b> holds the best line · <button class="ls-reset-inline" data-ls-reset>clear</button></div>` : ''}
+    ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div class="ls-bias-strip">
+      <span class="ls-bias-head" title="Historical settle data: how far each book's line sits from the result on average. A negative number means the book posts LOW, so its overs clear more easily than the field's.">Platform bias</span>
       ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 8).map(b => {
         const plat = PLAT_LABEL_MAP[b.platform] || b.platform.toUpperCase();
         const st = b.propType === 'FightTime' ? 'FT' : b.propType === 'Fantasy' ? 'FP' : b.propType === 'Fantasy_PP' ? 'FP·PP' : b.propType;
-        const col = b.avgEdge > 0 ? 'var(--green)' : 'var(--red)';
-        const dir = b.avgEdge > 0 ? 'soft OVER' : 'soft UNDER';
-        return `<span style="font-size:10px;padding:3px 7px;border-radius:4px;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border:1px solid rgba(248,198,74,0.12);backdrop-filter:blur(4px)" title="${plat} ${st}: avg edge ${b.avgEdge > 0 ? '+' : ''}${b.avgEdge} (${dir}) · n=${b.total}"><span style="color:rgba(248,198,74,0.65)">${plat}</span> <span style="font-weight:700">${st}</span> <span style="color:${col};font-weight:700">${b.avgEdge > 0 ? '+' : ''}${b.avgEdge}</span></span>`;
+        const soft = b.avgEdge > 0 ? 'posts HIGH — its unders are the easier side' : 'posts LOW — its overs are the easier side';
+        const bookKey = Object.keys(LS_TAG).find(k => (PLAT_LABEL_MAP[k] || k.toUpperCase()) === plat) || '';
+        return `<button class="ls-bias-chip${lsBiasBook && lsBiasBook === bookKey ? ' on' : ''}"${bookKey ? ` data-ls-bias="${bookKey}"` : ''} title="${plat} ${st}: lines land ${b.avgEdge > 0 ? '+' : ''}${b.avgEdge} from the result on average across ${b.total} settled props — ${plat} ${soft}.${bookKey ? ' Click to show only fighters where this book has the best line.' : ''}"><span class="ls-bias-plat">${plat}</span> <span class="ls-bias-stat">${st}</span> <span class="ls-bias-val ${b.avgEdge > 0 ? 'pos' : 'neg'}">${b.avgEdge > 0 ? '+' : ''}${b.avgEdge}</span></button>`;
     }).join('')}
     </div>` : ''}
     <table class="lineshop-table">
       <thead><tr>
         <th style="text-align:left">FIGHTER + LEAN</th>
-        <th>FP LINES</th><th>SPREAD</th>
-        <th>SS LINES</th><th>SPREAD</th>
-        <th>TD LINES</th><th>SPREAD</th>
+        ${(lsStatFilter === 'all' ? STAT_DEFS : STAT_DEFS.filter(d => d.key === lsStatFilter))
+        .map(d => `<th>${d.label} LINES · TAKE</th>`).join('')}
       </tr></thead>
-      <tbody>${rowsHtml}</tbody>
+      <tbody>${rowsHtml || `<tr><td colspan="${(lsStatFilter === 'all' ? 3 : 1) + 1}" class="ls-empty-row">No shoppable disagreement under this filter — <button class="ls-reset-inline" data-ls-reset>reset</button></td></tr>`}</tbody>
+      ${flatRows.length ? `<tbody class="ls-flat-body">
+        <tr><td colspan="${(lsStatFilter === 'all' ? 3 : 1) + 1}" class="ls-fold-row"><button class="ls-fold" data-ls-fold>${lsShowFlat ? '▾' : '▸'} ${flatRows.length} fighter${flatRows.length === 1 ? '' : 's'} with no book disagreement</button></td></tr>
+        ${flatHtml}
+      </tbody>` : ''}
     </table>`;
+    // ── handlers ─────────────────────────────────────────────────────────────
+    // Every control re-runs this function; it is idempotent and rebinds each time,
+    // the same pattern renderParlayLab uses.
+    content.querySelectorAll('[data-ls-sort]').forEach(b => b.addEventListener('click', () => {
+        lsSort = b.dataset['lsSort'] || 'spread';
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-stat]').forEach(b => b.addEventListener('click', () => {
+        const v = b.dataset['lsStat'] || 'all';
+        lsStatFilter = lsStatFilter === v && v !== 'all' ? 'all' : v;
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-big]').forEach(b => b.addEventListener('click', () => {
+        lsBigOnly = !lsBigOnly;
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-fold]').forEach(b => b.addEventListener('click', () => {
+        lsShowFlat = !lsShowFlat;
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-bias]').forEach(b => b.addEventListener('click', () => {
+        const v = b.dataset['lsBias'] || '';
+        lsBiasBook = lsBiasBook === v ? null : v;
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-reset]').forEach(b => b.addEventListener('click', () => {
+        lsSort = 'spread';
+        lsStatFilter = 'all';
+        lsBigOnly = false;
+        lsBiasBook = null;
+        generateLineShopModal();
+    }));
+    content.querySelectorAll('[data-ls-take]').forEach(btn => btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.dataset['lsTake'] || '';
+        if (!key)
+            return;
+        if (bestPicksSlate.has(key)) {
+            bestPicksSlate.delete(key);
+            showToast(`Removed from My Slate (${bestPicksSlate.size})`);
+        }
+        else {
+            const d = _leanSlateData.get(key);
+            if (!d)
+                return;
+            if (!bestPicksSlate.size)
+                bestPicksSlateOpen = true;
+            bestPicksSlate.set(key, d);
+            showToast(`+ ${d.clip} · My Slate (${bestPicksSlate.size})`);
+        }
+        generateLineShopModal();
+    }));
     modal.classList.remove('is-hidden');
 }
 // AI × CLV Phase 2 — market-validation boost.
