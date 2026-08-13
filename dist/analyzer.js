@@ -9127,6 +9127,7 @@ function renderBestPicks(container, renderSeq = 0) {
                 // Sits left of the ⧉ copy button; stays visible (not hover-only) once on.
                 const slateKey = `${f.name}|${el.lean}|${el._source || 'fp'}`;
                 slateRowData.set(slateKey, {
+                    key: slateKey,
                     name: f.name,
                     pretty: prettyName(f.name),
                     dir: (el.lean || '').toUpperCase(),
@@ -9653,7 +9654,13 @@ function renderBestPicks(container, renderSeq = 0) {
             const groupsHtml = presentBooks.map(b => {
                 const list = groups.get(b);
                 const entries = list.map(p => {
-                    const key = `${p.name}|${p.dir.toLowerCase()}|${p.source}`;
+                    // GLOW-UP 211b: use the key the pick was STORED under. Rebuilding it here
+                    // dropped the book segment on book-targeted picks (`…|betr`), so the
+                    // lookup missed and ○ PLACE did nothing at all — and the ✕ beside it was
+                    // removing by the same wrong key. The reconstruction survives only as the
+                    // fallback for picks persisted before `key` existed, which were all
+                    // three-part by definition.
+                    const key = p.key || `${p.name}|${p.dir.toLowerCase()}|${p.source}`;
                     const fk = slateFightKeyOf(p);
                     const corrWarn = fk && (slateFightCounts.get(fk) || 0) > 1
                         ? ` <span class="bps-corr" title="Another checked leg comes from this same fight — correlated legs on one slip">⚠</span>`
@@ -15883,9 +15890,12 @@ function buildSlatePickFor(f, source, dir, fallbackLine = null, bookOverride) {
     const statLabel = EFFECTIVE_LEAN_STAT_LABEL[source] || 'FP';
     const bookLabel = book ? (LEAN_BOOK_LABEL[book] || book) : 'No book';
     const clip = `${prettyName(f.name)} ${dir.toUpperCase()} ${finalLine ?? ''} ${statLabel}${book ? ` @ ${bookLabel}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`.replace(/\s+/g, ' ').trim();
+    const key = `${f.name}|${dir}|${source}${bookOverride ? `|${bookOverride}` : ''}`;
     return {
-        key: `${f.name}|${dir}|${source}${bookOverride ? `|${bookOverride}` : ''}`,
-        pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
+        key,
+        // `key` rides along on the pick so no consumer has to rebuild it — see the
+        // field's note on BestPicksSlatePick.
+        pick: { key, name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
     };
 }
 function buildLeanSlatePick(f, lean) {
@@ -15898,9 +15908,10 @@ function buildLeanSlatePick(f, lean) {
     const clip = `${prettyName(f.name)} ${dir.toUpperCase()} ${finalLine ?? ''} ${statLabel}${book ? ` @ ${bookLabel}` : ''}${f.opponent ? ` (vs ${prettyName(f.opponent)})` : ''}`.replace(/\s+/g, ' ').trim();
     // Same key shape as Best Picks (`name|lean|source`) so a pick added here and one
     // added there are the SAME slate entry — they dedupe and sync automatically.
+    const key = `${f.name}|${dir}|${source}`;
     return {
-        key: `${f.name}|${dir}|${source}`,
-        pick: { name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
+        key,
+        pick: { key, name: f.name, pretty: prettyName(f.name), dir: dir.toUpperCase(), source, statLabel, line: finalLine, book, bookLabel, clip, opponent: f.opponent ? prettyName(f.opponent) : null, opponentRaw: f.opponent || null },
     };
 }
 /**
