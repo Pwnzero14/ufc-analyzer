@@ -2398,6 +2398,20 @@ function getSourceLineEntries(f: AnalyzerFighter, source: LeanSource): Array<{ p
             ['betr', f.line_betr_td],
             ['draftkings_sportsbook', f.line_dk_td],
           ]
+        // CTRL had no branch of its own and fell into the FT fallback below, so
+        // every consumer that asked for a fighter's control-time line — the active
+        // line, the active platform, the platform label, the Best Picks clip for a
+        // CTRL pick — was handed their FIGHT TIME line instead. Both are minutes,
+        // so it read as plausible rather than broken.
+        : source === 'ctrl'
+          ? [
+              ['pick6', f.line_p6_ctrl],
+              ['underdog', f.line_ud_ctrl],
+              ['prizepicks', f.line_pp_ctrl],
+              ['betr', f.line_betr_ctrl],
+              ['draftkings_sportsbook', f.line_dk_ctrl],
+            ]
+        // FT — and the fallback for any stat that somehow reaches here.
         : [
             ['pick6', f.line_p6_ft],
             ['underdog', f.line_ud_ft],
