@@ -24477,17 +24477,25 @@ async function generateReportCard(): Promise<void> {
   };
 
   const leanFighters = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
-  const overCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'over').length;
-  const underCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'under').length;
-  const avgConf = leanFighters.length
-    ? Math.round(leanFighters.reduce((s, f) => s + getEffectiveLean(f).conf, 0) / leanFighters.length)
-    : 0;
   // GLOW-UP 221 — a lean nobody will take is a READ, not something actionable.
   // Neil Magny's FP UNDER sat at the top of this card at 81% while Pick6 posts
   // him More-only (fp_under_available === false, +120 dog) — the placeability
   // rules had already flagged the row, but the headline still recommended it.
   const placeableLeans = leanFighters.filter(f => !resolveRow(f).unplaceable);
   const blockedCount = leanFighters.length - placeableLeans.length;
+  // GLOW-UP 222 — ONE denominator for the whole summary. ACTIONABLE and TOP PICK
+  // counted placeable leans while DIRECTION, AVG CONF and every section header
+  // still averaged all 24, so on UFC 330 the card called itself a "workable card"
+  // at 63% with 8 of those leans being bets no book will take. Every summary
+  // number now describes the same set: the leans you can actually place. The
+  // blocked ones stay visible as rows (they are real reads) and are reported as a
+  // count beside each figure, never folded into it.
+  const placeableSet = new Set<AnalyzerFighter>(placeableLeans);
+  const overCount = placeableLeans.filter(f => getEffectiveLean(f).lean === 'over').length;
+  const underCount = placeableLeans.filter(f => getEffectiveLean(f).lean === 'under').length;
+  const avgConf = placeableLeans.length
+    ? Math.round(placeableLeans.reduce((s, f) => s + getEffectiveLean(f).conf, 0) / placeableLeans.length)
+    : 0;
 
   // ── GLOW-UP 218 R1 — the headline ────────────────────────────────────────
   // The summary was a run-on of four values in one grey line, so the card's own
@@ -24497,7 +24505,7 @@ async function generateReportCard(): Promise<void> {
   const topPick = placeableLeans
     .map(f => ({ f, el: getEffectiveLean(f) }))
     .sort((a, b) => b.el.conf - a.el.conf)[0];
-  const overPct = leanFighters.length ? Math.round((overCount / leanFighters.length) * 100) : 0;
+  const overPct = placeableLeans.length ? Math.round((overCount / placeableLeans.length) * 100) : 0;
   const sections: string[] = [];
   // The event header and headline stay pinned while the fights scroll beneath —
   // otherwise the card's verdict scrolls away the moment you look at the prelims.
@@ -24514,15 +24522,15 @@ async function generateReportCard(): Promise<void> {
         <span class="rc-hero-sub">${!leanFighters.length ? 'still loading — reopen in a moment'
           : blockedCount ? `${blockedCount} more unplaceable` : `of ${allFighters.length} fighters`}</span>
       </div>
-      <div class="rc-hero-tile" title="Direction split across the card: ${overCount} overs, ${underCount} unders. A heavily one-sided card is worth noticing before you build entries.">
+      <div class="rc-hero-tile" title="Direction split across the leans you can place: ${overCount} overs, ${underCount} unders.${blockedCount ? ` The ${blockedCount} unplaceable read${blockedCount === 1 ? ' is' : 's are'} excluded.` : ''} A heavily one-sided card is worth noticing before you build entries.">
         <span class="rc-hero-label">DIRECTION</span>
         <span class="rc-hero-val rc-split"><b class="rc-over">${overCount}</b><i>/</i><b class="rc-under">${underCount}</b></span>
         <span class="rc-hero-bar"><i style="width:${overPct}%"></i></span>
       </div>
-      <div class="rc-hero-tile" title="Mean model confidence across every lean on the card.">
+      <div class="rc-hero-tile" title="Mean model confidence across the ${placeableLeans.length} placeable lean${placeableLeans.length === 1 ? '' : 's'}.${blockedCount ? ` Unplaceable reads are excluded — including them rated the card on bets you cannot take.` : ''}">
         <span class="rc-hero-label">AVG CONF</span>
         <span class="rc-hero-val">${avgConf}<em>%</em></span>
-        <span class="rc-hero-sub">${!leanFighters.length ? 'leans not computed yet' : avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
+        <span class="rc-hero-sub">${!placeableLeans.length ? (leanFighters.length ? 'nothing placeable' : 'leans not computed yet') : avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
       </div>
       ${topPick ? `<div class="rc-hero-tile is-top" title="Highest-confidence lean on the card: ${prettyName(topPick.f.name)} ${topPick.el.lean.toUpperCase()} at ${topPick.el.conf}%.">
         <span class="rc-hero-label">TOP PICK</span>
@@ -24575,12 +24583,23 @@ async function generateReportCard(): Promise<void> {
     // prelims?" was a question you could only answer by reading 24 rows and
     // doing the arithmetic in your head.
     const secFighters = groups.filter(x => x.badge === g.badge).flatMap(x => x.pair);
-    const secLeans = secFighters.map(x => getEffectiveLean(x)).filter(l => l.lean !== 'none');
-    const secAvg = secLeans.length ? Math.round(secLeans.reduce((n, l) => n + l.conf, 0) / secLeans.length) : 0;
+    // GLOW-UP 222 — same denominator as the hero tiles. A section that reads
+    // "10 leans · 63%" while four of them are unplaceable is describing a section
+    // you cannot enter.
+    const secPlaceable = secFighters.filter(x => placeableSet.has(x));
+    const secBlocked = secFighters.filter(x => getEffectiveLean(x).lean !== 'none').length - secPlaceable.length;
+    const secAvg = secPlaceable.length
+      ? Math.round(secPlaceable.reduce((n, x) => n + getEffectiveLean(x).conf, 0) / secPlaceable.length)
+      : 0;
+    const secTitle = secPlaceable.length
+      ? `${secPlaceable.length} placeable lean${secPlaceable.length === 1 ? '' : 's'} in this section, averaging ${secAvg}% confidence.${secBlocked ? ` ${secBlocked} more ${secBlocked === 1 ? 'is a read' : 'are reads'} no book will take (⛔).` : ''}`
+      : `No placeable lean in this section — ${secBlocked} read${secBlocked === 1 ? '' : 's'} no book will take (⛔).`;
     const headHtml = g.badge !== lastBadge
       ? `<div class="rc-section-head rc-badge-${g.badgeCls}">
           <span>${g.badge}</span>
-          ${secLeans.length ? `<b class="rc-sec-stat" title="${secLeans.length} actionable lean${secLeans.length === 1 ? '' : 's'} in this section, averaging ${secAvg}% confidence.">${secLeans.length} leans · ${secAvg}%</b>` : ''}
+          ${secPlaceable.length
+            ? `<b class="rc-sec-stat" title="${secTitle}">${secPlaceable.length} leans · ${secAvg}%${secBlocked ? ` <u>+${secBlocked} ⛔</u>` : ''}</b>`
+            : secBlocked ? `<b class="rc-sec-stat" title="${secTitle}">${secBlocked} ⛔ only</b>` : ''}
           <i></i>
         </div>`
       : '';
@@ -24629,7 +24648,10 @@ async function generateReportCard(): Promise<void> {
     textLines.push('');
   }
   textLines.push('\u2500'.repeat(45));
-  textLines.push(`${leanFighters.length} leans  \u00B7  ${overCount} overs  \u00B7  ${underCount} unders  \u00B7  avg conf: ${avgConf}%`);
+  // GLOW-UP 222 \u2014 overCount/underCount/avgConf are now placeable-only, so the
+  // footer says so. "24 leans \u00B7 5 overs \u00B7 19 unders" beside a placeable-only
+  // average was the export telling two stories with one row of numbers.
+  textLines.push(`${placeableLeans.length} placeable lean${placeableLeans.length === 1 ? '' : 's'}  \u00B7  ${overCount} overs  \u00B7  ${underCount} unders  \u00B7  avg conf: ${avgConf}%${blockedCount ? `  \u00B7  ${blockedCount} unplaceable` : ''}`);
   // `!` beside a line means no book will take that side \u2014 worth stating, since
   // the export is read away from the tooltips that explain it on screen.
   if (groups.some(g => g.pair.some(f => resolveRow(f).unplaceable))) {
