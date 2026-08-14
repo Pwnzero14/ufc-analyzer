@@ -24489,9 +24489,20 @@ async function generateReportCard(): Promise<void> {
   // against some book's number, so the card is only as fresh as its stalest one.
   let lineAge = '';
   try {
-    const linesPayload = await storageGet<Record<string, { capturedAt?: number }>>([...STORAGE_LINE_KEYS]);
+    const linesPayload = await storageGet<Record<string, { capturedAt?: number }>>(
+      [...STORAGE_LINE_KEYS, STORAGE_BETR_MANUAL_KEY]);
+    // Betr's stored capturedAt is the SEED's, not the manual entry's — the manual
+    // rows live under their own key and never rewrite it. The QA panel already
+    // overlays the effective timestamp before judging staleness; without the same
+    // overlay here, a card built minutes after a fresh Betr entry would date its
+    // own lines to whenever the seed was written.
+    const betrManual = linesPayload?.[STORAGE_BETR_MANUAL_KEY] as { fighters?: unknown[]; capturedAt?: number } | undefined;
+    const effectiveCapturedAt = (k: string): number =>
+      (k === 'lines_betr' && betrManual?.fighters?.length)
+        ? (Number(betrManual.capturedAt) || Date.now())
+        : Number(linesPayload?.[k]?.capturedAt || 0);
     const ages = STORAGE_LINE_KEYS
-      .map(k => Number(linesPayload?.[k]?.capturedAt || 0))
+      .map(effectiveCapturedAt)
       .filter(ts => ts > 0)
       .map(ts => Math.floor((Date.now() - ts) / 60000));
     if (ages.length) lineAge = fmtAgeMin(Math.max(...ages));
