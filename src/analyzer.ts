@@ -24397,59 +24397,6 @@ async function generateReportCard(): Promise<void> {
     groups.push({ badge, badgeCls, pair });
   });
 
-  const leanFighters = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
-  const overCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'over').length;
-  const underCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'under').length;
-  const avgConf = leanFighters.length
-    ? Math.round(leanFighters.reduce((s, f) => s + getEffectiveLean(f).conf, 0) / leanFighters.length)
-    : 0;
-
-  // ── GLOW-UP 218 R1 — the headline ────────────────────────────────────────
-  // The summary was a run-on of four values in one grey line, so the card's own
-  // verdict carried no more weight than its punctuation. Tiles, matching the
-  // language Slate Check and the line-shop hero already use.
-  const topPick = leanFighters
-    .map(f => ({ f, el: getEffectiveLean(f) }))
-    .sort((a, b) => b.el.conf - a.el.conf)[0];
-  const overPct = leanFighters.length ? Math.round((overCount / leanFighters.length) * 100) : 0;
-  const sections: string[] = [];
-  // The event header and headline stay pinned while the fights scroll beneath —
-  // otherwise the card's verdict scrolls away the moment you look at the prelims.
-  sections.push(`
-    <div class="rc-sticky-top">
-    <div class="rc-event-header">
-      <div class="rc-event-name">${eventTitle}</div>
-      <div class="rc-event-meta">Generated ${eventDate}</div>
-    </div>
-    <div class="rc-hero">
-      <div class="rc-hero-tile" title="Fighters carrying an actionable lean — the rows below with a direction on them.">
-        <span class="rc-hero-label">ACTIONABLE</span>
-        <span class="rc-hero-val">${leanFighters.length}<em>leans</em></span>
-        <span class="rc-hero-sub">${leanFighters.length ? `of ${allFighters.length} fighters` : 'still loading — reopen in a moment'}</span>
-      </div>
-      <div class="rc-hero-tile" title="Direction split across the card: ${overCount} overs, ${underCount} unders. A heavily one-sided card is worth noticing before you build entries.">
-        <span class="rc-hero-label">DIRECTION</span>
-        <span class="rc-hero-val rc-split"><b class="rc-over">${overCount}</b><i>/</i><b class="rc-under">${underCount}</b></span>
-        <span class="rc-hero-bar"><i style="width:${overPct}%"></i></span>
-      </div>
-      <div class="rc-hero-tile" title="Mean model confidence across every lean on the card.">
-        <span class="rc-hero-label">AVG CONF</span>
-        <span class="rc-hero-val">${avgConf}<em>%</em></span>
-        <span class="rc-hero-sub">${!leanFighters.length ? 'leans not computed yet' : avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
-      </div>
-      ${topPick ? `<div class="rc-hero-tile is-top" title="Highest-confidence lean on the card: ${prettyName(topPick.f.name)} ${topPick.el.lean.toUpperCase()} at ${topPick.el.conf}%.">
-        <span class="rc-hero-label">TOP PICK</span>
-        <span class="rc-hero-val">${topPick.el.conf}<em>%</em></span>
-        <span class="rc-hero-sub">${prettyName(topPick.f.name)} · ${topPick.el.lean.toUpperCase()}</span>
-      </div>` : ''}
-    </div>
-    </div>
-  `);
-
-  // R4 — the model's generic fallback rationale. It carries no fighter-specific
-  // information, repeats verbatim on a third of the card, and was the string
-  // that got truncated mid-word on every row. Detected so it can be demoted
-  // rather than compete with real reasoning.
   const isBoilerplate = (t: string): boolean => /^Platform-aware FP baseline/i.test(t.trim());
 
   // ── GLOW-UP 220 — ONE resolver, two renderers ────────────────────────────
@@ -24496,6 +24443,67 @@ async function generateReportCard(): Promise<void> {
     };
   };
 
+  const leanFighters = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
+  const overCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'over').length;
+  const underCount = leanFighters.filter(f => getEffectiveLean(f).lean === 'under').length;
+  const avgConf = leanFighters.length
+    ? Math.round(leanFighters.reduce((s, f) => s + getEffectiveLean(f).conf, 0) / leanFighters.length)
+    : 0;
+  // GLOW-UP 221 — a lean nobody will take is a READ, not something actionable.
+  // Neil Magny's FP UNDER sat at the top of this card at 81% while Pick6 posts
+  // him More-only (fp_under_available === false, +120 dog) — the placeability
+  // rules had already flagged the row, but the headline still recommended it.
+  const placeableLeans = leanFighters.filter(f => !resolveRow(f).unplaceable);
+  const blockedCount = leanFighters.length - placeableLeans.length;
+
+  // ── GLOW-UP 218 R1 — the headline ────────────────────────────────────────
+  // The summary was a run-on of four values in one grey line, so the card's own
+  // verdict carried no more weight than its punctuation. Tiles, matching the
+  // language Slate Check and the line-shop hero already use.
+  // Only a lean you can actually place can be the card's recommendation.
+  const topPick = placeableLeans
+    .map(f => ({ f, el: getEffectiveLean(f) }))
+    .sort((a, b) => b.el.conf - a.el.conf)[0];
+  const overPct = leanFighters.length ? Math.round((overCount / leanFighters.length) * 100) : 0;
+  const sections: string[] = [];
+  // The event header and headline stay pinned while the fights scroll beneath —
+  // otherwise the card's verdict scrolls away the moment you look at the prelims.
+  sections.push(`
+    <div class="rc-sticky-top">
+    <div class="rc-event-header">
+      <div class="rc-event-name">${eventTitle}</div>
+      <div class="rc-event-meta">Generated ${eventDate}</div>
+    </div>
+    <div class="rc-hero">
+      <div class="rc-hero-tile" title="Leans you can actually place. ${blockedCount ? `${blockedCount} more have a direction but no book will take that side — they are reads, not bets, and are marked ⛔ below.` : 'Every lean on this card is placeable.'}">
+        <span class="rc-hero-label">ACTIONABLE</span>
+        <span class="rc-hero-val">${placeableLeans.length}<em>leans</em></span>
+        <span class="rc-hero-sub">${!leanFighters.length ? 'still loading — reopen in a moment'
+          : blockedCount ? `${blockedCount} more unplaceable` : `of ${allFighters.length} fighters`}</span>
+      </div>
+      <div class="rc-hero-tile" title="Direction split across the card: ${overCount} overs, ${underCount} unders. A heavily one-sided card is worth noticing before you build entries.">
+        <span class="rc-hero-label">DIRECTION</span>
+        <span class="rc-hero-val rc-split"><b class="rc-over">${overCount}</b><i>/</i><b class="rc-under">${underCount}</b></span>
+        <span class="rc-hero-bar"><i style="width:${overPct}%"></i></span>
+      </div>
+      <div class="rc-hero-tile" title="Mean model confidence across every lean on the card.">
+        <span class="rc-hero-label">AVG CONF</span>
+        <span class="rc-hero-val">${avgConf}<em>%</em></span>
+        <span class="rc-hero-sub">${!leanFighters.length ? 'leans not computed yet' : avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
+      </div>
+      ${topPick ? `<div class="rc-hero-tile is-top" title="Highest-confidence lean on the card: ${prettyName(topPick.f.name)} ${topPick.el.lean.toUpperCase()} at ${topPick.el.conf}%.">
+        <span class="rc-hero-label">TOP PICK</span>
+        <span class="rc-hero-val">${topPick.el.conf}<em>%</em></span>
+        <span class="rc-hero-sub">${prettyName(topPick.f.name)} · ${topPick.el.lean.toUpperCase()}</span>
+      </div>` : ''}
+    </div>
+    </div>
+  `);
+
+  // R4 — the model's generic fallback rationale. It carries no fighter-specific
+  // information, repeats verbatim on a third of the card, and was the string
+  // that got truncated mid-word on every row. Detected so it can be demoted
+  // rather than compete with real reasoning.
   // R2 — one heading per SECTION, not per fight. "MAIN CARD" printed five times
   // and "PRELIM" five times, which read as five separate sections and buried the
   // structure of the card.
@@ -24513,7 +24521,10 @@ async function generateReportCard(): Promise<void> {
         : `<span class="rc-avg"></span>`;
       const reasonTxt = topReason;
       const lineStr = line != null ? line.toFixed(1) : '—';
-      const srcEl = src ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
+      // Naming the active book on an unplaceable row was the part that read as a
+      // recommendation: "UNDER 73.5 P6" says take it on Pick6, when Pick6 is
+      // precisely the book refusing it.
+      const srcEl = (src && !unplaceable) ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
       return `<div class="rc-fighter-row${el.lean === 'none' ? ' is-noplay' : ''} tier-${tier}">
         <span class="rc-name">${prettyName(f.name)}</span>
         <span class="rc-lean-chip ${leanCls}">${leanLabel}</span>
@@ -24552,7 +24563,7 @@ async function generateReportCard(): Promise<void> {
   const content = document.getElementById('reportContent');
   if (content) content.innerHTML = sections.join('');
   const sub = document.getElementById('reportModalSub');
-  if (sub) sub.textContent = `${allFighters.length} fighters · ${leanFighters.length} actionable leans`;
+  if (sub) sub.textContent = `${allFighters.length} fighters · ${placeableLeans.length} placeable lean${placeableLeans.length === 1 ? '' : 's'}${blockedCount ? ` · ${blockedCount} unplaceable` : ''}`;
   document.getElementById('reportModal')?.classList.remove('is-hidden');
 
   // Build plain-text version for clipboard/download
@@ -24576,7 +24587,7 @@ async function generateReportCard(): Promise<void> {
       // export is what gets read away from the app where nothing disambiguates it.
       const statStr = el.lean !== 'none' ? statLbl.padEnd(5) : '     ';
       const lineStr = line != null
-        ? `${src} ${line.toFixed(1)}${unplaceable ? '!' : ''}`.padStart(10)
+        ? `${unplaceable ? '' : `${src} `}${line.toFixed(1)}${unplaceable ? '!' : ''}`.padStart(10)
         : '          ';
       const confStr = el.lean !== 'none' ? `${el.conf}% conf` : '';
       const avgStr = avgVal != null ? `avg: ${avgVal.toFixed(1)} ${statLbl}` : '';
