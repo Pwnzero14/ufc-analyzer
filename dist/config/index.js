@@ -396,7 +396,13 @@ export const NAME_ALIASES = {
 //   inferred the opponent from takedown-defence %. calcCTRLLean now blends
 //   50/50 the same way SS does, and the opponent's actual over-rate at THIS
 //   line supersedes the tdDef proxy rather than stacking with it.
-export const MODEL_VERSION = 24;
+// v25 (2026-08-14): CTRL scores the moneyline. calcCTRLLean received it and
+//   never used it — only calcLean (FP) had a heavy-favourite/heavy-underdog
+//   branch. Control time is more win-coupled than FP (a dog can bank fantasy
+//   points while losing; he cannot bank sustained top control while losing), so
+//   the price belongs in it. Thresholds/magnitudes mirror the FP block: <=-300
+//   → +0.8, >=+300 → -0.7.
+export const MODEL_VERSION = 25;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

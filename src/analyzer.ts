@@ -6553,6 +6553,32 @@ function calcCTRLLean(
     reasons.push({ icon:'neg', text:`High finish profile (${Math.round(db.finishRate*100)}%) can end fight before control accumulates` });
   }
 
+  // ── MODEL v25 — the price ────────────────────────────────────────────────
+  // calcCTRLLean took `moneyline` as a parameter and never scored with it; it
+  // reached only the confidence-memory call. calcLean has had a heavy-favourite
+  // / heavy-underdog branch for a long time, and control time is if anything
+  // MORE win-coupled than fantasy points: a dog banking sustained top position
+  // is largely describing a fight he is winning, whereas FP can accrue from
+  // volume while losing. On UFC 330 that left a +675 dog at 12% vig-removed win
+  // probability projected for 3.2m of control with the price nowhere in the
+  // math.
+  //
+  // Thresholds and magnitudes mirror the FP block rather than inventing a
+  // steeper curve for CTRL — a bespoke tier would be tuning, not precedent.
+  if (moneyline != null && moneyline <= -300) {
+    score += 0.8;
+    reasons.push({
+      icon: 'pos',
+      text: `Heavy favorite (${moneyline}) — ${Math.round(moneylineToImpliedProb(moneyline) * 100)}% implied win probability supports sustained top position`,
+    });
+  } else if (moneyline != null && moneyline >= 300) {
+    score -= 0.7;
+    reasons.push({
+      icon: 'neg',
+      text: `Heavy underdog (+${moneyline}) at ${Math.round(moneylineToImpliedProb(moneyline) * 100)}% implied win probability — sustained control largely implies winning the fight`,
+    });
+  }
+
   if (dkLine != null && dkLine !== line_ctrl && Math.abs(dkLine - line_ctrl) >= 0.3) {
     if (dkLine < line_ctrl) {
       score -= 0.6;
