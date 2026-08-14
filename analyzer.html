@@ -717,6 +717,27 @@ body {
 .place-chip.ok { color: var(--green); background: rgba(0,232,122,0.12); border: 1px solid rgba(0,232,122,0.38); }
 .place-chip.blocked { color: var(--red); background: rgba(255,58,96,0.12); border: 1px solid rgba(255,58,96,0.38); }
 
+/* ══ GLOW-UP 225: the placement chip is a book selector ═══════════════════
+   It named the best book and the pickers beside it queued that book's line —
+   correct as a default, wrong whenever the bet was placed somewhere else. The
+   chip now cycles every book posting the prop and the pickers follow it. */
+.book-place { display: inline-flex; align-items: center; vertical-align: middle; }
+.place-chip.book-cycle {
+  cursor: pointer; font: inherit; font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: filter 0.12s, transform 0.12s;
+}
+.place-chip.book-cycle:hover { filter: brightness(1.25); }
+.place-chip.book-cycle:active { transform: translateY(1px); }
+.place-chip.book-cycle:focus-visible { outline: 1px solid currentColor; outline-offset: 1px; }
+/* The counter reads "which of how many", so cycling has a known end. */
+.place-chip.book-cycle i {
+  font-style: normal; font-size: 7.5px; opacity: 0.65; letter-spacing: 0.04em;
+}
+/* The model's own resolution stays marked, so cycling off it is visibly a choice. */
+.place-chip.book-cycle u { text-decoration: none; color: var(--gold); font-size: 8px; }
+
 /* L4 — book on the play pill */
 .play-pill-book { font-weight: 600; font-size: 9px; opacity: 0.8; }
 .play-pill-book.blocked { color: var(--red); opacity: 1; }
