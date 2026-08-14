@@ -136,6 +136,12 @@ export interface OppFightResult {
   kd: number | null;
   sub?: number | null;
   ctrlSecs: number | null;
+  /** Fight duration. The builder has always written this (`timeSecs: f.timeSecs`)
+   *  and the interface never declared it, so nothing could read it. MODEL v26
+   *  needs it: control time only means something as a share of the fight it was
+   *  accumulated in. Optional because caches written before it was populated
+   *  will not carry it — consumers fall back to raw totals. */
+  timeSecs?: number | null;
 }
 
 export interface FighterDB {

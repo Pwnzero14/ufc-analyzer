@@ -402,7 +402,14 @@ export const NAME_ALIASES = {
 //   points while losing; he cannot bank sustained top control while losing), so
 //   the price belongs in it. Thresholds/magnitudes mirror the FP block: <=-300
 //   → +0.8, >=+300 → -0.7.
-export const MODEL_VERSION = 25;
+// v26 (2026-08-14): CTRL is duration-aware. It never called
+//   durationAdjustProjection (SS and TD both do), and v24's opp-allowed average
+//   was contaminated by fight LENGTH — a fighter who finishes people early
+//   "allows" almost no control because his fights end, not because he is hard to
+//   control. Both halves of the blend are now expressed against THIS fight's
+//   expected minutes: the opponent's allowed control as a SHARE of fight time,
+//   the fighter's own average through the standard helper. Each half scaled once.
+export const MODEL_VERSION = 26;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,
