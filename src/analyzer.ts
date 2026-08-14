@@ -10663,6 +10663,20 @@ function parlayUnrankableReason(f: AnalyzerFighter, stat: LeanSource, dir: 'over
   if (stat === 'ctrl' && dir !== 'over') {
     return 'Control time is an OVER-only market — Pick6 is the primary CTRL book and posts no Less button, so an under lean is information, not a play.';
   }
+  // ── GLOW-UP 229 — the general case the three rules above kept missing ─────
+  // Each of them names ONE market rule. None of them asked the plain question:
+  // does any book take this side at all? So a TD UNDER whose only pick-em book
+  // is More-only, with the sportsbook's other side priced as chalk, ranked
+  // freely — on UFC 330 that put Barboza, Ribovics and Machado Garry at the top
+  // of the pool at 90% and seeded all three AI suggestions with legs nobody
+  // will write. Pick6 posts those three More-only and DK's under is -2500.
+  //
+  // leanBestBook already encodes every book rule (per-book under availability,
+  // DK chalk exclusion, FP's per-book placeability), so this asks it directly
+  // rather than adding a fourth hand-written rule to drift out of sync.
+  if (leanBestBook(f, stat, dir).book == null) {
+    return `No book takes this ${dir.toUpperCase()} — the pick-em books that post the prop are one-sided on it, or the sportsbook prices the side as chalk. It stays parlayable off-board; it just isn't a ranked play.`;
+  }
   return null;
 }
 
