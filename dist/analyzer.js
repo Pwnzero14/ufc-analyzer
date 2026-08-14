@@ -24006,7 +24006,7 @@ async function generateReportCard() {
       <div class="rc-hero-tile" title="Fighters carrying an actionable lean — the rows below with a direction on them.">
         <span class="rc-hero-label">ACTIONABLE</span>
         <span class="rc-hero-val">${leanFighters.length}<em>leans</em></span>
-        <span class="rc-hero-sub">of ${allFighters.length} fighters</span>
+        <span class="rc-hero-sub">${leanFighters.length ? `of ${allFighters.length} fighters` : 'still loading — reopen in a moment'}</span>
       </div>
       <div class="rc-hero-tile" title="Direction split across the card: ${overCount} overs, ${underCount} unders. A heavily one-sided card is worth noticing before you build entries.">
         <span class="rc-hero-label">DIRECTION</span>
@@ -24016,7 +24016,7 @@ async function generateReportCard() {
       <div class="rc-hero-tile" title="Mean model confidence across every lean on the card.">
         <span class="rc-hero-label">AVG CONF</span>
         <span class="rc-hero-val">${avgConf}<em>%</em></span>
-        <span class="rc-hero-sub">${avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
+        <span class="rc-hero-sub">${!leanFighters.length ? 'leans not computed yet' : avgConf >= 70 ? 'strong card' : avgConf >= 60 ? 'workable card' : 'thin card'}</span>
       </div>
       ${topPick ? `<div class="rc-hero-tile is-top" title="Highest-confidence lean on the card: ${prettyName(topPick.f.name)} ${topPick.el.lean.toUpperCase()} at ${topPick.el.conf}%.">
         <span class="rc-hero-label">TOP PICK</span>
@@ -24086,7 +24086,9 @@ async function generateReportCard() {
             return `<div class="rc-fighter-row${el.lean === 'none' ? ' is-noplay' : ''} tier-${tier}">
         <span class="rc-name">${prettyName(f.name)}</span>
         <span class="rc-lean-chip ${leanCls}">${leanLabel}</span>
-        <span class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</span>
+        ${el.lean === 'none'
+                ? '<span class="rc-stat-tag is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
+                : `<span class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</span>`}
         <span class="rc-line">${lineStr}${unplaceable ? '<i class="rc-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet.">⛔</i>' : ''}</span>
         ${srcEl}
         ${confEl}
