@@ -29845,6 +29845,97 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    un-underlined: <u> is a layout element throughout this card, never a link. */
 .rc-sec-stat u { text-decoration: none; opacity: 0.6; font-weight: 600; margin-left: 2px; }
 
+
+/* ══ GLOW-UP 223: report card — ten levels ════════════════════════════════
+   The card had stopped lying about WHAT it recommends (221/222) but not about
+   how loudly. A push rendered as an empty box, a lean no book will take still
+   carried the brightest bar and a lit spine, and the confidence meter measured
+   a decimal rather than an edge. L1 pushes · L2 blocked rows lose their weight ·
+   L3 rank stars · L4 the sticky header seals · L5 numbers form a column ·
+   L6 the bout-level read · L7 an honest bar · L8 rationale that opens ·
+   L9 the card's vintage · L10 legend + narrow widths. */
+
+/* ── L1 · a push is the model's answer, not a missing row ────────────────── */
+.rc-lean-chip.rc-push {
+  background: rgba(255,255,255,0.04); color: var(--text4);
+  border: 1px dashed rgba(255,255,255,0.18); letter-spacing: 0.02em;
+}
+.rc-fighter-row.is-push .rc-name { color: var(--text3); font-weight: 600; }
+
+/* ── L2 · a read is not a bet, and must not look like the best one ───────── */
+.rc-conf.is-muted b { color: var(--text4); font-weight: 700; }
+.rc-fighter-row.is-blocked { background: rgba(255,58,96,0.03); }
+.rc-fighter-row.is-blocked .rc-name,
+.rc-fighter-row.is-blocked .rc-line { color: var(--text3); }
+.rc-fighter-row.is-blocked .rc-lean-chip { opacity: 0.6; }
+.rc-src.is-blocked { cursor: help; }
+
+/* ── L3 · the plays, findable without leaving card order ─────────────────── */
+.rc-rank {
+  font-style: normal; font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 800; color: var(--gold);
+  margin-right: 5px; letter-spacing: 0.02em; cursor: help;
+  text-shadow: 0 0 10px rgba(248,198,74,0.4);
+}
+
+/* ── L4 · the sticky header seals ────────────────────────────────────────
+   The old 84%→transparent tail meant rows scrolled INTO the headline and sat
+   there half-visible: on UFC 330 a co-main row floated under the hero tiles
+   looking like a rendering fault. Opaque to the content edge, with the fade
+   confined to a 10px lip below it. */
+.rc-sticky-top {
+  background: linear-gradient(180deg,
+    var(--rc-seal, rgba(16,20,29,1)) 0,
+    var(--rc-seal, rgba(16,20,29,1)) calc(100% - 10px),
+    rgba(16,20,29,0) 100%);
+  padding-bottom: 10px;
+}
+
+/* ── L5 · the numbers form a column ──────────────────────────────────────
+   Tabular figures, so 108.5 and 39.5 line up on the decimal instead of
+   drifting with glyph width. */
+.rc-line, .rc-avg, .rc-conf b, .rc-sec-stat { font-variant-numeric: tabular-nums; }
+
+/* ── L6 · when the bout itself is the read ──────────────────────────────── */
+.rc-fight-note {
+  margin: 1px 4px 3px; padding: 2px 7px; border-radius: 5px; cursor: help;
+  font-family: 'JetBrains Mono', monospace; font-size: 8px;
+  letter-spacing: 0.09em; font-weight: 700; display: inline-block;
+}
+.rc-fight-note.is-under { background: rgba(255,58,96,0.1); color: #ff8098; }
+.rc-fight-note.is-over  { background: rgba(38,208,124,0.1); color: #6ee7a8; }
+
+/* ── L8 · the rationale opens instead of only living in a tooltip ────────
+   Hovering the TEXT, not the row: expanding on row-hover reflows the list under
+   the cursor while you are just scanning down it. */
+.rc-reason:hover { -webkit-line-clamp: 6; }
+
+/* ── L10 · the marks explain themselves ─────────────────────────────────── */
+.rc-legend {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  margin: 2px 0 4px; font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; letter-spacing: 0.06em; color: var(--text4);
+}
+.rc-legend b { font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+.rc-legend s { flex: 0 0 1px; height: 8px; background: rgba(255,255,255,0.12); text-decoration: none; }
+.rc-legend .rc-rank { margin-right: 0; }
+.rc-legend .rc-blocked { font-size: 8px; margin-left: 0; }
+.rc-key-push {
+  font-style: normal; padding: 0 4px; border-radius: 3px;
+  border: 1px dashed rgba(255,255,255,0.18); color: var(--text3);
+}
+
+/* ── L10 · narrow windows drop the two supporting columns rather than
+   overflowing the eight-column grid. ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .rc-fighter-row { grid-template-columns: 128px 62px 30px 48px 22px 52px minmax(0, 1fr); }
+  .rc-fighter-row .rc-avg { display: none; }
+}
+@media (max-width: 720px) {
+  .rc-fighter-row { grid-template-columns: 112px 58px 28px 46px 22px 48px; }
+  .rc-fighter-row .rc-reason { display: none; }
+}
+
 </style>
 </head>
 <body>
