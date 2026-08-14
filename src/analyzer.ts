@@ -10613,9 +10613,20 @@ let parlayPoolShowOffBoard = false;
 function parlayLegKey(fighter: string, stat: LeanSource, dir: string, book?: string | null): string {
   return `${fighter}|${stat}|${dir}${book ? `|${book}` : ''}`;
 }
-/** The key for a leg, book-qualified when the stat needs it. */
+/**
+ * The key for a leg, book-qualified.
+ *
+ * GLOW-UP 227 — this used to book-qualify FP only, on the reasoning that every
+ * other stat is line-shopped down to one best book. That reasoning describes
+ * SHOPPING, not PLACING: books post genuinely different numbers on the same prop
+ * (Machado Garry R1 SS was PP 6.5, DK 7.5, UD 13.5), and a leg already placed at
+ * one of them has to be selectable as itself. Every book now gets its own leg, so
+ * every leg needs its own key. Selection is session-scoped and placed parlays are
+ * persisted by leg VALUES (`fighter|stat|dir` signature), so widening this key
+ * carries no migration.
+ */
 function parlayLegKeyOf(l: ParlayLeg): string {
-  return parlayLegKey(l.fighter, l.stat, l.direction, l.stat === 'fp' ? (l.bookKey ?? null) : null);
+  return parlayLegKey(l.fighter, l.stat, l.direction, l.bookKey ?? null);
 }
 
 /**
@@ -11039,6 +11050,50 @@ function findCorrelatedPairs(
 }
 
 /** Suggest top parlay combinations from available leans */
+/**
+ * GLOW-UP 227 — ONE ranked-leg builder, for both pools.
+ *
+ * `renderParlayLab` and `suggestParlays` each built a near-identical leg from the
+ * same lean, which is the shape that keeps biting this codebase: the moment the
+ * Lab's leg started resolving its line direction-aware, the suggestions beside it
+ * would still have been quoting the active-platform number for the same pick —
+ * and their legs, lacking a bookKey, would no longer have matched a pool key at
+ * all, breaking LOAD. Derived once here; both callers consume it.
+ *
+ * Returns null when the lean has no side, no line, or a market rule keeps the
+ * side off the ranked board.
+ */
+function buildRankedParlayLeg(
+  f: AnalyzerFighter,
+  lean: LeanResult | null | undefined,
+  stat: LeanSource,
+): ParlayLeg | null {
+  if (!lean || lean.lean === 'none' || lean.lean === 'push') return null;
+  const dir = lean.lean as 'over' | 'under';
+  // FP excluded from best-book shopping on purpose: its books score fantasy
+  // points differently, so there is no better or worse line to shop for.
+  const best = stat === 'fp'
+    ? { book: null as string | null, line: null as number | null }
+    : leanBestBook(f, stat, dir);
+  const line = best.line ?? getSourceActiveLine(f, stat);
+  if (line == null) return null;
+  if (parlayUnrankableReason(f, stat, dir)) return null;
+  const conf = lean.conf || 0;
+  return {
+    fighter: f.name,
+    opponent: f.opponent || '?',
+    stat,
+    direction: dir,
+    line,
+    confidence: conf,
+    tier: conf >= 72 ? 'High' : conf >= 58 ? 'Med' : 'Low',
+    platform: activePlatformLabel(f),
+    bookKey: stat === 'fp'
+      ? (getSourceActivePlatformKey(f, 'fp') ?? null)
+      : (best.book ?? getSourceActivePlatformKey(f, stat) ?? null),
+  };
+}
+
 function suggestParlays(
   fighters: AnalyzerFighter[],
   maxLegs: number = 3,
@@ -11049,24 +11104,9 @@ function suggestParlays(
   for (const f of fighters) {
     if (!f.db?.loaded) continue;
     const addLeg = (lean: LeanResult | null | undefined, stat: LeanSource) => {
-      if (!lean || lean.lean === 'none' || lean.lean === 'push') return;
-      const line = getSourceActiveLine(f, stat);
-      if (line == null) return;
-      if ((lean.conf || 0) < 55) return; // skip low confidence
-      if (parlayUnrankableReason(f, stat, lean.lean as 'over' | 'under')) return;
-      available.push({
-        leg: {
-          fighter: f.name,
-          opponent: f.opponent || '?',
-          stat,
-          direction: lean.lean as 'over' | 'under',
-          line,
-          confidence: lean.conf || 0,
-          tier: (lean.conf || 0) >= 72 ? 'High' : (lean.conf || 0) >= 58 ? 'Med' : 'Low',
-          platform: activePlatformLabel(f),
-        },
-        fighter: f,
-      });
+      if ((lean?.conf || 0) < 55) return; // skip low confidence
+      const leg = buildRankedParlayLeg(f, lean, stat);
+      if (leg) available.push({ leg, fighter: f });
     };
     // GLOW-UP 208: same seven families the pool ranks. Suggestions drawing from a
     // NARROWER set than the list they sit beside was the older half of the same
@@ -11154,27 +11194,18 @@ function renderParlayLab(container: HTMLElement): void {
   const availableLegs: { leg: ParlayLeg; fighter: AnalyzerFighter }[] = [];
   for (const f of visibleFighters) {
     if (!f.db?.loaded) continue;
+    // ── GLOW-UP 227 — the ranked leg is priced at the best book for its SIDE ──
+    // It used to take `getSourceActiveLine`, which walks the active-platform
+    // priority chain and knows nothing about direction. On UFC 330 that put Ian
+    // Machado Garry's ranked R1 SS OVER on Underdog 13.5 while PrizePicks posted
+    // 6.5 — a seven-point giveaway on an OVER, and worse, the 58% beside it was
+    // scored by calcSSR1Lean against 6.5 ("edges the line by 5.4", projection
+    // 11.9). Displayed at 13.5, that same confidence describes a leg the model's
+    // own projection lands UNDER. Best Picks has shopped the best side for a long
+    // while; this is the Lab catching up. Shared with suggestParlays.
     const addLeg = (lean: LeanResult | null | undefined, stat: LeanSource) => {
-      if (!lean || lean.lean === 'none' || lean.lean === 'push') return;
-      const line = getSourceActiveLine(f, stat);
-      if (line == null) return;
-      if (parlayUnrankableReason(f, stat, lean.lean as 'over' | 'under')) return;
-      availableLegs.push({
-        leg: {
-          fighter: f.name,
-          opponent: f.opponent || '?',
-          stat,
-          direction: lean.lean as 'over' | 'under',
-          line,
-          confidence: lean.conf || 0,
-          tier: (lean.conf || 0) >= 72 ? 'High' : (lean.conf || 0) >= 58 ? 'Med' : 'Low',
-          platform: activePlatformLabel(f),
-          // GLOW-UP 211: FP legs carry their book, because FP is priced per book
-          // and the key has to distinguish Pick6 93.5 from Betr 85.5.
-          ...(stat === 'fp' ? { bookKey: getSourceActivePlatformKey(f, 'fp') ?? null } : {}),
-        },
-        fighter: f,
-      });
+      const leg = buildRankedParlayLeg(f, lean, stat);
+      if (leg) availableLegs.push({ leg, fighter: f });
     };
     // GLOW-UP 208: R1 SS, CTRL and KD are first-class ranked sources here now.
     // Best Picks has scored all three for a while (R1 SS can even overrule FT
@@ -11220,32 +11251,34 @@ function renderParlayLab(container: HTMLElement): void {
       const leanDir = (lean && lean.lean !== 'none' && lean.lean !== 'push') ? lean.lean as 'over' | 'under' : null;
       const leanConf = lean?.conf || 0;
       for (const dir of ['over', 'under'] as const) {
-        // GLOW-UP 211 — FP gets ONE CANDIDATE PER BOOK, everything else one.
-        // Fantasy points are scored differently by each book, so Pick6 93.5 and
-        // Betr 85.5 are two distinct props and both have to be reachable; the
-        // ranked pool can only carry the one book it resolved to, which left the
-        // rest unparlayable. Every other stat IS line-shoppable, so leanBestBook
-        // picking a single best book stays correct there.
-        const candidates: Array<{ book: string | null; line: number | null }> = stat === 'fp'
-          ? (LEAN_STAT_FIELDS['fp'] || []).map(([bk]) => ({ book: bk, line: lineForBook(f, 'fp', bk) }))
-          : [leanBestBook(f, stat, dir)];
+        // ── GLOW-UP 227 — EVERY stat gets one candidate per book ──────────────
+        // GLOW-UP 211 gave FP per-book candidates because its books score fantasy
+        // points differently, and left every other stat on a single best-book pick
+        // "because they're line-shoppable". Shopping is what you do BEFORE placing;
+        // afterwards you need the leg you actually hold. The board offered exactly
+        // one number per side, so a PrizePicks SS 21.5 and a placed DK R1 SS 7.5
+        // were both unreachable while UD's 20.5 and 13.5 sat in the pool. Books
+        // disagree hard on these props — R1 SS ran PP 6.5 / DK 7.5 / UD 13.5 on one
+        // fighter — so a single line was never a fair summary of the market either.
+        const candidates: Array<{ book: string | null; line: number | null }> =
+          (LEAN_STAT_FIELDS[stat] || []).map(([bk]) => ({ book: bk, line: lineForBook(f, stat, bk) }));
         for (const cand of candidates) {
-        const key = parlayLegKey(f.name, stat, dir, stat === 'fp' ? cand.book : null);
+        // Book-qualified for every stat now, so a book's leg dedupes against the
+        // ranked leg only when it IS the ranked leg's book.
+        const key = parlayLegKey(f.name, stat, dir, cand.book);
         if (rankedKeys.has(key)) continue;
-        // Direction-aware line + book: leanBestBook already knows an OVER wants
-        // the lowest line and an UNDER the highest, and already drops books that
-        // don't post the side. A side no book takes still gets a leg (the active
-        // line), flagged — placeability is REPORTED here, never enforced, the same
-        // call the two-sided slate picker makes.
-        const bb = stat === 'fp'
-          // For FP the "book" is the candidate itself; whether it takes this SIDE
-          // is a separate per-book question.
-          ? { book: (cand.line != null && !shouldSkipFpSideForFighter(f, 'fp', dir, cand.book as SourcePlatformKey)) ? cand.book : null, line: cand.line }
-          : cand;
-        const line = bb.line ?? cand.line ?? (stat === 'fp' ? null : getSourceActiveLine(f, stat));
-        if (line == null) continue;
+        // A book with no line for this prop has nothing to offer — skip it rather
+        // than inventing a leg at some other book's number.
+        if (cand.line == null) continue;
+        // Placeability is REPORTED here, never enforced: a side this book won't
+        // take still gets a leg, flagged, because you may hold it anyway. Via
+        // bookTakesSide so the non-FP market rules (Pick6 TD More-only, DK chalk)
+        // are applied per book instead of being silently skipped.
+        const takes = cand.book != null && bookTakesSide(f, stat, dir, cand.book);
+        const bb = { book: takes ? cand.book : null, line: cand.line };
+        const line = bb.line;
         const statLbl = statDisplayLabel(stat);
-        const bookLbl = stat === 'fp' && cand.book ? (LEAN_BOOK_LABEL[cand.book] || cand.book) : '';
+        const bookLbl = cand.book ? (LEAN_BOOK_LABEL[cand.book] || cand.book) : '';
         // The market rule that would keep this side off the ranked board, if any.
         // Same call the pool builder gates on, so the flag and the demotion can
         // never tell different stories.
@@ -11269,14 +11302,12 @@ function renderParlayLab(container: HTMLElement): void {
           reason = `No model lean on this ${statLbl} prop either way — 50% is the honest prior, not a read. EV prices the vig against it.`;
         }
         if (marketBlock) reason += ` · ${marketBlock}`;
-        // FP says WHICH book, because the line only means anything paired with it.
-        if (stat === 'fp' && bookLbl) {
-          reason = `${bookLbl} FP ${line}. ${reason}`;
-        }
-        if (!bb.book) {
-          reason += stat === 'fp' && bookLbl
-            ? ` · ${bookLbl} does not offer this side — queue it anyway if you have it.`
-            : ' · No book posts this side that the scraper can see — queue it anyway if you have it somewhere.';
+        // GLOW-UP 227: every leg names its book now, not just FP. With one leg per
+        // book in the pool, "SS UNDER 21.5" beside "SS UNDER 20.5" is unreadable
+        // unless each says whose number it is.
+        if (bookLbl) reason = `${bookLbl} ${statLbl} ${line}. ${reason}`;
+        if (!bb.book && bookLbl) {
+          reason += ` · ${bookLbl} does not offer this side — queue it anyway if you have it.`;
         }
         offBoardLegs.push({
           leg: {
@@ -11290,9 +11321,11 @@ function renderParlayLab(container: HTMLElement): void {
             platform: activePlatformLabel(f),
             offBoard: true,
             offReason: reason,
-            // FP keeps its candidate book even when that book won't take the side,
-            // so the row still says which line it is and the key stays unique.
-            bookKey: stat === 'fp' ? cand.book : bb.book,
+            // GLOW-UP 227: the CANDIDATE's book for every stat, even when that book
+            // won't take the side — the row has to say whose line it is, and the
+            // key has to stay unique per book. Whether the book takes it is carried
+            // by the flag in `reason`, not by blanking the book.
+            bookKey: cand.book,
           },
           fighter: f,
         });
