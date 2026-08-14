@@ -30029,6 +30029,138 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   .rc-fighter-row .rc-reason { display: none; }
 }
 
+
+/* ══ GLOW-UP 231: report card — five levels, all of them look ═════════════
+   223 made the card HONEST; it did not make it handsome. Eight columns of
+   near-equal weight read as a spreadsheet: no focal point, four hues competing
+   for the same glance, and bouts that looked like a list rather than pairs.
+   L1 the pick is one object · L2 evidence recedes · L3 the bout is the unit ·
+   L4 one colour job per axis · L5 rhythm. Appended last on purpose — every
+   earlier block uses single-class selectors, so these win on order alone. */
+
+/* ── L1 · the pick is one object, and the LINE is the anchor ─────────────── */
+.rc-fighter-row {
+  grid-template-columns: 150px 168px 52px minmax(0, 1fr);
+  gap: 12px;
+  padding: 6px 8px;
+  align-items: center;
+  border-bottom: none;
+  border-radius: 7px;
+}
+.rc-pick {
+  display: inline-grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: 7px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: border-color 0.15s, background 0.15s;
+}
+.rc-fighter-row:hover .rc-pick { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+/* Direction is the ONLY saturated colour on the row (L4) — small, so it reads
+   as a label on the number rather than as a competing block of colour. */
+.rc-dir {
+  font-family: 'JetBrains Mono', monospace; font-style: normal;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.11em; white-space: nowrap;
+}
+.rc-pick.rc-over  .rc-dir { color: #4ade80; }
+.rc-pick.rc-under .rc-dir { color: #ff7d95; }
+.rc-pick.rc-push  .rc-dir,
+.rc-pick.rc-none  { color: var(--text4); }
+/* The number you are actually betting. Nothing else on the row is this size. */
+.rc-line {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px; font-weight: 800; line-height: 1;
+  color: var(--text); text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.rc-meta {
+  font-style: normal; display: inline-flex; align-items: center; gap: 5px;
+  justify-content: flex-end; white-space: nowrap;
+}
+/* L4 — the stat keeps its family hue (that mapping is load-bearing across the
+   app) but drops to a bare tinted word: no pill, no background, so it stops
+   reading as a second chip beside the direction. */
+.rc-stat-tag {
+  background: none !important; padding: 0 !important;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em; opacity: 0.75;
+}
+.rc-src { font-size: 7.5px; color: var(--text4); letter-spacing: 0.08em; text-align: left; }
+.rc-src.is-blocked { opacity: 0.9; }
+.rc-pick.is-none { color: var(--text4); text-align: center; display: block; }
+
+/* ── L2 · evidence recedes: one block, quiet, expands when you ask ───────── */
+.rc-evidence { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.rc-avg {
+  flex: 0 0 auto; font-size: 8.5px; color: var(--text4);
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.rc-avg b { font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums; }
+.rc-reason { flex: 1 1 auto; font-size: 8.5px; line-height: 1.4; color: var(--text4); }
+.rc-reason.is-generic { opacity: 0.3; font-style: normal; }
+
+/* ── L3 · the bout is the unit ──────────────────────────────────────────── */
+.rc-fight-group {
+  margin-bottom: 7px; padding: 5px 7px; border-radius: 10px;
+  background: rgba(255,255,255,0.022);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-left: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.18s, border-color 0.18s;
+}
+.rc-fight-group:hover { background: rgba(255,255,255,0.038); border-color: rgba(255,255,255,0.09); }
+/* A hairline between the two fighters only — the pair is the object, so the
+   separator belongs INSIDE it, not around every row. */
+.rc-matchup > .rc-fighter-row + .rc-fighter-row {
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+/* Card position reads from a single accent bar, not from four coloured borders. */
+.rc-fight-group.rc-badge-main-event { border-left: 2px solid rgba(249,115,22,0.75); }
+.rc-fight-group.rc-badge-co-main    { border-left: 2px solid rgba(45,212,208,0.6); }
+
+/* ── L4 · confidence is WEIGHT, not a third hue ─────────────────────────── */
+.rc-conf b { font-size: 11.5px; font-weight: 800; }
+.rc-conf.tier-high b { color: var(--text); }
+.rc-conf.tier-med  b { color: var(--text2); }
+.rc-conf.tier-low  b { color: var(--text4); }
+.rc-conf-bar { height: 2px; background: rgba(255,255,255,0.07); }
+.rc-conf.tier-high .rc-conf-bar u { background: rgba(255,255,255,0.85); box-shadow: none; }
+.rc-conf.tier-med  .rc-conf-bar u { background: rgba(255,255,255,0.45); }
+.rc-conf.tier-low  .rc-conf-bar u { background: rgba(255,255,255,0.18); }
+/* The lit spine was a green stripe fighting the green OVER chips two columns
+   over. Strength is now a brightness step on the row itself. */
+.rc-fighter-row.tier-high { box-shadow: none; background: rgba(255,255,255,0.03); }
+.rc-fighter-row.is-blocked { background: none; opacity: 0.5; }
+.rc-fighter-row.is-blocked:hover { opacity: 0.85; }
+
+/* ── L5 · rhythm: the section is a quiet rule, not a coloured shout ──────── */
+.rc-section-head {
+  margin: 16px 0 6px; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.26em; color: var(--text4);
+}
+.rc-section-head.rc-badge-main-event { color: rgba(249,115,22,0.85); }
+.rc-section-head.rc-badge-co-main    { color: rgba(45,212,208,0.7); }
+.rc-section-head.rc-badge-main-card,
+.rc-section-head.rc-badge-prelim     { color: var(--text4); }
+.rc-section-head i { opacity: 0.1; }
+.rc-section-head:first-child { margin-top: 4px; }
+.rc-sec-stat { opacity: 0.5; letter-spacing: 0.08em; }
+/* The fight note sat flush against the rows above it. */
+.rc-fight-note { margin: 4px 2px 1px; font-size: 7.5px; opacity: 0.9; }
+/* The name carries the row; the star sits above it in the hierarchy. */
+.rc-name { font-size: 12.5px; font-weight: 700; letter-spacing: -0.005em; }
+.rc-rank { font-size: 9px; margin-right: 6px; }
+
+@media (max-width: 900px) {
+  .rc-fighter-row { grid-template-columns: 132px 158px 48px minmax(0, 1fr); gap: 9px; }
+  .rc-fighter-row .rc-avg { display: none; }
+}
+@media (max-width: 720px) {
+  .rc-fighter-row { grid-template-columns: 118px 150px 44px; gap: 8px; }
+  .rc-fighter-row .rc-evidence { display: none; }
+}
+
 </style>
 </head>
 <body>
