@@ -23728,29 +23728,13 @@ function exportToCSV() {
     showToast('Exported leans to CSV');
 }
 let _reportCardText = '';
-function bestAvailableLine(f) {
-    // Return the best FP line across all platforms with a short source label
-    if (currentPlatform === 'pick6' && f.line_p6 != null)
-        return { line: f.line_p6, src: 'P6' };
-    if (currentPlatform === 'underdog' && f.line_ud != null)
-        return { line: f.line_ud, src: 'UD' };
-    if (currentPlatform === 'prizepicks' && f.line_pp != null)
-        return { line: f.line_pp, src: 'PP' };
-    if (currentPlatform === 'betr' && f.line_betr != null)
-        return { line: f.line_betr, src: 'BT' };
-    // Fallback: any platform with a line
-    if (f.line_p6 != null)
-        return { line: f.line_p6, src: 'P6' };
-    if (f.line_ud != null)
-        return { line: f.line_ud, src: 'UD' };
-    if (f.line_pp != null)
-        return { line: f.line_pp, src: 'PP' };
-    if (f.line_betr != null)
-        return { line: f.line_betr, src: 'BT' };
-    if (f.line_dk_ss != null)
-        return { line: f.line_dk_ss, src: 'DK' };
-    return { line: null, src: '' };
-}
+// GLOW-UP 220: `bestAvailableLine` removed. It returned an FP line for any
+// fighter regardless of which stat their lean was on — with a lone `line_dk_ss`
+// fallback that made SS leans look handled — and the report card was its only
+// caller. Deleted rather than left available: it reads like a general-purpose
+// "get this fighter's line" helper, which is exactly how it ended up on a
+// surface that needed the LEAN'S stat. Use leanBestBook(f, statKey, dir), which
+// knows the stat, respects placeability, and shops FP within its scoring family.
 // Fetches UFCStats directly from the popup (avoids MV3 service worker kill issue).
 // Searches upcoming + completed pages for an event that overlaps with `names`.
 async function fetchCardFromUFCStatsDirect(names) {
@@ -24031,55 +24015,52 @@ async function generateReportCard() {
     // that got truncated mid-word on every row. Detected so it can be demoted
     // rather than compete with real reasoning.
     const isBoilerplate = (t) => /^Platform-aware FP baseline/i.test(t.trim());
+    const resolveRow = (f) => {
+        const el = getEffectiveLean(f);
+        // The line must belong to the LEAN'S OWN STAT. bestAvailableLine only ever
+        // knew FP lines with a single DK-SS fallback, so it had no idea which prop
+        // the lean was on: Eric McConico exported "—" on an SS lean while Pick6 had
+        // him at 30.5, and any fighter with both an FP line and an SS lean exported
+        // the FP number beside SS reasoning. leanBestBook knows the stat, is
+        // placeability-aware, and shops FP within its scoring family.
+        const statKey = (el._source || 'fp');
+        const statLbl = EFFECTIVE_LEAN_STAT_LABEL[statKey] || statKey.toUpperCase();
+        const resolved = (el.lean === 'over' || el.lean === 'under')
+            ? leanBestBook(f, statKey, el.lean)
+            : { book: null, line: null };
+        const line = resolved.line ?? getSourceActiveLine(f, statKey);
+        const srcKey = resolved.book ?? getSourceActivePlatformKey(f, statKey);
+        const topReason = el.reasons?.[0]?.text ?? '';
+        return {
+            el, statKey, statLbl, line,
+            src: srcKey ? platformKeyShort(srcKey) : '',
+            // No book will take this side — the flag the board and Parlay Lab use.
+            unplaceable: (el.lean === 'over' || el.lean === 'under') && !resolved.book && line != null,
+            tier: el.conf >= 72 ? 'high' : el.conf >= 58 ? 'med' : 'low',
+            // The average has to be the average OF THAT STAT, or an SS row reads
+            // "18.5 · avg 63.0" with the 63.0 being fantasy points.
+            avgVal: statKey === 'ss' ? (f.db?.avgSigStr ?? null)
+                : statKey === 'td' ? (f.db?.avgTD ?? null)
+                    : (f.db?.avgFP ?? null),
+            topReason,
+            generic: !!topReason && isBoilerplate(topReason),
+        };
+    };
     // R2 — one heading per SECTION, not per fight. "MAIN CARD" printed five times
     // and "PRELIM" five times, which read as five separate sections and buried the
     // structure of the card.
     let lastBadge = '';
     for (const g of groups) {
         const rows = g.pair.map(f => {
-            const el = getEffectiveLean(f);
-            // ── GLOW-UP 219 F1 — the line must belong to the LEAN'S OWN STAT ──────
-            // bestAvailableLine only ever knew FP lines, with a single DK-SS fallback,
-            // so it had no idea what prop the lean was actually on. Eric McConico read
-            // "—" on an SS lean while Pick6 had him at 30.5, and any fighter holding
-            // both an FP line and an SS lean was shown the FP number beside SS
-            // reasoning — the wrong-line trap, on the export people read before
-            // locking entries. leanBestBook resolves the correct stat, is placeability
-            // aware, and shops FP within its scoring family (GLOW-UP 212).
-            const statKey = (el._source || 'fp');
-            const statLbl = EFFECTIVE_LEAN_STAT_LABEL[statKey] || statKey.toUpperCase();
-            const resolved = (el.lean === 'over' || el.lean === 'under')
-                ? leanBestBook(f, statKey, el.lean)
-                : { book: null, line: null };
-            const line = resolved.line ?? getSourceActiveLine(f, statKey);
-            const srcKey = resolved.book ?? getSourceActivePlatformKey(f, statKey);
-            const src = srcKey ? platformKeyShort(srcKey) : '';
-            // No book will take this side — the same flag the board and Parlay Lab use.
-            const unplaceable = (el.lean === 'over' || el.lean === 'under') && !resolved.book && line != null;
+            const { el, statKey, statLbl, line, src, unplaceable, tier, avgVal, topReason, generic } = resolveRow(f);
             const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : 'rc-none';
             const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : '—';
-            // R3 — confidence carries visual weight. 43% and 81% rendered identically
-            // before, so the card's strongest reads were invisible in a list.
-            const tier = el.conf >= 72 ? 'high' : el.conf >= 58 ? 'med' : 'low';
             const confEl = el.lean !== 'none'
                 ? `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${Math.min(100, Math.max(6, el.conf))}%"></u></i></span>`
                 : `<span class="rc-conf is-none">—</span>`;
-            // F2 — the average has to be the average OF THAT STAT. `avgFP` was printed
-            // beside every line regardless, so an SS lean read "18.5 · avg 63.0" where
-            // the 63.0 was fantasy points — two different quantities side by side with
-            // nothing saying so. Labelled as well as matched.
-            const avgVal = statKey === 'ss' ? (f.db?.avgSigStr ?? null)
-                : statKey === 'td' ? (f.db?.avgTD ?? null)
-                    : (f.db?.avgFP ?? null);
             const avgEl = avgVal != null
                 ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg ${avgVal.toFixed(1)} <i>${statLbl}</i></span>`
                 : `<span class="rc-avg"></span>`;
-            const topReason = el.reasons?.[0]?.text ?? '';
-            const generic = !!topReason && isBoilerplate(topReason);
-            // F3 — the boilerplate repeated verbatim on a third of the card and told
-            // you nothing about the fighter. It is replaced by a short, honest line
-            // saying exactly that, instead of spending two clamped lines saying
-            // nothing. The original string stays on hover for anyone who wants it.
             const reasonTxt = topReason;
             const lineStr = line != null ? line.toFixed(1) : '—';
             const srcEl = src ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
@@ -24139,18 +24120,29 @@ async function generateReportCard() {
         else if (fa)
             textLines.push(`\u2694  ${fa.name.toUpperCase()}`);
         for (const f of g.pair) {
-            const el = getEffectiveLean(f);
-            const { line, src } = bestAvailableLine(f);
+            // Same resolver the screen uses, so the exported line can never disagree
+            // with the one on the card.
+            const { el, statLbl, line, src, unplaceable, avgVal } = resolveRow(f);
             const leanStr = el.lean === 'over' ? '\u25B2 OVER ' : el.lean === 'under' ? '\u25BC UNDER' : '\u2500      ';
-            const lineStr = line != null ? `${src} ${line.toFixed(1)}`.padStart(9) : '         ';
+            // The stat is printed now: "18.5" alone could be SS, FP or TD, and the
+            // export is what gets read away from the app where nothing disambiguates it.
+            const statStr = el.lean !== 'none' ? statLbl.padEnd(5) : '     ';
+            const lineStr = line != null
+                ? `${src} ${line.toFixed(1)}${unplaceable ? '!' : ''}`.padStart(10)
+                : '          ';
             const confStr = el.lean !== 'none' ? `${el.conf}% conf` : '';
-            const avgStr = f.db?.avgFP != null ? `avg: ${f.db.avgFP.toFixed(1)} FP` : '';
-            textLines.push(`    ${f.name.padEnd(22)} ${leanStr}  ${lineStr}  ${confStr.padEnd(9)}  ${avgStr}`);
+            const avgStr = avgVal != null ? `avg: ${avgVal.toFixed(1)} ${statLbl}` : '';
+            textLines.push(`    ${f.name.padEnd(22)} ${leanStr}  ${statStr} ${lineStr}  ${confStr.padEnd(9)}  ${avgStr}`);
         }
         textLines.push('');
     }
     textLines.push('\u2500'.repeat(45));
     textLines.push(`${leanFighters.length} leans  \u00B7  ${overCount} overs  \u00B7  ${underCount} unders  \u00B7  avg conf: ${avgConf}%`);
+    // `!` beside a line means no book will take that side \u2014 worth stating, since
+    // the export is read away from the tooltips that explain it on screen.
+    if (groups.some(g => g.pair.some(f => resolveRow(f).unplaceable))) {
+        textLines.push('! = no book posts this side \u2014 read only, not placeable');
+    }
     _reportCardText = textLines.join('\n');
 }
 function runWalkForwardDiagnostics() {
