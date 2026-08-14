@@ -6018,35 +6018,66 @@ oppDB, dkLine, availableLines = [], moneyline = null, underAvailable = null) {
         return null;
     const ctrlMinsSamples = history.map(h => Number(h.ctrlSecs) / 60);
     const avgCTRL = ctrlMinsSamples.reduce((s, v) => s + v, 0) / ctrlMinsSamples.length;
+    // ── MODEL v24 — opponent-allowed control ─────────────────────────────────
+    // CTRL was the ONLY lean that never read `oppHistory`. FP, SS, TD, FT and R1
+    // SS all blend what the opponent ALLOWS into their projection; CTRL scored
+    // from the fighter's own average and inferred the opponent from two proxies
+    // (their takedown-defence % and whether they wrestle back). So on UFC 330 the
+    // board put Jeremiah Wells CTRL OVER 1:30 at the top at 91% off his own 5:12
+    // average, while the panel directly beneath it showed Orolbai Uulu allowing
+    // 0:57 across six fights with 2 of 6 over that line — the model could not see
+    // the number the user was reading.
+    //
+    // NOTE the filter: SS drops zero samples, and CTRL must NOT. A shut-out
+    // (Hermansson 0:00 against Uulu) is the most informative sample there is for
+    // this stat; dropping zeros would bias the allowed-average upward exactly
+    // when the opponent is a control-denier.
+    const oppCtrlSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+        .map(h => Number(h.ctrlSecs))
+        .filter(v => Number.isFinite(v) && v >= 0)
+        .map(v => v / 60);
+    const oppAvgCtrlAllowed = oppCtrlSamples.length >= 3
+        ? parseFloat((oppCtrlSamples.reduce((s, v) => s + v, 0) / oppCtrlSamples.length).toFixed(2))
+        : null;
+    // Same 50/50 blend SS and FP use — his history and their resistance, weighted
+    // equally, rather than his history alone.
+    const effectiveCTRL = oppAvgCtrlAllowed != null
+        ? parseFloat(((avgCTRL + oppAvgCtrlAllowed) / 2).toFixed(2))
+        : avgCTRL;
     const reasons = [];
     let score = 0;
-    const diff = avgCTRL - line_ctrl;
+    // The projection names both halves, so a blended number can never be mistaken
+    // for the fighter's own average the way "Avg control (5.2m)" was.
+    const ctrlLabel = oppAvgCtrlAllowed != null
+        ? `Proj control ${effectiveCTRL.toFixed(1)}m (avg ${avgCTRL.toFixed(1)}m + opp allows ${oppAvgCtrlAllowed.toFixed(1)}m)`
+        : `Avg control (${avgCTRL.toFixed(1)}m)`;
+    const diff = effectiveCTRL - line_ctrl;
     if (diff > 1.5) {
         score += 2.4;
-        reasons.push({ icon: 'pos', text: `Avg control (${avgCTRL.toFixed(1)}m) is ${diff.toFixed(1)}m above line` });
+        reasons.push({ icon: 'pos', text: `${ctrlLabel} is ${diff.toFixed(1)}m above line` });
     }
     else if (diff > 0.8) {
         score += 1.4;
-        reasons.push({ icon: 'pos', text: `Avg control (${avgCTRL.toFixed(1)}m) edges line by ${diff.toFixed(1)}m` });
+        reasons.push({ icon: 'pos', text: `${ctrlLabel} edges line by ${diff.toFixed(1)}m` });
     }
     else if (diff > 0.3) {
         score += 0.5;
-        reasons.push({ icon: 'pos', text: `Avg control (${avgCTRL.toFixed(1)}m) slightly above line` });
+        reasons.push({ icon: 'pos', text: `${ctrlLabel} slightly above line` });
     }
     else if (diff < -1.5) {
         score -= 2.4;
-        reasons.push({ icon: 'neg', text: `Avg control (${avgCTRL.toFixed(1)}m) is ${Math.abs(diff).toFixed(1)}m below line` });
+        reasons.push({ icon: 'neg', text: `${ctrlLabel} is ${Math.abs(diff).toFixed(1)}m below line` });
     }
     else if (diff < -0.8) {
         score -= 1.4;
-        reasons.push({ icon: 'neg', text: `Avg control (${avgCTRL.toFixed(1)}m) trails line by ${Math.abs(diff).toFixed(1)}m` });
+        reasons.push({ icon: 'neg', text: `${ctrlLabel} trails line by ${Math.abs(diff).toFixed(1)}m` });
     }
     else if (diff < -0.3) {
         score -= 0.5;
-        reasons.push({ icon: 'neg', text: `Avg control (${avgCTRL.toFixed(1)}m) slightly below line` });
+        reasons.push({ icon: 'neg', text: `${ctrlLabel} slightly below line` });
     }
     else {
-        reasons.push({ icon: 'neu', text: `Avg control (${avgCTRL.toFixed(1)}m) near line — toss-up` });
+        reasons.push({ icon: 'neu', text: `${ctrlLabel} near line — toss-up` });
     }
     const hits = ctrlMinsSamples.filter(v => v > line_ctrl).length;
     const rate = hits / ctrlMinsSamples.length;
@@ -6095,8 +6126,27 @@ oppDB, dkLine, availableLines = [], moneyline = null, underAvailable = null) {
             reasons.push({ icon: 'neg', text: `Low TD volume (${tdAvg.toFixed(1)}/fight) caps control ceiling` });
         }
     }
-    // Opponent TD defense dampens control potential.
-    if (oppDB?.loaded && oppDB.tdDef != null) {
+    // MODEL v24 — how many of the opponent's recent foes actually cleared THIS
+    // line. Takedown-defence % is a proxy for this; when the measurement itself is
+    // available it SUPERSEDES the proxy rather than stacking with it, or a
+    // control-denier gets charged twice for the same trait. Thresholds and
+    // magnitudes deliberately mirror the tdDef block they replace.
+    const oppOverRate = oppCtrlSamples.length >= 3
+        ? oppCtrlSamples.filter(v => v > line_ctrl).length / oppCtrlSamples.length
+        : null;
+    if (oppOverRate != null) {
+        const over = oppCtrlSamples.filter(v => v > line_ctrl).length;
+        if (oppOverRate <= 0.40) {
+            score -= 1.1;
+            reasons.push({ icon: 'neg', text: `Opponent has allowed only ${over}/${oppCtrlSamples.length} recent foes over this control line` });
+        }
+        else if (oppOverRate >= 0.60) {
+            score += 0.8;
+            reasons.push({ icon: 'pos', text: `Opponent has allowed ${over}/${oppCtrlSamples.length} recent foes over this control line` });
+        }
+    }
+    else if (oppDB?.loaded && oppDB.tdDef != null) {
+        // No allowed-control history — fall back to the defence-percentage proxy.
         if (oppDB.tdDef >= 75) {
             score -= 1.1;
             reasons.push({ icon: 'neg', text: `Opponent TD defense ${oppDB.tdDef}% suppresses ground control` });
