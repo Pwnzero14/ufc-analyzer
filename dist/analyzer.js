@@ -20433,11 +20433,34 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
     // eligible; a demon/goblin is More-only on a non-standard payout, which makes
     // NEITHER side an ordinary pick-em play — the same rule parlayUnrankableReason
     // enforces, said out loud where the user is looking at the prop.
+    // ── GLOW-UP 224 — every prop panel follows the LINE, not the lean ─────────
+    // Each lean panel was gated on its lean object existing, but the side picker
+    // INSIDE the panel is the only control that queues a pick for that prop. So a
+    // posted line with no lean — a normal state, not an edge case, whenever the
+    // model lacks the history it needs — meant the prop was unreachable from the
+    // board: no panel, no picker, no way to track a bet already placed on it.
+    // A live line is now enough to earn the panel. The lean, when there is one,
+    // still supplies the verdict chip, the factor block and the placement chip;
+    // without one the panel is lines plus the two-sided picker, which is exactly
+    // what FP has always been.
+    const leanDirOf = (l) => l && (l.lean === 'over' || l.lean === 'under') ? l.lean : null;
+    const anyLine = (...vals) => vals.some(v => v != null);
+    const noReadNote = (what) => `<div class="ctrl-noplay">No ${what} read — the model takes no side here, usually for want of the history it scores from. The line is live, so either side can still be queued.</div>`;
+    const ssHasLine = anyLine(f.line_p6_ss, f.line_ud_ss, f.line_pp_ss, f.line_betr_ss, f.line_dk_ss);
+    const tdHasLine = anyLine(f.line_p6_td, f.line_ud_td, f.line_pp_td, f.line_betr_td, f.line_dk_td);
+    const ftHasLine = anyLine(f.line_p6_ft, f.line_ud_ft, f.line_pp_ft, f.line_betr_ft, f.line_dk_ft);
+    const ctrlHasLine = anyLine(f.line_p6_ctrl, f.line_ud_ctrl, f.line_pp_ctrl, f.line_betr_ctrl, f.line_dk_ctrl);
+    const r1HasLine = anyLine(f.line_pp_ss_r1, f.line_ud_ss_r1, f.line_dk_ss_r1);
+    const ssDir = leanDirOf(f.lean_ss);
+    const tdDir = leanDirOf(f.lean_td);
+    const ftDir = leanDirOf(f.lean_ft);
+    const ctrlDir = leanDirOf(f.lean_ctrl);
+    const r1Dir = leanDirOf(f.lean_ss_r1);
     const kdStandard = f.kd_under_available === true;
     const kdDir = f.lean_kd && (f.lean_kd.lean === 'over' || f.lean_kd.lean === 'under') ? f.lean_kd.lean : null;
     const kdPanel = (f.lean_kd || f.line_pp_kd != null)
         ? `<div class="detail-panel">
-          <div class="detail-panel-title">KD Lean${kdDir ? ` <span class="lean-verdict ${kdDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${kdDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_kd?.conf ?? 0}%</span>` : ''} · PP: ${f.line_pp_kd ?? '—'}${kdStandard && kdDir ? buildPlacementChip(f, 'kd', kdDir) : ''}${buildSidePicker(f, 'kd', kdDir)}</div>
+          <div class="detail-panel-title">KD ${f.lean_kd ? 'Lean' : 'Lines'}${kdDir ? ` <span class="lean-verdict ${kdDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${kdDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_kd?.conf ?? 0}%</span>` : ''} · PP: ${f.line_pp_kd ?? '—'}${kdStandard && kdDir ? buildPlacementChip(f, 'kd', kdDir) : ''}${buildSidePicker(f, 'kd', kdDir)}</div>
           ${kdStandard
             ? ''
             : `<div class="ctrl-overonly-note" title="PrizePicks prices this knockdowns prop More-only (a demon or goblin projection). Those carry non-standard payouts, so neither side is a normal pick-em play and the board keeps KD display-only here — the lean below is information, not a play.">⚠ MORE-ONLY (demon/goblin) — non-standard payout, so neither side is Best-Picks eligible.</div>`}
@@ -20459,40 +20482,59 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         (f.line_p6 != null || f.line_ud != null || f.line_pp != null || f.line_betr != null) ? `<div class="detail-panel">
           <div class="detail-panel-title">FP Lines${buildFpBookPickers(f, lean && lean._source === 'fp' ? lean.lean : null)}</div>
         </div>` : '',
-        f.lean_ss ? `<div class="detail-panel">
-          <div class="detail-panel-title">SS Lean (P6: ${f.line_p6_ss ?? '—'} · UD: ${f.line_ud_ss ?? '—'} · PP: ${f.line_pp_ss ?? '—'} · BT: ${f.line_betr_ss ?? '—'} · DK: ${f.line_dk_ss ?? '—'})${buildPlacementChip(f, 'ss', f.lean_ss.lean)}${buildSidePicker(f, 'ss', f.lean_ss.lean)}</div>
-          ${buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean)}
-          <div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>
+        (f.lean_ss || ssHasLine) ? `<div class="detail-panel">
+          <div class="detail-panel-title">SS ${f.lean_ss ? 'Lean' : 'Lines'} (P6: ${f.line_p6_ss ?? '—'} · UD: ${f.line_ud_ss ?? '—'} · PP: ${f.line_pp_ss ?? '—'} · BT: ${f.line_betr_ss ?? '—'} · DK: ${f.line_dk_ss ?? '—'})${buildPlacementChip(f, 'ss', ssDir)}${buildSidePicker(f, 'ss', ssDir)}</div>
+          ${f.lean_ss ? buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean) : ''}
+          ${f.lean_ss
+            ? `<div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>`
+            : noReadNote('significant strikes')}
         </div>` : '',
-        f.lean_ss_r1 ? `<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS Lean (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})${buildPlacementChip(f, 'ss_r1', f.lean_ss_r1.lean)}${buildSidePicker(f, 'ss_r1', f.lean_ss_r1.lean)}</div>
-          ${buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean)}
-          <div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>
+        // ── GLOW-UP 224 — the R1 SS panel follows the LINE, not the lean ────────
+        // This panel was gated on `f.lean_ss_r1`, so a fighter with a live round-one
+        // SS line but no lean had no panel — and the side picker inside it is the
+        // only control that queues an R1 SS pick, so the prop was unreachable from
+        // the board entirely. calcSSR1Lean needs round-one history the fighter may
+        // simply not have, which makes "line posted, no lean" a normal state rather
+        // than an edge case: Lucas Fernando held an Underdog R1 SS 16.5 that had
+        // already been bet, with nothing on the card to track it against.
+        // FP gates on lines and KD gates on `lean || line` — R1 SS now matches.
+        (f.lean_ss_r1 || r1HasLine) ? `<div class="detail-panel">
+          <div class="detail-panel-title">R1 SS ${f.lean_ss_r1 ? 'Lean' : 'Lines'}${r1Dir ? ` <span class="lean-verdict ${r1Dir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${r1Dir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ss_r1?.conf ?? 0}%</span>` : ''} (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})${r1Dir ? buildPlacementChip(f, 'ss_r1', r1Dir) : ''}${buildSidePicker(f, 'ss_r1', r1Dir)}</div>
+          ${f.lean_ss_r1 ? buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean) : ''}
+          ${f.lean_ss_r1
+            ? `<div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>`
+            : '<div class="ctrl-noplay">No round-one read — the model needs round-one history this fighter does not have, so it takes no side. The line is live and either side can still be queued.</div>'}
         </div>` : '',
-        f.lean_td ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD Lean (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · BT: ${f.line_betr_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', f.lean_td.lean)}${buildSidePicker(f, 'td', f.lean_td.lean)}</div>
-          ${buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean)}
-          <div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>
+        (f.lean_td || tdHasLine) ? `<div class="detail-panel">
+          <div class="detail-panel-title">TD ${f.lean_td ? 'Lean' : 'Lines'} (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · BT: ${f.line_betr_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', tdDir)}${buildSidePicker(f, 'td', tdDir)}</div>
+          ${f.lean_td ? buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean) : ''}
+          ${f.lean_td
+            ? `<div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>`
+            : noReadNote('takedown')}
         </div>` : '',
-        f.lean_ft ? `<div class="detail-panel">
-          <div class="detail-panel-title">FT Lean${f.lean_ft.lean !== 'push' ? ` <span class="lean-verdict ${f.lean_ft.lean}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${f.lean_ft.lean === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft.conf}%</span>` : ''} · P6: ${f.line_p6_ft ?? '—'} · UD: ${f.line_ud_ft ?? '—'} · PP: ${f.line_pp_ft ?? '—'} · BT: ${f.line_betr_ft ?? '—'} · DK: ${f.line_dk_ft ?? '—'}${buildPlacementChip(f, 'ft', f.lean_ft.lean)}${buildSidePicker(f, 'ft', f.lean_ft.lean)}</div>
-          ${buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean)}
-          <div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>
+        (f.lean_ft || ftHasLine) ? `<div class="detail-panel">
+          <div class="detail-panel-title">FT ${f.lean_ft ? 'Lean' : 'Lines'}${ftDir ? ` <span class="lean-verdict ${ftDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${ftDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ft ?? '—'} · UD: ${f.line_ud_ft ?? '—'} · PP: ${f.line_pp_ft ?? '—'} · BT: ${f.line_betr_ft ?? '—'} · DK: ${f.line_dk_ft ?? '—'}${buildPlacementChip(f, 'ft', ftDir)}${buildSidePicker(f, 'ft', ftDir)}</div>
+          ${f.lean_ft ? buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean) : ''}
+          ${f.lean_ft
+            ? `<div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>`
+            : noReadNote('fight-time')}
         </div>` : '',
         // CTRL panel (MODEL v16). CTRL had history/opp panels and line cells but no
         // lean panel, so its verdict was computed and never shown. The over-only rule
         // is stated ON the panel rather than left implicit: when the model lands on
         // UNDER, the honest answer is "no play", not a pick you can't enter.
-        f.lean_ctrl ? `<div class="detail-panel">
-          <div class="detail-panel-title">CTRL Lean${f.lean_ctrl.lean === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl.conf}%</span>` : ''} · P6: ${f.line_p6_ctrl ?? '—'} · UD: ${f.line_ud_ctrl ?? '—'} · PP: ${f.line_pp_ctrl ?? '—'} · BT: ${f.line_betr_ctrl ?? '—'} · DK: ${f.line_dk_ctrl ?? '—'}${f.lean_ctrl.lean === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}${buildSidePicker(f, 'ctrl', f.lean_ctrl.lean)}</div>
+        (f.lean_ctrl || ctrlHasLine) ? `<div class="detail-panel">
+          <div class="detail-panel-title">CTRL ${f.lean_ctrl ? 'Lean' : 'Lines'}${ctrlDir === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ctrl ?? '—'} · UD: ${f.line_ud_ctrl ?? '—'} · PP: ${f.line_pp_ctrl ?? '—'} · BT: ${f.line_betr_ctrl ?? '—'} · DK: ${f.line_dk_ctrl ?? '—'}${ctrlDir === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}${buildSidePicker(f, 'ctrl', ctrlDir)}</div>
           <div class="ctrl-overonly-note" title="Control-time props are More-only in practice — Pick6 is the primary CTRL book and posts no Less button, and no other book reliably offers the under. So CTRL contributes OVER picks to the board and nothing else; an under lean is information, not a play.">⚠ OVER-ONLY market — the under side isn't offered, so only an OVER can become a pick.</div>
-          ${buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean)}
-          <div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>
-          ${f.lean_ctrl.lean !== 'over'
-            ? `<div class="ctrl-noplay">${f.lean_ctrl.lean === 'under'
-                ? 'Model leans UNDER here — not takeable, so this fighter contributes no CTRL pick.'
-                : 'No CTRL edge either way.'}</div>`
-            : ''}
+          ${f.lean_ctrl ? buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean) : ''}
+          ${f.lean_ctrl ? `<div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>` : ''}
+          ${!f.lean_ctrl
+            ? noReadNote('control-time')
+            : f.lean_ctrl.lean !== 'over'
+                ? `<div class="ctrl-noplay">${f.lean_ctrl.lean === 'under'
+                    ? 'Model leans UNDER here — not takeable, so this fighter contributes no CTRL pick.'
+                    : 'No CTRL edge either way.'}</div>`
+                : ''}
         </div>` : '',
         kdPanel,
     ].filter(Boolean).join('');
