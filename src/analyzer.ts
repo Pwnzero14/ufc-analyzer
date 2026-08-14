@@ -6467,27 +6467,66 @@ function calcCTRLLean(
   // (Hermansson 0:00 against Uulu) is the most informative sample there is for
   // this stat; dropping zeros would bias the allowed-average upward exactly
   // when the opponent is a control-denier.
-  const oppCtrlSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+  const oppCtrlRaw = (oppDB?.oppHistory ?? []).slice(0, 5)
     .map(h => Number(h.ctrlSecs))
     .filter(v => Number.isFinite(v) && v >= 0)
     .map(v => v / 60);
-  const oppAvgCtrlAllowed = oppCtrlSamples.length >= 3
-    ? parseFloat((oppCtrlSamples.reduce((s, v) => s + v, 0) / oppCtrlSamples.length).toFixed(2))
+
+  // ── MODEL v26 — duration ─────────────────────────────────────────────────
+  // Two related defects, both about time.
+  //
+  // (a) CTRL never duration-adjusted at all. SS and TD both run their
+  //     projection through durationAdjustProjection; control accrues with time
+  //     on the mat exactly the way strikes accrue with time on the feet.
+  //
+  // (b) v24's opp-allowed average is contaminated by fight LENGTH. Jeremiah
+  //     Wells "allows 1:21" across seven fights — but four of them he finished
+  //     by KO or submission (opponents at 0:13, 0:00, 0:03, 0:22), and nobody
+  //     accumulates control in a fight that ends in ninety seconds. Averaging
+  //     raw seconds conflates "hard to control" with "his fights end early",
+  //     and v24 then weighted that number 50%.
+  //
+  // Both halves are now expressed against THIS fight's expected length: the
+  // opponent's allowed control as a SHARE of fight time projected onto the
+  // market's expected minutes, and the fighter's own average through the same
+  // helper SS and TD use. Each half is scaled exactly once — running
+  // durationAdjustProjection over an already-projected blend would count the
+  // market's duration twice.
+  const schedRoundsCtrl = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
+  const expMinsCtrl = marketExpectedFightMinutes(name, schedRoundsCtrl);
+  const oppShareSamples = (oppDB?.oppHistory ?? []).slice(0, 5)
+    .map(h => ({ ctrl: Number(h.ctrlSecs), secs: Number(h.timeSecs) }))
+    .filter(s => Number.isFinite(s.ctrl) && s.ctrl >= 0 && Number.isFinite(s.secs) && s.secs > 0)
+    .map(s => s.ctrl / s.secs);
+  // The samples every downstream test uses: duration-normalised when the market
+  // gives us an expected length and the histories carry fight times, raw
+  // minutes otherwise (v24 behaviour, which is still better than nothing).
+  const oppEvalSamples = (oppShareSamples.length >= 3 && expMinsCtrl != null)
+    ? oppShareSamples.map(s => s * expMinsCtrl)
+    : oppCtrlRaw;
+  const durationNormalised = oppEvalSamples !== oppCtrlRaw;
+  const oppAvgCtrlAllowed = oppEvalSamples.length >= 3
+    ? parseFloat((oppEvalSamples.reduce((s, v) => s + v, 0) / oppEvalSamples.length).toFixed(2))
     : null;
+
+  const ownDurAdj = durationAdjustProjection(name, db, avgCTRL);
+  const ownProjected = ownDurAdj ? ownDurAdj.adjusted : avgCTRL;
+
   // Same 50/50 blend SS and FP use — his history and their resistance, weighted
   // equally, rather than his history alone.
   const effectiveCTRL = oppAvgCtrlAllowed != null
-    ? parseFloat(((avgCTRL + oppAvgCtrlAllowed) / 2).toFixed(2))
-    : avgCTRL;
+    ? parseFloat(((ownProjected + oppAvgCtrlAllowed) / 2).toFixed(2))
+    : ownProjected;
 
   const reasons: LeanReason[] = [];
   let score = 0;
 
   // The projection names both halves, so a blended number can never be mistaken
   // for the fighter's own average the way "Avg control (5.2m)" was.
+  const ownLabel = ownDurAdj ? `avg ${avgCTRL.toFixed(1)}m→${ownProjected.toFixed(1)}m` : `avg ${avgCTRL.toFixed(1)}m`;
   const ctrlLabel = oppAvgCtrlAllowed != null
-    ? `Proj control ${effectiveCTRL.toFixed(1)}m (avg ${avgCTRL.toFixed(1)}m + opp allows ${oppAvgCtrlAllowed.toFixed(1)}m)`
-    : `Avg control (${avgCTRL.toFixed(1)}m)`;
+    ? `Proj control ${effectiveCTRL.toFixed(1)}m (${ownLabel} + opp allows ${oppAvgCtrlAllowed.toFixed(1)}m${durationNormalised ? ' at this fight’s length' : ''})`
+    : `${ownDurAdj ? `Proj control ${ownProjected.toFixed(1)}m (avg ${avgCTRL.toFixed(1)}m)` : `Avg control (${avgCTRL.toFixed(1)}m)`}`;
   const diff = effectiveCTRL - line_ctrl;
   if      (diff >  1.5) { score += 2.4; reasons.push({ icon:'pos', text:`${ctrlLabel} is ${diff.toFixed(1)}m above line` }); }
   else if (diff >  0.8) { score += 1.4; reasons.push({ icon:'pos', text:`${ctrlLabel} edges line by ${diff.toFixed(1)}m` }); }
@@ -6523,17 +6562,21 @@ function calcCTRLLean(
   // available it SUPERSEDES the proxy rather than stacking with it, or a
   // control-denier gets charged twice for the same trait. Thresholds and
   // magnitudes deliberately mirror the tdDef block they replace.
-  const oppOverRate = oppCtrlSamples.length >= 3
-    ? oppCtrlSamples.filter(v => v > line_ctrl).length / oppCtrlSamples.length
+  // v26: judged on the same duration-normalised samples as the projection, so a
+  // foe shut out inside ninety seconds is measured on the share of the fight he
+  // controlled rather than on a raw total no one could have reached.
+  const oppOverRate = oppEvalSamples.length >= 3
+    ? oppEvalSamples.filter(v => v > line_ctrl).length / oppEvalSamples.length
     : null;
   if (oppOverRate != null) {
-    const over = oppCtrlSamples.filter(v => v > line_ctrl).length;
+    const over = oppEvalSamples.filter(v => v > line_ctrl).length;
+    const basis = durationNormalised ? ' (at this fight’s expected length)' : '';
     if (oppOverRate <= 0.40) {
       score -= 1.1;
-      reasons.push({ icon:'neg', text:`Opponent has allowed only ${over}/${oppCtrlSamples.length} recent foes over this control line` });
+      reasons.push({ icon:'neg', text:`Opponent has allowed only ${over}/${oppEvalSamples.length} recent foes over this control line${basis}` });
     } else if (oppOverRate >= 0.60) {
       score += 0.8;
-      reasons.push({ icon:'pos', text:`Opponent has allowed ${over}/${oppCtrlSamples.length} recent foes over this control line` });
+      reasons.push({ icon:'pos', text:`Opponent has allowed ${over}/${oppEvalSamples.length} recent foes over this control line${basis}` });
     }
   } else if (oppDB?.loaded && oppDB.tdDef != null) {
     // No allowed-control history — fall back to the defence-percentage proxy.
