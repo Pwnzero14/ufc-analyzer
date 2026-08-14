@@ -15997,6 +15997,97 @@ function buildLeanSlatePick(f, lean) {
  * The model's own side carries `is-lean` so the panel still reads as a
  * recommendation at a glance rather than a neutral pair of buttons.
  */
+/**
+ * Does ONE named book take this exact side? The same rules `leanBestBook` filters
+ * candidates with, asked about a specific book instead of resolving the best one.
+ *
+ * Needed because the per-book path only ever consulted `shouldSkipFpSideForFighter`,
+ * which returns false for every non-FP stat — so a Pick6 TD under (More-only) or a
+ * DK chalk side reported as takeable the moment a book was named explicitly.
+ */
+function bookTakesSide(f, source, dir, book) {
+    if (lineForBook(f, source, book) == null)
+        return false;
+    if (source === 'fp')
+        return !shouldSkipFpSideForFighter(f, 'fp', dir, book);
+    if (dir === 'under' && !statUnderBookOffered(f, source, book))
+        return false;
+    if (book === 'draftkings_sportsbook' && dkSideChalk(f, source, dir))
+        return false;
+    return true;
+}
+/** The sub-lean object for a stat, so panel controls can re-derive their own direction. */
+function leanResultForSource(f, source) {
+    switch (source) {
+        case 'ss': return f.lean_ss ?? null;
+        case 'ss_r1': return f.lean_ss_r1 ?? null;
+        case 'td': return f.lean_td ?? null;
+        case 'ft': return f.lean_ft ?? null;
+        case 'ctrl': return f.lean_ctrl ?? null;
+        case 'kd': return f.lean_kd ?? null;
+        default: return f.lean ?? null;
+    }
+}
+function leanDirForSource(f, source) {
+    const l = leanResultForSource(f, source);
+    return l && (l.lean === 'over' || l.lean === 'under') ? l.lean : null;
+}
+/**
+ * GLOW-UP 225 — which book each lean panel is pointed at.
+ *
+ * Session-scoped by design: this changes the book you are QUEUEING against, never
+ * what the model picked, so it belongs with the other view-only state rather than
+ * in storage.
+ */
+const _panelBookChoice = new Map();
+/**
+ * GLOW-UP 225 — the placement chip becomes a book selector.
+ *
+ * The chip named the BEST book for the side and the ▲▼ beside it queued that
+ * book's line, which is the right default and the wrong answer whenever you
+ * placed the bet somewhere else: Ian Machado Garry's R1 SS chip read PrizePicks
+ * 6.5 while the bet was on DK at 7.5, and there was no control anywhere that
+ * produced the DK entry. Every book with a line for this prop is now reachable by
+ * clicking through the chip, and the pickers follow the selection — so the queued
+ * leg carries the line you actually placed.
+ *
+ * The model's own resolution stays marked (★ BEST), so cycling away from it is
+ * visibly a deliberate choice rather than a lost recommendation.
+ */
+function buildBookPlacementControl(f, source, dir) {
+    const books = (LEAN_STAT_FIELDS[source] || [])
+        .map(([bk]) => ({ bk, line: lineForBook(f, source, bk) }))
+        .filter((c) => c.line != null);
+    // No book has posted this prop — the old chip still says that better than an
+    // empty selector would.
+    if (!books.length)
+        return dir ? buildPlacementChip(f, source, dir) : '';
+    const key = `${f.name}|${source}`;
+    const best = dir ? leanBestBook(f, source, dir).book : null;
+    const stored = _panelBookChoice.get(key);
+    const chosen = stored && books.some(b => b.bk === stored)
+        ? stored
+        : (best && books.some(b => b.bk === best) ? best : books[0].bk);
+    const idx = Math.max(0, books.findIndex(b => b.bk === chosen));
+    const cur = books[idx];
+    const label = LEAN_BOOK_LABEL[cur.bk] || cur.bk;
+    const takes = dir ? bookTakesSide(f, source, dir, cur.bk) : true;
+    const isBest = best != null && best === cur.bk;
+    const others = books.filter(b => b.bk !== cur.bk)
+        .map(b => `${LEAN_BOOK_LABEL[b.bk] || b.bk} ${b.line}`).join(', ');
+    const tip = books.length > 1
+        ? `Queueing against ${label} ${cur.line}${isBest ? " — the book the model's pick resolves to" : ''}.${dir && !takes ? ` ${label} does not offer this ${dir.toUpperCase()} — queue it anyway if you have it.` : ''} Click to switch: ${others}.`
+        : `${label} ${cur.line} is the only book posting this prop${dir && !takes ? ` and does not offer the ${dir.toUpperCase()} side` : ''}.`;
+    return `<span class="book-place" data-book-place="${key.replace(/"/g, '&quot;')}">`
+        + `<button type="button" class="place-chip book-cycle ${takes ? 'ok' : 'blocked'}${isBest ? ' is-best' : ''}"`
+        + ` data-book-cycle="${key.replace(/"/g, '&quot;')}" title="${tip.replace(/"/g, '&quot;')}">`
+        + `${takes ? '✔' : '⛔'} ${label} ${cur.line}`
+        + `${isBest ? '<u>★</u>' : ''}`
+        + `${books.length > 1 ? `<i>${idx + 1}/${books.length} ⟳</i>` : ''}`
+        + `</button>`
+        + buildSidePicker(f, source, dir, cur.bk)
+        + `</span>`;
+}
 function buildSidePicker(f, source, leanDir, bookOverride) {
     const one = (dir) => {
         const { key, pick } = buildSlatePickFor(f, source, dir, null, bookOverride);
@@ -16004,8 +16095,10 @@ function buildSidePicker(f, source, leanDir, bookOverride) {
         const inSlate = bestPicksSlate.has(key);
         const isLean = dir === leanDir;
         // With a book named, placeability is that BOOK's answer, not the best book's.
+        // GLOW-UP 225: via bookTakesSide, which knows the non-FP rules too — the old
+        // call was FP-only, so a named Pick6 TD under reported as takeable.
         const takesIt = bookOverride
-            ? !shouldSkipFpSideForFighter(f, source, dir, bookOverride) && pick.line != null
+            ? bookTakesSide(f, source, dir, bookOverride)
             : leanBestBook(f, source, dir).book != null;
         const best = leanBestBook(f, source, dir);
         const where = bookOverride
@@ -20483,7 +20576,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
           <div class="detail-panel-title">FP Lines${buildFpBookPickers(f, lean && lean._source === 'fp' ? lean.lean : null)}</div>
         </div>` : '',
         (f.lean_ss || ssHasLine) ? `<div class="detail-panel">
-          <div class="detail-panel-title">SS ${f.lean_ss ? 'Lean' : 'Lines'} (P6: ${f.line_p6_ss ?? '—'} · UD: ${f.line_ud_ss ?? '—'} · PP: ${f.line_pp_ss ?? '—'} · BT: ${f.line_betr_ss ?? '—'} · DK: ${f.line_dk_ss ?? '—'})${buildPlacementChip(f, 'ss', ssDir)}${buildSidePicker(f, 'ss', ssDir)}</div>
+          <div class="detail-panel-title">SS ${f.lean_ss ? 'Lean' : 'Lines'} (P6: ${f.line_p6_ss ?? '—'} · UD: ${f.line_ud_ss ?? '—'} · PP: ${f.line_pp_ss ?? '—'} · BT: ${f.line_betr_ss ?? '—'} · DK: ${f.line_dk_ss ?? '—'})${buildBookPlacementControl(f, 'ss', ssDir)}</div>
           ${f.lean_ss ? buildLeanFactorBlock(f.lean_ss.reasons, f.lean_ss.lean) : ''}
           ${f.lean_ss
             ? `<div class="lean-verdict ${f.lean_ss.lean}">${f.lean_ss.verdict}</div>`
@@ -20499,21 +20592,21 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         // already been bet, with nothing on the card to track it against.
         // FP gates on lines and KD gates on `lean || line` — R1 SS now matches.
         (f.lean_ss_r1 || r1HasLine) ? `<div class="detail-panel">
-          <div class="detail-panel-title">R1 SS ${f.lean_ss_r1 ? 'Lean' : 'Lines'}${r1Dir ? ` <span class="lean-verdict ${r1Dir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${r1Dir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ss_r1?.conf ?? 0}%</span>` : ''} (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})${r1Dir ? buildPlacementChip(f, 'ss_r1', r1Dir) : ''}${buildSidePicker(f, 'ss_r1', r1Dir)}</div>
+          <div class="detail-panel-title">R1 SS ${f.lean_ss_r1 ? 'Lean' : 'Lines'}${r1Dir ? ` <span class="lean-verdict ${r1Dir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${r1Dir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ss_r1?.conf ?? 0}%</span>` : ''} (PP: ${f.line_pp_ss_r1 || '—'} · UD: ${f.line_ud_ss_r1 || '—'} · DK: ${f.line_dk_ss_r1 || '—'})${buildBookPlacementControl(f, 'ss_r1', r1Dir)}</div>
           ${f.lean_ss_r1 ? buildLeanFactorBlock(f.lean_ss_r1.reasons, f.lean_ss_r1.lean) : ''}
           ${f.lean_ss_r1
             ? `<div class="lean-verdict ${f.lean_ss_r1.lean}">${f.lean_ss_r1.verdict}</div>`
             : '<div class="ctrl-noplay">No round-one read — the model needs round-one history this fighter does not have, so it takes no side. The line is live and either side can still be queued.</div>'}
         </div>` : '',
         (f.lean_td || tdHasLine) ? `<div class="detail-panel">
-          <div class="detail-panel-title">TD ${f.lean_td ? 'Lean' : 'Lines'} (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · BT: ${f.line_betr_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildPlacementChip(f, 'td', tdDir)}${buildSidePicker(f, 'td', tdDir)}</div>
+          <div class="detail-panel-title">TD ${f.lean_td ? 'Lean' : 'Lines'} (P6: ${f.line_p6_td ?? '—'} · UD: ${f.line_ud_td ?? '—'} · PP: ${f.line_pp_td ?? '—'} · BT: ${f.line_betr_td ?? '—'} · DK: ${f.line_dk_td ?? '—'})${buildBookPlacementControl(f, 'td', tdDir)}</div>
           ${f.lean_td ? buildLeanFactorBlock(f.lean_td.reasons, f.lean_td.lean) : ''}
           ${f.lean_td
             ? `<div class="lean-verdict ${f.lean_td.lean}">${f.lean_td.verdict}</div>`
             : noReadNote('takedown')}
         </div>` : '',
         (f.lean_ft || ftHasLine) ? `<div class="detail-panel">
-          <div class="detail-panel-title">FT ${f.lean_ft ? 'Lean' : 'Lines'}${ftDir ? ` <span class="lean-verdict ${ftDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${ftDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ft ?? '—'} · UD: ${f.line_ud_ft ?? '—'} · PP: ${f.line_pp_ft ?? '—'} · BT: ${f.line_betr_ft ?? '—'} · DK: ${f.line_dk_ft ?? '—'}${buildPlacementChip(f, 'ft', ftDir)}${buildSidePicker(f, 'ft', ftDir)}</div>
+          <div class="detail-panel-title">FT ${f.lean_ft ? 'Lean' : 'Lines'}${ftDir ? ` <span class="lean-verdict ${ftDir}" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">${ftDir === 'over' ? '▲ OVER' : '▼ UNDER'} ${f.lean_ft?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ft ?? '—'} · UD: ${f.line_ud_ft ?? '—'} · PP: ${f.line_pp_ft ?? '—'} · BT: ${f.line_betr_ft ?? '—'} · DK: ${f.line_dk_ft ?? '—'}${buildBookPlacementControl(f, 'ft', ftDir)}</div>
           ${f.lean_ft ? buildLeanFactorBlock(f.lean_ft.reasons, f.lean_ft.lean) : ''}
           ${f.lean_ft
             ? `<div class="lean-verdict ${f.lean_ft.lean}">${f.lean_ft.verdict}</div>`
@@ -20524,7 +20617,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         // is stated ON the panel rather than left implicit: when the model lands on
         // UNDER, the honest answer is "no play", not a pick you can't enter.
         (f.lean_ctrl || ctrlHasLine) ? `<div class="detail-panel">
-          <div class="detail-panel-title">CTRL ${f.lean_ctrl ? 'Lean' : 'Lines'}${ctrlDir === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ctrl ?? '—'} · UD: ${f.line_ud_ctrl ?? '—'} · PP: ${f.line_pp_ctrl ?? '—'} · BT: ${f.line_betr_ctrl ?? '—'} · DK: ${f.line_dk_ctrl ?? '—'}${ctrlDir === 'over' ? buildPlacementChip(f, 'ctrl', 'over') : ''}${buildSidePicker(f, 'ctrl', ctrlDir)}</div>
+          <div class="detail-panel-title">CTRL ${f.lean_ctrl ? 'Lean' : 'Lines'}${ctrlDir === 'over' ? ` <span class="lean-verdict over" style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;margin-left:6px">▲ OVER ${f.lean_ctrl?.conf ?? 0}%</span>` : ''} · P6: ${f.line_p6_ctrl ?? '—'} · UD: ${f.line_ud_ctrl ?? '—'} · PP: ${f.line_pp_ctrl ?? '—'} · BT: ${f.line_betr_ctrl ?? '—'} · DK: ${f.line_dk_ctrl ?? '—'}${buildBookPlacementControl(f, 'ctrl', ctrlDir)}</div>
           <div class="ctrl-overonly-note" title="Control-time props are More-only in practice — Pick6 is the primary CTRL book and posts no Less button, and no other book reliably offers the under. So CTRL contributes OVER picks to the board and nothing else; an under lean is information, not a play.">⚠ OVER-ONLY market — the under side isn't offered, so only an OVER can become a pick.</div>
           ${f.lean_ctrl ? buildLeanFactorBlock(f.lean_ctrl.reasons, f.lean_ctrl.lean) : ''}
           ${f.lean_ctrl ? `<div class="lean-verdict ${f.lean_ctrl.lean}">${f.lean_ctrl.verdict}</div>` : ''}
@@ -20711,32 +20804,75 @@ function expandRowDetailPanel(row) {
         // several sides off one fighter. Updates its own button in place instead, and
         // toasts, because My Slate's tray only exists in the Best Picks render path
         // (see GLOW-UP 198 L5 — an add from a view with no tray reads as broken).
-        detail.querySelectorAll('.side-pick-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const key = btn.dataset['slateKey'] || '';
-                if (!key)
-                    return;
-                if (bestPicksSlate.has(key)) {
-                    bestPicksSlate.delete(key);
-                    btn.classList.remove('on');
-                    btn.querySelector('i')?.remove();
-                    showToast(`Removed from My Slate (${bestPicksSlate.size})`);
-                }
-                else {
-                    const d = _leanSlateData.get(key);
-                    if (!d)
+        // GLOW-UP 225 — wiring lives in a function because the book selector replaces
+        // its own subtree, and the fresh ▲▼ inside it need the same handlers.
+        const wireDetailControls = (scope) => {
+            scope.querySelectorAll('.side-pick-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const key = btn.dataset['slateKey'] || '';
+                    if (!key)
                         return;
-                    if (!bestPicksSlate.size)
-                        bestPicksSlateOpen = true;
-                    bestPicksSlate.set(key, d);
-                    btn.classList.add('on');
-                    if (!btn.querySelector('i'))
-                        btn.insertAdjacentHTML('beforeend', '<i>✓</i>');
-                    showToast(`+ ${d.clip} · My Slate (${bestPicksSlate.size})`);
-                }
+                    if (bestPicksSlate.has(key)) {
+                        bestPicksSlate.delete(key);
+                        btn.classList.remove('on');
+                        btn.querySelector('i')?.remove();
+                        showToast(`Removed from My Slate (${bestPicksSlate.size})`);
+                    }
+                    else {
+                        const d = _leanSlateData.get(key);
+                        if (!d)
+                            return;
+                        if (!bestPicksSlate.size)
+                            bestPicksSlateOpen = true;
+                        bestPicksSlate.set(key, d);
+                        btn.classList.add('on');
+                        if (!btn.querySelector('i'))
+                            btn.insertAdjacentHTML('beforeend', '<i>✓</i>');
+                        showToast(`+ ${d.clip} · My Slate (${bestPicksSlate.size})`);
+                    }
+                });
             });
-        });
+            scope.querySelectorAll('[data-book-cycle]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const key = btn.dataset['bookCycle'] || '';
+                    const sep = key.lastIndexOf('|');
+                    if (sep < 0)
+                        return;
+                    const fighterName = key.slice(0, sep);
+                    const source = key.slice(sep + 1);
+                    const target = allFighters.find(x => x.name === fighterName);
+                    const wrap = btn.closest('.book-place');
+                    if (!target || !wrap)
+                        return;
+                    const books = (LEAN_STAT_FIELDS[source] || [])
+                        .map(([bk]) => bk)
+                        .filter(bk => lineForBook(target, source, bk) != null);
+                    if (books.length < 2)
+                        return;
+                    // Direction is re-derived rather than captured, so a lean that changed
+                    // under an open card cannot leave the selector pointed at a stale side.
+                    const dir = leanDirForSource(target, source);
+                    // Resolve what is CURRENTLY shown the same way the control does — the
+                    // stored choice, else the model's book, else the first. Starting from
+                    // the stored value alone would make the first click jump from the best
+                    // book to the second in table order.
+                    const stored = _panelBookChoice.get(key);
+                    const best = dir ? leanBestBook(target, source, dir).book : null;
+                    const shown = stored && books.includes(stored)
+                        ? stored
+                        : (best && books.includes(best) ? best : books[0]);
+                    const next = books[(books.indexOf(shown) + 1) % books.length];
+                    _panelBookChoice.set(key, next);
+                    wrap.outerHTML = buildBookPlacementControl(target, source, dir);
+                    const fresh = detail.querySelector(`[data-book-place="${CSS.escape(key)}"]`);
+                    if (fresh)
+                        wireDetailControls(fresh);
+                });
+            });
+        };
+        wireDetailControls(detail);
         const sigToggle = detail.querySelector('[data-signal-toggle]');
         const grid = detail.querySelector('.detail-grid');
         if (sigToggle && grid) {
@@ -22171,6 +22307,10 @@ async function loadData() {
             // Record what we just rendered (raw-storage basis) so the periodic
             // heartbeat can skip a no-op rebuild when the data signature is unchanged.
             lastLoadedLinesSig = loadedSig;
+            // Recorded from the SAME read the merge used, so the heartbeat compares
+            // what is on screen against what is in storage — not against itself.
+            lastLoadedBetrManualSig = betrManualSig(result);
+            betrManualPending = { sig: '', since: 0 };
         }
         else {
             fightOddsMoneylineByName = {};
@@ -22207,6 +22347,29 @@ function lineDataSigFromResult(result) {
     parts.push(`bh:${bh && typeof bh === 'object' ? Object.keys(bh).length : 0}`);
     return parts.join('|');
 }
+/**
+ * GLOW-UP 226 — the one line store that can change with nobody watching.
+ *
+ * Betr rows are entered by hand into `lines_betr_manual_v1`. That write sends no
+ * runtime message and never touches `lines_betr.capturedAt`, so the heartbeat's
+ * core signature came back identical and an open board kept serving leans scored
+ * without those rows — two report cards seventeen minutes apart disagreed about
+ * eight fighters for exactly this reason.
+ *
+ * Kept OUT of `lineDataSigFromResult` deliberately: a Betr entry is typed one row
+ * at a time, and reloading on the first write would re-merge (and re-anchor
+ * baselines against) a half-entered set. This signature is therefore compared
+ * separately and must hold still before it counts — see the heartbeat.
+ */
+function betrManualSig(result) {
+    const m = result[STORAGE_BETR_MANUAL_KEY];
+    return `btman:${m?.capturedAt ?? 0}:${Array.isArray(m?.fighters) ? m.fighters.length : 0}`;
+}
+let lastLoadedBetrManualSig = '';
+/** The manual-Betr signature waiting to settle, and when we first saw it. */
+let betrManualPending = { sig: '', since: 0 };
+/** How long the manual Betr key must hold still before a reload is safe. */
+const BETR_MANUAL_SETTLE_MS = 90000;
 function requestDataReload(delayMs = 0) {
     const fire = () => { lastReloadFireTs = Date.now(); void loadData(); };
     // Explicit delay (e.g. LINES_DROPPED waits 1.5s for the write to settle):
@@ -22242,12 +22405,37 @@ function startPeriodicDataReload(intervalMs = 60000) {
     // data signature is unchanged, so it no longer flickers every minute while idle.
     periodicRefreshTimer = setInterval(() => {
         void (async () => {
+            let manualSig = '';
             try {
-                const r = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, 'fight_bethandle_dk_v1']);
-                if (lineDataSigFromResult(r) === lastLoadedLinesSig)
-                    return; // nothing new — no render
+                const r = await storageGet([...STORAGE_LINE_KEYS, STORAGE_ODDS_KEY, 'fight_bethandle_dk_v1', STORAGE_BETR_MANUAL_KEY]);
+                manualSig = betrManualSig(r);
+                if (lineDataSigFromResult(r) !== lastLoadedLinesSig) {
+                    // A scraped store moved — that is a complete write, so render at once.
+                    betrManualPending = { sig: '', since: 0 };
+                    requestDataReload();
+                    return;
+                }
             }
-            catch { /* fall through and reload on read error */ }
+            catch {
+                requestDataReload();
+                return;
+            } // read error — reload rather than go blind
+            // Nothing scraped changed. The manual Betr key is the remaining way the
+            // board can be wrong, and it is typed row by row, so it has to hold still
+            // before we act on it: reloading mid-entry would re-merge a half-entered
+            // set and re-anchor the baselines against it.
+            if (manualSig === lastLoadedBetrManualSig) {
+                betrManualPending = { sig: '', since: 0 };
+                return;
+            }
+            const now = Date.now();
+            if (betrManualPending.sig !== manualSig) {
+                betrManualPending = { sig: manualSig, since: now };
+                return;
+            }
+            if (now - betrManualPending.since < BETR_MANUAL_SETTLE_MS)
+                return;
+            betrManualPending = { sig: '', since: 0 };
             requestDataReload();
         })();
     }, intervalMs);
