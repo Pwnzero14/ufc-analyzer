@@ -100,7 +100,14 @@ interface LeanResult {
 }
 type LeanSource = 'fp'|'ss'|'ss_r1'|'td'|'ft'|'ctrl'|'kd';
 type SourcePlatformKey = 'pick6'|'underdog'|'prizepicks'|'betr'|'draftkings_sportsbook';
-interface EffectiveLean extends LeanResult { _source: LeanSource; _label: string; _platform?: SourcePlatformKey }
+interface EffectiveLean extends LeanResult {
+  _source: LeanSource; _label: string; _platform?: SourcePlatformKey;
+  /** MODEL v23 — the model has a read here but NO book takes this side, so it is
+   *  information rather than a play. Set only when nothing in the lean's own
+   *  direction is placeable on any book; surfaces that RECOMMEND must not treat
+   *  it as actionable. */
+  _unplaceable?: boolean;
+}
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
 interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_ss_body?: number|null; line_ud_ss_leg?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_ss_body?: number|null; line_pp_ss_leg?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_pp_kd?: number|null; kd_under_available?: boolean|null; line_dk_ss?: number|null; line_dk_ss_r1?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; ss_r1_over_odds?: number|null; ss_r1_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ss_under_available?: boolean|null; td_under_available?: boolean|null; fp_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null; lean_kd?: LeanResult|null }
@@ -6641,25 +6648,49 @@ function _computeEffectiveLean(f: AnalyzerFighter): EffectiveLean {
   // nothing else covers that direction.
   if (f.lean?.lean && f.lean.lean !== 'none') {
     const fpDir = f.lean.lean;
-    if (fpDir === 'push' || !shouldSkipFpSideForFighter(f, 'fp', fpDir as 'over' | 'under')) {
-      return { ...f.lean, _source: 'fp', _label: '' };
-    }
     // Only fall through to a sub-lean whose side is actually placeable on some book
     // (leanBestBook returns a book) — else a Pick6 TD-under (More-only) would just be
-    // the next unplaceable play. If nothing in-direction is placeable, keep the FP.
+    // the next unplaceable play.
     const _pl = (src: string) => leanBestBook(f, src, fpDir).book != null;
+    // MODEL v23 — FP is judged by the SAME test as the sub-leans below it: does
+    // ANY book take this side. It used to call shouldSkipFpSideForFighter with no
+    // book override, which judges only the ACTIVE platform — so a dog holding a
+    // Pick6 FP line (active, blocked) AND an Underdog one had its perfectly
+    // placeable FP under declared dead and fell through to a sub-lean. A dog's FP
+    // under is blocked on exactly Pick6 and Betr; Underdog and PrizePicks post it.
+    if (fpDir === 'push' || _pl('fp')) {
+      return { ...f.lean, _source: 'fp', _label: '' };
+    }
     if (f.lean_ss?.lean === fpDir && _pl('ss'))       return { ...f.lean_ss,    _source: 'ss',    _label: ' (SS)' };
     if (f.lean_td?.lean === fpDir && _pl('td'))       return { ...f.lean_td,    _source: 'td',    _label: ' (TD)' };
     if (f.lean_ft?.lean === fpDir && _pl('ft'))       return { ...f.lean_ft,    _source: 'ft',    _label: ' (FT)' };
     if (f.lean_ss_r1?.lean === fpDir && _pl('ss_r1')) return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
     if (f.lean_kd?.lean === fpDir && _pl('kd'))       return { ...f.lean_kd,    _source: 'kd',    _label: ' (KD)' };
-    return { ...f.lean, _source: 'fp', _label: '' };
+    // MODEL v23 — nothing in this direction is takeable anywhere. The read is
+    // kept (it is real: Neil Magny's FP UNDER is an 81% read on a fighter Pick6
+    // simply will not let you fade) but it is FLAGGED, and a flagged lean must
+    // not be presented as a recommendation. Previously this returned the
+    // unplaceable FP unmarked, so it could and did win the board's top pick.
+    return { ...f.lean, _source: 'fp', _label: '', _unplaceable: true };
   }
-  if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push') return { ...f.lean_ss, _source: 'ss', _label: ' (SS)' };
-  if (f.lean_td?.lean && f.lean_td.lean !== 'none' && f.lean_td.lean !== 'push') return { ...f.lean_td, _source: 'td', _label: ' (TD)' };
-  if (f.lean_ft?.lean && f.lean_ft.lean !== 'none' && f.lean_ft.lean !== 'push') return { ...f.lean_ft, _source: 'ft', _label: ' (FT)' };
-  if (f.lean_ss_r1?.lean && f.lean_ss_r1.lean !== 'none' && f.lean_ss_r1.lean !== 'push') return { ...f.lean_ss_r1, _source: 'ss_r1', _label: ' (R1 SS)' };
-  if (f.lean_kd?.lean && f.lean_kd.lean !== 'none' && f.lean_kd.lean !== 'push') return { ...f.lean_kd, _source: 'kd', _label: ' (KD)' };
+  // No FP lean at all. MODEL v23 — these used to be returned with no placeability
+  // test whatsoever, so a Pick6-only TD under (More-only) or a demon/goblin KD
+  // could win the effective lean outright. Same rule as above: a placeable side
+  // wins first; an unplaceable one is kept as a read but flagged.
+  const _plStat = (src: string, dir: string) => leanBestBook(f, src, dir).book != null;
+  const statOrder: Array<[LeanResult | null | undefined, LeanSource, string]> = [
+    [f.lean_ss, 'ss', ' (SS)'], [f.lean_td, 'td', ' (TD)'], [f.lean_ft, 'ft', ' (FT)'],
+    [f.lean_ss_r1, 'ss_r1', ' (R1 SS)'], [f.lean_kd, 'kd', ' (KD)'],
+  ];
+  const live = statOrder.filter(([l]) => l?.lean && l.lean !== 'none' && l.lean !== 'push');
+  for (const [l, src, label] of live) {
+    if (_plStat(src, l!.lean)) return { ...l!, _source: src, _label: label };
+  }
+  // Nothing placeable — fall back to the highest-priority read, flagged.
+  if (live.length) {
+    const [l, src, label] = live[0];
+    return { ...l!, _source: src, _label: label, _unplaceable: true };
+  }
   return { ...(f.lean || { lean: 'none', conf: 0, reasons: [], verdict: '' }), _source: 'fp', _label: '' };
 }
 
@@ -24430,8 +24461,10 @@ async function generateReportCard(): Promise<void> {
     return {
       el, statKey, statLbl, line,
       src: srcKey ? platformKeyShort(srcKey) : '',
-      // No book will take this side — the flag the board and Parlay Lab use.
-      unplaceable: (el.lean === 'over' || el.lean === 'under') && !resolved.book && line != null,
+      // MODEL v23 stamps this on the lean itself, so the card reports the model's
+      // own verdict rather than deriving a second opinion from the same inputs.
+      unplaceable: el._unplaceable === true
+        || ((el.lean === 'over' || el.lean === 'under') && !resolved.book && line != null),
       tier: el.conf >= 72 ? 'high' : el.conf >= 58 ? 'med' : 'low',
       // The average has to be the average OF THAT STAT, or an SS row reads
       // "18.5 · avg 63.0" with the 63.0 being fantasy points.
