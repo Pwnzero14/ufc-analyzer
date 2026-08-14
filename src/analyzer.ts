@@ -7133,6 +7133,41 @@ function sortFighters(fighters: AnalyzerFighter[], sortKey: string): AnalyzerFig
   }
 }
 
+/**
+ * GLOW-UP 223 L9 — time from now to the first bell, which the QA panel and the
+ * report card both need.
+ *
+ * Event timestamps are frequently date-only (local midnight) and no card starts
+ * at midnight, so a 7pm start is assumed — otherwise the countdown and the
+ * fight-day escalation both fire a day early. That shim lived inside
+ * renderQAPanel; the report card would have had to re-derive it, and a fact
+ * derived twice drifts (see the two line-staleness checks, and the report card's
+ * own screen-vs-export split).
+ */
+function eventCountdown(): { msToEvent: number; fightDay: boolean; tMinus: string } {
+  let effEventTs = upcomingEventTs;
+  if (effEventTs > 0) {
+    const evD = new Date(effEventTs);
+    if (evD.getHours() === 0 && evD.getMinutes() === 0) effEventTs += 19 * 3600e3;
+  }
+  const msToEvent = effEventTs > 0 ? effEventTs - Date.now() : NaN;
+  const fightDay = Number.isFinite(msToEvent) && msToEvent > -12 * 3600e3 && msToEvent < 24 * 3600e3;
+  const tMinus = ((): string => {
+    if (!Number.isFinite(msToEvent) || msToEvent <= 0) return '';
+    const h = Math.floor(msToEvent / 3600e3);
+    const d = Math.floor(h / 24);
+    return d >= 1 ? `T-${d}d ${h % 24}h` : h >= 1 ? `T-${h}h ${Math.floor((msToEvent % 3600e3) / 60000)}m` : `T-${Math.floor(msToEvent / 60000)}m`;
+  })();
+  return { msToEvent, fightDay, tMinus };
+}
+
+/** Minutes → the compact age the platform pills and the report card both print. */
+function fmtAgeMin(min: number): string {
+  if (min < 60) return `${min}m`;
+  if (min < 1440) return `${Math.floor(min / 60)}h`;
+  return `${Math.floor(min / 1440)}d`;
+}
+
 async function renderQAPanel(): Promise<void> {
   const panel = document.getElementById('qaPanel');
   if (!panel) return;
@@ -7345,23 +7380,9 @@ async function renderQAPanel(): Promise<void> {
   // depends on how far out the event is. Within 24h ("fight day") aging lines
   // escalate from warning to blocker: stale lines inside the entry window are
   // entry-threatening, not cosmetic.
-  // Event timestamps are frequently date-only (local midnight). No card starts
-  // at midnight — assume a 7pm start so the countdown and fight-day escalation
-  // track the real entry window instead of firing a day early.
-  let effEventTs = upcomingEventTs;
-  if (effEventTs > 0) {
-    const evD = new Date(effEventTs);
-    if (evD.getHours() === 0 && evD.getMinutes() === 0) effEventTs += 19 * 3600e3;
-  }
-  const msToEvent = effEventTs > 0 ? effEventTs - Date.now() : NaN;
-  const fightDay = Number.isFinite(msToEvent) && msToEvent > -12 * 3600e3 && msToEvent < 24 * 3600e3;
-  const tMinus = ((): string => {
-    if (!Number.isFinite(msToEvent)) return '';
-    if (msToEvent <= 0) return '';
-    const h = Math.floor(msToEvent / 3600e3);
-    const d = Math.floor(h / 24);
-    return d >= 1 ? `T-${d}d ${h % 24}h` : h >= 1 ? `T-${h}h ${Math.floor((msToEvent % 3600e3) / 60000)}m` : `T-${Math.floor(msToEvent / 60000)}m`;
-  })();
+  // GLOW-UP 223 L9: the countdown (including the midnight → 7pm shim) now lives
+  // in eventCountdown(), shared with the report card's vintage line.
+  const { msToEvent, fightDay, tMinus } = eventCountdown();
   const tlock = Number.isFinite(msToEvent)
     ? (msToEvent <= 0
       ? `<span class="qa-tlock qa-tlock-hot" title="${upcomingEventName || 'Event'} has started — lines are locked">● LOCKED</span>`
@@ -24410,7 +24431,33 @@ async function generateReportCard(): Promise<void> {
   }
 
   const eventTitle = reportTitle || 'UFC Card';
-  const eventDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  // ── GLOW-UP 223 L9 — the card states its own vintage ─────────────────────
+  // This is the artifact that gets read away from the app, sometimes hours after
+  // it was generated, and it dated itself to the DAY. "August 14" says nothing
+  // about whether the lines behind it are twelve minutes or nine hours old, and
+  // nothing about how long is left to enter. A pre-event report that cannot be
+  // aged is a report you have to regenerate to trust.
+  const eventDate = new Date().toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+  const { tMinus } = eventCountdown();
+  // Oldest book bounds the whole card's staleness: every lean on it was scored
+  // against some book's number, so the card is only as fresh as its stalest one.
+  let lineAge = '';
+  try {
+    const linesPayload = await storageGet<Record<string, { capturedAt?: number }>>([...STORAGE_LINE_KEYS]);
+    const ages = STORAGE_LINE_KEYS
+      .map(k => Number(linesPayload?.[k]?.capturedAt || 0))
+      .filter(ts => ts > 0)
+      .map(ts => Math.floor((Date.now() - ts) / 60000));
+    if (ages.length) lineAge = fmtAgeMin(Math.max(...ages));
+  } catch { /* the header degrades to no age rather than failing the card */ }
+  const vintageBits = [
+    `Generated ${eventDate}`,
+    lineAge ? `lines ≤${lineAge} old` : '',
+    tMinus ? `${tMinus} to first bell` : '',
+    `MODEL v${MODEL_VERSION}`,
+  ].filter(Boolean);
 
   interface FightGroup { badge: string; badgeCls: string; pair: AnalyzerFighter[]; }
   const groups: FightGroup[] = [];
@@ -24476,7 +24523,18 @@ async function generateReportCard(): Promise<void> {
     };
   };
 
-  const leanFighters = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
+  // ── GLOW-UP 223 L1 — a push is not a lean ────────────────────────────────
+  // `lean !== 'none'` also matches 'push', so every count on this card treated a
+  // fighter the model has NO side on as an actionable lean. UFC 330 showed it
+  // plainly: ACTIONABLE said 19 while DIRECTION said 7/10 — the missing 2 were
+  // Makhachev and Ribovics, both pushes, inflating the headline and dragging the
+  // average toward 50%. Actionable means the model picked a side.
+  const hasSide = (f: AnalyzerFighter): boolean => {
+    const l = getEffectiveLean(f).lean;
+    return l === 'over' || l === 'under';
+  };
+  const leanFighters = allFighters.filter(hasSide);
+  const pushCount = allFighters.filter(f => getEffectiveLean(f).lean === 'push').length;
   // GLOW-UP 221 — a lean nobody will take is a READ, not something actionable.
   // Neil Magny's FP UNDER sat at the top of this card at 81% while Pick6 posts
   // him More-only (fp_under_available === false, +120 dog) — the placeability
@@ -24502,9 +24560,23 @@ async function generateReportCard(): Promise<void> {
   // verdict carried no more weight than its punctuation. Tiles, matching the
   // language Slate Check and the line-shop hero already use.
   // Only a lean you can actually place can be the card's recommendation.
-  const topPick = placeableLeans
+  const rankedPlaceable = placeableLeans
     .map(f => ({ f, el: getEffectiveLean(f) }))
-    .sort((a, b) => b.el.conf - a.el.conf)[0];
+    .sort((a, b) => b.el.conf - a.el.conf);
+  const topPick = rankedPlaceable[0];
+  // ── GLOW-UP 223 L3 — the plays, findable in card order ───────────────────
+  // Card order is the right order: you read the report the way the night runs.
+  // But it buries the strongest plays among 24 rows, and TOP PICK names exactly
+  // one of them. The top three placeable leans carry a rank star, so the card
+  // can be scanned for the plays without being re-sorted away from card order.
+  const rankMap = new Map<AnalyzerFighter, number>();
+  rankedPlaceable.slice(0, 3).forEach((r, i) => rankMap.set(r.f, i + 1));
+  // ── GLOW-UP 223 L7 — the bar measures edge, not the number's decimal value ─
+  // `width: conf%` meant a 50% lean — the model's coin-flip floor — rendered
+  // half full, and a 43% one still showed a third of a bar. Confidence on this
+  // card lives in roughly 45–90, so the bar spans that range instead.
+  const confBarPct = (c: number): number =>
+    Math.round(Math.min(100, Math.max(4, ((c - 45) / 45) * 100)));
   const overPct = placeableLeans.length ? Math.round((overCount / placeableLeans.length) * 100) : 0;
   const sections: string[] = [];
   // The event header and headline stay pinned while the fights scroll beneath —
@@ -24513,13 +24585,13 @@ async function generateReportCard(): Promise<void> {
     <div class="rc-sticky-top">
     <div class="rc-event-header">
       <div class="rc-event-name">${eventTitle}</div>
-      <div class="rc-event-meta">Generated ${eventDate}</div>
+      <div class="rc-event-meta" title="When this card was generated, how old the stalest book behind it is, how long until the first bell, and the model that scored it.">${vintageBits.join(' · ')}</div>
     </div>
     <div class="rc-hero">
-      <div class="rc-hero-tile" title="Leans you can actually place. ${blockedCount ? `${blockedCount} more have a direction but no book will take that side — they are reads, not bets, and are marked ⛔ below.` : 'Every lean on this card is placeable.'}">
+      <div class="rc-hero-tile" title="Leans you can actually place. ${blockedCount ? `${blockedCount} more have a direction but no book will take that side — they are reads, not bets, and are marked ⛔ below.` : 'Every lean on this card is placeable.'}${pushCount ? ` ${pushCount} fighter${pushCount === 1 ? ' has' : 's have'} no side at all (NO EDGE) and are not counted here.` : ''}">
         <span class="rc-hero-label">ACTIONABLE</span>
         <span class="rc-hero-val">${placeableLeans.length}<em>leans</em></span>
-        <span class="rc-hero-sub">${!leanFighters.length ? 'still loading — reopen in a moment'
+        <span class="rc-hero-sub">${!leanFighters.length && !pushCount ? 'still loading — reopen in a moment'
           : blockedCount ? `${blockedCount} more unplaceable` : `of ${allFighters.length} fighters`}</span>
       </div>
       <div class="rc-hero-tile" title="Direction split across the leans you can place: ${overCount} overs, ${underCount} unders.${blockedCount ? ` The ${blockedCount} unplaceable read${blockedCount === 1 ? ' is' : 's are'} excluded.` : ''} A heavily one-sided card is worth noticing before you build entries.">
@@ -24538,6 +24610,17 @@ async function generateReportCard(): Promise<void> {
         <span class="rc-hero-sub">${prettyName(topPick.f.name)} · ${topPick.el.lean.toUpperCase()}</span>
       </div>` : ''}
     </div>
+    ${(() => {
+      // ── GLOW-UP 223 L10 — the marks explain themselves ────────────────────
+      // ★, ⛔ and NO EDGE all carry meaning that lived only in a hover tooltip,
+      // which the exported screenshot and a quick scan both lose. The legend
+      // prints only the marks this particular card actually uses.
+      const keys: string[] = [];
+      if (rankMap.size) keys.push(`<b><i class="rc-rank">★</i> top ${rankMap.size} placeable by confidence</b>`);
+      if (blockedCount) keys.push('<b><i class="rc-blocked">⛔</i> no book takes this side — read only</b>');
+      if (pushCount) keys.push('<b><i class="rc-key-push">NO EDGE</i> model has no side</b>');
+      return keys.length ? `<div class="rc-legend">${keys.join('<s></s>')}</div>` : '';
+    })()}
     </div>
   `);
 
@@ -24552,11 +24635,24 @@ async function generateReportCard(): Promise<void> {
   for (const g of groups) {
     const rows = g.pair.map(f => {
       const { el, statKey, statLbl, line, src, unplaceable, tier, avgVal, topReason, generic } = resolveRow(f);
-      const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : 'rc-none';
-      const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : '—';
-      const confEl = el.lean !== 'none'
-        ? `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${Math.min(100, Math.max(6, el.conf))}%"></u></i></span>`
-        : `<span class="rc-conf is-none">—</span>`;
+      // L1 — a push rendered as a bare dash in an empty box, which reads as a
+      // failed row rather than as the model's actual answer: no side here.
+      const isPush = el.lean === 'push';
+      const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : isPush ? 'rc-push' : 'rc-none';
+      const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : isPush ? 'NO EDGE' : '—';
+      // L1/L2 — confidence is a recommendation's WEIGHT, so only a recommendation
+      // earns the tiered colour and the bar. A push has no side to back, and an
+      // unplaceable lean is not a bet: Ian Machado Garry's blocked 80% was the
+      // loudest row on the card, lit spine and full green bar, directly under a
+      // headline that had just excluded it.
+      const confMuted = isPush || unplaceable;
+      const confEl = el.lean === 'none'
+        ? `<span class="rc-conf is-none">—</span>`
+        : confMuted
+          ? `<span class="rc-conf is-muted" title="${isPush
+              ? 'The model has no side here, so this number is not a play — shown without weight.'
+              : 'A read, not a bet: no book will take this side. Shown without weight so it cannot outrank a placeable lean.'}"><b>${el.conf}%</b></span>`
+          : `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier. The bar spans 45–90%, the range this model's confidence actually occupies."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${confBarPct(el.conf)}%"></u></i></span>`;
       const avgEl = avgVal != null
         ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg ${avgVal.toFixed(1)} <i>${statLbl}</i></span>`
         : `<span class="rc-avg"></span>`;
@@ -24565,14 +24661,33 @@ async function generateReportCard(): Promise<void> {
       // Naming the active book on an unplaceable row was the part that read as a
       // recommendation: "UNDER 73.5 P6" says take it on Pick6, when Pick6 is
       // precisely the book refusing it.
-      const srcEl = (src && !unplaceable) ? `<span class="rc-src">${src}</span>` : '<span class="rc-src"></span>';
-      return `<div class="rc-fighter-row${el.lean === 'none' ? ' is-noplay' : ''} tier-${tier}">
-        <span class="rc-name">${prettyName(f.name)}</span>
-        <span class="rc-lean-chip ${leanCls}">${leanLabel}</span>
+      // L5 — the ⛔ used to sit inside the line cell, so the numbers stopped
+      // being a column the moment a row was blocked. The book slot is already
+      // empty on exactly those rows, so the flag lands there instead and the
+      // line column stays pure.
+      const srcEl = unplaceable
+        ? `<span class="rc-src is-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet."><i class="rc-blocked">⛔</i></span>`
+        : `<span class="rc-src">${src || ''}</span>`;
+      const rank = rankMap.get(f);
+      const rankEl = rank
+        ? `<i class="rc-rank" title="#${rank} of the ${placeableLeans.length} placeable leans by model confidence.">★${rank}</i>`
+        : '';
+      const rowCls = [
+        'rc-fighter-row',
+        el.lean === 'none' ? 'is-noplay' : '',
+        isPush ? 'is-push' : '',
+        unplaceable ? 'is-blocked' : '',
+        // The lit spine marks a strong PLAY, so it follows the same rule as the
+        // bar: muted rows never earn it.
+        confMuted || el.lean === 'none' ? '' : `tier-${tier}`,
+      ].filter(Boolean).join(' ');
+      return `<div class="${rowCls}">
+        <span class="rc-name">${rankEl}${prettyName(f.name)}</span>
+        <span class="rc-lean-chip ${leanCls}"${isPush ? ' title="The model scored this fighter and landed on neither side — not a play, and not a missing row."' : ''}>${leanLabel}</span>
         ${el.lean === 'none'
           ? '<span class="rc-stat-tag is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
           : `<span class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</span>`}
-        <span class="rc-line">${lineStr}${unplaceable ? '<i class="rc-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet.">⛔</i>' : ''}</span>
+        <span class="rc-line">${lineStr}</span>
         ${srcEl}
         ${confEl}
         ${avgEl}
@@ -24587,7 +24702,9 @@ async function generateReportCard(): Promise<void> {
     // "10 leans · 63%" while four of them are unplaceable is describing a section
     // you cannot enter.
     const secPlaceable = secFighters.filter(x => placeableSet.has(x));
-    const secBlocked = secFighters.filter(x => getEffectiveLean(x).lean !== 'none').length - secPlaceable.length;
+    // L1 — pushes are not leans here either, or a section of coin flips would
+    // report itself as a section full of blocked plays.
+    const secBlocked = secFighters.filter(hasSide).length - secPlaceable.length;
     const secAvg = secPlaceable.length
       ? Math.round(secPlaceable.reduce((n, x) => n + getEffectiveLean(x).conf, 0) / secPlaceable.length)
       : 0;
@@ -24604,11 +24721,31 @@ async function generateReportCard(): Promise<void> {
         </div>`
       : '';
     lastBadge = g.badge;
+    // ── GLOW-UP 223 L6 — when the bout itself is the read ────────────────────
+    // Both fighters leaning the same way on FP is a statement about the FIGHT,
+    // not about either man: two UNDERs is "this ends early", two OVERs is "this
+    // goes long and busy". Unnamed, the pair reads as the card contradicting
+    // itself. Named, it is the most useful line on the block.
+    // Display only. This is CONCENTRATION, never a demotion input — wiring the
+    // correlation engine into the same-fight rule once dropped a real pick.
+    const fpSides = g.pair
+      .map(f => resolveRow(f))
+      .filter(r => r.statKey === 'fp' && (r.el.lean === 'over' || r.el.lean === 'under'))
+      .map(r => r.el.lean);
+    const bothSame = (g.pair.length === 2 && fpSides.length === 2 && fpSides[0] === fpSides[1])
+      ? fpSides[0] : null;
+    const fightNote = bothSame
+      ? `<div class="rc-fight-note is-${bothSame}" title="Both fighters' fantasy-point leans point the same way, which is a read on the bout rather than on either fighter: ${bothSame === 'under'
+          ? 'neither man is expected to bank a full night of points, i.e. this ends early.'
+          : 'both are expected to clear their number, i.e. a long, busy fight.'} Entering both is concentration on one outcome, not two independent plays."
+        >${bothSame === 'under' ? '⇊ BOTH UNDER · reads as an early finish' : '⇈ BOTH OVER · reads as a long, busy fight'}</div>`
+      : '';
     // The `Surname vs Surname` label was dropped: both names are already on the
     // two rows directly beneath it, so it repeated the content of the block it
     // headed and cost a line on all twelve fights.
     sections.push(`${headHtml}<div class="rc-fight-group rc-badge-${g.badgeCls}">
       <div class="rc-matchup">${rows}</div>
+      ${fightNote}
     </div>`);
   }
 
@@ -24619,22 +24756,48 @@ async function generateReportCard(): Promise<void> {
   document.getElementById('reportModal')?.classList.remove('is-hidden');
 
   // Build plain-text version for clipboard/download
+  // L9 \u2014 the export is the copy that travels, so it carries the vintage too:
+  // when it was made, how stale the books behind it are, and how long is left.
   const textLines: string[] = [
     `\uD83D\uDCCA ${eventTitle}`,
-    `Generated: ${eventDate}`,
+    vintageBits.join('  \u00B7  '),
     '',
   ];
+  // L3 \u2014 the plays, stated up front. The body stays in card order; this is the
+  // answer to "what do I actually enter" without re-reading 24 rows.
+  if (rankedPlaceable.length) {
+    textLines.push('\u2605 TOP PLACEABLE LEANS');
+    rankedPlaceable.slice(0, 3).forEach((r, i) => {
+      const row = resolveRow(r.f);
+      const lineTxt = row.line != null ? `${row.statLbl} ${row.line.toFixed(1)}${row.src ? ` (${row.src})` : ''}` : row.statLbl;
+      textLines.push(`   ${i + 1}. ${r.f.name} \u2014 ${r.el.lean.toUpperCase()} ${lineTxt}  \u00B7  ${r.el.conf}%`);
+    });
+    textLines.push('');
+  }
   for (const g of groups) {
     const bar = '\u2501'.repeat(Math.max(0, 38 - g.badge.length));
     textLines.push(`\u2501\u2501\u2501 ${g.badge} ${bar}`);
     const [fa, fb] = g.pair;
     if (fa && fb) textLines.push(`\u2694  ${fa.name.toUpperCase()} vs ${fb.name.toUpperCase()}`);
     else if (fa) textLines.push(`\u2694  ${fa.name.toUpperCase()}`);
+    // L6 \u2014 same note the screen puts on the block.
+    const exFpSides = g.pair
+      .map(f => resolveRow(f))
+      .filter(r => r.statKey === 'fp' && (r.el.lean === 'over' || r.el.lean === 'under'))
+      .map(r => r.el.lean);
+    if (g.pair.length === 2 && exFpSides.length === 2 && exFpSides[0] === exFpSides[1]) {
+      textLines.push(exFpSides[0] === 'under'
+        ? '   \u21ca both under \u2014 reads as an early finish (one outcome, not two plays)'
+        : '   \u21c8 both over \u2014 reads as a long, busy fight (one outcome, not two plays)');
+    }
     for (const f of g.pair) {
       // Same resolver the screen uses, so the exported line can never disagree
       // with the one on the card.
       const { el, statLbl, line, src, unplaceable, avgVal } = resolveRow(f);
-      const leanStr = el.lean === 'over' ? '\u25B2 OVER ' : el.lean === 'under' ? '\u25BC UNDER' : '\u2500      ';
+      // L1 \u2014 the export had the same silent push as the screen: a bare rule where
+      // the model's actual answer was "neither side".
+      const leanStr = el.lean === 'over' ? '\u25B2 OVER ' : el.lean === 'under' ? '\u25BC UNDER'
+        : el.lean === 'push' ? 'NO EDGE' : '\u2500      ';
       // The stat is printed now: "18.5" alone could be SS, FP or TD, and the
       // export is what gets read away from the app where nothing disambiguates it.
       const statStr = el.lean !== 'none' ? statLbl.padEnd(5) : '     ';
@@ -24643,7 +24806,10 @@ async function generateReportCard(): Promise<void> {
         : '          ';
       const confStr = el.lean !== 'none' ? `${el.conf}% conf` : '';
       const avgStr = avgVal != null ? `avg: ${avgVal.toFixed(1)} ${statLbl}` : '';
-      textLines.push(`    ${f.name.padEnd(22)} ${leanStr}  ${statStr} ${lineStr}  ${confStr.padEnd(9)}  ${avgStr}`);
+      // L3 \u2014 the same rank the screen shows, so the two cannot disagree about
+      // which plays are the card's best.
+      const rankStr = rankMap.has(f) ? `\u2605${rankMap.get(f)} ` : '   ';
+      textLines.push(`    ${rankStr}${f.name.padEnd(22)} ${leanStr}  ${statStr} ${lineStr}  ${confStr.padEnd(9)}  ${avgStr}`);
     }
     textLines.push('');
   }
@@ -24656,6 +24822,9 @@ async function generateReportCard(): Promise<void> {
   // the export is read away from the tooltips that explain it on screen.
   if (groups.some(g => g.pair.some(f => resolveRow(f).unplaceable))) {
     textLines.push('! = no book posts this side \u2014 read only, not placeable');
+  }
+  if (pushCount) {
+    textLines.push(`NO EDGE = the model landed on neither side (${pushCount} fighter${pushCount === 1 ? '' : 's'}, not counted above)`);
   }
   _reportCardText = textLines.join('\n');
 }
