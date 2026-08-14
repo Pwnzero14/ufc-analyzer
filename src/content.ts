@@ -174,7 +174,39 @@ function scrapePick6() {
         }
       }
 
-      const tdMatch = cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
+      // ── TD: the SAME animated odometer, third time ────────────────────────
+      // Control Time was fixed for this, then SS. Takedowns kept the original
+      // adjacency pattern and so kept the original bug: with the odometer
+      // rendering, innerText reads "0.5 \n 0 \n . \n 5 \n Takedowns", the pattern
+      // requires the number adjacent to the label, and it captures only the
+      // trailing character — so a 0.5 line stored as 5. Confirmed against the
+      // live Pick6 board 2026-08-14: Barboza, Ribovics and Machado Garry all post
+      // 0.5 Takedowns and all three arrived as 5, while Abdul-Malik, Magny and
+      // Stoltzfus (same 0.5, plain render) were correct. Intermittent exactly as
+      // the odometer bug always is — it depends on whether the animation had
+      // settled when the card was read.
+      //
+      // A 0.5 read as 5 is not a cosmetic error: an UNDER shops to the HIGHEST
+      // line, so the corrupt value wins the side and lands at the top of the
+      // ranked pool as a near-certainty (three of them seeded every AI parlay
+      // suggestion on that card).
+      //
+      // Same resolution as SS: collapse whitespace so both renderings normalise
+      // to "<value><value>Takedowns", capture the whole numeric run, and treat an
+      // exact doubling as one value. No magnitude floor here — Pick6 takedown
+      // lines live at 0.5–3.5, so SS's `>= 4` integer guard would reject every
+      // real one; the plausibility bound below is the guard that matters.
+      const tdCompact = cardText.replace(/\s+/g, '');
+      const tdRun = (tdCompact.match(/([\d.]+)Takedowns?/i) || [])[1];
+      let tdParsed: number | null = null;
+      if (tdRun) {
+        const tdHalf = tdRun.length % 2 === 0 ? tdRun.slice(0, tdRun.length / 2) : '';
+        const tdHalfNum = (tdHalf && tdHalf === tdRun.slice(tdRun.length / 2)) ? parseFloat(tdHalf) : NaN;
+        tdParsed = Number.isFinite(tdHalfNum) ? tdHalfNum : parseFloat(tdRun);
+      }
+      const tdMatch = tdParsed != null && Number.isFinite(tdParsed)
+        ? [String(tdParsed), String(tdParsed)]
+        : cardText.match(/((?:\d+\.?\d*|\.\d+))\s*\n?\s*Takedowns?/i);
       if (tdMatch) {
         const line = parseFloat(tdMatch[1]);
         if (!isNaN(line) && line >= 0 && line < 20) {
