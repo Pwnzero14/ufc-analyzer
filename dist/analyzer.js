@@ -24691,8 +24691,11 @@ async function generateReportCard() {
                         ? 'The model has no side here, so this number is not a play — shown without weight.'
                         : 'A read, not a bet: no book will take this side. Shown without weight so it cannot outrank a placeable lean.'}"><b>${el.conf}%</b></span>`
                     : `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier. The bar spans 45–90%, the range this model's confidence actually occupies."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${confBarPct(el.conf)}%"></u></i></span>`;
+            // GLOW-UP 231 L2 — the stat label moved onto the pick block, so repeating
+            // it here was the same word twice on one row. The average is now just the
+            // number, which is all it ever needed to be beside a labelled line.
             const avgEl = avgVal != null
-                ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg ${avgVal.toFixed(1)} <i>${statLbl}</i></span>`
+                ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg <b>${avgVal.toFixed(1)}</b></span>`
                 : `<span class="rc-avg"></span>`;
             const reasonTxt = topReason;
             const lineStr = line != null ? line.toFixed(1) : '—';
@@ -24719,17 +24722,37 @@ async function generateReportCard() {
                 // bar: muted rows never earn it.
                 confMuted || el.lean === 'none' ? '' : `tier-${tier}`,
             ].filter(Boolean).join(' ');
+            // ── GLOW-UP 231 L1 — the pick is ONE object ──────────────────────────
+            // Direction, stat, line and book were four separate grid cells spread
+            // across the row, so reading "UNDER 83.5 FP on Pick6" meant reassembling
+            // it from four places at four different weights — and nothing in the row
+            // was dominant, so the eye had nowhere to land. They now share one
+            // surface, with the LINE as the typographic anchor and everything else
+            // subordinate to it.
+            const pickEl = el.lean === 'none'
+                ? '<span class="rc-pick is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
+                : `<span class="rc-pick ${leanCls}">`
+                    + `<i class="rc-dir"${isPush ? ' title="The model scored this fighter and landed on neither side — not a play, and not a missing row."' : ''}>${leanLabel}</i>`
+                    + `<b class="rc-line">${lineStr}</b>`
+                    + `<i class="rc-meta">`
+                    + `<em class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</em>`
+                    + srcEl
+                    + `</i>`
+                    + `</span>`;
+            // L2 — the evidence column is one block, not two cells. The average is a
+            // prefix to the reasoning it supports rather than a column competing with
+            // it, which is what let a 24-row card read as a spreadsheet.
+            const evidenceEl = `<span class="rc-evidence">`
+                + avgEl
+                + (reasonTxt
+                    ? `<span class="rc-reason${generic ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${generic ? 'no specific read' : reasonTxt}</span>`
+                    : '<span class="rc-reason"></span>')
+                + `</span>`;
             return `<div class="${rowCls}">
         <span class="rc-name">${rankEl}${prettyName(f.name)}</span>
-        <span class="rc-lean-chip ${leanCls}"${isPush ? ' title="The model scored this fighter and landed on neither side — not a play, and not a missing row."' : ''}>${leanLabel}</span>
-        ${el.lean === 'none'
-                ? '<span class="rc-stat-tag is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
-                : `<span class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</span>`}
-        <span class="rc-line">${lineStr}</span>
-        ${srcEl}
+        ${pickEl}
         ${confEl}
-        ${avgEl}
-        ${reasonTxt ? `<span class="rc-reason${generic ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${generic ? 'no specific read — baseline model only' : reasonTxt}</span>` : '<span class="rc-reason"></span>'}
+        ${evidenceEl}
       </div>`;
         }).join('');
         // F4 — each section reports itself. "Is the main card stronger than the
