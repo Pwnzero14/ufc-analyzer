@@ -29192,6 +29192,78 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 .parlay-slip-leg.off-board .parlay-leg-name { color: var(--text2); }
 
+
+/* ══ GLOW-UP 228: Parlay Lab pass ═════════════════════════════════════════
+   Making every book parlayable took the off-board tier from 194 rows to 462,
+   and the additions are near-clones — within one prop the confidence and EV are
+   identical across books, so only the number moves. L1 groups them onto one row
+   with a book rail · L2 the sort key stops being the faintest thing on the row ·
+   L3 numbers hold a column · L4 a synergy pair says whose night it rides on. */
+
+/* ── L1 · the book rail ────────────────────────────────────────────────── */
+.plg-books { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; cursor: help; }
+.plg-book {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 800;
+  letter-spacing: 0.06em; cursor: pointer;
+  padding: 2px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(120,132,168,0.28);
+  color: var(--text3);
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
+}
+.plg-book b { font-family: 'Space Grotesk', sans-serif; font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.plg-book i { font-style: normal; color: var(--gold); }
+.plg-book:hover { background: rgba(255,255,255,0.09); border-color: rgba(120,132,168,0.55); transform: translateY(-1px); }
+.plg-book:focus-visible { outline: 1px solid var(--gold); outline-offset: 1px; }
+/* Best entry for the SIDE — leftmost, and marked, so the rail reads in value
+   order rather than as an undifferentiated row of books. */
+.plg-book.is-best { border-color: rgba(38,208,124,0.42); }
+.plg-book.is-best b { color: #6ee7a8; }
+.plg-book.on {
+  background: rgba(248,198,74,0.14); border-color: rgba(248,198,74,0.6); color: var(--gold);
+}
+.plg-book.on b { color: var(--gold); }
+.plg-book.plat-none { border-style: dashed; opacity: 0.75; }
+/* A grouped row is a container, not a single control — only the chips click. */
+.parlay-leg-row.is-grouped { cursor: default; }
+.parlay-leg-row.is-grouped:hover { transform: none; }
+.parlay-leg-check.is-multi { display: inline-flex; align-items: baseline; gap: 1px; }
+.parlay-leg-check.is-multi i { font-style: normal; font-size: 8px; color: var(--gold); }
+.pob-props {
+  margin-left: auto; font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--text4); cursor: help;
+}
+
+/* ── L2 · the pool sorts by confidence, so confidence has to be readable ── */
+.parlay-leg-conf { min-width: 48px; }
+.parlay-leg-conf { font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.parlay-leg-row.conf-high .parlay-leg-conf { color: #6ee7a8; }
+.parlay-leg-row.conf-med  .parlay-leg-conf { color: var(--gold); }
+.parlay-leg-row.conf-low  .parlay-leg-conf { color: var(--text3); }
+
+/* ── L3 · numbers hold a column instead of drifting with glyph width ───── */
+.parlay-leg-line, .parlay-leg-ev, .parlay-leg-marg { font-variant-numeric: tabular-nums; }
+.parlay-leg-ev { min-width: 40px; text-align: right; display: inline-block; }
+
+/* ── L4 · which kind of pair this is ───────────────────────────────────── */
+.synergy-pair-scope {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 800;
+  letter-spacing: 0.1em; padding: 1px 5px; border-radius: 3px;
+  margin-left: auto; white-space: nowrap; cursor: help;
+}
+.synergy-pair-scope.same-fighter { color: #ffb27a; background: rgba(255,160,107,0.12); border: 1px solid rgba(255,160,107,0.32); }
+.synergy-pair-scope.same-fight   { color: #9aa4c4; background: rgba(154,164,196,0.10); border: 1px solid rgba(154,164,196,0.28); }
+.synergy-pair-legs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ── L5 · the pool's filters stay reachable in a 74-row list ───────────── */
+.parlay-pool-head-sticky {
+  position: sticky; top: 0; z-index: 4;
+  background: linear-gradient(180deg, var(--bg2, #0d1221) 0, var(--bg2, #0d1221) calc(100% - 8px), rgba(13,18,33,0) 100%);
+  padding-bottom: 8px;
+}
+
 /* ══ GLOW-UP 211: FP is picked per BOOK, not line-shopped ═════════════════
    Every other stat resolves to one best book, so one ▲▼ pair is right. Fantasy
    points are scored differently by each book, so there is no "best" FP line —
