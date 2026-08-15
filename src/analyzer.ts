@@ -250,6 +250,17 @@ const _archetypeLearnerCache = new Map<string, ArchetypeLearnerProfile>();
  *  FT results were historically stored in seconds; lines are in minutes. */
 function normalizeArchiveResult(propType: string, result: number): number {
   if (propType === 'FightTime' && result > 25) return result / 60;
+  // Same seconds-vs-minutes rescue for Control, for rows the backfill wrote in
+  // seconds before ctrlMinsOf existed. 25 is the ceiling for both: a 5R fight is
+  // 25 minutes, so anything above it cannot be a minutes value and must be seconds.
+  //
+  // Deliberately imperfect and that is fine — a legacy row of 18 is genuinely
+  // ambiguous (18 seconds of control, or 18 minutes) and this leaves it alone.
+  // It barely matters: backfilled rows carry no `line`, and the fighter-stats,
+  // per-event hit-rate and platform-bias paths all filter on a finite line, so
+  // they never see these. The net exists for resolveVsArchive, which grades a
+  // placed leg against the row's result using the LEG's line.
+  if (propType === 'Control' && result > 25) return result / 60;
   return result;
 }
 
@@ -13853,7 +13864,15 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     if (source === 'ss_r1') return ['SS_R1'];
     if (source === 'td') return ['TD'];
     if (source === 'ft') return ['FightTime'];
-    if (source === 'ctrl') return ['Control'];
+    // Both spellings, because CTRL is archived under two of them. A live CTRL
+    // LINE lands as 'ctrl': toArchivePropTypeFromLineKey has no case for
+    // 'line_ctrl' (its `includes('control')` test doesn't fire) so it falls
+    // through to the generic strip-and-space branch. Those are the rows the
+    // settle path resolves — in minutes, and the only ones carrying a line.
+    // Historical control from the UFCStats backfill lands as 'Control'.
+    // resolveVsArchive compares the RAW propType, so asking only for 'Control'
+    // matched the backfilled rows and never the settled ones.
+    if (source === 'ctrl') return ['ctrl', 'Control'];
     if (source === 'kd') return ['KD'];
     return [];
   };
@@ -23615,6 +23634,21 @@ function rosterNameSet(): Set<string> {
   return set;
 }
 
+// ── CTRL archive units ───────────────────────────────────────────────────
+// UFCStats gives control time in SECONDS; every CTRL *line* is in MINUTES, and
+// the settle path has always converted (background.ts, `ctrlMins`). This backfill
+// did not — it wrote raw seconds under the same `Control` propType, so the two
+// writers disagreed by 60x on the same rows. FightTime, written on the very next
+// line here, has always done the divide; Control was simply missed.
+//
+// It bit through PropArchiveService.updateResult: once an event lands in fighters'
+// UFCStats history, the backfill OVERWRITES the settled minutes with seconds, and
+// resolveVsArchive then grades placed CTRL legs against it — an OVER reads as a hit
+// and an UNDER as a miss whatever actually happened. Rounded to 2dp to match the
+// settle path exactly so the two can't differ by a rounding either.
+const ctrlMinsOf = (secs: number | null | undefined): number =>
+  Math.round((Number(secs) / 60) * 100) / 100;
+
 async function archivePerformanceForRosterFighter(name: string, ufcData: UFCStatsData | null): Promise<void> {
   if (!ufcData?.fightHistory?.length) return;
 
@@ -23642,14 +23676,14 @@ async function archivePerformanceForRosterFighter(name: string, ufcData: UFCStat
       records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Fantasy_PP', result: fantasyPP });
       if (fight.sigStr != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'SS', result: Number(fight.sigStr) });
       if (fight.td != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'TD', result: Number(fight.td) });
-      if (fight.ctrlSecs != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Control', result: Number(fight.ctrlSecs) });
+      if (fight.ctrlSecs != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'Control', result: ctrlMinsOf(fight.ctrlSecs) });
       if (fight.timeSecs != null) records.push({ fighter: fighterNorm, opponent, event: eventName, date: dateIso, propType: 'FightTime', result: parseFloat((Number(fight.timeSecs) / 60).toFixed(2)) });
 
       await PropArchiveService.updateResult(fighterNorm, eventName, 'Fantasy', fantasy, { date: dateIso, opponent });
       await PropArchiveService.updateResult(fighterNorm, eventName, 'Fantasy_PP', fantasyPP, { date: dateIso, opponent });
       if (fight.sigStr != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'SS', Number(fight.sigStr), { date: dateIso, opponent });
       if (fight.td != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'TD', Number(fight.td), { date: dateIso, opponent });
-      if (fight.ctrlSecs != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'Control', Number(fight.ctrlSecs), { date: dateIso, opponent });
+      if (fight.ctrlSecs != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'Control', ctrlMinsOf(fight.ctrlSecs), { date: dateIso, opponent });
       if (fight.timeSecs != null) await PropArchiveService.updateResult(fighterNorm, eventName, 'FightTime', parseFloat((Number(fight.timeSecs) / 60).toFixed(2)), { date: dateIso, opponent });
     }
 
@@ -23663,14 +23697,14 @@ async function archivePerformanceForRosterFighter(name: string, ufcData: UFCStat
       records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Fantasy_PP', result: oppFantasyPP });
       if (oppStats.sigStr != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'SS', result: Number(oppStats.sigStr) });
       if (oppStats.td != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'TD', result: Number(oppStats.td) });
-      if (oppStats.ctrlSecs != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Control', result: Number(oppStats.ctrlSecs) });
+      if (oppStats.ctrlSecs != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'Control', result: ctrlMinsOf(oppStats.ctrlSecs) });
       if (fight.timeSecs != null) records.push({ fighter: oppName, opponent: fighterNorm, event: eventName, date: dateIso, propType: 'FightTime', result: parseFloat((Number(fight.timeSecs) / 60).toFixed(2)) });
 
       await PropArchiveService.updateResult(oppName, eventName, 'Fantasy', oppFantasy, { date: dateIso, opponent: fighterNorm });
       await PropArchiveService.updateResult(oppName, eventName, 'Fantasy_PP', oppFantasyPP, { date: dateIso, opponent: fighterNorm });
       if (oppStats.sigStr != null) await PropArchiveService.updateResult(oppName, eventName, 'SS', Number(oppStats.sigStr), { date: dateIso, opponent: fighterNorm });
       if (oppStats.td != null) await PropArchiveService.updateResult(oppName, eventName, 'TD', Number(oppStats.td), { date: dateIso, opponent: fighterNorm });
-      if (oppStats.ctrlSecs != null) await PropArchiveService.updateResult(oppName, eventName, 'Control', Number(oppStats.ctrlSecs), { date: dateIso, opponent: fighterNorm });
+      if (oppStats.ctrlSecs != null) await PropArchiveService.updateResult(oppName, eventName, 'Control', ctrlMinsOf(oppStats.ctrlSecs), { date: dateIso, opponent: fighterNorm });
       if (fight.timeSecs != null) await PropArchiveService.updateResult(oppName, eventName, 'FightTime', parseFloat((Number(fight.timeSecs) / 60).toFixed(2)), { date: dateIso, opponent: fighterNorm });
     }
   }
