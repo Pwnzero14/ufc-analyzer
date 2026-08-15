@@ -18904,6 +18904,9 @@ let _lsTopGain = 0;
  * container is still there to catch the remainder.
  */
 const LS_FIT_FLOOR = 0.62;
+/** Slack so the last row is not flush against the edge, and so a rounding error
+ *  cannot leave a two-pixel scrollbar behind. */
+const LS_FIT_INSET = 10;
 function lsApplyFit() {
     const wrap = document.getElementById('lineShopContent');
     const fit = wrap?.querySelector('.ls-fit');
@@ -18912,14 +18915,30 @@ function lsApplyFit() {
     // Read natural size first — a stale transform makes the measurement lie.
     fit.style.transform = '';
     fit.style.width = '';
-    const avail = wrap.clientHeight;
+    const avail = wrap.clientHeight - LS_FIT_INSET;
     const need = fit.scrollHeight;
     if (!avail || !need || need <= avail)
         return; // already fits: leave it alone
     const k = Math.max(LS_FIT_FLOOR, avail / need);
     fit.style.transformOrigin = 'top left';
-    fit.style.width = `${(100 / k).toFixed(3)}%`;
+    // The scaled box must be a hair narrower than the container. At exactly 100%
+    // a sub-pixel rounding error is enough to trip `overflow-x` and put a
+    // horizontal scrollbar along the bottom — which then steals height and makes
+    // the vertical fit wrong too.
+    fit.style.width = `${(99.6 / k).toFixed(3)}%`;
     fit.style.transform = `scale(${k.toFixed(4)})`;
+}
+/**
+ * Fitting changes whether scrollbars exist, and scrollbars change the space
+ * available to fit into — so one pass is measured against a container that no
+ * longer exists by the time it lands. Running it again on the next frame
+ * settles it: the second read sees the post-scrollbar geometry, and because
+ * `lsApplyFit` always measures from the cleared natural size it converges
+ * instead of compounding.
+ */
+function lsApplyFitSettled() {
+    lsApplyFit();
+    requestAnimationFrame(lsApplyFit);
 }
 /** Re-fit when the window changes shape. Debounced — resize fires in bursts. */
 let _lsFitTimer = null;
@@ -18928,7 +18947,7 @@ window.addEventListener('resize', () => {
         return;
     if (_lsFitTimer)
         clearTimeout(_lsFitTimer);
-    _lsFitTimer = setTimeout(lsApplyFit, 120);
+    _lsFitTimer = setTimeout(lsApplyFitSettled, 120);
 });
 /** Can this book actually take this side for this fighter? The line-shop panel's
  *  whole job is naming a book to use, so a "best" line the book won't take is a
@@ -19366,7 +19385,7 @@ function generateLineShopModal() {
     // Fit only once the panel is actually laid out — measuring a hidden container
     // returns 0 and the scale would never be applied. One frame is enough for the
     // un-hide to take effect.
-    requestAnimationFrame(lsApplyFit);
+    requestAnimationFrame(lsApplyFitSettled);
 }
 // AI × CLV Phase 2 — market-validation boost.
 // Reads the live open→current drift for this fighter/propType/platform (unresolved rows only).
