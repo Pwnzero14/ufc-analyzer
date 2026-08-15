@@ -30298,9 +30298,15 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-fighter-row.is-blocked { border-left-color: rgba(255,58,96,0.35); background: rgba(255,58,96,0.03); opacity: 0.62; }
 .rc-fighter-row.is-push    { border-left-color: rgba(255,255,255,0.12); }
 .rc-fighter-row:hover { background: rgba(255,255,255,0.05); }
-/* ── Focus: hovering a bout quiets the rest of the card ─────────────────── */
-#reportContent:hover .rc-fight-group:not(:hover) { opacity: 0.5; transition: opacity 0.18s; }
-#reportContent .rc-fight-group { transition: opacity 0.18s; }
+/* ── Focus: LIFT the bout you are on, rather than dim the other twelve ────
+   Dimming was borrowed from the shop, where it quiets thin single rows and
+   reads as a highlight. Here a "row" is a whole bout, so hovering knocked half
+   the card to 42% — and because the cursor rests over the panel the entire
+   time you are reading it, the card spent most of its life mostly dark. The
+   signal is the same either way; this direction cannot make anything harder to
+   read. */
+#reportContent .rc-fight-group { transition: opacity 0.18s, filter 0.18s; }
+#reportContent .rc-fight-group:hover { filter: brightness(1.14); }
 
 /* ── The rank badge becomes the shop's gold coin ────────────────────────── */
 .rc-rank {
@@ -30534,8 +30540,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* ── 7 · a blocked row reads as struck through end to end ──────────────── */
 .rc-fighter-row.is-blocked .rc-name { text-decoration: line-through; text-decoration-color: rgba(255,58,96,0.4); }
 
-/* ── 8 · focus: the hovered bout is lit, the rest recede further ────────── */
-#reportContent:hover .rc-fight-group:not(:hover) { opacity: 0.42; }
+/* ── 8 · focus, same correction: the hovered bout lifts; nothing dims. A
+   faint recede on the others is fine, a 58% drop is not. ────────────────── */
+#reportContent:hover .rc-fight-group:not(:hover) { opacity: 0.88; }
 #reportContent .rc-fight-group:hover { opacity: 1; }
 
 /* ── 9 · the scrollbar stops being a system artifact ────────────────────── */
