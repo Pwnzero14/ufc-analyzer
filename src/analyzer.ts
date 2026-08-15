@@ -25146,6 +25146,22 @@ async function generateReportCard(): Promise<void> {
       if (pushCount) keys.push('<b><i class="rc-key-push">NO EDGE</i> model has no side</b>');
       return keys.length ? `<div class="rc-legend">${keys.join('<s></s>')}</div>` : '';
     })()}
+    <!-- GLOW-UP 243 — the card had eight columns and no labels. The shop has
+         carried FIGHTER + LEAN / FP / SS / TD since it was built, and it is
+         half of why that panel reads as a considered table rather than a list
+         of rows: you know what you are looking at before you look. Pinned with
+         the rest of the header, so it survives scrolling the way the shop's
+         sticky <th> does. -->
+    <div class="rc-colhead" aria-hidden="true">
+      <span>FIGHTER</span>
+      <span>PICK</span>
+      <span class="rc-ch-books">BOOKS</span>
+      <span>SPREAD</span>
+      <span>WHY</span>
+      <span class="rc-ch-r">CONF</span>
+      <span class="rc-ch-r">AVG</span>
+      <span class="rc-ch-r" title="Career average minus the line — how far his history sits from the number, and which way.">Δ LINE</span>
+    </div>
     </div>
   `);
 
