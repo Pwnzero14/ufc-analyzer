@@ -29766,6 +29766,14 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    to the list itself, so FP / SS / TD stay legible however far you scroll. */
 .lineshop-table th { top: -1px; }
 
+/* GLOW-UP 234 — the scaled wrapper. `transform-origin` and `width` are set
+   inline by lsApplyFit (they depend on the measured ratio); this just makes it
+   a clean block and keeps the shrink from being jarring when the window moves.
+   No transition on `width` — pairing it with the transform double-animates and
+   the table visibly rubber-bands. */
+.ls-fit { display: block; transition: transform 0.18s ease; }
+@media (prefers-reduced-motion: reduce) { .ls-fit { transition: none; } }
+
 /* Density: with the list scrolling, this is about seeing MORE rows per screen
    rather than about fitting at all. Small trims only — the values are tight. */
 .lineshop-table { border-spacing: 0 2px; }
