@@ -19293,6 +19293,11 @@ let lsStatFilter: LsStatFilter = 'all';
  * by definition, have nothing to shop. */
 let lsBigOnly = true;
 let lsShowFlat = false;
+/* GLOW-UP 237 — the platform-bias strip is reference data: how each book's
+ * lines have historically landed against results. Useful to consult, not
+ * something you act on row by row — and it was costing a full row of the list
+ * every time the panel opened. Collapsed by default, one chip away. */
+let lsShowBias = false;
 let lsBiasBook: string | null = null;
 /** GLOW-UP 216 G4 — the biggest single gain on the current card, so the chip
  *  that carries it can be styled as THE opportunity rather than one of many. */
@@ -19631,6 +19636,7 @@ function generateLineShopModal(): void {
       </span>
       <span class="ls-ctl-group">
         <button class="ls-chip${lsBigOnly ? ' on' : ''}" data-ls-big title="Only props where the books disagree by 2.5 or more">Δ ≥ 2.5</button>
+        ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<button class="ls-chip${lsShowBias ? ' on' : ''}" data-ls-bias-toggle title="Show how each book's lines have historically landed against results. Reference data — hidden by default so the fighter list gets the room.">BIAS</button>` : ''}
         ${(lsSort !== 'spread' || lsStatFilter !== 'all' || !lsBigOnly || lsBiasBook) ? '<button class="ls-reset-inline" data-ls-reset title="Back to the default view">reset</button>' : ''}
       </span>
       <span class="ls-legend-inline">
@@ -19641,7 +19647,7 @@ function generateLineShopModal(): void {
       </span>
     </div>
     ${lsBiasBook ? `<div class="ls-filter-note">Showing only fighters where <b>${LS_TAG[lsBiasBook] || lsBiasBook}</b> holds the best line · <button class="ls-reset-inline" data-ls-reset>clear</button></div>` : ''}
-    ${_platformBiasCache && _platformBiasCache.length >= 2 ? `<div class="ls-bias-strip">
+    ${(lsShowBias || lsBiasBook) && _platformBiasCache && _platformBiasCache.length >= 2 ? `<div class="ls-bias-strip">
       <span class="ls-bias-head" title="Historical settle data: how far each book's line sits from the result on average. A negative number means the book posts LOW, so its overs clear more easily than the field's.">Platform bias</span>
       ${_platformBiasCache.filter(b => b.total >= 3 && Math.abs(b.avgEdge) >= 0.5).sort((a, b) => Math.abs(b.avgEdge) - Math.abs(a.avgEdge)).slice(0, 6).map(b => {
         const plat = PLAT_LABEL_MAP[b.platform] || b.platform.toUpperCase();
@@ -19696,6 +19702,9 @@ function generateLineShopModal(): void {
     const v = (b.dataset['lsStat'] as LsStatFilter) || 'all';
     lsStatFilter = lsStatFilter === v && v !== 'all' ? 'all' : v; generateLineShopModal();
   }));
+  content.querySelectorAll<HTMLElement>('[data-ls-bias-toggle]').forEach(b => b.addEventListener('click', () => {
+    lsShowBias = !lsShowBias; generateLineShopModal();
+  }));
   content.querySelectorAll<HTMLElement>('[data-ls-big]').forEach(b => b.addEventListener('click', () => {
     lsBigOnly = !lsBigOnly; generateLineShopModal();
   }));
@@ -19707,7 +19716,7 @@ function generateLineShopModal(): void {
     lsBiasBook = lsBiasBook === v ? null : v; generateLineShopModal();
   }));
   content.querySelectorAll<HTMLElement>('[data-ls-reset]').forEach(b => b.addEventListener('click', () => {
-    lsSort = 'spread'; lsStatFilter = 'all'; lsBigOnly = true; lsBiasBook = null; generateLineShopModal();
+    lsSort = 'spread'; lsStatFilter = 'all'; lsBigOnly = true; lsBiasBook = null; lsShowBias = false; generateLineShopModal();
   }));
   content.querySelectorAll<HTMLElement>('[data-ls-take]').forEach(btn => btn.addEventListener('click', (e) => {
     e.stopPropagation();
