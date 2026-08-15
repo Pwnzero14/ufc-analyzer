@@ -29224,8 +29224,27 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 .plg-book.on b { color: var(--gold); }
 .plg-book.plat-none { border-style: dashed; opacity: 0.75; }
-/* A grouped row is a container, not a single control — only the chips click. */
-.parlay-leg-row.is-grouped { cursor: default; }
+/* ── GLOW-UP 246 — a grouped row clicks like a single-book one ──────────────
+   It used to be a container whose only targets were the chips: 90% of the row
+   was dead while looking exactly like a fully-clickable single-book row, so
+   "some props I can click and some I can't" was the honest reading. The row now
+   carries the BEST book's key and toggles it; the chips still pick a specific
+   number. cursor:default removed — it described the old behaviour truthfully and
+   would now be the lie. */
+.parlay-leg-row.is-grouped { cursor: pointer; }
+.parlay-leg-check.is-multi { cursor: pointer; }
+.parlay-leg-check.is-multi:hover { color: var(--gold); }
+/* The book you actually placed at, and the prop it belongs to. Gold reads as
+   "yours" everywhere else in the Lab (selected leg, slip), so it carries the
+   same meaning here rather than inventing a colour. */
+.plg-book.is-placed { border-color: rgba(248,198,74,0.5); }
+.plg-book.is-placed b { color: var(--gold); }
+.parlay-leg-placed {
+  font-size: 9px; line-height: 1; color: var(--gold);
+  text-shadow: 0 0 6px rgba(248,198,74,0.55);
+  cursor: help;
+}
+.plq-chip.plq-placed.on { border-color: rgba(248,198,74,0.6); color: var(--gold); }
 .parlay-leg-row.is-grouped:hover { transform: none; }
 .parlay-leg-check.is-multi { display: inline-flex; align-items: baseline; gap: 1px; }
 .parlay-leg-check.is-multi i { font-style: normal; font-size: 8px; color: var(--gold); }

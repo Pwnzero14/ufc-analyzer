@@ -10717,6 +10717,9 @@ type ParlayStatFilter = 'all' | LeanSource;
 let parlayPoolSort: ParlaySortMode = 'conf';
 let parlayPoolStat: ParlayStatFilter = 'all';
 let parlayPoolDir: 'all' | 'over' | 'under' = 'all';
+// GLOW-UP 246: filter the pool to props you've already marked placed. Same
+// session-scoped, draw-only contract as the rest of the strip.
+let parlayPoolPlacedOnly = false;
 // GLOW-UP 207: off-board section is collapsed by default — it is deliberately
 // the LONGER of the two lists (every side of every prop), and expanding it by
 // default would bury the ranked pool the view is built around.
@@ -11625,6 +11628,31 @@ function renderParlayLab(container: HTMLElement): void {
   // GLOW-UP 177: apply the command-strip view (filter then sort) to the pool
   // only — selection, conflict checks, health, suggestions all still see the
   // full availableLegs, so hiding a leg here never changes the math.
+  // ── GLOW-UP 246 — the legs you already hold, findable ────────────────────
+  // The pool sorts by confidence, so a leg placed AGAINST the model's lean sinks.
+  // On UFC 330 four Underdog FP OVERs were placed; the model leans UNDER on two of
+  // them, which puts those at 38% and 39% — real rows about 150 down a ~180-prop
+  // list, with no way to search for a fighter. They read as missing. Index the
+  // event's placed legs so a row can say you hold it and the strip can filter to
+  // exactly them. bestPicksPlaced is the in-memory map the slate tray already
+  // writes, so this stays synchronous — no storage round-trip in a sync render.
+  const placedPropKeys = new Set<string>();
+  const placedBookKeys = new Set<string>();
+  for (const r of bestPicksPlaced.values()) {
+    const nm = (normalizeName(r.name) || r.name || '').toLowerCase();
+    const dir = String(r.dir || '').toLowerCase();
+    if (!nm || (dir !== 'over' && dir !== 'under')) continue;
+    const stat = String(r.source || 'fp');
+    placedPropKeys.add(`${nm}|${stat}|${dir}`);
+    if (r.book) placedBookKeys.add(`${nm}|${stat}|${dir}|${r.book}`);
+  }
+  const legPlacedKey = (l: ParlayLeg): string =>
+    `${(normalizeName(l.fighter) || l.fighter).toLowerCase()}|${l.stat}|${l.direction}`;
+  const isLegPlaced = (l: ParlayLeg): boolean => placedPropKeys.has(legPlacedKey(l));
+  const isBookPlaced = (l: ParlayLeg): boolean =>
+    l.bookKey != null && placedBookKeys.has(`${legPlacedKey(l)}|${l.bookKey}`);
+  const placedInPool = new Set(poolLegs.filter(a => isLegPlaced(a.leg)).map(a => legPlacedKey(a.leg))).size;
+
   const evOf = (a: typeof availableLegs[number]): number | null =>
     parlayLegEv.get(parlayLegKeyOf(a.leg)) ?? null;
   const tierRank = (t: string): number => (t === 'High' ? 0 : t === 'Med' ? 1 : 2);
@@ -11634,7 +11662,8 @@ function renderParlayLab(container: HTMLElement): void {
   const applyPoolView = (legs: typeof availableLegs): typeof availableLegs => {
     const out = legs.filter(a =>
       (parlayPoolStat === 'all' || a.leg.stat === parlayPoolStat)
-      && (parlayPoolDir === 'all' || a.leg.direction === parlayPoolDir));
+      && (parlayPoolDir === 'all' || a.leg.direction === parlayPoolDir)
+      && (!parlayPoolPlacedOnly || isLegPlaced(a.leg)));
     if (parlayPoolSort === 'ev') {
       return [...out].sort((a, b) => (evOf(b) ?? -Infinity) - (evOf(a) ?? -Infinity));
     }
@@ -11671,6 +11700,9 @@ function renderParlayLab(container: HTMLElement): void {
       <button class="plq-chip${parlayPoolDir === 'over' ? ' on' : ''}" data-plq-dir="over" title="Only OVER legs">OVER</button>
       <button class="plq-chip${parlayPoolDir === 'under' ? ' on' : ''}" data-plq-dir="under" title="Only UNDER legs">UNDER</button>
     </span>
+    ${placedPropKeys.size ? `<span class="plq-group">
+      <button class="plq-chip plq-placed${parlayPoolPlacedOnly ? ' on' : ''}" data-plq-placed title="Show only props you marked placed for this event — the fastest way to rebuild a ticket from legs you already hold, since a leg placed against the model's lean sorts to the bottom of the pool.${placedInPool < placedPropKeys.size ? ` ${placedPropKeys.size - placedInPool} of your ${placedPropKeys.size} placed props aren't in the pool at all — no book the scraper can see still posts them.` : ''}">● PLACED <i>${placedInPool}</i></button>
+    </span>` : ''}
   </div>`;
 
   // GLOW-UP 197 L2 — the row never said who the opponent was, so fight membership was
@@ -11726,6 +11758,9 @@ function renderParlayLab(container: HTMLElement): void {
     const offTag = a.leg.offBoard
       ? `<span class="parlay-leg-off" title="${(a.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>`
       : '';
+    const placedTag = isLegPlaced(a.leg)
+      ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. Flagged on the row so a leg you already hold is findable without hunting the confidence order — the ● PLACED chip in the strip filters to just these.">●</span>`
+      : '';
     const warnTag = conflict ? `<span class="parlay-leg-warn" title="${conflict.replace(/"/g, '&quot;')}">✗ vs slip</span>` : '';
     const synTag = synergy ? `<span class="parlay-leg-syn" title="${synergy.replace(/"/g, '&quot;')}">🔗 synergy</span>` : '';
     // EV was already computed for the pool's EV sort but never shown — the sort
@@ -11736,7 +11771,7 @@ function renderParlayLab(container: HTMLElement): void {
     return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
-      ${vsTag}${offTag}${warnTag}${synTag}
+      ${vsTag}${placedTag}${offTag}${warnTag}${synTag}
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
       <span class="parlay-leg-line">${a.leg.line}</span>
@@ -11785,7 +11820,7 @@ function renderParlayLab(container: HTMLElement): void {
         + `${i === 0 ? ` — best ${dir.toUpperCase()} entry of the ${books.length}` : ''}`
         + `${takes ? '' : ' · queue it anyway if you have it somewhere'}`
         + ` · ${on ? 'in your slip — click to remove' : 'click to add this book to your slip'}`;
-      return `<button type="button" class="plg-book plat-${pk || 'none'}${on ? ' on' : ''}${i === 0 ? ' is-best' : ''}"`
+      return `<button type="button" class="plg-book plat-${pk || 'none'}${on ? ' on' : ''}${i === 0 ? ' is-best' : ''}${isBookPlaced(a.leg) ? ' is-placed' : ''}"`
         + ` data-parlay-key="${k}" title="${tip.replace(/"/g, '&quot;')}">${label} <b>${a.leg.line}</b>${on ? '<i>✓</i>' : ''}</button>`;
     }).join('');
     const vsTag = head.leg.opponent
@@ -11794,10 +11829,24 @@ function renderParlayLab(container: HTMLElement): void {
     const evTag = legEv != null
       ? `<span class="parlay-leg-ev ${legEv > 0 ? 'pos' : legEv < 0 ? 'neg' : ''}" title="Calibrated EV for this leg as a single pick. Identical across the books on this row — EV prices the model's confidence, not the line.">${legEv > 0 ? '+' : ''}${legEv}%</span>`
       : '';
-    return `<div class="parlay-leg-row is-grouped off-board ${confClass}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
-      <span class="parlay-leg-check is-multi" title="${selected.length} of ${books.length} books on this prop are in your slip.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
+    // ── GLOW-UP 246 — a grouped row was unclickable everywhere but the chips ──
+    // The row carries no data-parlay-key (each BOOK owns one), so the row-level
+    // handler bails on it — while `.parlay-leg-row` sets cursor:pointer for the
+    // whole strip. A single-book prop renders through renderPoolRow and IS fully
+    // clickable, so identical-looking rows behaved differently with no way to tell
+    // which was which: Brahimaj's FP OVER (one book) clicked, Orolbai's (two) did
+    // not. The ☐ now toggles the BEST book — leftmost chip, the one the model would
+    // take — so every row in the pool has one obvious target. Cursors corrected in
+    // CSS so neither the dead row body nor the live chips lie about it.
+    const bestKey = parlayLegKeyOf(books[0].leg);
+    const bestBk = parlayLegBook(books[0].leg, books[0].fighter);
+    const placedTag = isLegPlaced(head.leg)
+      ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. The ● PLACED chip in the strip filters to just these; a book chip outlined in gold is the one you placed at.">●</span>`
+      : '';
+    return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
+      <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${selected.length && parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} the best ${dir.toUpperCase()} entry (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${books[0].leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(head.leg.fighter)}</span>
-      ${vsTag}
+      ${vsTag}${placedTag}
       <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
       <span class="parlay-leg-dir ${dir}">${dir.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
@@ -12204,6 +12253,19 @@ function renderParlayLab(container: HTMLElement): void {
     });
   });
 
+  // GLOW-UP 246: the grouped row's ☐ owns the best book's key. stopPropagation
+  // so it can never also reach the row handler below.
+  container.querySelectorAll<HTMLElement>('.parlay-leg-check[data-parlay-key]').forEach(box => {
+    box.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = box.dataset['parlayKey'];
+      if (!key) return;
+      if (parlaySelectedLegs.has(key)) parlaySelectedLegs.delete(key);
+      else parlaySelectedLegs.add(key);
+      renderParlayLab(container);
+    });
+  });
+
   container.querySelectorAll<HTMLElement>('.parlay-leg-row').forEach(row => {
     row.addEventListener('click', () => {
       const key = row.dataset['parlayKey'];
@@ -12275,6 +12337,15 @@ function renderParlayLab(container: HTMLElement): void {
   });
   // GLOW-UP 207: expand/collapse the off-board section. Session-scoped like the
   // rest of the command strip — it changes what's drawn, never what's selected.
+  container.querySelectorAll<HTMLElement>('[data-plq-placed]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      parlayPoolPlacedOnly = !parlayPoolPlacedOnly;
+      // Placed legs are mostly off-board (they're the sides the model is against),
+      // so filtering to them with that section collapsed would show an empty pool.
+      if (parlayPoolPlacedOnly) parlayPoolShowOffBoard = true;
+      renderParlayLab(container);
+    });
+  });
   container.querySelectorAll<HTMLElement>('[data-plq-offboard]').forEach(btn => {
     btn.addEventListener('click', () => {
       parlayPoolShowOffBoard = !parlayPoolShowOffBoard;
@@ -12283,7 +12354,7 @@ function renderParlayLab(container: HTMLElement): void {
   });
   container.querySelectorAll<HTMLElement>('.plq-reset').forEach(btn => {
     btn.addEventListener('click', () => {
-      parlayPoolSort = 'conf'; parlayPoolStat = 'all'; parlayPoolDir = 'all';
+      parlayPoolSort = 'conf'; parlayPoolStat = 'all'; parlayPoolDir = 'all'; parlayPoolPlacedOnly = false;
       renderParlayLab(container);
     });
   });
