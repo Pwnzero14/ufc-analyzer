@@ -30133,14 +30133,29 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-fight-group.rc-badge-co-main    { border-left: 2px solid rgba(45,212,208,0.6); }
 
 /* ── L4 · confidence is WEIGHT, not a third hue ─────────────────────────── */
-.rc-conf b { font-size: 11.5px; font-weight: 800; }
+/* The number reads ONE row; the meter scans twenty-four, and on a card grouped
+   into bouts it is what lets you compare the two fighters in a fight without
+   parsing digits. The first cut made it 2px at 7% alpha — occupying the column
+   without doing the job, so it read as a stray rule beside the percentage.
+   Length AND brightness, no hue: still the L4 rule, actually applied. */
+.rc-conf {
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px;
+}
+.rc-conf b { font-size: 11.5px; font-weight: 800; text-align: right; line-height: 1; }
 .rc-conf.tier-high b { color: var(--text); }
 .rc-conf.tier-med  b { color: var(--text2); }
 .rc-conf.tier-low  b { color: var(--text4); }
-.rc-conf-bar { height: 2px; background: rgba(255,255,255,0.07); }
-.rc-conf.tier-high .rc-conf-bar u { background: rgba(255,255,255,0.85); box-shadow: none; }
-.rc-conf.tier-med  .rc-conf-bar u { background: rgba(255,255,255,0.45); }
-.rc-conf.tier-low  .rc-conf-bar u { background: rgba(255,255,255,0.18); }
+.rc-conf-bar {
+  display: block; width: 100%; height: 3px;
+  border-radius: 2px; overflow: hidden;
+  background: rgba(255,255,255,0.11);
+}
+.rc-conf.tier-high .rc-conf-bar u { background: rgba(255,255,255,0.92); box-shadow: none; }
+.rc-conf.tier-med  .rc-conf-bar u { background: rgba(255,255,255,0.55); }
+.rc-conf.tier-low  .rc-conf-bar u { background: rgba(255,255,255,0.24); }
+/* A muted row (push / unplaceable) prints the number and no meter — it is not
+   ranked against the plays, so it should not draw a bar next to them. */
+.rc-conf.is-muted b, .rc-conf.is-none { text-align: right; }
 /* The lit spine was a green stripe fighting the green OVER chips two columns
    over. Strength is now a brightness step on the row itself. */
 .rc-fighter-row.tier-high { box-shadow: none; background: rgba(255,255,255,0.03); }
