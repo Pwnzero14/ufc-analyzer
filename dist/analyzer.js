@@ -18886,69 +18886,18 @@ function buildLineTimelinePanel(f) {
 }
 let lsSort = 'spread';
 let lsStatFilter = 'all';
-let lsBigOnly = false;
+/* GLOW-UP 235 — ON by default. The panel is called line shopping DIFF, and on
+ * a typical card a quarter of the fighters have no diff worth shopping. Opening
+ * on all 22 meant 22 readable rows could not fit a screen, which is what drove
+ * the zooming and then the auto-scaling that made everything squint-sized. The
+ * ~17 with a real spread DO fit at full size. The rest are one click away and,
+ * by definition, have nothing to shop. */
+let lsBigOnly = true;
 let lsShowFlat = false;
 let lsBiasBook = null;
 /** GLOW-UP 216 G4 — the biggest single gain on the current card, so the chip
  *  that carries it can be styled as THE opportunity rather than one of many. */
 let _lsTopGain = 0;
-/**
- * GLOW-UP 234 — scale the shop's content to whatever height the window has.
- *
- * Measured against the natural (unscaled) size every time, so it converges
- * rather than compounding: the transform is cleared before reading, otherwise
- * each pass would measure an already-shrunk box and shrink it again.
- *
- * Floored at 0.62 — past that the book tags stop being readable, and a panel
- * you cannot read is worse than one you scroll. Below the floor the 233 scroll
- * container is still there to catch the remainder.
- */
-const LS_FIT_FLOOR = 0.62;
-/** Slack so the last row is not flush against the edge, and so a rounding error
- *  cannot leave a two-pixel scrollbar behind. */
-const LS_FIT_INSET = 10;
-function lsApplyFit() {
-    const wrap = document.getElementById('lineShopContent');
-    const fit = wrap?.querySelector('.ls-fit');
-    if (!wrap || !fit)
-        return;
-    // Read natural size first — a stale transform makes the measurement lie.
-    fit.style.transform = '';
-    fit.style.width = '';
-    const avail = wrap.clientHeight - LS_FIT_INSET;
-    const need = fit.scrollHeight;
-    if (!avail || !need || need <= avail)
-        return; // already fits: leave it alone
-    const k = Math.max(LS_FIT_FLOOR, avail / need);
-    fit.style.transformOrigin = 'top left';
-    // The scaled box must be a hair narrower than the container. At exactly 100%
-    // a sub-pixel rounding error is enough to trip `overflow-x` and put a
-    // horizontal scrollbar along the bottom — which then steals height and makes
-    // the vertical fit wrong too.
-    fit.style.width = `${(99.6 / k).toFixed(3)}%`;
-    fit.style.transform = `scale(${k.toFixed(4)})`;
-}
-/**
- * Fitting changes whether scrollbars exist, and scrollbars change the space
- * available to fit into — so one pass is measured against a container that no
- * longer exists by the time it lands. Running it again on the next frame
- * settles it: the second read sees the post-scrollbar geometry, and because
- * `lsApplyFit` always measures from the cleared natural size it converges
- * instead of compounding.
- */
-function lsApplyFitSettled() {
-    lsApplyFit();
-    requestAnimationFrame(lsApplyFit);
-}
-/** Re-fit when the window changes shape. Debounced — resize fires in bursts. */
-let _lsFitTimer = null;
-window.addEventListener('resize', () => {
-    if (document.getElementById('lineShopModal')?.classList.contains('is-hidden'))
-        return;
-    if (_lsFitTimer)
-        clearTimeout(_lsFitTimer);
-    _lsFitTimer = setTimeout(lsApplyFitSettled, 120);
-});
 /** Can this book actually take this side for this fighter? The line-shop panel's
  *  whole job is naming a book to use, so a "best" line the book won't take is a
  *  trap, not a bargain. Same rules the rest of the app gates picks on. */
@@ -19267,7 +19216,7 @@ function generateLineShopModal() {
       </span>
       <span class="ls-ctl-group">
         <button class="ls-chip${lsBigOnly ? ' on' : ''}" data-ls-big title="Only props where the books disagree by 2.5 or more">Δ ≥ 2.5</button>
-        ${(lsSort !== 'spread' || lsStatFilter !== 'all' || lsBigOnly || lsBiasBook) ? '<button class="ls-reset-inline" data-ls-reset title="Back to the default view">reset</button>' : ''}
+        ${(lsSort !== 'spread' || lsStatFilter !== 'all' || !lsBigOnly || lsBiasBook) ? '<button class="ls-reset-inline" data-ls-reset title="Back to the default view">reset</button>' : ''}
       </span>
       <span class="ls-legend-inline">
         <span class="ls-cell-val ls-best ls-legend-swatch"><span class="ls-plat-tag">BT</span>80.5</span> take
@@ -19321,14 +19270,6 @@ function generateLineShopModal() {
     // `width: 100/k %` before the transform is the standard pairing — scale()
     // shrinks the painted box but not the layout box, so without it the table
     // would render at full width, scale down, and leave dead space on the right.
-    const fit = document.createElement('div');
-    fit.className = 'ls-fit';
-    while (content.firstChild)
-        fit.appendChild(content.firstChild);
-    content.appendChild(fit);
-    // NOT fitted here: the modal is still `is-hidden` at this point, so the
-    // container measures 0 and the fit would silently no-op. It runs after the
-    // panel is shown, at the bottom of this function.
     // ── handlers ─────────────────────────────────────────────────────────────
     // Every control re-runs this function; it is idempotent and rebinds each time,
     // the same pattern renderParlayLab uses.
@@ -19357,7 +19298,7 @@ function generateLineShopModal() {
     content.querySelectorAll('[data-ls-reset]').forEach(b => b.addEventListener('click', () => {
         lsSort = 'spread';
         lsStatFilter = 'all';
-        lsBigOnly = false;
+        lsBigOnly = true;
         lsBiasBook = null;
         generateLineShopModal();
     }));
@@ -19382,10 +19323,6 @@ function generateLineShopModal() {
         generateLineShopModal();
     }));
     modal.classList.remove('is-hidden');
-    // Fit only once the panel is actually laid out — measuring a hidden container
-    // returns 0 and the scale would never be applied. One frame is enough for the
-    // un-hide to take effect.
-    requestAnimationFrame(lsApplyFitSettled);
 }
 // AI × CLV Phase 2 — market-validation boost.
 // Reads the live open→current drift for this fighter/propType/platform (unresolved rows only).
