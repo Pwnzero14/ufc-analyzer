@@ -29735,6 +29735,26 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .ls-empty-row { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
 
 
+/* ══ GLOW-UP 236: the last two rows ══════════════════════════════════════
+   235 got 17 rows into the panel and about 15 onto the screen. The remaining
+   gap is the header, not the list: the three hero tiles are ~90px of stacked
+   label-over-value-over-sub, and the whole reason they exist is to be read in
+   one glance — which a single line does just as well as three.
+   Roughly 60px from the tiles, 34px from the rows, ~2 rows back. */
+.ls-hero { gap: 6px; margin-bottom: 6px; }
+.ls-hero-tile {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 11px; flex: 1 1 150px;
+}
+.ls-hero-label { display: inline; margin-bottom: 0; white-space: nowrap; }
+.ls-hero-val { display: inline; font-size: 17px; }
+.ls-hero-val em { font-size: 9px; margin-left: 3px; }
+/* Pushed right so the three tiles read as label · value ......... context,
+   which is the same left-to-right order the stacked version had top-to-bottom. */
+.ls-hero-sub { display: inline; margin-top: 0; margin-left: auto; white-space: nowrap; }
+.lineshop-modal-box .lineshop-table td { padding-top: 2px !important; padding-bottom: 2px !important; }
+
+
 /* ══ GLOW-UP 233: the shop fits the window, at 100% zoom ══════════════════
    Every previous attempt widened it. Width was never the constraint — the
    table's intrinsic minimum is 940px against ~1330 available, so it has been
