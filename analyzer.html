@@ -30435,13 +30435,29 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    unfinished whatever is in it. L1 fills that space with the shop's rail;
    the rest is colour where there is meaning and weight where there is rank. */
 
+/* GLOW-UP 241 — the spread track is now a FIXED, compact sparkline rather than
+   the flexible column. At 1fr it ran ~900px for a three-book spread, which read
+   as a long empty line and made rows look stretched instead of full. The flex
+   goes to the factor chips, which is content. */
 .rc-fighter-row {
-  grid-template-columns: 186px 162px auto minmax(90px, 1fr) 52px 60px 56px;
+  grid-template-columns: 186px 162px auto 76px minmax(120px, 1fr) 52px 58px 54px;
   gap: 11px;
 }
 @media (max-width: 1200px) {
-  .rc-fighter-row { grid-template-columns: 156px 150px auto minmax(60px, 1fr) 48px 54px 52px; gap: 8px; }
+  .rc-fighter-row { grid-template-columns: 152px 148px auto 62px minmax(90px, 1fr) 46px 52px 50px; gap: 7px; }
 }
+
+/* ── The WHY, as chips — same ✓/✗ vocabulary as Best Picks ──────────────── */
+.rc-factors { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
+.rc-fchip {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 700;
+  letter-spacing: 0.07em; white-space: nowrap; cursor: help;
+  padding: 2px 6px; border-radius: 4px;
+  border: 1px solid transparent;
+}
+.rc-fchip-sup { color: #6ee7a8; background: rgba(38,208,124,0.1);  border-color: rgba(38,208,124,0.22); }
+.rc-fchip-opp { color: #ff8fa3; background: rgba(255,58,96,0.09);  border-color: rgba(255,58,96,0.22); }
+.rc-fchip-neu { color: var(--text4); background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.07); }
 
 /* ── L1 · the spread track: where the books sit, and where your pick sits ── */
 .rc-spread { position: relative; height: 14px; cursor: help; min-width: 60px; }
@@ -30457,10 +30473,6 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-spread-dot.is-best { background: #26d07c; box-shadow: 0 0 7px rgba(38,208,124,0.7); width: 6px; height: 6px; margin: -3px 0 0 -3px; }
 /* Where the pick actually sits in the range — a ring, so it reads as a marker
    on the scale rather than as another book. */
-.rc-spread-pick {
-  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
-  border-radius: 50%; border: 1.5px solid var(--gold); background: transparent;
-}
 /* A wide disagreement is the reason to open this panel, so it says so. */
 .rc-spread.is-wide .rc-spread-track { height: 3px; margin-top: -1.5px; }
 .rc-spread.is-flat { opacity: 0.25; }
