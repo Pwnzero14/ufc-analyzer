@@ -24794,7 +24794,11 @@ async function generateReportCard() {
                 ? `<span class="rc-books">` + railBooks.map((c, i) => {
                     const takes = bookTakesSide(f, statKey, railDir, c.bk);
                     const label = platformKeyShort(c.bk);
-                    const cls = `rc-bk${!takes ? ' is-blocked' : i === 0 ? ' is-best' : ''}`;
+                    // GLOW-UP 242 — brand hue per book, plus the shop's best/worst pair.
+                    // This IS a multi-book chart, which is the one place the app's colour
+                    // rules put book identity on the hue axis.
+                    const isWorst = takes && i === railBooks.length - 1 && railBooks.length > 1;
+                    const cls = `rc-bk plat-${c.bk}${!takes ? ' is-blocked' : i === 0 ? ' is-best' : isWorst ? ' is-worst' : ''}`;
                     const tip = takes
                         ? `${LEAN_BOOK_LABEL[c.bk] || c.bk} ${c.v}${i === 0 ? ` — best ${railDir.toUpperCase()} entry of the ${railBooks.length}` : ''}`
                         : `${LEAN_BOOK_LABEL[c.bk] || c.bk} posts ${c.v} but will not take this ${railDir.toUpperCase()}`;
