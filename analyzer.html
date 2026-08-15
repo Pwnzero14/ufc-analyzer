@@ -9993,10 +9993,15 @@ html { scroll-behavior: smooth; }
   .h2h-modal-box .h2h-vs { animation: none; }
 }
 
-/* --- Pre-Event Report Card compact: fit on screen at 100% zoom --- */
+/* --- Pre-Event Report Card compact: fit on screen at 100% zoom ---
+   Identical mistake to the shop's, one block over: the 700px cap carried
+   `!important` and beat the 1000px set earlier in the file, so this panel has
+   been rendering at 700px in a ~1330px window — a narrow column with dead
+   space either side, which is most of why it read as a smaller, lesser thing
+   than the line-shop. Narrowing never made it fit; it made it cramped. */
 .report-modal-box {
-  max-width: 700px !important;
-  padding: 6px 10px !important;
+  max-width: min(1500px, 94vw) !important;
+  padding: 6px 14px !important;
   margin: 2px auto !important;
 }
 .report-modal-box .modal-title {
@@ -30332,6 +30337,48 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-section-head.rc-badge-prelim { color: rgba(248,198,74,0.62); }
 .rc-section-head i { display: none; }
 .rc-sec-stat { margin-left: auto; opacity: 0.65; }
+
+
+/* ══ GLOW-UP 238: the last two things the shop does and this did not ══════
+   With the width bug fixed, the remaining gap is two devices. */
+
+/* ── 1 · headline tiles on ONE line, as the shop's now are ──────────────── */
+.rc-hero { gap: 6px; margin-bottom: 6px; }
+.rc-hero-tile {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 11px; flex: 1 1 150px;
+}
+.rc-hero-label { display: inline; margin-bottom: 0; white-space: nowrap; }
+.rc-hero-val { display: inline; font-size: 17px; }
+.rc-hero-val em { font-size: 9px; margin-left: 3px; }
+.rc-hero-sub { display: inline; margin-top: 0; margin-left: auto; white-space: nowrap; }
+.rc-hero-val.rc-split { display: inline-flex; }
+
+/* ── 2 · the pick reads like a shop cell: book above, number below ───────
+   `.ls-cell-val` stacks a tiny platform tag over the value, and that is the
+   single most recognisable thing about the shop's grid. Same shape here,
+   without touching the markup — the DOM order is dir → line → meta, so grid
+   areas put the meta row above the line row while leaving the direction
+   spanning both. */
+.rc-pick {
+  grid-template-columns: 48px minmax(0, auto);
+  grid-template-areas: "dir meta" "dir line";
+  align-items: center;
+  gap: 2px 8px;
+  padding: 4px 10px;
+}
+.rc-dir { grid-area: dir; align-self: center; }
+.rc-meta { grid-area: meta; gap: 6px; opacity: 0.8; }
+.rc-line { grid-area: line; font-size: 16px; line-height: 1; }
+/* The book tag takes the shop's treatment — 8px, heavy, letterspaced, quiet. */
+.rc-src { font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em; }
+
+/* With the panel at full width the row can breathe: the name gets room for
+   long ones, and the evidence stops being the only thing that flexes. */
+.rc-fighter-row { grid-template-columns: 200px 190px 56px minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1200px) {
+  .rc-fighter-row { grid-template-columns: 170px 180px 52px minmax(0, 1fr); gap: 11px; }
+}
 
 </style>
 </head>
