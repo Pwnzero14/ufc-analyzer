@@ -24734,6 +24734,20 @@ function exportToCSV(): void {
 }
 
 let _reportCardText = '';
+/**
+ * GLOW-UP 245 — report card sort. Session-scoped, like the shop's lsSort and
+ * Parlay Lab's command strip: it changes what is DRAWN, never what the model
+ * picked, so it resets on reload by design.
+ *
+ * CARD is the default and stays the default: you read the report the way the
+ * night runs, and it is the only order in which the bout pairings and the
+ * BOTH UNDER reads mean anything. The other two flatten deliberately —
+ * "what do I enter first" is a different question from "how does the card go",
+ * and pretending a confidence ranking still has main-card sections would be
+ * grouping that no longer describes anything.
+ */
+type RcSort = 'card' | 'conf' | 'edge';
+let rcSort: RcSort = 'card';
 
 // GLOW-UP 220: `bestAvailableLine` removed. It returned an FP line for any
 // fighter regardless of which stat their lean was on — with a lone `line_dk_ss`
@@ -25152,7 +25166,14 @@ async function generateReportCard(): Promise<void> {
          of rows: you know what you are looking at before you look. Pinned with
          the rest of the header, so it survives scrolling the way the shop's
          sticky <th> does. -->
-    <div class="rc-colhead" aria-hidden="true">
+    <div class="rc-sortbar">
+      <span class="rc-sort-label">SORT</span>
+      <button class="rc-sort-btn${rcSort === 'card' ? ' on' : ''}" data-rc-sort="card" title="Card order — main event down. The only order in which the bout pairings and the both-under reads mean anything.">CARD</button>
+      <button class="rc-sort-btn${rcSort === 'conf' ? ' on' : ''}" data-rc-sort="conf" title="Highest model confidence first, placeable leans above reads. Flattens the card: sections and bout pairing stop describing anything once the order is not the running order.">CONF</button>
+      <button class="rc-sort-btn${rcSort === 'edge' ? ' on' : ''}" data-rc-sort="edge" title="Biggest gap between the fighter's career average and the line, in the direction the pick needs. Also flattens.">Δ LINE</button>
+      ${rcSort !== 'card' ? '<span class="rc-sort-note">grouping off — flat ranking</span>' : ''}
+    </div>
+    <div class="rc-colhead${rcSort === 'card' ? '' : ' is-flat'}" aria-hidden="true">
       <span>FIGHTER</span>
       <span>PICK</span>
       <span class="rc-ch-books">BOOKS</span>
@@ -25172,9 +25193,11 @@ async function generateReportCard(): Promise<void> {
   // R2 — one heading per SECTION, not per fight. "MAIN CARD" printed five times
   // and "PRELIM" five times, which read as five separate sections and buried the
   // structure of the card.
-  let lastBadge = '';
-  for (const g of groups) {
-    const rows = g.pair.map(f => {
+  // ── GLOW-UP 245 — one row builder, two orders ────────────────────────────
+  // Hoisted out of the group loop so the sorted view can render the same row.
+  // Deriving the row twice was how the screen and the export drifted apart in
+  // 220; not making that mistake again for the sake of a sort.
+  const renderFighterRow = (f: AnalyzerFighter): string => {
       const { el, statKey, statLbl, line, src, unplaceable, tier, avgVal, topReason, generic } = resolveRow(f);
       // L1 — a push rendered as a bare dash in an empty box, which reads as a
       // failed row rather than as the model's actual answer: no side here.
@@ -25341,7 +25364,37 @@ async function generateReportCard(): Promise<void> {
         ${avgEl}
         ${deltaEl}
       </div>`;
-    }).join('');
+  };
+
+  if (rcSort !== 'card') {
+    // Flat ranking. Fighters with no lean at all are dropped rather than parked
+    // at the bottom — in card order they are context for their bout, and with
+    // the bout gone they are just empty rows.
+    const ranked = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
+    const sortKey = (f: AnalyzerFighter): number => {
+      const r = resolveRow(f);
+      if (rcSort === 'conf') {
+        // A read no book will take cannot outrank a placeable lean, however
+        // confident it is — the same rule the headline and TOP PICK follow.
+        return (r.unplaceable ? 0 : 1000) + (r.el.conf || 0);
+      }
+      // Δ LINE: how far his history sits from the number in the direction the
+      // pick needs. Against the pick sorts below everything that is for it.
+      if (r.avgVal == null || r.line == null) return -Infinity;
+      const d = r.avgVal - r.line;
+      const helps = r.el.lean === 'over' ? d > 0 : d < 0;
+      return (helps ? Math.abs(d) : -Math.abs(d)) + (r.unplaceable ? -1000 : 0);
+    };
+    const rowsHtml = ranked
+      .map(f => ({ f, k: sortKey(f) }))
+      .sort((a, b) => b.k - a.k)
+      .map(x => renderFighterRow(x.f))
+      .join('');
+    sections.push(`<div class="rc-fight-group rc-flat"><div class="rc-matchup">${rowsHtml}</div></div>`);
+  } else {
+  let lastBadge = '';
+  for (const g of groups) {
+    const rows = g.pair.map(renderFighterRow).join('');
     // F4 — each section reports itself. "Is the main card stronger than the
     // prelims?" was a question you could only answer by reading 24 rows and
     // doing the arithmetic in your head.
@@ -25396,11 +25449,16 @@ async function generateReportCard(): Promise<void> {
       ${fightNote}
     </div>`);
   }
+  }
 
   const content = document.getElementById('reportContent');
   if (content) content.innerHTML = sections.join('');
   const sub = document.getElementById('reportModalSub');
   if (sub) sub.textContent = `${allFighters.length} fighters · ${placeableLeans.length} placeable lean${placeableLeans.length === 1 ? '' : 's'}${blockedCount ? ` · ${blockedCount} unplaceable` : ''}`;
+  content?.querySelectorAll<HTMLElement>('[data-rc-sort]').forEach(b => b.addEventListener('click', () => {
+    rcSort = (b.dataset['rcSort'] as RcSort) || 'card';
+    void generateReportCard();
+  }));
   document.getElementById('reportModal')?.classList.remove('is-hidden');
 
   // Build plain-text version for clipboard/download

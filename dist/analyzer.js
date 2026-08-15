@@ -24285,6 +24285,7 @@ function exportToCSV() {
     showToast('Exported leans to CSV');
 }
 let _reportCardText = '';
+let rcSort = 'card';
 // GLOW-UP 220: `bestAvailableLine` removed. It returned an FP line for any
 // fighter regardless of which stat their lean was on — with a lone `line_dk_ss`
 // fallback that made SS leans look handled — and the report card was its only
@@ -24696,7 +24697,14 @@ async function generateReportCard() {
          of rows: you know what you are looking at before you look. Pinned with
          the rest of the header, so it survives scrolling the way the shop's
          sticky <th> does. -->
-    <div class="rc-colhead" aria-hidden="true">
+    <div class="rc-sortbar">
+      <span class="rc-sort-label">SORT</span>
+      <button class="rc-sort-btn${rcSort === 'card' ? ' on' : ''}" data-rc-sort="card" title="Card order — main event down. The only order in which the bout pairings and the both-under reads mean anything.">CARD</button>
+      <button class="rc-sort-btn${rcSort === 'conf' ? ' on' : ''}" data-rc-sort="conf" title="Highest model confidence first, placeable leans above reads. Flattens the card: sections and bout pairing stop describing anything once the order is not the running order.">CONF</button>
+      <button class="rc-sort-btn${rcSort === 'edge' ? ' on' : ''}" data-rc-sort="edge" title="Biggest gap between the fighter's career average and the line, in the direction the pick needs. Also flattens.">Δ LINE</button>
+      ${rcSort !== 'card' ? '<span class="rc-sort-note">grouping off — flat ranking</span>' : ''}
+    </div>
+    <div class="rc-colhead${rcSort === 'card' ? '' : ' is-flat'}" aria-hidden="true">
       <span>FIGHTER</span>
       <span>PICK</span>
       <span class="rc-ch-books">BOOKS</span>
@@ -24715,166 +24723,168 @@ async function generateReportCard() {
     // R2 — one heading per SECTION, not per fight. "MAIN CARD" printed five times
     // and "PRELIM" five times, which read as five separate sections and buried the
     // structure of the card.
-    let lastBadge = '';
-    for (const g of groups) {
-        const rows = g.pair.map(f => {
-            const { el, statKey, statLbl, line, src, unplaceable, tier, avgVal, topReason, generic } = resolveRow(f);
-            // L1 — a push rendered as a bare dash in an empty box, which reads as a
-            // failed row rather than as the model's actual answer: no side here.
-            const isPush = el.lean === 'push';
-            const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : isPush ? 'rc-push' : 'rc-none';
-            const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : isPush ? 'NO EDGE' : '—';
-            // L1/L2 — confidence is a recommendation's WEIGHT, so only a recommendation
-            // earns the tiered colour and the bar. A push has no side to back, and an
-            // unplaceable lean is not a bet: Ian Machado Garry's blocked 80% was the
-            // loudest row on the card, lit spine and full green bar, directly under a
-            // headline that had just excluded it.
-            const confMuted = isPush || unplaceable;
-            const confEl = el.lean === 'none'
-                ? `<span class="rc-conf is-none">—</span>`
-                : confMuted
-                    ? `<span class="rc-conf is-muted" title="${isPush
-                        ? 'The model has no side here, so this number is not a play — shown without weight.'
-                        : 'A read, not a bet: no book will take this side. Shown without weight so it cannot outrank a placeable lean.'}"><b>${el.conf}%</b></span>`
-                    : `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier. The bar spans 45–90%, the range this model's confidence actually occupies."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${confBarPct(el.conf)}%"></u></i></span>`;
-            // GLOW-UP 231 L2 — the stat label moved onto the pick block, so repeating
-            // it here was the same word twice on one row. The average is now just the
-            // number, which is all it ever needed to be beside a labelled line.
-            const avgEl = avgVal != null
-                ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg <b>${avgVal.toFixed(1)}</b></span>`
-                : `<span class="rc-avg"></span>`;
-            const reasonTxt = topReason;
-            const lineStr = line != null ? line.toFixed(1) : '—';
-            // Naming the active book on an unplaceable row was the part that read as a
-            // recommendation: "UNDER 73.5 P6" says take it on Pick6, when Pick6 is
-            // precisely the book refusing it.
-            // L5 — the ⛔ used to sit inside the line cell, so the numbers stopped
-            // being a column the moment a row was blocked. The book slot is already
-            // empty on exactly those rows, so the flag lands there instead and the
-            // line column stays pure.
-            const srcEl = unplaceable
-                ? `<span class="rc-src is-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet."><i class="rc-blocked">⛔</i></span>`
-                : `<span class="rc-src">${src || ''}</span>`;
-            const rank = rankMap.get(f);
-            const rankEl = rank
-                ? `<i class="rc-rank" title="#${rank} of the ${placeableLeans.length} placeable leans by model confidence.">★${rank}</i>`
-                : '';
-            const rowCls = [
-                'rc-fighter-row',
-                el.lean === 'none' ? 'is-noplay' : '',
-                isPush ? 'is-push' : '',
-                unplaceable ? 'is-blocked' : '',
-                // The lit spine marks a strong PLAY, so it follows the same rule as the
-                // bar: muted rows never earn it.
-                confMuted || el.lean === 'none' ? '' : `tier-${tier}`,
-            ].filter(Boolean).join(' ');
-            // ── GLOW-UP 231 L1 — the pick is ONE object ──────────────────────────
-            // Direction, stat, line and book were four separate grid cells spread
-            // across the row, so reading "UNDER 83.5 FP on Pick6" meant reassembling
-            // it from four places at four different weights — and nothing in the row
-            // was dominant, so the eye had nowhere to land. They now share one
-            // surface, with the LINE as the typographic anchor and everything else
-            // subordinate to it.
-            const pickEl = el.lean === 'none'
-                ? '<span class="rc-pick is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
-                : `<span class="rc-pick ${leanCls}">`
-                    + `<i class="rc-dir"${isPush ? ' title="The model scored this fighter and landed on neither side — not a play, and not a missing row."' : ''}>${leanLabel}</i>`
-                    + `<b class="rc-line">${lineStr}</b>`
-                    + `<i class="rc-meta">`
-                    + `<em class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</em>`
-                    + srcEl
-                    + `</i>`
-                    + `</span>`;
-            // ── GLOW-UP 239 — the row becomes a shop row ─────────────────────────
-            // The card looked bland next to the line shop for a structural reason,
-            // not a styling one: a shop row is a dozen small coloured chips and this
-            // was one grey box plus a sentence. Two changes fix that, and the second
-            // one earns its place rather than just adding colour.
-            //
-            // 1. The BOOK RAIL. Every book posting this prop gets a chip, best entry
-            //    for the side marked, blocked books dashed. It is the shop's most
-            //    recognisable device AND it answers the question the card could not:
-            //    the old row named one book, so "where do I actually put this" meant
-            //    leaving the card. Uses the same lineForBook / bookTakesSide pair the
-            //    shop and the placement chip use, so it cannot disagree with them.
-            const dirForRail = (el.lean === 'over' || el.lean === 'under') ? el.lean : null;
-            const railBooks = dirForRail
-                ? (LEAN_STAT_FIELDS[statKey] || [])
-                    .map(([bk]) => ({ bk, v: lineForBook(f, statKey, bk) }))
-                    .filter((c) => c.v != null)
-                    // Best entry first, the rule leanBestBook shops by.
-                    .sort((a, b) => dirForRail === 'over' ? a.v - b.v : b.v - a.v)
-                : [];
-            const railDir = dirForRail;
-            const railEl = railBooks.length
-                ? `<span class="rc-books">` + railBooks.map((c, i) => {
-                    const takes = bookTakesSide(f, statKey, railDir, c.bk);
-                    const label = platformKeyShort(c.bk);
-                    // GLOW-UP 242 — brand hue per book, plus the shop's best/worst pair.
-                    // This IS a multi-book chart, which is the one place the app's colour
-                    // rules put book identity on the hue axis.
-                    const isWorst = takes && i === railBooks.length - 1 && railBooks.length > 1;
-                    const cls = `rc-bk plat-${c.bk}${!takes ? ' is-blocked' : i === 0 ? ' is-best' : isWorst ? ' is-worst' : ''}`;
-                    const tip = takes
-                        ? `${LEAN_BOOK_LABEL[c.bk] || c.bk} ${c.v}${i === 0 ? ` — best ${railDir.toUpperCase()} entry of the ${railBooks.length}` : ''}`
-                        : `${LEAN_BOOK_LABEL[c.bk] || c.bk} posts ${c.v} but will not take this ${railDir.toUpperCase()}`;
-                    return `<span class="${cls}" title="${tip.replace(/"/g, '&quot;')}"><i>${label}</i><b>${c.v}</b></span>`;
-                }).join('') + `</span>`
-                : `<span class="rc-books"></span>`;
-            // ── GLOW-UP 240 L1 — the spread track ────────────────────────────────
-            // The rail left a third of the row empty, which is most of why this still
-            // read bland: rows that end two-thirds of the way across look unfinished
-            // regardless of what is in them. The shop fills exactly that space with a
-            // rail — a track from the worst book to the best with a dot per book —
-            // and it is the single most recognisable thing on that screen.
-            //
-            // It is also the one view of the market the card never had: the chips say
-            // WHAT each book posts, the track says how far apart they are and where
-            // your pick sits in that range. A wide track is a shopping opportunity; a
-            // tight one means the books agree and the number is the number.
-            const railVals = railBooks.map(c => c.v);
-            const railMin = railVals.length ? Math.min(...railVals) : 0;
-            const railMax = railVals.length ? Math.max(...railVals) : 0;
-            const railSpan = railMax - railMin;
-            const pctOf = (v) => railSpan > 0 ? ((v - railMin) / railSpan) * 100 : 50;
-            const spreadEl = railBooks.length >= 2 && railSpan > 0
-                ? `<span class="rc-spread${railSpan >= 5 ? ' is-wide' : ''}" title="${railBooks.length} books, ${railMin} to ${railMax} — a ${railSpan.toFixed(1)} point spread on the same prop.${railSpan >= 5 ? ' That is a wide disagreement; the book you choose matters as much as the side.' : ''}">`
-                    + `<i class="rc-spread-track"></i>`
-                    + railBooks.map((c, i) => `<i class="rc-spread-dot${i === 0 ? ' is-best' : ''}" style="left:${pctOf(c.v).toFixed(1)}%"></i>`).join('')
-                    + `</span>`
-                : `<span class="rc-spread is-flat"${railBooks.length ? ' title="Every book posting this prop has the same number — nothing to shop."' : ''}></span>`;
-            // ── GLOW-UP 241 — the WHY, as chips ──────────────────────────────────
-            // 240 handed the row's flexible column to a rail that stretched ~900px
-            // for a three-book spread, which made rows look stretched rather than
-            // full — and its gold pick-ring was redundant: leanBestBook returns the
-            // lowest line for an OVER and the highest for an UNDER, so the pick is
-            // ALWAYS an endpoint and the ring always marked the dot already lit.
-            //
-            // The space goes to factor chips instead — the same ✓/✗ treatment Best
-            // Picks uses, via the same pickDistinctFactors/factorChipHtml pair, so
-            // the two surfaces cannot describe one lean differently. This also gets
-            // the reasoning back ON the card, in a form you can actually scan, after
-            // 239 moved it into a tooltip.
-            const factorsEl = `<span class="rc-factors">`
-                + pickDistinctFactors(el.reasons, 3).map(r => factorChipHtml(r, el.lean, 'rc-fchip')).join('')
+    // ── GLOW-UP 245 — one row builder, two orders ────────────────────────────
+    // Hoisted out of the group loop so the sorted view can render the same row.
+    // Deriving the row twice was how the screen and the export drifted apart in
+    // 220; not making that mistake again for the sake of a sort.
+    const renderFighterRow = (f) => {
+        const { el, statKey, statLbl, line, src, unplaceable, tier, avgVal, topReason, generic } = resolveRow(f);
+        // L1 — a push rendered as a bare dash in an empty box, which reads as a
+        // failed row rather than as the model's actual answer: no side here.
+        const isPush = el.lean === 'push';
+        const leanCls = el.lean === 'over' ? 'rc-over' : el.lean === 'under' ? 'rc-under' : isPush ? 'rc-push' : 'rc-none';
+        const leanLabel = el.lean === 'over' ? '▲ OVER' : el.lean === 'under' ? '▼ UNDER' : isPush ? 'NO EDGE' : '—';
+        // L1/L2 — confidence is a recommendation's WEIGHT, so only a recommendation
+        // earns the tiered colour and the bar. A push has no side to back, and an
+        // unplaceable lean is not a bet: Ian Machado Garry's blocked 80% was the
+        // loudest row on the card, lit spine and full green bar, directly under a
+        // headline that had just excluded it.
+        const confMuted = isPush || unplaceable;
+        const confEl = el.lean === 'none'
+            ? `<span class="rc-conf is-none">—</span>`
+            : confMuted
+                ? `<span class="rc-conf is-muted" title="${isPush
+                    ? 'The model has no side here, so this number is not a play — shown without weight.'
+                    : 'A read, not a bet: no book will take this side. Shown without weight so it cannot outrank a placeable lean.'}"><b>${el.conf}%</b></span>`
+                : `<span class="rc-conf tier-${tier}" title="Model confidence — ${tier === 'high' ? 'high' : tier === 'med' ? 'medium' : 'low'} tier. The bar spans 45–90%, the range this model's confidence actually occupies."><b>${el.conf}%</b><i class="rc-conf-bar"><u style="width:${confBarPct(el.conf)}%"></u></i></span>`;
+        // GLOW-UP 231 L2 — the stat label moved onto the pick block, so repeating
+        // it here was the same word twice on one row. The average is now just the
+        // number, which is all it ever needed to be beside a labelled line.
+        const avgEl = avgVal != null
+            ? `<span class="rc-avg" title="This fighter's career average for ${statLbl} — the same stat as the line beside it.">avg <b>${avgVal.toFixed(1)}</b></span>`
+            : `<span class="rc-avg"></span>`;
+        const reasonTxt = topReason;
+        const lineStr = line != null ? line.toFixed(1) : '—';
+        // Naming the active book on an unplaceable row was the part that read as a
+        // recommendation: "UNDER 73.5 P6" says take it on Pick6, when Pick6 is
+        // precisely the book refusing it.
+        // L5 — the ⛔ used to sit inside the line cell, so the numbers stopped
+        // being a column the moment a row was blocked. The book slot is already
+        // empty on exactly those rows, so the flag lands there instead and the
+        // line column stays pure.
+        const srcEl = unplaceable
+            ? `<span class="rc-src is-blocked" title="No book the scraper can see will take this side for this fighter — the lean is a read, not a placeable bet."><i class="rc-blocked">⛔</i></span>`
+            : `<span class="rc-src">${src || ''}</span>`;
+        const rank = rankMap.get(f);
+        const rankEl = rank
+            ? `<i class="rc-rank" title="#${rank} of the ${placeableLeans.length} placeable leans by model confidence.">★${rank}</i>`
+            : '';
+        const rowCls = [
+            'rc-fighter-row',
+            el.lean === 'none' ? 'is-noplay' : '',
+            isPush ? 'is-push' : '',
+            unplaceable ? 'is-blocked' : '',
+            // The lit spine marks a strong PLAY, so it follows the same rule as the
+            // bar: muted rows never earn it.
+            confMuted || el.lean === 'none' ? '' : `tier-${tier}`,
+        ].filter(Boolean).join(' ');
+        // ── GLOW-UP 231 L1 — the pick is ONE object ──────────────────────────
+        // Direction, stat, line and book were four separate grid cells spread
+        // across the row, so reading "UNDER 83.5 FP on Pick6" meant reassembling
+        // it from four places at four different weights — and nothing in the row
+        // was dominant, so the eye had nowhere to land. They now share one
+        // surface, with the LINE as the typographic anchor and everything else
+        // subordinate to it.
+        const pickEl = el.lean === 'none'
+            ? '<span class="rc-pick is-none" title="No lean on this fighter, so there is no prop to name.">—</span>'
+            : `<span class="rc-pick ${leanCls}">`
+                + `<i class="rc-dir"${isPush ? ' title="The model scored this fighter and landed on neither side — not a play, and not a missing row."' : ''}>${leanLabel}</i>`
+                + `<b class="rc-line">${lineStr}</b>`
+                + `<i class="rc-meta">`
+                + `<em class="rc-stat-tag src-${statKey}" title="Which prop this lean is on. The line and average beside it are both ${statLbl}.">${statLbl}</em>`
+                + srcEl
+                + `</i>`
                 + `</span>`;
-            // 2. The DELTA chip. "avg 80.4" beside a line of 83.5 makes you do the
-            //    subtraction; the number that matters is the gap and which way it
-            //    points. Green when the fighter's history supports the side being
-            //    recommended, red when it argues against it — which is the same
-            //    thing the reason sentence was spending forty words saying.
-            const delta = (avgVal != null && line != null) ? avgVal - line : null;
-            const deltaHelps = delta == null ? null : (el.lean === 'over' ? delta > 0 : delta < 0);
-            const deltaEl = delta != null
-                ? `<span class="rc-delta ${deltaHelps ? 'pos' : 'neg'}" title="Career ${statLbl} average of ${avgVal.toFixed(1)} against a line of ${line.toFixed(1)} — ${Math.abs(delta).toFixed(1)} ${delta > 0 ? 'above' : 'below'}, which ${deltaHelps ? 'supports' : 'argues against'} the ${(el.lean || '').toUpperCase()}.">${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}</span>`
-                : `<span class="rc-delta"></span>`;
-            // The reasoning moves to the row's tooltip. It was a third of the width
-            // in grey prose and it is the one thing on the card that cannot be read
-            // at a glance anyway — so it stops competing with the numbers that can.
-            const rowTip = reasonTxt
-                ? `${prettyName(f.name)} — ${topReason}`.replace(/"/g, '&quot;')
-                : `${prettyName(f.name)} — no specific read; baseline model only.`;
-            return `<div class="${rowCls}" title="${rowTip}">
+        // ── GLOW-UP 239 — the row becomes a shop row ─────────────────────────
+        // The card looked bland next to the line shop for a structural reason,
+        // not a styling one: a shop row is a dozen small coloured chips and this
+        // was one grey box plus a sentence. Two changes fix that, and the second
+        // one earns its place rather than just adding colour.
+        //
+        // 1. The BOOK RAIL. Every book posting this prop gets a chip, best entry
+        //    for the side marked, blocked books dashed. It is the shop's most
+        //    recognisable device AND it answers the question the card could not:
+        //    the old row named one book, so "where do I actually put this" meant
+        //    leaving the card. Uses the same lineForBook / bookTakesSide pair the
+        //    shop and the placement chip use, so it cannot disagree with them.
+        const dirForRail = (el.lean === 'over' || el.lean === 'under') ? el.lean : null;
+        const railBooks = dirForRail
+            ? (LEAN_STAT_FIELDS[statKey] || [])
+                .map(([bk]) => ({ bk, v: lineForBook(f, statKey, bk) }))
+                .filter((c) => c.v != null)
+                // Best entry first, the rule leanBestBook shops by.
+                .sort((a, b) => dirForRail === 'over' ? a.v - b.v : b.v - a.v)
+            : [];
+        const railDir = dirForRail;
+        const railEl = railBooks.length
+            ? `<span class="rc-books">` + railBooks.map((c, i) => {
+                const takes = bookTakesSide(f, statKey, railDir, c.bk);
+                const label = platformKeyShort(c.bk);
+                // GLOW-UP 242 — brand hue per book, plus the shop's best/worst pair.
+                // This IS a multi-book chart, which is the one place the app's colour
+                // rules put book identity on the hue axis.
+                const isWorst = takes && i === railBooks.length - 1 && railBooks.length > 1;
+                const cls = `rc-bk plat-${c.bk}${!takes ? ' is-blocked' : i === 0 ? ' is-best' : isWorst ? ' is-worst' : ''}`;
+                const tip = takes
+                    ? `${LEAN_BOOK_LABEL[c.bk] || c.bk} ${c.v}${i === 0 ? ` — best ${railDir.toUpperCase()} entry of the ${railBooks.length}` : ''}`
+                    : `${LEAN_BOOK_LABEL[c.bk] || c.bk} posts ${c.v} but will not take this ${railDir.toUpperCase()}`;
+                return `<span class="${cls}" title="${tip.replace(/"/g, '&quot;')}"><i>${label}</i><b>${c.v}</b></span>`;
+            }).join('') + `</span>`
+            : `<span class="rc-books"></span>`;
+        // ── GLOW-UP 240 L1 — the spread track ────────────────────────────────
+        // The rail left a third of the row empty, which is most of why this still
+        // read bland: rows that end two-thirds of the way across look unfinished
+        // regardless of what is in them. The shop fills exactly that space with a
+        // rail — a track from the worst book to the best with a dot per book —
+        // and it is the single most recognisable thing on that screen.
+        //
+        // It is also the one view of the market the card never had: the chips say
+        // WHAT each book posts, the track says how far apart they are and where
+        // your pick sits in that range. A wide track is a shopping opportunity; a
+        // tight one means the books agree and the number is the number.
+        const railVals = railBooks.map(c => c.v);
+        const railMin = railVals.length ? Math.min(...railVals) : 0;
+        const railMax = railVals.length ? Math.max(...railVals) : 0;
+        const railSpan = railMax - railMin;
+        const pctOf = (v) => railSpan > 0 ? ((v - railMin) / railSpan) * 100 : 50;
+        const spreadEl = railBooks.length >= 2 && railSpan > 0
+            ? `<span class="rc-spread${railSpan >= 5 ? ' is-wide' : ''}" title="${railBooks.length} books, ${railMin} to ${railMax} — a ${railSpan.toFixed(1)} point spread on the same prop.${railSpan >= 5 ? ' That is a wide disagreement; the book you choose matters as much as the side.' : ''}">`
+                + `<i class="rc-spread-track"></i>`
+                + railBooks.map((c, i) => `<i class="rc-spread-dot${i === 0 ? ' is-best' : ''}" style="left:${pctOf(c.v).toFixed(1)}%"></i>`).join('')
+                + `</span>`
+            : `<span class="rc-spread is-flat"${railBooks.length ? ' title="Every book posting this prop has the same number — nothing to shop."' : ''}></span>`;
+        // ── GLOW-UP 241 — the WHY, as chips ──────────────────────────────────
+        // 240 handed the row's flexible column to a rail that stretched ~900px
+        // for a three-book spread, which made rows look stretched rather than
+        // full — and its gold pick-ring was redundant: leanBestBook returns the
+        // lowest line for an OVER and the highest for an UNDER, so the pick is
+        // ALWAYS an endpoint and the ring always marked the dot already lit.
+        //
+        // The space goes to factor chips instead — the same ✓/✗ treatment Best
+        // Picks uses, via the same pickDistinctFactors/factorChipHtml pair, so
+        // the two surfaces cannot describe one lean differently. This also gets
+        // the reasoning back ON the card, in a form you can actually scan, after
+        // 239 moved it into a tooltip.
+        const factorsEl = `<span class="rc-factors">`
+            + pickDistinctFactors(el.reasons, 3).map(r => factorChipHtml(r, el.lean, 'rc-fchip')).join('')
+            + `</span>`;
+        // 2. The DELTA chip. "avg 80.4" beside a line of 83.5 makes you do the
+        //    subtraction; the number that matters is the gap and which way it
+        //    points. Green when the fighter's history supports the side being
+        //    recommended, red when it argues against it — which is the same
+        //    thing the reason sentence was spending forty words saying.
+        const delta = (avgVal != null && line != null) ? avgVal - line : null;
+        const deltaHelps = delta == null ? null : (el.lean === 'over' ? delta > 0 : delta < 0);
+        const deltaEl = delta != null
+            ? `<span class="rc-delta ${deltaHelps ? 'pos' : 'neg'}" title="Career ${statLbl} average of ${avgVal.toFixed(1)} against a line of ${line.toFixed(1)} — ${Math.abs(delta).toFixed(1)} ${delta > 0 ? 'above' : 'below'}, which ${deltaHelps ? 'supports' : 'argues against'} the ${(el.lean || '').toUpperCase()}.">${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}</span>`
+            : `<span class="rc-delta"></span>`;
+        // The reasoning moves to the row's tooltip. It was a third of the width
+        // in grey prose and it is the one thing on the card that cannot be read
+        // at a glance anyway — so it stops competing with the numbers that can.
+        const rowTip = reasonTxt
+            ? `${prettyName(f.name)} — ${topReason}`.replace(/"/g, '&quot;')
+            : `${prettyName(f.name)} — no specific read; baseline model only.`;
+        return `<div class="${rowCls}" title="${rowTip}">
         <span class="rc-name">${rankEl}${prettyName(f.name)}</span>
         ${pickEl}
         ${railEl}
@@ -24884,60 +24894,92 @@ async function generateReportCard() {
         ${avgEl}
         ${deltaEl}
       </div>`;
-        }).join('');
-        // F4 — each section reports itself. "Is the main card stronger than the
-        // prelims?" was a question you could only answer by reading 24 rows and
-        // doing the arithmetic in your head.
-        const secFighters = groups.filter(x => x.badge === g.badge).flatMap(x => x.pair);
-        // GLOW-UP 222 — same denominator as the hero tiles. A section that reads
-        // "10 leans · 63%" while four of them are unplaceable is describing a section
-        // you cannot enter.
-        const secPlaceable = secFighters.filter(x => placeableSet.has(x));
-        // L1 — pushes are not leans here either, or a section of coin flips would
-        // report itself as a section full of blocked plays.
-        const secBlocked = secFighters.filter(hasSide).length - secPlaceable.length;
-        const secAvg = secPlaceable.length
-            ? Math.round(secPlaceable.reduce((n, x) => n + getEffectiveLean(x).conf, 0) / secPlaceable.length)
-            : 0;
-        const secTitle = secPlaceable.length
-            ? `${secPlaceable.length} placeable lean${secPlaceable.length === 1 ? '' : 's'} in this section, averaging ${secAvg}% confidence.${secBlocked ? ` ${secBlocked} more ${secBlocked === 1 ? 'is a read' : 'are reads'} no book will take (⛔).` : ''}`
-            : `No placeable lean in this section — ${secBlocked} read${secBlocked === 1 ? '' : 's'} no book will take (⛔).`;
-        const headHtml = g.badge !== lastBadge
-            ? `<div class="rc-section-head rc-badge-${g.badgeCls}">
+    };
+    if (rcSort !== 'card') {
+        // Flat ranking. Fighters with no lean at all are dropped rather than parked
+        // at the bottom — in card order they are context for their bout, and with
+        // the bout gone they are just empty rows.
+        const ranked = allFighters.filter(f => getEffectiveLean(f).lean !== 'none');
+        const sortKey = (f) => {
+            const r = resolveRow(f);
+            if (rcSort === 'conf') {
+                // A read no book will take cannot outrank a placeable lean, however
+                // confident it is — the same rule the headline and TOP PICK follow.
+                return (r.unplaceable ? 0 : 1000) + (r.el.conf || 0);
+            }
+            // Δ LINE: how far his history sits from the number in the direction the
+            // pick needs. Against the pick sorts below everything that is for it.
+            if (r.avgVal == null || r.line == null)
+                return -Infinity;
+            const d = r.avgVal - r.line;
+            const helps = r.el.lean === 'over' ? d > 0 : d < 0;
+            return (helps ? Math.abs(d) : -Math.abs(d)) + (r.unplaceable ? -1000 : 0);
+        };
+        const rowsHtml = ranked
+            .map(f => ({ f, k: sortKey(f) }))
+            .sort((a, b) => b.k - a.k)
+            .map(x => renderFighterRow(x.f))
+            .join('');
+        sections.push(`<div class="rc-fight-group rc-flat"><div class="rc-matchup">${rowsHtml}</div></div>`);
+    }
+    else {
+        let lastBadge = '';
+        for (const g of groups) {
+            const rows = g.pair.map(renderFighterRow).join('');
+            // F4 — each section reports itself. "Is the main card stronger than the
+            // prelims?" was a question you could only answer by reading 24 rows and
+            // doing the arithmetic in your head.
+            const secFighters = groups.filter(x => x.badge === g.badge).flatMap(x => x.pair);
+            // GLOW-UP 222 — same denominator as the hero tiles. A section that reads
+            // "10 leans · 63%" while four of them are unplaceable is describing a section
+            // you cannot enter.
+            const secPlaceable = secFighters.filter(x => placeableSet.has(x));
+            // L1 — pushes are not leans here either, or a section of coin flips would
+            // report itself as a section full of blocked plays.
+            const secBlocked = secFighters.filter(hasSide).length - secPlaceable.length;
+            const secAvg = secPlaceable.length
+                ? Math.round(secPlaceable.reduce((n, x) => n + getEffectiveLean(x).conf, 0) / secPlaceable.length)
+                : 0;
+            const secTitle = secPlaceable.length
+                ? `${secPlaceable.length} placeable lean${secPlaceable.length === 1 ? '' : 's'} in this section, averaging ${secAvg}% confidence.${secBlocked ? ` ${secBlocked} more ${secBlocked === 1 ? 'is a read' : 'are reads'} no book will take (⛔).` : ''}`
+                : `No placeable lean in this section — ${secBlocked} read${secBlocked === 1 ? '' : 's'} no book will take (⛔).`;
+            const headHtml = g.badge !== lastBadge
+                ? `<div class="rc-section-head rc-badge-${g.badgeCls}">
           <span>${g.badge}</span>
           ${secPlaceable.length
-                ? `<b class="rc-sec-stat" title="${secTitle}">${secPlaceable.length} leans · ${secAvg}%${secBlocked ? ` <u>+${secBlocked} ⛔</u>` : ''}</b>`
-                : secBlocked ? `<b class="rc-sec-stat" title="${secTitle}">${secBlocked} ⛔ only</b>` : ''}
+                    ? `<b class="rc-sec-stat" title="${secTitle}">${secPlaceable.length} leans · ${secAvg}%${secBlocked ? ` <u>+${secBlocked} ⛔</u>` : ''}</b>`
+                    : secBlocked ? `<b class="rc-sec-stat" title="${secTitle}">${secBlocked} ⛔ only</b>` : ''}
           <i></i>
         </div>`
-            : '';
-        lastBadge = g.badge;
-        // ── GLOW-UP 223 L6 — when the bout itself is the read ────────────────────
-        // Both fighters leaning the same way on FP is a statement about the FIGHT,
-        // not about either man: two UNDERs is "this ends early", two OVERs is "this
-        // goes long and busy". Unnamed, the pair reads as the card contradicting
-        // itself. Named, it is the most useful line on the block.
-        // Display only. This is CONCENTRATION, never a demotion input — wiring the
-        // correlation engine into the same-fight rule once dropped a real pick.
-        const fpSides = g.pair
-            .map(f => resolveRow(f))
-            .filter(r => r.statKey === 'fp' && (r.el.lean === 'over' || r.el.lean === 'under'))
-            .map(r => r.el.lean);
-        const bothSame = (g.pair.length === 2 && fpSides.length === 2 && fpSides[0] === fpSides[1])
-            ? fpSides[0] : null;
-        const fightNote = bothSame
-            ? `<div class="rc-fight-note is-${bothSame}" title="Both fighters' fantasy-point leans point the same way, which is a read on the bout rather than on either fighter: ${bothSame === 'under'
-                ? 'neither man is expected to bank a full night of points, i.e. this ends early.'
-                : 'both are expected to clear their number, i.e. a long, busy fight.'} Entering both is concentration on one outcome, not two independent plays."
+                : '';
+            lastBadge = g.badge;
+            // ── GLOW-UP 223 L6 — when the bout itself is the read ────────────────────
+            // Both fighters leaning the same way on FP is a statement about the FIGHT,
+            // not about either man: two UNDERs is "this ends early", two OVERs is "this
+            // goes long and busy". Unnamed, the pair reads as the card contradicting
+            // itself. Named, it is the most useful line on the block.
+            // Display only. This is CONCENTRATION, never a demotion input — wiring the
+            // correlation engine into the same-fight rule once dropped a real pick.
+            const fpSides = g.pair
+                .map(f => resolveRow(f))
+                .filter(r => r.statKey === 'fp' && (r.el.lean === 'over' || r.el.lean === 'under'))
+                .map(r => r.el.lean);
+            const bothSame = (g.pair.length === 2 && fpSides.length === 2 && fpSides[0] === fpSides[1])
+                ? fpSides[0] : null;
+            const fightNote = bothSame
+                ? `<div class="rc-fight-note is-${bothSame}" title="Both fighters' fantasy-point leans point the same way, which is a read on the bout rather than on either fighter: ${bothSame === 'under'
+                    ? 'neither man is expected to bank a full night of points, i.e. this ends early.'
+                    : 'both are expected to clear their number, i.e. a long, busy fight.'} Entering both is concentration on one outcome, not two independent plays."
         >${bothSame === 'under' ? '⇊ BOTH UNDER · reads as an early finish' : '⇈ BOTH OVER · reads as a long, busy fight'}</div>`
-            : '';
-        // The `Surname vs Surname` label was dropped: both names are already on the
-        // two rows directly beneath it, so it repeated the content of the block it
-        // headed and cost a line on all twelve fights.
-        sections.push(`${headHtml}<div class="rc-fight-group rc-badge-${g.badgeCls}">
+                : '';
+            // The `Surname vs Surname` label was dropped: both names are already on the
+            // two rows directly beneath it, so it repeated the content of the block it
+            // headed and cost a line on all twelve fights.
+            sections.push(`${headHtml}<div class="rc-fight-group rc-badge-${g.badgeCls}">
       <div class="rc-matchup">${rows}</div>
       ${fightNote}
     </div>`);
+        }
     }
     const content = document.getElementById('reportContent');
     if (content)
@@ -24945,6 +24987,10 @@ async function generateReportCard() {
     const sub = document.getElementById('reportModalSub');
     if (sub)
         sub.textContent = `${allFighters.length} fighters · ${placeableLeans.length} placeable lean${placeableLeans.length === 1 ? '' : 's'}${blockedCount ? ` · ${blockedCount} unplaceable` : ''}`;
+    content?.querySelectorAll('[data-rc-sort]').forEach(b => b.addEventListener('click', () => {
+        rcSort = b.dataset['rcSort'] || 'card';
+        void generateReportCard();
+    }));
     document.getElementById('reportModal')?.classList.remove('is-hidden');
     // Build plain-text version for clipboard/download
     // L9 \u2014 the export is the copy that travels, so it carries the vintage too:
