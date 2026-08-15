@@ -328,6 +328,37 @@ async function refreshPlacedPersonalRecord() {
         return false;
     }
 }
+// GLOW-UP 246b: hydrate the CURRENT event's placed map from storage. This was
+// only ever done inside the Best Picks render, so opening Parlay Lab first left
+// bestPicksPlaced empty — the ● PLACED chip never rendered and no row could say
+// you held it, which reads exactly like the placed legs being absent from the
+// pool. Same signature-gated shape as refreshPlacedPersonalRecord above (whose
+// comment already named this failure mode for the calibration chips) so it
+// re-renders exactly once and cannot loop.
+let bestPicksPlacedSig = '';
+async function refreshBestPicksPlaced() {
+    try {
+        const payload = await storageGet([STORAGE_BEST_PICKS_PLACED_KEY]);
+        const raw = payload[STORAGE_BEST_PICKS_PLACED_KEY];
+        const evMap = raw && typeof raw === 'object' && !Array.isArray(raw)
+            ? raw[bestPicksEventKey()]
+            : undefined;
+        const entries = evMap && typeof evMap === 'object' ? Object.entries(evMap) : [];
+        const sig = entries.map(([k]) => k).sort().join(',');
+        if (sig === bestPicksPlacedSig)
+            return false;
+        bestPicksPlacedSig = sig;
+        bestPicksPlaced.clear();
+        for (const [k, v] of entries) {
+            if (v && typeof v === 'object')
+                bestPicksPlaced.set(k, v);
+        }
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 async function persistBestPicksPlaced() {
     try {
         const payload = await storageGet([STORAGE_BEST_PICKS_PLACED_KEY]);
@@ -11010,6 +11041,11 @@ function renderParlayLab(container) {
         if (changed && currentView === 'parlaylab')
             renderParlayLab(container);
     });
+    // GLOW-UP 246b: same treatment for the placed map itself — see above.
+    void refreshBestPicksPlaced().then((changed) => {
+        if (changed && currentView === 'parlaylab')
+            renderParlayLab(container);
+    });
     // YOU n/m chip for a leg's stat + direction — informational only (house
     // rule: never mutates model confidence); needs 2+ settled legs.
     const parlayYouTag = (stat, dir) => {
@@ -11537,13 +11573,22 @@ function renderParlayLab(container) {
         // not. The ☐ now toggles the BEST book — leftmost chip, the one the model would
         // take — so every row in the pool has one obvious target. Cursors corrected in
         // CSS so neither the dead row body nor the live chips lie about it.
-        const bestKey = parlayLegKeyOf(books[0].leg);
-        const bestBk = parlayLegBook(books[0].leg, books[0].fighter);
+        // GLOW-UP 246b — the row picks YOUR book when you have one.
+        // 246 had the row toggle the best-VALUE entry, which is right for shopping
+        // and wrong for the job that surfaced it: rebuilding a ticket already placed.
+        // Every leg of the UFC 330 parlay was on Underdog, but best-value for an OVER
+        // is the lowest number, so row-clicking Ribovics added Pick6 99.5 and Islam
+        // would have added PrizePicks 63.55 — never the UD line the user actually
+        // holds. When the prop is one you placed, your book leads.
+        const rowPick = books.find(a => isBookPlaced(a.leg)) || books[0];
+        const rowIsYours = rowPick !== books[0] || isBookPlaced(books[0].leg);
+        const bestKey = parlayLegKeyOf(rowPick.leg);
+        const bestBk = parlayLegBook(rowPick.leg, rowPick.fighter);
         const placedTag = isLegPlaced(head.leg)
             ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. The ● PLACED chip in the strip filters to just these; a book chip outlined in gold is the one you placed at.">●</span>`
             : '';
         return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
-      <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${selected.length && parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} the best ${dir.toUpperCase()} entry (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${books[0].leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
+      <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} ${rowIsYours ? 'the book you placed at' : `the best ${dir.toUpperCase()} entry`} (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${rowPick.leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
       <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(head.leg.fighter)}</span>
       ${vsTag}${placedTag}
       <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
