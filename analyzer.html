@@ -30380,6 +30380,54 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   .rc-fighter-row { grid-template-columns: 170px 180px 52px minmax(0, 1fr); gap: 11px; }
 }
 
+
+/* ══ GLOW-UP 239: the row IS a shop row ══════════════════════════════════
+   The card read bland beside the shop for a structural reason: a shop row is
+   a dozen small coloured chips, this was one grey box and a sentence. The
+   sentence moves to the row tooltip; the width it was eating goes to a book
+   rail and a delta chip — both of which carry information the card could not
+   show before. */
+.rc-fighter-row {
+  grid-template-columns: 190px 168px minmax(0, 1fr) 54px 62px 58px;
+  gap: 12px;
+}
+
+/* ── The book rail — the shop's signature, and the answer to "where do I
+   actually place this", which the single-book row could never give. ─────── */
+.rc-books { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+.rc-bk {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 2px 6px 1px; border-radius: 5px; min-width: 34px; line-height: 1.15;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.rc-bk i { font-style: normal; font-size: 7px; font-weight: 800; letter-spacing: 0.08em; color: var(--text4); }
+.rc-bk b { font-size: 10.5px; font-weight: 700; color: var(--text2); font-variant-numeric: tabular-nums; }
+/* Best entry for the side, in the shop's green. */
+.rc-bk.is-best { background: rgba(38,208,124,0.16); border-color: rgba(38,208,124,0.4); }
+.rc-bk.is-best i { color: rgba(110,231,168,0.8); }
+.rc-bk.is-best b { color: #8ff0c0; }
+/* A book that posts the prop but will not take this side. */
+.rc-bk.is-blocked { border-style: dashed; opacity: 0.45; }
+.rc-bk.is-blocked b { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* ── The delta: the gap between his history and the line, and which way it
+   points. The sentence spent forty words on this. ───────────────────────── */
+.rc-delta {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
+  text-align: right; font-variant-numeric: tabular-nums; cursor: help;
+  padding: 2px 6px; border-radius: 5px;
+}
+.rc-delta.pos { color: #8ff0c0; background: rgba(38,208,124,0.13); }
+.rc-delta.neg { color: #ff8fa3; background: rgba(255,58,96,0.11); }
+.rc-avg { text-align: right; white-space: nowrap; }
+.rc-fighter-row { cursor: help; }
+
+@media (max-width: 1200px) {
+  .rc-fighter-row { grid-template-columns: 160px 156px minmax(0, 1fr) 50px 56px 54px; gap: 9px; }
+}
+
 </style>
 </head>
 <body>

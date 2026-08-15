@@ -24769,20 +24769,61 @@ async function generateReportCard() {
                     + srcEl
                     + `</i>`
                     + `</span>`;
-            // L2 — the evidence column is one block, not two cells. The average is a
-            // prefix to the reasoning it supports rather than a column competing with
-            // it, which is what let a 24-row card read as a spreadsheet.
-            const evidenceEl = `<span class="rc-evidence">`
-                + avgEl
-                + (reasonTxt
-                    ? `<span class="rc-reason${generic ? ' is-generic' : ''}" title="${topReason.replace(/"/g, '&quot;')}">${generic ? 'no specific read' : reasonTxt}</span>`
-                    : '<span class="rc-reason"></span>')
-                + `</span>`;
-            return `<div class="${rowCls}">
+            // ── GLOW-UP 239 — the row becomes a shop row ─────────────────────────
+            // The card looked bland next to the line shop for a structural reason,
+            // not a styling one: a shop row is a dozen small coloured chips and this
+            // was one grey box plus a sentence. Two changes fix that, and the second
+            // one earns its place rather than just adding colour.
+            //
+            // 1. The BOOK RAIL. Every book posting this prop gets a chip, best entry
+            //    for the side marked, blocked books dashed. It is the shop's most
+            //    recognisable device AND it answers the question the card could not:
+            //    the old row named one book, so "where do I actually put this" meant
+            //    leaving the card. Uses the same lineForBook / bookTakesSide pair the
+            //    shop and the placement chip use, so it cannot disagree with them.
+            const dirForRail = (el.lean === 'over' || el.lean === 'under') ? el.lean : null;
+            const railBooks = dirForRail
+                ? (LEAN_STAT_FIELDS[statKey] || [])
+                    .map(([bk]) => ({ bk, v: lineForBook(f, statKey, bk) }))
+                    .filter((c) => c.v != null)
+                    // Best entry first, the rule leanBestBook shops by.
+                    .sort((a, b) => dirForRail === 'over' ? a.v - b.v : b.v - a.v)
+                : [];
+            const railDir = dirForRail;
+            const railEl = railBooks.length
+                ? `<span class="rc-books">` + railBooks.map((c, i) => {
+                    const takes = bookTakesSide(f, statKey, railDir, c.bk);
+                    const label = platformKeyShort(c.bk);
+                    const cls = `rc-bk${!takes ? ' is-blocked' : i === 0 ? ' is-best' : ''}`;
+                    const tip = takes
+                        ? `${LEAN_BOOK_LABEL[c.bk] || c.bk} ${c.v}${i === 0 ? ` — best ${railDir.toUpperCase()} entry of the ${railBooks.length}` : ''}`
+                        : `${LEAN_BOOK_LABEL[c.bk] || c.bk} posts ${c.v} but will not take this ${railDir.toUpperCase()}`;
+                    return `<span class="${cls}" title="${tip.replace(/"/g, '&quot;')}"><i>${label}</i><b>${c.v}</b></span>`;
+                }).join('') + `</span>`
+                : `<span class="rc-books"></span>`;
+            // 2. The DELTA chip. "avg 80.4" beside a line of 83.5 makes you do the
+            //    subtraction; the number that matters is the gap and which way it
+            //    points. Green when the fighter's history supports the side being
+            //    recommended, red when it argues against it — which is the same
+            //    thing the reason sentence was spending forty words saying.
+            const delta = (avgVal != null && line != null) ? avgVal - line : null;
+            const deltaHelps = delta == null ? null : (el.lean === 'over' ? delta > 0 : delta < 0);
+            const deltaEl = delta != null
+                ? `<span class="rc-delta ${deltaHelps ? 'pos' : 'neg'}" title="Career ${statLbl} average of ${avgVal.toFixed(1)} against a line of ${line.toFixed(1)} — ${Math.abs(delta).toFixed(1)} ${delta > 0 ? 'above' : 'below'}, which ${deltaHelps ? 'supports' : 'argues against'} the ${(el.lean || '').toUpperCase()}.">${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}</span>`
+                : `<span class="rc-delta"></span>`;
+            // The reasoning moves to the row's tooltip. It was a third of the width
+            // in grey prose and it is the one thing on the card that cannot be read
+            // at a glance anyway — so it stops competing with the numbers that can.
+            const rowTip = reasonTxt
+                ? `${prettyName(f.name)} — ${topReason}`.replace(/"/g, '&quot;')
+                : `${prettyName(f.name)} — no specific read; baseline model only.`;
+            return `<div class="${rowCls}" title="${rowTip}">
         <span class="rc-name">${rankEl}${prettyName(f.name)}</span>
         ${pickEl}
+        ${railEl}
         ${confEl}
-        ${evidenceEl}
+        ${avgEl}
+        ${deltaEl}
       </div>`;
         }).join('');
         // F4 — each section reports itself. "Is the main card stronger than the
