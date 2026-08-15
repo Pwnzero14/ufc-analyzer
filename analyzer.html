@@ -30564,9 +30564,6 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-avg { text-align: right; white-space: nowrap; }
 .rc-fighter-row { cursor: help; }
 
-@media (max-width: 1200px) {
-  .rc-fighter-row { grid-template-columns: 160px 156px minmax(0, 1fr) 50px 56px 54px; gap: 9px; }
-}
 
 
 /* ══ GLOW-UP 240: ten levels of look ═════════════════════════════════════
@@ -30579,13 +30576,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    the flexible column. At 1fr it ran ~900px for a three-book spread, which read
    as a long empty line and made rows look stretched instead of full. The flex
    goes to the factor chips, which is content. */
-.rc-fighter-row {
-  grid-template-columns: 186px 162px auto 76px minmax(120px, 1fr) 52px 58px 54px;
-  gap: 11px;
-}
-@media (max-width: 1200px) {
-  .rc-fighter-row { grid-template-columns: 152px 148px auto 62px minmax(90px, 1fr) 46px 52px 50px; gap: 7px; }
-}
+/* The track's own width lives with the grid definition in 243 — declaring the
+   template again here is what silently reverted the books column to `auto`,
+   because same-specificity later wins and this block sits after that one. */
 
 /* ── The WHY, as chips — same ✓/✗ vocabulary as Best Picks ──────────────── */
 .rc-factors { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
