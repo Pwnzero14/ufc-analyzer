@@ -30048,8 +30048,16 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   border-radius: 7px;
 }
 .rc-pick {
-  display: inline-grid;
-  grid-template-columns: auto auto 1fr;
+  display: grid;
+  /* FIX 1+2 — a fixed first track, and no 1fr. The `auto auto 1fr` version put
+     the line at a different x on every row (UNDER / OVER / NO EDGE are
+     different widths, and each row is its own grid so nothing aligned across
+     them) AND pushed the stat/book to the far edge, so the "one object" read
+     as two things in a box. The dir track is now fixed, which columnises the
+     anchor number, and the remaining tracks hug it. */
+  grid-template-columns: 48px auto auto;
+  justify-content: start;
+  width: 100%;
   align-items: baseline;
   gap: 7px;
   padding: 3px 9px;
@@ -30078,7 +30086,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-meta {
   font-style: normal; display: inline-flex; align-items: center; gap: 5px;
-  justify-content: flex-end; white-space: nowrap;
+  justify-content: flex-start; white-space: nowrap;
 }
 /* L4 — the stat keeps its family hue (that mapping is load-bearing across the
    app) but drops to a bare tinted word: no pill, no background, so it stops
@@ -30098,8 +30106,13 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   letter-spacing: 0.04em; white-space: nowrap;
 }
 .rc-avg b { font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums; }
-.rc-reason { flex: 1 1 auto; font-size: 8.5px; line-height: 1.4; color: var(--text4); }
-.rc-reason.is-generic { opacity: 0.3; font-style: normal; }
+/* FIX 3 — two tiers, not one. Dimming the whole column took the real
+   reasoning down with the boilerplate: a duration adjustment or a projection
+   gap is something you want to read, and it was sitting at the same weight as
+   "no specific read". Real rationale steps back up; only the filler stays at
+   the bottom of the ramp. */
+.rc-reason { flex: 1 1 auto; font-size: 8.5px; line-height: 1.4; color: var(--text3); }
+.rc-reason.is-generic { color: var(--text4); opacity: 0.35; font-style: normal; }
 
 /* ── L3 · the bout is the unit ──────────────────────────────────────────── */
 .rc-fight-group {
