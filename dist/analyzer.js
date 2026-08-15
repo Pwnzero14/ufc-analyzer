@@ -24801,6 +24801,29 @@ async function generateReportCard() {
                     return `<span class="${cls}" title="${tip.replace(/"/g, '&quot;')}"><i>${label}</i><b>${c.v}</b></span>`;
                 }).join('') + `</span>`
                 : `<span class="rc-books"></span>`;
+            // ── GLOW-UP 240 L1 — the spread track ────────────────────────────────
+            // The rail left a third of the row empty, which is most of why this still
+            // read bland: rows that end two-thirds of the way across look unfinished
+            // regardless of what is in them. The shop fills exactly that space with a
+            // rail — a track from the worst book to the best with a dot per book —
+            // and it is the single most recognisable thing on that screen.
+            //
+            // It is also the one view of the market the card never had: the chips say
+            // WHAT each book posts, the track says how far apart they are and where
+            // your pick sits in that range. A wide track is a shopping opportunity; a
+            // tight one means the books agree and the number is the number.
+            const railVals = railBooks.map(c => c.v);
+            const railMin = railVals.length ? Math.min(...railVals) : 0;
+            const railMax = railVals.length ? Math.max(...railVals) : 0;
+            const railSpan = railMax - railMin;
+            const pctOf = (v) => railSpan > 0 ? ((v - railMin) / railSpan) * 100 : 50;
+            const spreadEl = railBooks.length >= 2 && railSpan > 0
+                ? `<span class="rc-spread${railSpan >= 5 ? ' is-wide' : ''}" title="${railBooks.length} books, ${railMin} to ${railMax} — a ${railSpan.toFixed(1)} point spread on the same prop.${railSpan >= 5 ? ' That is a wide disagreement; the book you choose matters as much as the side.' : ''}">`
+                    + `<i class="rc-spread-track"></i>`
+                    + railBooks.map((c, i) => `<i class="rc-spread-dot${i === 0 ? ' is-best' : ''}" style="left:${pctOf(c.v).toFixed(1)}%"></i>`).join('')
+                    + (line != null ? `<i class="rc-spread-pick" style="left:${pctOf(line).toFixed(1)}%"></i>` : '')
+                    + `</span>`
+                : `<span class="rc-spread is-flat"${railBooks.length ? ' title="Every book posting this prop has the same number — nothing to shop."' : ''}></span>`;
             // 2. The DELTA chip. "avg 80.4" beside a line of 83.5 makes you do the
             //    subtraction; the number that matters is the gap and which way it
             //    points. Green when the fighter's history supports the side being
@@ -24821,6 +24844,7 @@ async function generateReportCard() {
         <span class="rc-name">${rankEl}${prettyName(f.name)}</span>
         ${pickEl}
         ${railEl}
+        ${spreadEl}
         ${confEl}
         ${avgEl}
         ${deltaEl}

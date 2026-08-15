@@ -30428,6 +30428,107 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   .rc-fighter-row { grid-template-columns: 160px 156px minmax(0, 1fr) 50px 56px 54px; gap: 9px; }
 }
 
+
+/* ══ GLOW-UP 240: ten levels of look ═════════════════════════════════════
+   239 made the row informationally right and still left a third of it empty,
+   which is most of why it read bland — a row that ends two thirds across looks
+   unfinished whatever is in it. L1 fills that space with the shop's rail;
+   the rest is colour where there is meaning and weight where there is rank. */
+
+.rc-fighter-row {
+  grid-template-columns: 186px 162px auto minmax(90px, 1fr) 52px 60px 56px;
+  gap: 11px;
+}
+@media (max-width: 1200px) {
+  .rc-fighter-row { grid-template-columns: 156px 150px auto minmax(60px, 1fr) 48px 54px 52px; gap: 8px; }
+}
+
+/* ── L1 · the spread track: where the books sit, and where your pick sits ── */
+.rc-spread { position: relative; height: 14px; cursor: help; min-width: 60px; }
+.rc-spread-track {
+  position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,58,96,0.35), rgba(255,255,255,0.12), rgba(38,208,124,0.45));
+}
+.rc-spread-dot {
+  position: absolute; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%; background: rgba(255,255,255,0.4);
+}
+.rc-spread-dot.is-best { background: #26d07c; box-shadow: 0 0 7px rgba(38,208,124,0.7); width: 6px; height: 6px; margin: -3px 0 0 -3px; }
+/* Where the pick actually sits in the range — a ring, so it reads as a marker
+   on the scale rather than as another book. */
+.rc-spread-pick {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; border: 1.5px solid var(--gold); background: transparent;
+}
+/* A wide disagreement is the reason to open this panel, so it says so. */
+.rc-spread.is-wide .rc-spread-track { height: 3px; margin-top: -1.5px; }
+.rc-spread.is-flat { opacity: 0.25; }
+.rc-spread.is-flat::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: rgba(255,255,255,0.18);
+}
+
+/* ── L2 · the confidence meter, visible ─────────────────────────────────── */
+.rc-conf { min-width: 52px; }
+.rc-conf-bar { height: 3px; background: rgba(255,255,255,0.12); }
+.rc-conf.tier-high .rc-conf-bar u { background: linear-gradient(90deg, rgba(38,208,124,0.5), #26d07c); box-shadow: 0 0 7px rgba(38,208,124,0.5); }
+.rc-conf.tier-med  .rc-conf-bar u { background: linear-gradient(90deg, rgba(248,198,74,0.45), var(--gold)); }
+.rc-conf.tier-low  .rc-conf-bar u { background: rgba(255,255,255,0.3); }
+.rc-conf.tier-high b { color: #8ff0c0; }
+.rc-conf.tier-med  b { color: var(--gold); }
+
+/* ── L3 · the pick carries its direction as colour ──────────────────────── */
+.rc-pick.rc-over  { background: rgba(38,208,124,0.09); border-color: rgba(38,208,124,0.28); }
+.rc-pick.rc-under { background: rgba(255,58,96,0.08);  border-color: rgba(255,58,96,0.26); }
+.rc-fighter-row:hover .rc-pick.rc-over  { background: rgba(38,208,124,0.15); border-color: rgba(38,208,124,0.45); }
+.rc-fighter-row:hover .rc-pick.rc-under { background: rgba(255,58,96,0.14);  border-color: rgba(255,58,96,0.42); }
+.rc-pick.rc-over  .rc-line { color: #a8f5cd; }
+.rc-pick.rc-under .rc-line { color: #ffc0cc; }
+
+/* ── L4 · sections rank themselves ──────────────────────────────────────── */
+.rc-section-head.rc-badge-main-event { font-size: 11px; letter-spacing: 0.3em; color: var(--orange); border-left-color: var(--orange); background: linear-gradient(135deg, rgba(249,115,22,0.1), rgba(249,115,22,0.01)); }
+.rc-section-head.rc-badge-co-main { font-size: 10px; color: #2dd4d0; border-left-color: rgba(45,212,208,0.65); background: linear-gradient(135deg, rgba(45,212,208,0.07), rgba(45,212,208,0.01)); }
+.rc-sec-stat {
+  font-size: 8px; padding: 1px 7px; border-radius: 9px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── L5 · the top three are visibly the top three ───────────────────────── */
+.rc-fighter-row:has(.rc-rank) {
+  background: linear-gradient(90deg, rgba(248,198,74,0.07), rgba(255,255,255,0.02) 42%);
+  border-left-color: var(--gold);
+}
+.rc-fighter-row:has(.rc-rank) .rc-name { color: #ffe9b0; }
+
+/* ── L6 · the bout is bracketed ─────────────────────────────────────────── */
+.rc-fight-group { position: relative; padding-left: 9px; }
+.rc-fight-group::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px;
+  border-radius: 2px; background: rgba(255,255,255,0.07);
+}
+.rc-fight-group.rc-badge-main-event::before { background: rgba(249,115,22,0.5); }
+.rc-fight-group.rc-badge-co-main::before { background: rgba(45,212,208,0.4); }
+
+/* ── L7 · headline tiles get identity ───────────────────────────────────── */
+.rc-hero-tile:nth-child(1) { border-color: rgba(38,208,124,0.26); background: linear-gradient(135deg, rgba(38,208,124,0.09), rgba(38,208,124,0.01)); }
+.rc-hero-tile:nth-child(1) .rc-hero-val { color: #8ff0c0; }
+.rc-hero-tile:nth-child(3) .rc-hero-val { color: var(--gold); }
+
+/* ── L8 · a read is visibly not a bet ───────────────────────────────────── */
+.rc-fighter-row.is-blocked .rc-pick { background: rgba(255,58,96,0.05); border-style: dashed; }
+.rc-fighter-row.is-blocked .rc-line { text-decoration: line-through; text-decoration-thickness: 1px; opacity: 0.75; }
+.rc-fighter-row.is-push .rc-pick { border-style: dashed; background: rgba(255,255,255,0.02); }
+
+/* ── L9 · the row answers the cursor ────────────────────────────────────── */
+.rc-fighter-row { transition: background 0.15s, border-color 0.15s, transform 0.14s; }
+.rc-fighter-row:hover { transform: translateX(2px); border-left-width: 4px; }
+
+/* ── L10 · numbers behave like numbers ──────────────────────────────────── */
+.rc-line, .rc-avg, .rc-delta, .rc-conf b, .rc-bk b, .rc-sec-stat { font-variant-numeric: tabular-nums; }
+.rc-avg { font-size: 8.5px; letter-spacing: 0.03em; }
+.rc-delta { min-width: 52px; }
+
 </style>
 </head>
 <body>
