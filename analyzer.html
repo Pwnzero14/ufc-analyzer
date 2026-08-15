@@ -30404,13 +30404,45 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-bk i { font-style: normal; font-size: 7px; font-weight: 800; letter-spacing: 0.08em; color: var(--text4); }
 .rc-bk b { font-size: 10.5px; font-weight: 700; color: var(--text2); font-variant-numeric: tabular-nums; }
-/* Best entry for the side, in the shop's green. */
-.rc-bk.is-best { background: rgba(38,208,124,0.16); border-color: rgba(38,208,124,0.4); }
-.rc-bk.is-best i { color: rgba(110,231,168,0.8); }
+/* ══ GLOW-UP 242: colour, on the axis that carries meaning ═══════════════
+   The rail was fifteen grey boxes with one green one, which is why it still
+   read bland. Two changes, both borrowed rather than invented: the book TAG
+   takes the app's existing brand hue (this is a multi-book chart, the one
+   place the colour rules put book identity on the hue axis), and the range
+   gets the shop's best/worst pair instead of best-only. */
+.rc-bk.plat-pick6 i                 { color: #7cc4ff; }
+.rc-bk.plat-underdog i              { color: #a8aeff; }
+.rc-bk.plat-prizepicks i            { color: #5fe0dc; }
+.rc-bk.plat-betr i                  { color: #ffa06b; }
+.rc-bk.plat-draftkings_sportsbook i { color: #ffc75e; }
+.rc-bk.plat-pick6                 { background: rgba(86,195,255,0.06);  border-color: rgba(86,195,255,0.2); }
+.rc-bk.plat-underdog              { background: rgba(127,136,255,0.06); border-color: rgba(127,136,255,0.2); }
+.rc-bk.plat-prizepicks            { background: rgba(44,212,208,0.06);  border-color: rgba(44,212,208,0.2); }
+.rc-bk.plat-betr                  { background: rgba(255,138,61,0.06);  border-color: rgba(255,138,61,0.2); }
+.rc-bk.plat-draftkings_sportsbook { background: rgba(245,158,11,0.06);  border-color: rgba(245,158,11,0.2); }
+/* Best entry for the side, in the shop's green — wins over the brand tint,
+   because which book to USE outranks which book it is. */
+.rc-bk.is-best { background: rgba(38,208,124,0.18); border-color: rgba(38,208,124,0.45); }
 .rc-bk.is-best b { color: #8ff0c0; }
+.rc-bk.is-best i { opacity: 1; }
+/* Worst of the range, the shop's other half of the pair. */
+.rc-bk.is-worst { background: rgba(255,58,96,0.12); border-color: rgba(255,58,96,0.3); }
+.rc-bk.is-worst b { color: #ff8fa3; }
 /* A book that posts the prop but will not take this side. */
-.rc-bk.is-blocked { border-style: dashed; opacity: 0.45; }
+.rc-bk.is-blocked { border-style: dashed; opacity: 0.4; background: rgba(255,255,255,0.02); }
 .rc-bk.is-blocked b { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* The row gains the shop's surface — a gradient with a lit top edge and a dark
+   bottom one, which is what stops a dark row reading as a flat void. */
+.rc-fighter-row {
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+  border-top-color: rgba(255,255,255,0.06);
+  border-bottom-color: rgba(0,0,0,0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.rc-fighter-row:hover { background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03)); }
+/* The average was grey text between two coloured chips. */
+.rc-avg b { color: var(--text2); }
 
 /* ── The delta: the gap between his history and the line, and which way it
    points. The sentence spent forty words on this. ───────────────────────── */
