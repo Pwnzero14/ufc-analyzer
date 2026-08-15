@@ -1717,34 +1717,34 @@ body {
 .fhr-right { text-align: right; }
 
 /* ── REPORT CARD MODAL ── */
-.report-modal-box { max-width: 1000px; }
-.rc-event-header { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.rc-event-name { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--orange); letter-spacing: 0.06em; }
-.rc-event-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 3px; }
-.rc-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid var(--border); }
+.report-modal-box { }
+.rc-event-header { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.rc-event-name { }
+.rc-event-meta { font-family: 'JetBrains Mono', monospace; }
+.rc-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
 .rc-stat { color: var(--text2); }
 .rc-stat.rc-over { color: #22c55e; }
 .rc-stat.rc-under { color: #ef4444; }
 .rc-dot { color: var(--text3); }
-.rc-fight-group { margin-bottom: 14px; }
+.rc-fight-group { }
 .rc-fight-badge { font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: 0.15em; padding: 2px 8px; border-radius: 3px; display: inline-block; margin-bottom: 6px; }
 .rc-fight-badge.rc-badge-main-event { background: rgba(249,115,22,0.18); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
 .rc-fight-badge.rc-badge-co-main { background: rgba(45,212,208,0.12); color: var(--cyan, #2dd4d0); border: 1px solid rgba(45,212,208,0.25); }
 .rc-fight-badge.rc-badge-main-card { background: rgba(255,255,255,0.05); color: var(--text2); border: 1px solid var(--border); }
 .rc-fight-badge.rc-badge-prelim { background: rgba(255,255,255,0.03); color: var(--text3); border: 1px solid var(--border); }
-.rc-matchup { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.rc-fighter-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; border-bottom: 1px solid var(--border); }
+.rc-matchup { border: 1px solid var(--border); overflow: hidden; }
+.rc-fighter-row { }
 .rc-fighter-row:last-child { border-bottom: none; }
-.rc-name { flex: 0 0 180px; font-weight: 600; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-name { flex: 0 0 180px; }
 .rc-lean-chip { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.05em; flex-shrink: 0; min-width: 60px; text-align: center; }
 .rc-lean-chip.rc-over { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
 .rc-lean-chip.rc-under { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
 .rc-lean-chip.rc-none { background: transparent; color: var(--text3); border: 1px solid var(--border); }
-.rc-line { flex: 0 0 44px; color: var(--text1); font-weight: 600; text-align: center; }
-.rc-src { flex: 0 0 26px; font-size: 9px; color: var(--text3); text-align: center; letter-spacing: 0.05em; }
+.rc-line { flex: 0 0 44px; }
+.rc-src { flex: 0 0 26px; }
 .rc-conf { flex: 0 0 50px; color: var(--text2); font-size: 10px; text-align: right; }
-.rc-avg { flex: 0 0 68px; color: var(--text3); font-size: 10px; }
-.rc-reason { flex: 1; color: var(--text3); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-avg { }
+.rc-reason { text-overflow: ellipsis; }
 
 .modal-head {
   display: flex;
@@ -5188,29 +5188,29 @@ body.loading {
   }
 
 /* ── LINE SHOP MODAL ── */
-.lineshop-modal-box { max-width: 980px; }
-.lineshop-table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
-.lineshop-table th { padding: 6px 8px; text-align: center; color: var(--text3); font-weight: 700; border-bottom: 1px solid var(--border2); font-size: 10px; letter-spacing: 0.06em; white-space: nowrap; }
-.lineshop-table td { padding: 5px 8px; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.lineshop-modal-box { }
+.lineshop-table { font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+.lineshop-table th { text-align: center; white-space: nowrap; }
+.lineshop-table td { text-align: center; }
 .lineshop-table tr:hover td { background: var(--bg3); }
-.lineshop-fighter-name { text-align: left !important; font-weight: 600; color: var(--text1); font-size: 12px; min-width: 130px; }
-.ls-cell-val { display: inline-block; padding: 2px 6px; border-radius: 3px; min-width: 28px; text-align: center; }
+.lineshop-fighter-name { text-align: left !important; font-weight: 600; color: var(--text1); font-size: 12px; }
+.ls-cell-val { text-align: center; }
 .ls-high { background: rgba(72,199,142,0.18); color: #48c78e; font-weight: 700; }
 .ls-low  { background: rgba(255,100,100,0.14); color: #ff6464; font-weight: 700; }
 .ls-neutral { color: var(--text2); }
-.ls-empty { color: var(--text4, #555); font-size: 10px; }
+.ls-empty { }
 .ls-spread-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
 .ls-spread-high { background: rgba(255,165,0,0.22); color: var(--orange); }
 .ls-spread-med  { background: rgba(255,255,255,0.06); color: var(--text2); }
 .ls-spread-low  { color: var(--text4, #555); font-size: 9px; }
-.lineshop-stat-group { display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap; }
+.lineshop-stat-group { justify-content: center; flex-wrap: nowrap; }
 .lineshop-legend { display: flex; gap: 14px; font-size: 10px; color: var(--text3); margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .lineshop-legend-item { display: flex; align-items: center; gap: 4px; }
-.ls-plat-tag { display: block; font-size: 8px; font-weight: 800; letter-spacing: 0.06em; opacity: 0.65; margin-bottom: 2px; line-height: 1; }
-.ls-cell-val { display: inline-flex; flex-direction: column; align-items: center; padding: 3px 7px 2px; border-radius: 3px; min-width: 32px; line-height: 1.25; }
+.ls-plat-tag { display: block; }
+.ls-cell-val { }
 .ls-best  { background: rgba(72,199,142,0.22); color: #48c78e; font-weight: 700; }
 .ls-worst { background: rgba(255,100,100,0.14); color: #ff6464; }
-.ls-scale-mismatch { opacity: 0.38; color: var(--text4, #555); font-style: italic; border: 1px dashed rgba(255,255,255,0.1); }
+.ls-scale-mismatch { color: var(--text4, #555); border: 1px dashed rgba(255,255,255,0.1); }
 .archive-stat-summary { display:flex; gap:10px; flex-wrap:wrap; padding:8px 4px; }
 .archive-stat-badge { display:flex; flex-direction:column; gap:2px; padding:8px 14px; background:var(--surface2); border-radius:8px; border-left:3px solid var(--asb-color, var(--text-muted)); min-width:70px; }
 .archive-stat-badge.archive-stat-empty { border-left-color:var(--text4,#555); opacity:0.5; }
@@ -10135,7 +10135,6 @@ html { scroll-behavior: smooth; }
   border-bottom: 1px solid rgba(255,255,255,0.02) !important;
 }
 .lineshop-modal-box .lineshop-table tr:nth-child(even) td {
-  background: rgba(255,255,255,0.015);
 }
 .lineshop-modal-box .lineshop-fighter-name {
   font-size: 10.5px !important;
@@ -15165,12 +15164,6 @@ div[style*="border-left:2px solid"]:hover {
   overflow: hidden;
 }
 .report-modal-box::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 10%; right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,138,61,0.3), transparent);
-  pointer-events: none;
 }
 
 /* --- Report card event header: orange glow --- */
@@ -15187,8 +15180,6 @@ div[style*="border-left:2px solid"]:hover {
 
 /* --- Report card fight badge: glass depth --- */
 .rc-fight-badge {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: box-shadow 0.15s ease;
 }
 
@@ -15568,11 +15559,9 @@ button:focus-visible, .tab-btn:focus-visible, .sort-btn:focus-visible {
 }
 .rc-fighter-row {
   animation: rcRowSlide 0.2s ease both;
-  transition: background 0.12s ease;
 }
 .rc-fighter-row:nth-child(2) { animation-delay: 0.04s; }
 .rc-fighter-row:hover {
-  background: rgba(255,255,255,0.02);
 }
 @media (prefers-reduced-motion: reduce) {
   .rc-fighter-row { animation: none; }
@@ -29314,13 +29303,11 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
    with equal emphasis, so the panel read as a wall. Five visual levels:
    V1 hierarchy · V2 the take as an object · V3 magnitude as position ·
    V4 book identity · V5 depth and focus. */
-.lineshop-modal-box { max-width: 1180px; }
+.lineshop-modal-box { }
 
 /* ── V5 · modal chrome ─────────────────────────────────────────────────── */
 .lineshop-modal-box .modal-head {
   position: sticky; top: 0; z-index: 4;
-  background: linear-gradient(180deg, var(--bg2) 72%, rgba(0,0,0,0));
-  padding-bottom: 10px;
 }
 #lineShopContent { padding-top: 2px; }
 
@@ -29397,28 +29384,24 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 
 /* ── V1 · table rhythm ─────────────────────────────────────────────────── */
-.lineshop-table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+.lineshop-table { width: 100%; border-collapse: separate; }
 .lineshop-table th {
-  position: sticky; top: 0; z-index: 3;
-  background: var(--bg2);
+  position: sticky; z-index: 3;
   padding: 5px 8px; font-size: 8.5px; letter-spacing: 0.16em;
   color: var(--text4); font-weight: 800; border-bottom: 1px solid var(--border2);
 }
 .lineshop-table td {
   padding: 4px 7px; vertical-align: middle;
-  background: rgba(255,255,255,0.018);
-  border-top: 1px solid rgba(255,255,255,0.05);
-  border-bottom: 1px solid rgba(0,0,0,0.25);
   transition: background 0.15s;
 }
 .lineshop-table tr.ls-row td:first-child { border-radius: 9px 0 0 9px; border-left: 3px solid transparent; }
 .lineshop-table tr.ls-row td:last-child { border-radius: 0 9px 9px 0; }
 /* Value heat on the spine — the table gains a shape you can skim. */
-.ls-row.heat-3 td:first-child { border-left-color: #26d07c; }
-.ls-row.heat-2 td:first-child { border-left-color: rgba(38,208,124,0.55); }
-.ls-row.heat-1 td:first-child { border-left-color: rgba(38,208,124,0.22); }
-.ls-row.heat-3 td { background: rgba(38,208,124,0.045); }
-.ls-row:hover td { background: rgba(255,255,255,0.05); }
+.ls-row.heat-3 td:first-child { }
+.ls-row.heat-2 td:first-child { }
+.ls-row.heat-1 td:first-child { }
+.ls-row.heat-3 td { }
+.ls-row:hover td { }
 /* V5 — focus: hovering a row quiets the others instead of just lighting one. */
 .lineshop-table tbody:hover tr.ls-row:not(:hover) { opacity: 0.45; transition: opacity 0.18s; }
 
@@ -29433,8 +29416,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 .ls-rank {
   display: inline-flex; align-items: center; justify-content: center;
   width: 15px; height: 15px; border-radius: 50%;
-  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
-  background: rgba(248,198,74,0.16); color: var(--gold);
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800; color: var(--gold);
   border: 1px solid rgba(248,198,74,0.4); cursor: help;
 }
 .ls-vs { font-size: 8px; color: var(--text4); white-space: nowrap; }
@@ -29490,16 +29472,14 @@ button.ls-cell-val:hover { transform: translateY(-1px); }
 .ls-empty { color: var(--text4); font-size: 10px; padding: 0 4px; }
 
 /* ── V3 · the range track ──────────────────────────────────────────────── */
-.ls-track { position: relative; height: 7px; margin: 3px 3px 0; cursor: help; }
+.ls-track { position: relative; cursor: help; }
 .ls-track-rail {
-  position: absolute; left: 0; right: 0; top: 2px; height: 3px; border-radius: 2px;
-  background: linear-gradient(90deg, rgba(38,208,124,0.5), rgba(255,255,255,0.09) 55%, rgba(255,58,96,0.35));
+  position: absolute; left: 0; right: 0;
 }
 .ls-track.good-hi .ls-track-rail {
-  background: linear-gradient(90deg, rgba(255,58,96,0.35), rgba(255,255,255,0.09) 45%, rgba(38,208,124,0.5));
 }
 .ls-dot {
-  position: absolute; top: 0.5px; width: 6px; height: 6px; border-radius: 50%;
+  position: absolute; border-radius: 50%;
   transform: translateX(-50%); border: 1px solid var(--bg2);
   background: var(--text3);
 }
@@ -29509,14 +29489,11 @@ button.ls-cell-val:hover { transform: translateY(-1px); }
 .ls-dot.plat-betr { background: #ffa06b; }
 .ls-dot.plat-draftkings_sportsbook { background: #ffc75e; }
 .ls-dot.is-best {
-  width: 8px; height: 8px; top: -0.5px;
-  box-shadow: 0 0 0 1.5px rgba(38,208,124,0.55), 0 0 8px rgba(38,208,124,0.5);
   z-index: 2;
 }
 
 /* ── V2 · the take, as an inline chip ──────────────────────────────────── */
-.ls-take-mini {
-  margin-left: auto; flex-shrink: 0; cursor: help; white-space: nowrap;
+.ls-take-mini { flex-shrink: 0; cursor: help; white-space: nowrap;
   font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
   padding: 3px 7px; border-radius: 9px;
   background: rgba(255,255,255,0.04); border: 1px solid var(--border2); color: var(--text4);
@@ -29535,7 +29512,7 @@ button.ls-cell-val:hover { transform: translateY(-1px); }
 .ls-fold-row { text-align: left !important; padding: 6px 8px !important; background: none !important; border: none !important; }
 .ls-fold {
   font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
-  color: var(--text3); background: rgba(255,255,255,0.03); cursor: pointer;
+  color: var(--text3); cursor: pointer;
   border: 1px solid var(--border2); border-radius: 6px; padding: 5px 10px;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -29550,10 +29527,8 @@ button.ls-cell-val:hover { transform: translateY(-1px); }
    dead space removed, and the one number worth acting on lit like it matters. */
 
 /* ── G1 · the headline ─────────────────────────────────────────────────── */
-.ls-hero { display: flex; gap: 8px; margin-bottom: 9px; flex-wrap: wrap; }
-.ls-hero-tile {
-  flex: 1 1 150px; min-width: 130px; cursor: help; position: relative; overflow: hidden;
-  padding: 9px 13px; border-radius: 10px;
+.ls-hero { display: flex; flex-wrap: wrap; }
+.ls-hero-tile { min-width: 130px; cursor: help; position: relative; overflow: hidden; border-radius: 10px;
   background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
   border: 1px solid var(--border2);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 14px rgba(0,0,0,0.28);
@@ -29562,19 +29537,16 @@ button.ls-cell-val:hover { transform: translateY(-1px); }
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(120% 90% at 100% 0%, rgba(255,255,255,0.07), transparent 60%);
 }
-.ls-hero-label {
-  display: block; font-family: 'JetBrains Mono', monospace;
-  font-size: 7.5px; letter-spacing: 0.2em; color: var(--text4); margin-bottom: 3px;
+.ls-hero-label { font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.2em; color: var(--text4);
 }
-.ls-hero-val {
-  display: block; font-family: 'Space Grotesk', sans-serif;
-  font-size: 25px; font-weight: 800; line-height: 1; color: var(--text); letter-spacing: -0.01em;
+.ls-hero-val { font-family: 'Space Grotesk', sans-serif; font-weight: 800; line-height: 1; color: var(--text); letter-spacing: -0.01em;
 }
 .ls-hero-val em {
-  font-style: normal; font-size: 10px; font-weight: 700; margin-left: 4px;
+  font-style: normal; font-weight: 700;
   color: var(--text4); letter-spacing: 0.06em;
 }
-.ls-hero-sub { display: block; margin-top: 4px; font-size: 8.5px; color: var(--text4); }
+.ls-hero-sub { font-size: 8.5px; color: var(--text4); }
 .ls-hero-tile.is-primary {
   background: linear-gradient(145deg, rgba(38,208,124,0.16), rgba(38,208,124,0.02));
   border-color: rgba(38,208,124,0.34);
@@ -29638,7 +29610,7 @@ button.ls-cell-val.plat-underdog:hover { box-shadow: 0 0 0 1px rgba(127,136,255,
 button.ls-cell-val.plat-prizepicks:hover { box-shadow: 0 0 0 1px rgba(44,212,208,0.55), 0 4px 14px rgba(44,212,208,0.22); }
 button.ls-cell-val.plat-betr:hover { box-shadow: 0 0 0 1px rgba(255,138,61,0.55), 0 4px 14px rgba(255,138,61,0.22); }
 button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba(245,158,11,0.55), 0 4px 14px rgba(245,158,11,0.22); }
-.ls-track-rail { box-shadow: 0 0 8px rgba(38,208,124,0.12); }
+.ls-track-rail { }
 .ls-fold {
   background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
 }
@@ -29683,7 +29655,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .ls-th.src-td::after { color: rgba(240,192,64,0.9); }
 
 /* ── U3 · the track reads as a gauge, not a stray rule ─────────────────── */
-.ls-track { height: 9px; margin: 4px 3px 1px; }
+.ls-track { }
 .ls-track-rail {
   top: 3px; height: 4px; border-radius: 3px;
   background: linear-gradient(90deg, rgba(38,208,124,0.55), rgba(255,255,255,0.07) 58%, rgba(255,58,96,0.3));
@@ -29704,8 +29676,6 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   background:
     radial-gradient(120% 70% at 12% -8%, rgba(248,198,74,0.07), transparent 62%),
     linear-gradient(180deg, rgba(22,26,38,0.96), rgba(12,15,23,0.985));
-  border: 1px solid rgba(255,255,255,0.09);
-  box-shadow: 0 34px 90px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.07);
 }
 .lineshop-modal-box .modal-head {
   background: linear-gradient(180deg, rgba(18,22,32,0.98) 74%, rgba(18,22,32,0));
@@ -29811,57 +29781,43 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    R3 confidence as weight · R4 rationale that reads · R5 alignment. */
 
 /* ── R1 · headline tiles ───────────────────────────────────────────────── */
-.rc-hero { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.rc-hero-tile {
-  flex: 1 1 128px; min-width: 116px; cursor: help; position: relative; overflow: hidden;
-  padding: 9px 13px; border-radius: 10px;
+.rc-hero { display: flex; flex-wrap: wrap; }
+.rc-hero-tile { min-width: 116px; cursor: help; position: relative; overflow: hidden; border-radius: 10px;
   background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
   border: 1px solid var(--border2);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 14px rgba(0,0,0,0.26);
 }
-.rc-hero-label {
-  display: block; font-family: 'JetBrains Mono', monospace;
-  font-size: 7.5px; letter-spacing: 0.2em; color: var(--text4); margin-bottom: 3px;
+.rc-hero-label { font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.2em; color: var(--text4);
 }
-.rc-hero-val {
-  display: block; font-family: 'Space Grotesk', sans-serif;
-  font-size: 24px; font-weight: 800; line-height: 1; color: var(--text);
+.rc-hero-val { font-family: 'Space Grotesk', sans-serif; font-weight: 800; line-height: 1; color: var(--text);
 }
 .rc-hero-val em {
-  font-style: normal; font-size: 10px; font-weight: 700; margin-left: 3px;
+  font-style: normal; font-weight: 700;
   color: var(--text4); letter-spacing: 0.06em;
 }
-.rc-hero-sub { display: block; margin-top: 4px; font-size: 8.5px; color: var(--text4); }
-.rc-hero-val.rc-split { display: flex; align-items: baseline; gap: 3px; }
+.rc-hero-sub { font-size: 8.5px; color: var(--text4); }
+.rc-hero-val.rc-split { align-items: baseline; gap: 3px; }
 .rc-hero-val.rc-split i { font-style: normal; font-size: 13px; color: var(--text4); }
 .rc-hero-bar {
-  display: block; margin-top: 6px; height: 4px; border-radius: 3px;
+  display: block; border-radius: 3px;
   background: rgba(255,58,96,0.35); overflow: hidden;
 }
 .rc-hero-bar i { display: block; height: 100%; background: #26d07c; border-radius: 3px; }
 .rc-hero-tile.is-top {
-  background: linear-gradient(145deg, rgba(248,198,74,0.14), rgba(248,198,74,0.02));
-  border-color: rgba(248,198,74,0.34);
 }
-.rc-hero-tile.is-top .rc-hero-val { color: var(--gold); text-shadow: 0 0 24px rgba(248,198,74,0.35); }
+.rc-hero-tile.is-top .rc-hero-val { color: var(--gold); }
 .rc-hero-tile.is-top .rc-hero-label { color: rgba(248,198,74,0.75); }
 
 /* ── R2 · one heading per section; bouts read as bouts ─────────────────── */
-.rc-section-head {
-  display: flex; align-items: center; gap: 10px;
-  margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;
-  font-size: 11px; font-weight: 800; letter-spacing: 0.2em;
+.rc-section-head { gap: 10px; font-family: 'Space Grotesk', sans-serif;
 }
-.rc-section-head i { flex: 1 1 auto; height: 1px; background: currentColor; opacity: 0.18; }
-.rc-section-head.rc-badge-main-event { color: var(--orange); }
-.rc-section-head.rc-badge-co-main { color: #2dd4d0; }
-.rc-section-head.rc-badge-main-card { color: var(--text2); }
-.rc-section-head.rc-badge-prelim { color: var(--text3); }
+.rc-section-head i { flex: 1 1 auto; height: 1px; background: currentColor; }
+.rc-section-head.rc-badge-main-event { }
+.rc-section-head.rc-badge-co-main { }
+.rc-section-head.rc-badge-main-card { }
+.rc-section-head.rc-badge-prelim { }
 .rc-fight-group {
-  margin-bottom: 8px; padding: 7px 9px 5px; border-radius: 9px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-  border: 1px solid var(--border2);
-  border-left: 3px solid rgba(255,255,255,0.12);
 }
 .rc-fight-group.rc-badge-main-event { border-left-color: var(--orange); }
 .rc-fight-group.rc-badge-co-main { border-left-color: #2dd4d0; }
@@ -29873,66 +29829,54 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* ── R5 · the row becomes a grid so columns actually line up ───────────── */
 .rc-fighter-row {
   display: grid;
-  grid-template-columns: 168px 74px 52px 30px 66px 74px minmax(0, 1fr);
-  align-items: center; gap: 9px;
-  padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,0.05);
   font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
-  border-radius: 5px; transition: background 0.15s;
 }
-.rc-fighter-row:hover { background: rgba(255,255,255,0.045); }
+.rc-fighter-row:hover { }
 .rc-fighter-row.is-noplay { opacity: 0.55; }
 .rc-name {
-  font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
   color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.rc-line { font-size: 12px; font-weight: 700; color: var(--text); text-align: right; }
-.rc-src { font-size: 8px; color: var(--text4); letter-spacing: 0.08em; }
-.rc-avg { font-size: 9px; color: var(--text4); }
+.rc-line { }
+.rc-src { }
+.rc-avg { }
 
 /* ── R3 · confidence carries weight ────────────────────────────────────── */
-.rc-conf { display: flex; flex-direction: column; gap: 2px; }
-.rc-conf b { font-size: 11px; font-weight: 800; line-height: 1; }
+.rc-conf { }
+.rc-conf b { }
 .rc-conf-bar {
-  display: block; height: 3px; border-radius: 2px;
-  background: rgba(255,255,255,0.09); overflow: hidden;
 }
 .rc-conf-bar u { display: block; height: 100%; border-radius: 2px; }
-.rc-conf.tier-high b { color: #6ee7a8; }
-.rc-conf.tier-high .rc-conf-bar u { background: #26d07c; box-shadow: 0 0 8px rgba(38,208,124,0.5); }
+.rc-conf.tier-high b { }
+.rc-conf.tier-high .rc-conf-bar u { }
 .rc-conf.tier-med b { color: var(--gold); }
 .rc-conf.tier-med .rc-conf-bar u { background: rgba(248,198,74,0.85); }
 .rc-conf.tier-low b { color: var(--text3); }
 .rc-conf.tier-low .rc-conf-bar u { background: rgba(255,255,255,0.28); }
 .rc-conf.is-none { color: var(--text4); }
 /* The strongest reads earn a lit spine so they surface out of a 24-row list. */
-.rc-fighter-row.tier-high { box-shadow: inset 2px 0 0 rgba(38,208,124,0.55); }
+.rc-fighter-row.tier-high { }
 
 /* ── R4 · rationale that reads instead of trailing off ─────────────────── */
-.rc-reason {
-  font-size: 9px; line-height: 1.4; color: var(--text3); cursor: help;
+.rc-reason { cursor: help;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; white-space: normal;
 }
 /* The generic platform-baseline fallback says nothing fighter-specific and
    repeats verbatim across the card — kept, but never competing with real
    reasoning for attention. */
-.rc-reason.is-generic { opacity: 0.45; font-style: italic; }
+.rc-reason.is-generic { }
 
 /* ── R5 · export actions + modal material ──────────────────────────────── */
 .report-modal-box {
   backdrop-filter: blur(22px) saturate(1.2);
-  background:
-    radial-gradient(120% 70% at 12% -8%, rgba(248,198,74,0.06), transparent 62%),
-    linear-gradient(180deg, rgba(22,26,38,0.96), rgba(12,15,23,0.985));
-  border: 1px solid rgba(255,255,255,0.09);
-  box-shadow: 0 34px 90px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
 }
 .rc-event-name {
-  font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 800;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 800;
   color: var(--gold); letter-spacing: 0.01em;
 }
 .rc-event-meta { font-size: 9px; color: var(--text4); margin-top: 2px; }
-.rc-event-header { margin-bottom: 12px; }
+.rc-event-header { }
 
 
 /* ══ GLOW-UP 218b: report card fits the window ════════════════════════════
@@ -29951,28 +29895,23 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 #reportContent::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 4px; }
 .rc-sticky-top {
   position: sticky; top: 0; z-index: 5;
-  background: linear-gradient(180deg, rgba(16,20,29,0.99) 84%, rgba(16,20,29,0));
-  padding-bottom: 6px;
 }
 .report-modal-box { margin: 18px auto !important; padding: 18px !important; }
 
 /* density: the fight block was spending more on chrome than on content */
 .rc-event-header { margin-bottom: 8px; }
 .rc-event-name { font-size: 15px; }
-.rc-hero { gap: 7px; margin-bottom: 8px; }
-.rc-hero-tile { padding: 7px 11px; }
-.rc-hero-val { font-size: 20px; }
-.rc-hero-sub { margin-top: 3px; }
+.rc-hero { }
+.rc-hero-tile { }
+.rc-hero-val { }
+.rc-hero-sub { }
 .rc-hero-bar { margin-top: 5px; height: 3px; }
-.rc-section-head { margin: 10px 0 4px; font-size: 10px; }
-.rc-fight-group { margin-bottom: 5px; padding: 2px 7px; }
+.rc-section-head { }
+.rc-fight-group { }
 .rc-fighter-row {
-  padding: 3px 6px;
-  grid-template-columns: 150px 70px 48px 26px 62px 62px minmax(0, 1fr);
-  gap: 8px;
 }
-.rc-name { font-size: 11.5px; }
-.rc-reason { font-size: 8.5px; line-height: 1.32; }
+.rc-name { }
+.rc-reason { }
 
 
 /* ══ GLOW-UP 219: report card — the last pass ═════════════════════════════
@@ -29981,12 +29920,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* F1 — the stat the lean is actually on, in its own family colour. */
 .rc-fighter-row {
-  grid-template-columns: 148px 68px 34px 52px 24px 58px 74px minmax(0, 1fr);
 }
 .rc-stat-tag {
-  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
-  letter-spacing: 0.08em; text-align: center; cursor: help;
-  padding: 2px 0; border-radius: 4px; background: rgba(255,255,255,0.05);
+  font-family: 'JetBrains Mono', monospace; text-align: center; cursor: help; border-radius: 4px;
 }
 .rc-stat-tag.src-fp { color: rgba(255,255,255,0.8); }
 .rc-stat-tag.src-ss, .rc-stat-tag.src-ss_r1 { color: rgba(44,212,208,0.95); }
@@ -30003,8 +29939,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* F4 — section self-report. */
 .rc-sec-stat {
-  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
-  letter-spacing: 0.06em; opacity: 0.75; cursor: help;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; cursor: help;
 }
 /* GLOW-UP 222 — the section stat counts PLACEABLE leans, so the blocked ones are
    reported beside it rather than folded into the number. Muted, and explicitly
@@ -30030,7 +29965,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* ── L2 · a read is not a bet, and must not look like the best one ───────── */
 .rc-conf.is-muted b { color: var(--text4); font-weight: 700; }
-.rc-fighter-row.is-blocked { background: rgba(255,58,96,0.03); }
+.rc-fighter-row.is-blocked { }
 .rc-fighter-row.is-blocked .rc-name,
 .rc-fighter-row.is-blocked .rc-line { color: var(--text3); }
 .rc-fighter-row.is-blocked .rc-lean-chip { opacity: 0.6; }
@@ -30038,10 +29973,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* ── L3 · the plays, findable without leaving card order ─────────────────── */
 .rc-rank {
-  font-style: normal; font-family: 'JetBrains Mono', monospace;
-  font-size: 8.5px; font-weight: 800; color: var(--gold);
-  margin-right: 5px; letter-spacing: 0.02em; cursor: help;
-  text-shadow: 0 0 10px rgba(248,198,74,0.4);
+  font-style: normal; letter-spacing: 0.02em; cursor: help;
 }
 
 /* ── L4 · the sticky header seals ────────────────────────────────────────
@@ -30060,13 +29992,11 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* ── L5 · the numbers form a column ──────────────────────────────────────
    Tabular figures, so 108.5 and 39.5 line up on the decimal instead of
    drifting with glyph width. */
-.rc-line, .rc-avg, .rc-conf b, .rc-sec-stat { font-variant-numeric: tabular-nums; }
+.rc-line, .rc-avg, .rc-conf b, .rc-sec-stat { }
 
 /* ── L6 · when the bout itself is the read ──────────────────────────────── */
-.rc-fight-note {
-  margin: 1px 4px 3px; padding: 2px 7px; border-radius: 5px; cursor: help;
-  font-family: 'JetBrains Mono', monospace; font-size: 8px;
-  letter-spacing: 0.09em; font-weight: 700; display: inline-block;
+.rc-fight-note { cursor: help;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700;
 }
 .rc-fight-note.is-under { background: rgba(255,58,96,0.1); color: #ff8098; }
 .rc-fight-note.is-over  { background: rgba(38,208,124,0.1); color: #6ee7a8; }
@@ -30094,11 +30024,11 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* ── L10 · narrow windows drop the two supporting columns rather than
    overflowing the eight-column grid. ─────────────────────────────────────── */
 @media (max-width: 900px) {
-  .rc-fighter-row { grid-template-columns: 128px 62px 30px 48px 22px 52px minmax(0, 1fr); }
-  .rc-fighter-row .rc-avg { display: none; }
+  .rc-fighter-row { }
+  .rc-fighter-row .rc-avg { }
 }
 @media (max-width: 720px) {
-  .rc-fighter-row { grid-template-columns: 112px 58px 28px 46px 22px 48px; }
+  .rc-fighter-row { }
   .rc-fighter-row .rc-reason { display: none; }
 }
 
@@ -30113,12 +30043,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* ── L1 · the pick is one object, and the LINE is the anchor ─────────────── */
 .rc-fighter-row {
-  grid-template-columns: 150px 168px 52px minmax(0, 1fr);
-  gap: 12px;
-  padding: 6px 8px;
   align-items: center;
-  border-bottom: none;
-  border-radius: 7px;
 }
 .rc-pick {
   display: grid;
@@ -30131,15 +30056,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   grid-template-columns: 48px auto auto;
   justify-content: start;
   width: 100%;
-  align-items: baseline;
-  gap: 7px;
-  padding: 3px 9px;
   border-radius: 7px;
-  background: rgba(255,255,255,0.035);
-  border: 1px solid rgba(255,255,255,0.07);
-  transition: border-color 0.15s, background 0.15s;
 }
-.rc-fighter-row:hover .rc-pick { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+.rc-fighter-row:hover .rc-pick { }
 /* Direction is the ONLY saturated colour on the row (L4) — small, so it reads
    as a label on the number rather than as a competing block of colour. */
 .rc-dir {
@@ -30152,13 +30071,11 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-pick.rc-none  { color: var(--text4); }
 /* The number you are actually betting. Nothing else on the row is this size. */
 .rc-line {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 15px; font-weight: 800; line-height: 1;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 800;
   color: var(--text); text-align: left;
-  font-variant-numeric: tabular-nums;
 }
 .rc-meta {
-  font-style: normal; display: inline-flex; align-items: center; gap: 5px;
+  font-style: normal; display: inline-flex; align-items: center;
   justify-content: flex-start; white-space: nowrap;
 }
 /* L4 — the stat keeps its family hue (that mapping is load-bearing across the
@@ -30168,17 +30085,16 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   background: none !important; padding: 0 !important;
   font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em; opacity: 0.75;
 }
-.rc-src { font-size: 7.5px; color: var(--text4); letter-spacing: 0.08em; text-align: left; }
+.rc-src { color: var(--text4); text-align: left; }
 .rc-src.is-blocked { opacity: 0.9; }
 .rc-pick.is-none { color: var(--text4); text-align: center; display: block; }
 
 /* ── L2 · evidence recedes: one block, quiet, expands when you ask ───────── */
 .rc-evidence { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .rc-avg {
-  flex: 0 0 auto; font-size: 8.5px; color: var(--text4);
-  letter-spacing: 0.04em; white-space: nowrap;
+  flex: 0 0 auto;
 }
-.rc-avg b { font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums; }
+.rc-avg b { font-variant-numeric: tabular-nums; }
 /* FIX 3 — two tiers, not one. Dimming the whole column took the real
    reasoning down with the boilerplate: a duration adjustment or a projection
    gap is something you want to read, and it was sitting at the same weight as
@@ -30189,17 +30105,12 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* ── L3 · the bout is the unit ──────────────────────────────────────────── */
 .rc-fight-group {
-  margin-bottom: 7px; padding: 5px 7px; border-radius: 10px;
-  background: rgba(255,255,255,0.022);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-left: 1px solid rgba(255,255,255,0.05);
   transition: background 0.18s, border-color 0.18s;
 }
-.rc-fight-group:hover { background: rgba(255,255,255,0.038); border-color: rgba(255,255,255,0.09); }
+.rc-fight-group:hover { }
 /* A hairline between the two fighters only — the pair is the object, so the
    separator belongs INSIDE it, not around every row. */
 .rc-matchup > .rc-fighter-row + .rc-fighter-row {
-  border-top: 1px solid rgba(255,255,255,0.05);
 }
 /* Card position reads from a single accent bar, not from four coloured borders. */
 .rc-fight-group.rc-badge-main-event { border-left: 2px solid rgba(249,115,22,0.75); }
@@ -30215,43 +30126,41 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   display: flex; flex-direction: column; align-items: stretch; gap: 3px;
 }
 .rc-conf b { font-size: 11.5px; font-weight: 800; text-align: right; line-height: 1; }
-.rc-conf.tier-high b { color: var(--text); }
-.rc-conf.tier-med  b { color: var(--text2); }
+.rc-conf.tier-high b { }
+.rc-conf.tier-med  b { }
 .rc-conf.tier-low  b { color: var(--text4); }
 .rc-conf-bar {
-  display: block; width: 100%; height: 3px;
+  display: block; width: 100%;
   border-radius: 2px; overflow: hidden;
-  background: rgba(255,255,255,0.11);
 }
-.rc-conf.tier-high .rc-conf-bar u { background: rgba(255,255,255,0.92); box-shadow: none; }
-.rc-conf.tier-med  .rc-conf-bar u { background: rgba(255,255,255,0.55); }
-.rc-conf.tier-low  .rc-conf-bar u { background: rgba(255,255,255,0.24); }
+.rc-conf.tier-high .rc-conf-bar u { }
+.rc-conf.tier-med  .rc-conf-bar u { }
+.rc-conf.tier-low  .rc-conf-bar u { }
 /* A muted row (push / unplaceable) prints the number and no meter — it is not
    ranked against the plays, so it should not draw a bar next to them. */
 .rc-conf.is-muted b, .rc-conf.is-none { text-align: right; }
 /* The lit spine was a green stripe fighting the green OVER chips two columns
    over. Strength is now a brightness step on the row itself. */
-.rc-fighter-row.tier-high { box-shadow: none; background: rgba(255,255,255,0.03); }
-.rc-fighter-row.is-blocked { background: none; opacity: 0.5; }
+.rc-fighter-row.tier-high { box-shadow: none; }
+.rc-fighter-row.is-blocked { }
 .rc-fighter-row.is-blocked:hover { opacity: 0.85; }
 
 /* ── L5 · rhythm: the section is a quiet rule, not a coloured shout ──────── */
-.rc-section-head {
-  margin: 16px 0 6px; font-size: 9px; font-weight: 700;
-  letter-spacing: 0.26em; color: var(--text4);
+.rc-section-head { font-size: 9px; font-weight: 700;
+  letter-spacing: 0.26em;
 }
-.rc-section-head.rc-badge-main-event { color: rgba(249,115,22,0.85); }
-.rc-section-head.rc-badge-co-main    { color: rgba(45,212,208,0.7); }
+.rc-section-head.rc-badge-main-event { }
+.rc-section-head.rc-badge-co-main    { }
 .rc-section-head.rc-badge-main-card,
-.rc-section-head.rc-badge-prelim     { color: var(--text4); }
+.rc-section-head.rc-badge-prelim     { }
 .rc-section-head i { opacity: 0.1; }
 .rc-section-head:first-child { margin-top: 4px; }
-.rc-sec-stat { opacity: 0.5; letter-spacing: 0.08em; }
+.rc-sec-stat { letter-spacing: 0.08em; }
 /* The fight note sat flush against the rows above it. */
-.rc-fight-note { margin: 4px 2px 1px; font-size: 7.5px; opacity: 0.9; }
+.rc-fight-note { font-size: 7.5px; opacity: 0.9; }
 /* The name carries the row; the star sits above it in the hierarchy. */
 .rc-name { font-size: 12.5px; font-weight: 700; letter-spacing: -0.005em; }
-.rc-rank { font-size: 9px; margin-right: 6px; }
+.rc-rank { }
 
 @media (max-width: 900px) {
   .rc-fighter-row { grid-template-columns: 132px 158px 48px minmax(0, 1fr); gap: 9px; }
@@ -30284,12 +30193,10 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-matchup > .rc-fighter-row + .rc-fighter-row { border-top: 1px solid rgba(255,255,255,0.05); }
 .rc-fighter-row {
   border-radius: 9px;
-  background: rgba(255,255,255,0.018);
   border-top: 1px solid rgba(255,255,255,0.05);
   border-bottom: 1px solid rgba(0,0,0,0.25);
   border-left: 3px solid transparent;
   padding: 6px 10px;
-  transition: background 0.15s, border-color 0.15s;
 }
 /* ── The heat spine: strength on the left edge, same device as the shop's ── */
 .rc-fighter-row.tier-high { border-left-color: #26d07c; background: rgba(38,208,124,0.045); }
@@ -30297,7 +30204,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-fighter-row.tier-low  { border-left-color: rgba(38,208,124,0.18); }
 .rc-fighter-row.is-blocked { border-left-color: rgba(255,58,96,0.35); background: rgba(255,58,96,0.03); opacity: 0.62; }
 .rc-fighter-row.is-push    { border-left-color: rgba(255,255,255,0.12); }
-.rc-fighter-row:hover { background: rgba(255,255,255,0.05); }
+.rc-fighter-row:hover { }
 /* ── Focus: LIFT the bout you are on, rather than dim the other twelve ────
    Dimming was borrowed from the shop, where it quiets thin single rows and
    reads as a highlight. Here a "row" is a whole bout, so hovering knocked half
@@ -30381,9 +30288,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 
 /* With the panel at full width the row can breathe: the name gets room for
    long ones, and the evidence stops being the only thing that flexes. */
-.rc-fighter-row { grid-template-columns: 200px 190px 56px minmax(0, 1fr); gap: 14px; }
+.rc-fighter-row { }
 @media (max-width: 1200px) {
-  .rc-fighter-row { grid-template-columns: 170px 180px 52px minmax(0, 1fr); gap: 11px; }
+  .rc-fighter-row { }
 }
 
 
@@ -30394,8 +30301,6 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    rail and a delta chip — both of which carry information the card could not
    show before. */
 .rc-fighter-row {
-  grid-template-columns: 190px 168px minmax(0, 1fr) 54px 62px 58px;
-  gap: 12px;
 }
 
 /* ── The book rail — the shop's signature, and the answer to "where do I
@@ -30409,7 +30314,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   border: 1px solid rgba(255,255,255,0.07);
 }
 .rc-bk i { font-style: normal; font-size: 7px; font-weight: 800; letter-spacing: 0.08em; color: var(--text4); }
-.rc-bk b { font-size: 10.5px; font-weight: 700; color: var(--text2); font-variant-numeric: tabular-nums; }
+.rc-bk b { font-size: 10.5px; font-weight: 700; color: var(--text2); }
 /* ══ GLOW-UP 242: colour, on the axis that carries meaning ═══════════════
    The rail was fifteen grey boxes with one green one, which is why it still
    read bland. Two changes, both borrowed rather than invented: the book TAG
@@ -30497,7 +30402,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-avg {
   display: inline-block; padding: 2px 6px; border-radius: 5px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-  color: var(--text4); font-size: 8px;
+  color: var(--text4);
 }
 .rc-avg b { font-size: 10px; font-weight: 700; }
 
@@ -30556,7 +30461,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    points. The sentence spent forty words on this. ───────────────────────── */
 .rc-delta {
   font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
-  text-align: right; font-variant-numeric: tabular-nums; cursor: help;
+  text-align: right; cursor: help;
   padding: 2px 6px; border-radius: 5px;
 }
 .rc-delta.pos { color: #8ff0c0; background: rgba(38,208,124,0.13); }
