@@ -30452,7 +30452,12 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* ── The header the card never had ──────────────────────────────────────── */
 .rc-colhead {
   display: grid; align-items: center;
-  padding: 4px 10px 5px;
+  /* Left inset must equal the ROW's total: 9px of fight-group padding (the
+     bracket spine's gutter) plus the row's own 10px. Matching only the row's
+     10px put every label 9px left of its column, and because a grid's tracks
+     are measured from the padding edge the error compounded across the row —
+     BOOKS landed over the spread track and WHY sat clear of its chips. */
+  padding: 4px 10px 5px 19px;
   margin: 6px 0 2px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   font-family: 'JetBrains Mono', monospace;
@@ -30461,6 +30466,9 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-colhead .rc-ch-books { text-align: right; }
 .rc-colhead .rc-ch-r { text-align: right; }
+/* CONF / AVG / Δ are right-aligned in the row too, so their labels sit over the
+   digits rather than over the left edge of tracks that end short of them. */
+.rc-colhead span { overflow: hidden; text-overflow: clip; white-space: nowrap; }
 .rc-colhead span:last-child { cursor: help; }
 
 /* The row gains the shop's surface — a gradient with a lit top edge and a dark
