@@ -30432,6 +30432,37 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-bk.is-blocked { border-style: dashed; opacity: 0.4; background: rgba(255,255,255,0.02); }
 .rc-bk.is-blocked b { text-decoration: line-through; text-decoration-thickness: 1px; }
 
+/* ══ GLOW-UP 243: the column grid holds its shape ════════════════════════
+   The rail column was `auto`, so its width changed with how many books post
+   the prop — a fighter on one book and a fighter on five pushed everything
+   after them to different x positions, and the card lost its columns. Fixed
+   width, right-aligned: chips grow leftward from a constant edge, so the
+   track, the WHY chips and every number below line up down the whole card. */
+.rc-fighter-row,
+.rc-colhead {
+  grid-template-columns: 186px 162px 214px 76px minmax(120px, 1fr) 52px 58px 54px;
+  gap: 11px;
+}
+@media (max-width: 1200px) {
+  .rc-fighter-row,
+  .rc-colhead { grid-template-columns: 152px 148px 176px 62px minmax(90px, 1fr) 46px 52px 50px; gap: 7px; }
+}
+.rc-books { justify-content: flex-end; }
+
+/* ── The header the card never had ──────────────────────────────────────── */
+.rc-colhead {
+  display: grid; align-items: center;
+  padding: 4px 10px 5px;
+  margin: 6px 0 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px; font-weight: 800; letter-spacing: 0.22em;
+  color: var(--text4);
+}
+.rc-colhead .rc-ch-books { text-align: right; }
+.rc-colhead .rc-ch-r { text-align: right; }
+.rc-colhead span:last-child { cursor: help; }
+
 /* The row gains the shop's surface — a gradient with a lit top edge and a dark
    bottom one, which is what stops a dark row reading as a flat void. */
 .rc-fighter-row {
@@ -30443,6 +30474,68 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-fighter-row:hover { background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03)); }
 /* The average was grey text between two coloured chips. */
 .rc-avg b { color: var(--text2); }
+
+
+/* ══ GLOW-UP 244: further evolution ══════════════════════════════════════ */
+
+/* ── 1 · the average becomes a chip, so the three numeric columns read as
+   three chips rather than chip / text / chip. ───────────────────────────── */
+.rc-avg {
+  display: inline-block; padding: 2px 6px; border-radius: 5px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  color: var(--text4); font-size: 8px;
+}
+.rc-avg b { font-size: 10px; font-weight: 700; }
+
+/* ── 2 · alternating bouts, so pairs separate without another border ────── */
+.rc-fight-group:nth-of-type(even) .rc-fighter-row {
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+}
+.rc-fight-group:nth-of-type(even) .rc-fighter-row:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.085), rgba(255,255,255,0.04));
+}
+
+/* ── 3 · TOP PICK is the card's headline, so it outranks its neighbours ─── */
+.rc-hero-tile.is-top {
+  flex: 1.35 1 200px;
+  border-color: rgba(248,198,74,0.5);
+  background: linear-gradient(135deg, rgba(248,198,74,0.2), rgba(248,198,74,0.03));
+  box-shadow: 0 0 22px rgba(248,198,74,0.12), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.rc-hero-tile.is-top .rc-hero-val { font-size: 20px; text-shadow: 0 0 22px rgba(248,198,74,0.45); }
+.rc-hero-tile.is-top .rc-hero-sub { color: rgba(248,198,74,0.85); }
+
+/* ── 4 · the spread track earns its width: a wide one is the signal ─────── */
+.rc-spread.is-wide .rc-spread-track {
+  background: linear-gradient(90deg, rgba(255,58,96,0.5), rgba(255,255,255,0.15), rgba(38,208,124,0.75));
+  box-shadow: 0 0 8px rgba(38,208,124,0.2);
+}
+
+/* ── 5 · the fight note stops being a floating pill and becomes a footer
+   on the bout it belongs to. ───────────────────────────────────────────── */
+.rc-fight-note {
+  display: block; margin: 3px 0 0; border-radius: 0 0 7px 7px;
+  padding: 3px 10px; letter-spacing: 0.12em;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ── 6 · the section rule spans the card and carries its own count ──────── */
+.rc-section-head { display: flex; align-items: center; }
+.rc-section-head > span:first-child { flex: 0 0 auto; }
+
+/* ── 7 · a blocked row reads as struck through end to end ──────────────── */
+.rc-fighter-row.is-blocked .rc-name { text-decoration: line-through; text-decoration-color: rgba(255,58,96,0.4); }
+
+/* ── 8 · focus: the hovered bout is lit, the rest recede further ────────── */
+#reportContent:hover .rc-fight-group:not(:hover) { opacity: 0.42; }
+#reportContent .rc-fight-group:hover { opacity: 1; }
+
+/* ── 9 · the scrollbar stops being a system artifact ────────────────────── */
+#reportContent::-webkit-scrollbar-thumb { background: rgba(248,198,74,0.22); }
+#reportContent::-webkit-scrollbar-thumb:hover { background: rgba(248,198,74,0.4); }
+
+/* ── 10 · the panel edge picks up the gold the header uses ──────────────── */
+.report-modal-box { border-color: rgba(248,198,74,0.16) !important; }
 
 /* ── The delta: the gap between his history and the line, and which way it
    points. The sentence spent forty words on this. ───────────────────────── */
