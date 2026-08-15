@@ -29735,6 +29735,44 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .ls-empty-row { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
 
 
+/* ══ GLOW-UP 233: the shop fits the window, at 100% zoom ══════════════════
+   Every previous attempt widened it. Width was never the constraint — the
+   table's intrinsic minimum is 940px against ~1330 available, so it has been
+   fitting horizontally all along. The panel runs off the BOTTOM: 22 rows plus
+   three hero tiles, a control strip and a bias strip is taller than the
+   viewport, and zooming to 67% was the only way to see the list. Widening
+   cannot fix a vertical overflow.
+
+   The report card has done this correctly since 218b — cap the list, scroll it
+   inside the panel, pin the header. The shop simply never got it. */
+.lineshop-modal-box {
+  max-height: calc(100vh - 16px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+#lineShopContent {
+  flex: 1 1 auto;
+  min-height: 0;             /* or the flex child refuses to shrink and scroll */
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.18) transparent;
+}
+#lineShopContent::-webkit-scrollbar { width: 8px; height: 8px; }
+#lineShopContent::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 4px; }
+/* The column headers already carry `position: sticky; top: 0` — they only had
+   nothing to stick to, because the scroll container was the page. Now they pin
+   to the list itself, so FP / SS / TD stay legible however far you scroll. */
+.lineshop-table th { top: -1px; }
+
+/* Density: with the list scrolling, this is about seeing MORE rows per screen
+   rather than about fitting at all. Small trims only — the values are tight. */
+.lineshop-table { border-spacing: 0 2px; }
+.lineshop-modal-box .lineshop-table td { padding-top: 3px !important; padding-bottom: 3px !important; }
+.ls-track { height: 7px; margin: 3px 3px 0; }
+
+
 /* ══ GLOW-UP 218: PRE-EVENT REPORT CARD — five-level pass ═════════════════
    The card had the right content and no voice: a four-value summary run
    together in one grey line, "MAIN CARD" printed five times, every confidence
