@@ -30360,6 +30360,37 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-books { justify-content: flex-end; }
 
+/* ── GLOW-UP 245 · the sort strip, in the shop's control language ───────── */
+.rc-sortbar {
+  display: flex; align-items: center; gap: 5px;
+  margin: 4px 0 2px; padding: 3px 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.rc-sort-label { font-size: 7px; font-weight: 800; letter-spacing: 0.22em; color: var(--text4); margin-right: 2px; }
+.rc-sort-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+  letter-spacing: 0.1em; cursor: pointer; padding: 3px 9px; border-radius: 5px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text3); transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.rc-sort-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.rc-sort-btn.on {
+  background: rgba(248,198,74,0.16); border-color: rgba(248,198,74,0.5); color: var(--gold);
+}
+/* Says out loud that the card is no longer in running order — otherwise a
+   flattened list looks like the bouts have gone missing. */
+.rc-sort-note {
+  margin-left: auto; font-size: 7.5px; letter-spacing: 0.08em;
+  color: rgba(248,198,74,0.7);
+}
+/* Flat mode has no bout to bracket, so the group loses its spine and gutter. */
+.rc-fight-group.rc-flat { padding-left: 0; margin-bottom: 0; }
+.rc-fight-group.rc-flat::before { display: none; }
+.rc-fight-group.rc-flat .rc-matchup { gap: 2px; }
+/* The header's inset matches the row's, and in flat mode the row loses the
+   bracket gutter — so the header has to lose it too or the columns shear. */
+.rc-colhead.is-flat { padding-left: 10px; }
+
 /* ── The header the card never had ──────────────────────────────────────── */
 .rc-colhead {
   display: grid; align-items: center;
