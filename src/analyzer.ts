@@ -25278,9 +25278,23 @@ async function generateReportCard(): Promise<void> {
         ? `<span class="rc-spread${railSpan >= 5 ? ' is-wide' : ''}" title="${railBooks.length} books, ${railMin} to ${railMax} — a ${railSpan.toFixed(1)} point spread on the same prop.${railSpan >= 5 ? ' That is a wide disagreement; the book you choose matters as much as the side.' : ''}">`
           + `<i class="rc-spread-track"></i>`
           + railBooks.map((c, i) => `<i class="rc-spread-dot${i === 0 ? ' is-best' : ''}" style="left:${pctOf(c.v).toFixed(1)}%"></i>`).join('')
-          + (line != null ? `<i class="rc-spread-pick" style="left:${pctOf(line).toFixed(1)}%"></i>` : '')
           + `</span>`
         : `<span class="rc-spread is-flat"${railBooks.length ? ' title="Every book posting this prop has the same number — nothing to shop."' : ''}></span>`;
+      // ── GLOW-UP 241 — the WHY, as chips ──────────────────────────────────
+      // 240 handed the row's flexible column to a rail that stretched ~900px
+      // for a three-book spread, which made rows look stretched rather than
+      // full — and its gold pick-ring was redundant: leanBestBook returns the
+      // lowest line for an OVER and the highest for an UNDER, so the pick is
+      // ALWAYS an endpoint and the ring always marked the dot already lit.
+      //
+      // The space goes to factor chips instead — the same ✓/✗ treatment Best
+      // Picks uses, via the same pickDistinctFactors/factorChipHtml pair, so
+      // the two surfaces cannot describe one lean differently. This also gets
+      // the reasoning back ON the card, in a form you can actually scan, after
+      // 239 moved it into a tooltip.
+      const factorsEl = `<span class="rc-factors">`
+        + pickDistinctFactors(el.reasons, 3).map(r => factorChipHtml(r, el.lean, 'rc-fchip')).join('')
+        + `</span>`;
       // 2. The DELTA chip. "avg 80.4" beside a line of 83.5 makes you do the
       //    subtraction; the number that matters is the gap and which way it
       //    points. Green when the fighter's history supports the side being
@@ -25302,6 +25316,7 @@ async function generateReportCard(): Promise<void> {
         ${pickEl}
         ${railEl}
         ${spreadEl}
+        ${factorsEl}
         ${confEl}
         ${avgEl}
         ${deltaEl}
