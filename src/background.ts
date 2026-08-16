@@ -736,6 +736,7 @@ async function fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; incl
 async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; includeZeroResults?: boolean; recentOnly?: boolean }): Promise<{ settled: number; skipped: number; errors: string[]; purged?: number }> {
   let settled = 0, skipped = 0;
   let _purgedGhosts = 0;
+  let _shadowFixed = 0;
   const errors: string[] = [];
 
   // Inline normalizers matching PropArchiveService logic
@@ -749,6 +750,36 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
   for (const [k, v] of Object.entries(NAME_ALIASES)) _aliasLC[_baseNorm(k)] = _baseNorm(v);
   const _normName  = (s: string) => { const base = _baseNorm(s); return _aliasLC[base] || base; };
   const _normEvent = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+  // ── Shadow rows: one card, two raw event names ───────────────────────────
+  // The archive stores the RAW event string, and the same card can arrive under
+  // two of them — UFC 330 sat as both "UFC 330: Makhachev vs. Machado Garry" and
+  // "UFC Fight Night: Ian Machado Garry vs Islam Makhachev". _normEvent only
+  // lowercases, so those never match and a settle reaches exactly one spelling.
+  // The other keeps whatever it was first written with, forever.
+  //
+  // That is invisible until something reads the archive by a LOOSER key: the
+  // analyzer's eventDedupeKey pairs the two headline surnames, so both rows match
+  // there and `allRows.find` returns whichever sits earlier — the stale twin can
+  // win. On UFC 330 that graded Ribovics' FP against 57.2 while the settled row
+  // said 97.17, and Turner's against 43.8 while his said 128.8.
+  //
+  // Mirrors analyzer.ts eventDedupeKey exactly. Keep them in step.
+  const _evDupeKey = (name: string): string => {
+    const m = name.match(/:\s*(.+?)\s+vs\.?\s+(.+)/i);
+    if (!m) return name.toLowerCase().trim();
+    const a = m[1].trim().split(/\s+/).pop()!.toLowerCase();
+    const b = m[2].trim().split(/\s+/).pop()!.toLowerCase();
+    return [a, b].sort().join('|');
+  };
+  // Same headline pair AND same calendar day. The date is what keeps a rematch
+  // ("Makhachev vs Garry 2") from being treated as the same card as the first
+  // fight — the surname pair alone would collide.
+  const _dayOf = (d: string): string => {
+    const ts = Date.parse(d);
+    return Number.isFinite(ts) ? new Date(ts).toISOString().slice(0, 10) : '';
+  };
+  const _dupeResKey = (fighter: string, event: string, propType: string, date: string) =>
+    `${_normName(String(fighter || ''))}|${_evDupeKey(String(event || ''))}|${_normProp(String(propType || ''))}|${_dayOf(String(date || ''))}`;
   const _normProp  = (v: string) => {
     if (/^ss[\s_]*body$/i.test(v)) return 'ss_body';
     if (/^ss[\s_]*leg$/i.test(v)) return 'ss_leg';
@@ -785,6 +816,9 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
     const _resKey = (fighter: string, event: string, propType: string) =>
       `${_normName(String(fighter || ''))}|${_normEvent(String(event || ''))}|${_normProp(String(propType || ''))}`;
     const resolvedKeys = new Map<string, number>();
+    // Results from THIS run, keyed loosely enough to reach a twin row filed under
+    // the other event name for the same card on the same day.
+    const resolvedDupe = new Map<string, number>();
 
     // For each event we successfully matched + parsed on UFCStats, record the roster of fighter
     // surnames that actually fought. Any unresolved row under a graded event whose fighter is NOT
@@ -808,6 +842,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
         if (Number.isFinite(Number(row.result)) && !opts?.includeZeroResults) continue; // already resolved
         row.result = result;
         resolvedKeys.set(_resKey(String(row.fighter || ''), nEvent, nProp), result);
+        resolvedDupe.set(_dupeResKey(String(row.fighter || ''), String(row.event || ''), nProp, String(row.date || '')), result);
         count++;
       }
       return count;
@@ -1138,13 +1173,28 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           if (lineOk && (!hasResult || (opts?.includeZeroResults && Number(row.result) === 0))) {
             const r = resolvedKeys.get(_resKey(String(row.fighter || ''), String(row.event || ''), String(row.propType || '')));
             if (r !== undefined) { row.result = r; reapplied++; }
+          } else if (lineOk && hasResult) {
+            // A row that ALREADY holds a result is normally left alone — that is what
+            // keeps a re-settle from churning the archive. The one exception is a
+            // shadow row: same fighter, same prop, same DAY, same headline pairing,
+            // but filed under the other event spelling and carrying a value this run
+            // just superseded. Its number is stale by construction, and because the
+            // ledger's looser key can pick it over the settled row, leaving it is
+            // what produced the mis-grades. Narrow on purpose: an exact-key match
+            // was already handled above, and a same-value twin is left untouched so
+            // the counter only reports real corrections.
+            const d = resolvedDupe.get(_dupeResKey(String(row.fighter || ''), String(row.event || ''), String(row.propType || ''), String(row.date || '')));
+            if (d !== undefined && Number(row.result) !== d) {
+              console.log(`[UFC Settle] shadow row corrected: ${row.fighter} ${row.propType} @ "${row.event}" ${row.result} -> ${d}`);
+              row.result = d; _shadowFixed++;
+            }
           }
           kept.push(row);
         }
         keptLen = kept.length;
         return kept;
       });
-      console.log(`[UFC Settle] Wrote ${keptLen} records to storage (re-applied ${reapplied} results, purged ${_purgedGhosts} foreign ghost(s)) [locked]`);
+      console.log(`[UFC Settle] Wrote ${keptLen} records to storage (re-applied ${reapplied} results, corrected ${_shadowFixed} shadow row(s), purged ${_purgedGhosts} foreign ghost(s)) [locked]`);
 
       // Post-write verification — confirms values actually landed in storage
       const _verify = await new Promise<any>((res) => chrome.storage.local.get(['prop_archive_v1'], res));
