@@ -30379,6 +30379,82 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-books { justify-content: flex-end; }
 
+/* ── GLOW-UP 248 · the Archive calibration curve, which never had a stylesheet ──
+   Two renderers draw this chart. The Calibration TAB uses inline styles, so it has
+   always looked right. The ARCHIVE copy is the richer of the two — score ring,
+   legend, breakeven line, per-stat blocks — and was written entirely against
+   `cal-*` classes that were never authored. `git log -S'.cal-col'` returns nothing:
+   not deleted, never written.
+
+   With no CSS every element fell back to display:block, so the bars vanished and
+   each column collapsed into a stack of text. Worse than ugly: the delta label is
+   the FIRST child of a column, so stacked it prints directly beneath the PREVIOUS
+   bucket's labels and reads as belonging to it. Every delta appeared attached to
+   the wrong bucket, which is exactly how a -2% got read against the 50-54% row. A
+   chart that silently re-labels its own data is worse than no chart. */
+.cal-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.cal-score { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 800; line-height: 1; }
+.cal-score i { font-style: normal; font-size: 11px; opacity: 0.5; font-weight: 600; }
+.cal-score-good { color: var(--green); }
+.cal-score-warn { color: var(--gold); }
+.cal-score-bad  { color: #ff6c88; }
+.cal-verdict { font-size: 11px; color: var(--text2); font-weight: 600; }
+.cal-samples { font-size: 10px; color: var(--text4); margin-left: auto; }
+
+.cal-legend { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 9px; color: var(--text4); letter-spacing: 0.04em; }
+.cal-key { display: inline-flex; align-items: center; gap: 4px; }
+.cal-key::before { content: ''; width: 10px; height: 8px; border-radius: 2px; }
+.cal-key-pred::before   { border: 1px dashed rgba(125,145,190,0.7); }
+.cal-key-actual::before { background: var(--green); }
+.cal-key-be::before     { height: 0; border-top: 1px dashed rgba(248,198,74,0.8); border-radius: 0; }
+
+/* flex-end so unequal bar heights sit on one baseline */
+.cal-chart { display: flex; align-items: flex-end; gap: 4px; padding: 4px 0 2px; overflow-x: auto; }
+.cal-col { flex: 1 1 0; min-width: 46px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* Thin cells read lightly — the same honesty the diagnosis panel now enforces. */
+.cal-col.cal-low-n { opacity: 0.55; }
+
+.cal-diff { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.02em; }
+.cal-diff-good { color: var(--green); }
+.cal-diff-warn { color: var(--gold); }
+.cal-diff-bad  { color: #ff6c88; }
+
+/* Height comes from the inline style; this only supplies the positioning context. */
+.cal-track { position: relative; width: 100%; border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)); }
+.cal-be { position: absolute; left: -2px; right: -2px; height: 0; border-top: 1px dashed rgba(248,198,74,0.55); z-index: 3; pointer-events: none; }
+/* Predicted is the dashed ghost; actual is the solid bar drawn over it. */
+.cal-pred { position: absolute; left: 0; right: 0; bottom: 0; border: 1px dashed rgba(125,145,190,0.55); border-bottom: none; border-radius: 4px 4px 0 0; z-index: 1; }
+.cal-actual { position: absolute; left: 3px; right: 3px; bottom: 0; border-radius: 4px 4px 0 0; z-index: 2; transition: height 0.25s ease; }
+.cal-actual-good { background: linear-gradient(180deg, #2ee89a, #17b877); }
+.cal-actual-warn { background: linear-gradient(180deg, #f8c64a, #d99b1f); }
+.cal-actual-bad  { background: linear-gradient(180deg, #ff8098, #e04a6a); }
+
+.cal-rate  { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; color: var(--text); }
+.cal-range { font-size: 9px; color: var(--text3); }
+.cal-n     { font-size: 8px; color: var(--text4); }
+
+.cal-stat-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(125,145,190,0.12); }
+.cal-stat-head { font-size: 9px; color: var(--text4); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+.cal-stat-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.cal-stat-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; min-width: 22px; }
+/* Stat family owns its hue, matching the board. */
+.cal-stat-fp { color: #f8c64a; }
+.cal-stat-ss { color: #5ac8fa; }
+.cal-stat-td { color: #b07cff; }
+.cal-stat-ft { color: #2ee89a; }
+.cal-dots { display: flex; gap: 3px; align-items: center; }
+.cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cal-dot-good { background: var(--green); }
+.cal-dot-warn { background: var(--gold); }
+.cal-dot-bad  { background: #ff6c88; }
+.cal-dot-empty { background: rgba(125,145,190,0.12); border: 1px solid rgba(125,145,190,0.18); }
+.cal-dot-thin { opacity: 0.4; }
+.cal-stat-rate { font-family: 'JetBrains Mono', monospace; font-size: 10px; margin-left: auto; }
+.cal-rate-good { color: var(--green); }
+.cal-rate-warn { color: var(--gold); }
+.cal-rate-bad  { color: #ff6c88; }
+
 /* ── GLOW-UP 245 · the sort strip, in the shop's control language ───────── */
 .rc-sortbar {
   display: flex; align-items: center; gap: 5px;
