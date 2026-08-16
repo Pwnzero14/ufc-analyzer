@@ -13558,15 +13558,41 @@ async function renderArchivePanel(container) {
         if (!candidates.length || line == null || !Number.isFinite(Number(line)))
             return { outcome: 'pending', actual: null };
         const fighterNorm = normalizeName(fighterRaw)?.toLowerCase() || fighterRaw.toLowerCase();
-        const match = allRows.find(r => {
-            const ts = Date.parse(r.date);
-            return eventDedupeKey(r.event || '') === evDk
-                && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
-                && candidates.includes(String(r.propType))
-                && Number.isFinite(Number(r.result))
-                && Number.isFinite(ts)
-                && ts <= nowTs;
-        });
+        // ── The candidate list is PRIORITY-ORDERED; honour it ────────────────
+        // This used to be one `allRows.find` with `candidates.includes(propType)`,
+        // which returns whichever row sits earliest in allRows and so ignored the
+        // order entirely. propTypesFor is explicitly a preference list — 'Fantasy'
+        // then 'Fantasy_PP' for Pick6/UD/Betr, reversed for PrizePicks — because the
+        // two are DIFFERENT RULEBOOKS, not two copies of one number: PrizePicks
+        // scores no control time, no non-sig strikes, and a decision win at 10
+        // against 30. Grading an Underdog leg against the PP total is grading it
+        // against a sport it wasn't placed in.
+        //
+        // It stayed hidden until an event settled. The settle path writes one row;
+        // the UFCStats backfill writes BOTH Fantasy and Fantasy_PP, and only runs
+        // once the card lands in fighters' fight history — i.e. after the event. So
+        // pre-settle there was nothing to pick wrongly, and post-settle the live
+        // resolve started disagreeing with outcomes the Placed Ledger had already
+        // frozen. Esteban Ribovics OVER 93.99 FP @ Underdog, UFC 330: 97.2 by
+        // Fantasy scoring (a hit, as the Placed Ledger had persisted), graded a miss
+        // in the Parlay Ledger against his PP-scored total.
+        //
+        // Now also load-bearing for CTRL, whose candidates are ['ctrl','Control'] —
+        // 'ctrl' is the settled row that carries the line and must win.
+        let match;
+        for (const want of candidates) {
+            match = allRows.find(r => {
+                const ts = Date.parse(r.date);
+                return eventDedupeKey(r.event || '') === evDk
+                    && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
+                    && String(r.propType) === want
+                    && Number.isFinite(Number(r.result))
+                    && Number.isFinite(ts)
+                    && ts <= nowTs;
+            });
+            if (match)
+                break;
+        }
         if (!match)
             return { outcome: 'pending', actual: null };
         const actual = normalizeArchiveResult(String(match.propType), Number(match.result));
