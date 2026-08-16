@@ -10,6 +10,7 @@ import {
 } from './types/index.js';
 import { CONFIG, FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES } from './config/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
+import { calcFPForPlatform } from './analyzer/fantasy-scoring.js';
 
 // ── IN-MEMORY STORE ────────────────────────────────────────────────────
 const store = { pick6: null as any, underdog: null as any, betr: null as any, prizepicks: null as any, draftkings_sportsbook: null as any };
@@ -604,26 +605,14 @@ function parseCtrlTime(ctrl: string): number {
 function computeFP(stats: {
   sigStrikes: number; totalStrikes: number; td: number; kd: number;
   rev: number; ctrlSecs: number; won: boolean; method: string; round: number;
+  timeSecs: number;
 }): number {
-  const nonSig = Math.max(0, stats.totalStrikes - stats.sigStrikes);
-  let fp = stats.sigStrikes * FANTASY_SCORING.sigStrike
-    + nonSig * FANTASY_SCORING.nonSigStrike
-    + stats.td * FANTASY_SCORING.takedown
-    + stats.kd * FANTASY_SCORING.knockdown
-    + stats.rev * FANTASY_SCORING.reversal
-    + stats.ctrlSecs * FANTASY_SCORING.controlTimePerSec;
-  if (stats.won) {
-    const m = stats.method.toLowerCase();
-    const isFin = m.includes('ko') || m.includes('tko') || m.includes('sub');
-    if (isFin) {
-      if (stats.round === 1) fp += FANTASY_SCORING.winBonus.round1;
-      else if (stats.round === 2) fp += FANTASY_SCORING.winBonus.round2;
-      else if (stats.round === 3) fp += FANTASY_SCORING.winBonus.round3;
-      else fp += FANTASY_SCORING.winBonus.round4Plus;
-    } else {
-      fp += FANTASY_SCORING.winBonus.decision;
-    }
-  }
+  // Delegates to the SAME scorer the analyzer uses. This function reimplemented
+  // it and drifted: it never awarded quickWinBonus, so every sub-60-second round-1
+  // finish settled 25 points light, and its finish test (`includes('ko')`) and the
+  // shared one (`/DEC/i`) disagreed on which methods count.
+  let fp = calcFPForPlatform('pick6', stats.sigStrikes, stats.totalStrikes, stats.ctrlSecs,
+    stats.timeSecs, stats.kd, stats.td, stats.rev, null, stats.won, stats.method, stats.round);
   return Math.round(fp * 10) / 10;
 }
 
@@ -633,22 +622,12 @@ function computeFP_PP(stats: {
   sigStrikes: number; td: number; kd: number; sub: number;
   won: boolean; method: string; round: number;
 }): number {
-  const s = PRIZEPICKS_SCORING;
-  let fp = stats.sigStrikes * s.sigStrike
-    + stats.td * s.takedown
-    + stats.kd * s.knockdown
-    + stats.sub * s.submissionAttempt;
-  if (stats.won) {
-    const m = stats.method.toLowerCase();
-    const isFin = m.includes('ko') || m.includes('tko') || m.includes('sub');
-    if (isFin) {
-      if (stats.round === 1) fp += s.winBonus.round1;
-      else if (stats.round === 2) fp += s.winBonus.round2;
-      else if (stats.round === 3) fp += s.winBonus.round3;
-      else fp += s.winBonus.round4Plus;
-    } else {
-      fp += s.winBonus.decision;
-    }
+  // Same delegation as computeFP — this copy had the identical divergent finish
+  // test. PrizePicks has no quick-finish bonus, which calcFPForPlatform already
+  // knows, so the platform key is the only difference between the two calls.
+  let fp = calcFPForPlatform('prizepicks', stats.sigStrikes, null, null,
+    null, stats.kd, stats.td, null, stats.sub, stats.won, stats.method, stats.round);
+  if (false) {
   }
   return Math.round(fp * 10) / 10;
 }
@@ -676,7 +655,12 @@ async function fetchFightDetails(url: string): Promise<Array<{
     const methodM = html.match(/Method:[^<]*<\/i>\s*([A-Za-z][^<\n]+)/i);
     const roundM  = html.match(/Round:[^<]*<\/i>\s*(\d+)/i);
     const timeM   = html.match(/Time:[^<]*<\/i>\s*(\d+):(\d+)/i);
-    const method = methodM ? methodM[1].trim() : 'Decision';
+    // Fallback is EMPTY, not 'Decision'. A miss here used to mint a decision out
+    // of nothing, and the scorer pays a decision (30) where a round-1 finish pays
+    // 90 + 25 — so an unreadable method quietly cost 85 points and looked like a
+    // real score. Empty leaves the round to decide, which is the honest read: a
+    // fight that ended in round 1 or 2 cannot have gone to the cards.
+    const method = methodM ? methodM[1].trim() : '';
     const round  = roundM  ? parseInt(roundM[1]) : 3;
     // Total fight time in minutes: completed rounds + time in last round
     const lastRoundMins = timeM ? (parseInt(timeM[1]) + parseInt(timeM[2]) / 60) : 5;
@@ -977,7 +961,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
 
       for (const f of allFightResults) {
         if (!f.name) continue;
-        const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
+        const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, timeSecs: Math.round(f.fightTimeMins * 60), won: f.won, method: f.method, round: f.round });
         const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
 
         // Try exact name first, then abbreviated first-initial match (e.g. "M Aswell" → "Michael Aswell Jr")
@@ -1106,7 +1090,7 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
           const last = archiveName.trim().split(/\s+/).pop()?.toLowerCase();
           const f = last ? cardLastNameMap.get(last) : undefined;
           if (!f) { console.log(`[UFC Settle] Fallback: no card result for archive name "${archiveName}" (last="${last}")`); skipped++; continue; }
-          const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, won: f.won, method: f.method, round: f.round });
+          const fp = computeFP({ sigStrikes: f.ss, totalStrikes: f.totalStr, td: f.td, kd: f.kd, rev: f.rev, ctrlSecs: f.ctrlSecs, timeSecs: Math.round(f.fightTimeMins * 60), won: f.won, method: f.method, round: f.round });
           const fpPP = computeFP_PP({ sigStrikes: f.ss, td: f.td, kd: f.kd, sub: f.sub, won: f.won, method: f.method, round: f.round });
           const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
           const n = applyResult([archiveName], archiveEvent, 'SS', f.ss)
