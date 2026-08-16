@@ -16003,14 +16003,33 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   }
 
   // Per-bucket overconfidence detection
+  // ── GLOW-UP 247 — the diagnosis fires on the SHRUNK rate ────────────────
+  // The curve above deliberately plots RAW hits/total; that is the honest picture
+  // of what happened. But this panel turns those rates into ADVICE, and raw rates
+  // in a thin cell are not evidence. On UFC 330's data an n=8 cell (5/8) produced
+  // "85-89% Confidence is Overconfident, -24%, treat A-grade as C-grade" — sitting
+  // beside an n=87 finding, styled identically and shouting louder for having the
+  // bigger number. One fight flipping in that cell moves it 12 points.
+  //
+  // So the THRESHOLD now reads the same shrunk rate the recalibration engine
+  // already applies (K=6 phantom observations at the bucket's own midpoint), while
+  // the body still reports the raw hits/total, because what actually happened is
+  // what you want to read. Effect on this data: the n=8 card stops firing (shrinks
+  // to -14, under the bar) and the n=87 one survives at -16. Exactly the sort.
   for (const b of calibBuckets) {
     if (b.total < 5) continue;
     const actual = Math.round((b.hits / b.total) * 100);
-    const diff = actual - b.midpoint;
+    const shrunk = shrunkRecalRate(b.hits, b.total, b.midpoint);
+    const diff = shrunk - b.midpoint;
+    const rawDiff = actual - b.midpoint;
+    // Named so the card can say when the raw number is louder than the evidence.
+    const thin = Math.abs(rawDiff - diff) >= 5
+      ? ` Raw is ${rawDiff > 0 ? '+' : ''}${rawDiff}pts on ${b.total} pick${b.total === 1 ? '' : 's'}; shrunk toward the model's own prior it is ${diff > 0 ? '+' : ''}${diff}, which is what this card is graded on.`
+      : '';
     if (diff <= -15) {
       diagCards.push({
         title: `${b.rangeLabel} Confidence is Overconfident`,
-        body: `Picks rated ${b.rangeLabel} confidence actually hit at only ${actual}% (${b.hits}/${b.total}). The model overestimates its certainty in this range by ${Math.abs(diff)} points.`,
+        body: `Picks rated ${b.rangeLabel} confidence actually hit at only ${actual}% (${b.hits}/${b.total}). The model overestimates its certainty in this range by ${Math.abs(diff)} points.${thin}`,
         action: `Treat "${getConfidenceGrade(b.midpoint)}-grade" picks in this range as ${getConfidenceGrade(actual)}-grade. The recalibration engine below auto-corrects this.`,
         severity: diff <= -25 ? 'red' : 'amber',
         badge: `${diff > 0 ? '+' : ''}${diff}%`,
@@ -16018,7 +16037,7 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
     } else if (diff >= 10 && actual >= 60) {
       diagCards.push({
         title: `${b.rangeLabel} Confidence is Underconfident`,
-        body: `Picks rated ${b.rangeLabel} actually hit at ${actual}% — the model is more accurate than it thinks here (+${diff}pts). These are hidden value picks.`,
+        body: `Picks rated ${b.rangeLabel} actually hit at ${actual}% — the model is more accurate than it thinks here (+${diff}pts). These are hidden value picks.${thin}`,
         action: `This is good! Picks in this range are better than their confidence label suggests.`,
         severity: 'green',
         badge: `+${diff}%`,
@@ -16035,8 +16054,16 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
     const totalN = active.reduce((s, b) => s + b.total, 0);
     const overallRate = Math.round((totalHits / totalN) * 100);
     const avgPredicted = Math.round(active.reduce((s, b) => s + b.midpoint * b.total, 0) / totalN);
-    const gap = overallRate - avgPredicted;
+    // GLOW-UP 247: same treatment per stat type, plus a hard volume floor. TD on
+    // UFC 330 read "Deflated by 41pts — hidden edge, high-value targets" off
+    // 10/11. A 20-point gap is indistinguishable from luck at n=11, and calling
+    // it a hidden edge invites staking into noise. 20 is the point where a gap
+    // this size starts to mean something; below it the card simply stays quiet
+    // rather than making a claim the sample cannot carry.
+    const shrunkRate = shrunkRecalRate(totalHits, totalN, avgPredicted);
+    const gap = shrunkRate - avgPredicted;
     const label = pt === 'FightTime' ? 'FT' : pt === 'Fantasy' ? 'FP' : pt;
+    if (totalN < 20) continue;
     if (Math.abs(gap) >= 12) {
       diagCards.push({
         title: `${label} Confidence ${gap < 0 ? 'Inflated' : 'Deflated'} by ${Math.abs(gap)}pts`,
