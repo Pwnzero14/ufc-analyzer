@@ -14569,7 +14569,7 @@ async function renderArchivePanel(container) {
             const predictedH = Math.round((predicted / 100) * maxBarH);
             const actualH = Math.max(3, Math.round((actualRate / 100) * maxBarH));
             const barCls = actualRate >= predicted - 3 ? 'good' : actualRate >= predicted - 12 ? 'warn' : 'bad';
-            const lowN = b.total < 5;
+            const lowN = b.total < CALIB_THIN_N;
             return `<div class="cal-col${lowN ? ' cal-low-n' : ''}">
         <span class="cal-diff cal-diff-${diffCls}" title="Actual minus predicted for this bucket${lowN ? ' — thin sample, read lightly' : ''}">${diffSign}${diff}%</span>
         <div class="cal-track" style="height:${maxBarH}px">
@@ -14589,7 +14589,7 @@ async function renderArchivePanel(container) {
             const active = buckets.filter(b => b.total > 0);
             if (active.length < 1)
                 return '';
-            const label = pt === 'FightTime' ? 'FT' : pt;
+            const label = pt === 'FightTime' ? 'FT' : pt === 'Fantasy' ? 'FP' : pt;
             const totalHits = active.reduce((s, b) => s + b.hits, 0);
             const totalN = active.reduce((s, b) => s + b.total, 0);
             const overallRate = totalN > 0 ? Math.round((totalHits / totalN) * 100) : 0;
@@ -15348,6 +15348,14 @@ let _recalibrationByType = {};
 // move. Same Laplace idea as shrunkHitRate, anchored to the displayed confidence rather
 // than 50%. Panel-displayed empirical rates stay RAW; only this live-transform map is shrunk.
 const RECAL_SHRINK_K = 6;
+// GLOW-UP 249: the sample size below which a calibration bucket is drawn as thin
+// evidence. Was an inline `< 5` in both curve renderers, which stopped meaning
+// anything once GLOW-UP 247 made the diagnosis panel require n>=20 before stating a
+// per-stat claim: a bucket could be too thin to draw a conclusion from and still be
+// painted at full strength. One number, so the chart and the advice agree about what
+// counts as evidence. The curve still PLOTS the raw rate — dimming is a hint about
+// confidence in the sample, not a change to the data.
+const CALIB_THIN_N = 20;
 function shrunkRecalRate(hits, total, midpoint) {
     const prior = midpoint / 100;
     return Math.round(((hits + RECAL_SHRINK_K * prior) / (total + RECAL_SHRINK_K)) * 100);
@@ -15592,7 +15600,7 @@ async function renderCalibrationPanel(container) {
         const predictedH = Math.round((predicted / 100) * maxBarH);
         const actualH = Math.round((actualRate / 100) * maxBarH);
         const actualColor = actualRate >= predicted - 3 ? 'var(--green)' : actualRate >= predicted - 12 ? 'var(--amber)' : 'var(--red)';
-        const lowN = b.total < 5;
+        const lowN = b.total < CALIB_THIN_N;
         return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:42px">
       <div style="font-size:9px;color:${diffColor};font-weight:700${lowN ? ';opacity:0.5' : ''}">${diffSign}${diff}%</div>
       <div style="position:relative;width:100%;height:${maxBarH}px;display:flex;align-items:flex-end;justify-content:center">
@@ -20945,7 +20953,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
                 continue;
             const pct = Math.round(d.hits / d.total * 100);
             const col = pct >= 65 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
-            const label = pt === 'FightTime' ? 'FT' : pt;
+            const label = pt === 'FightTime' ? 'FT' : pt === 'Fantasy' ? 'FP' : pt;
             parts.push(`<span style="color:${col}">${label} ${pct}%</span>`);
         }
         if (!parts.length)
