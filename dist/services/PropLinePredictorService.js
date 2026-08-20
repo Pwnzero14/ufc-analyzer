@@ -634,36 +634,40 @@ export class PropLinePredictorService {
             }
             baseline = shrunk;
         }
-        // ── Step 3: Expected-duration adjustment ─────────────────────────
-        // Replaces the older "scheduled rounds vs avg history rounds" scaling with
-        // a finish-aware duration estimate. Counting stats (sig strikes, ctrl time,
-        // TDs) scale by expectedMin/avgHistMin; the win-bonus portion is held flat
-        // since it's a step function of outcome, not a linear function of time.
-        const { expectedMin, pFinish, avgHistMin, avgFinishMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
-        if (fightScores.length >= 2 && avgHistMin > 0 && Math.abs(expectedMin - avgHistMin) > 0.5) {
-            // Average historical win-bonus contribution to FP — this part doesn't scale with time.
-            const winners = fightScores.filter(f => f.won);
-            const avgWinBonus = winners.length > 0
-                ? winners.reduce((s, f) => {
-                    if (!f.isFinish)
-                        return s + FANTASY_SCORING.winBonus.decision;
-                    if (f.round === 1)
-                        return s + FANTASY_SCORING.winBonus.round1;
-                    if (f.round === 2)
-                        return s + FANTASY_SCORING.winBonus.round2;
-                    if (f.round === 3)
-                        return s + FANTASY_SCORING.winBonus.round3;
-                    return s + FANTASY_SCORING.winBonus.round4Plus;
-                }, 0) / fightScores.length
-                : 0;
-            const countingStatPortion = Math.max(0, baseline - avgWinBonus);
-            const durationRatio = expectedMin / avgHistMin;
-            const oldBaseline = baseline;
-            baseline = countingStatPortion * durationRatio + avgWinBonus;
-            if (Math.abs(durationRatio - 1) > 0.05) {
-                reasons.push(`Duration adj: ${expectedMin.toFixed(1)}min vs avg ${avgHistMin.toFixed(1)}min (×${durationRatio.toFixed(2)}) → ${oldBaseline.toFixed(1)}→${baseline.toFixed(1)}`);
-            }
-        }
+        // ── Step 3: duration — REMOVED in MODEL v29 ──────────────────────
+        // This scaled the counting-stat portion by expectedMin/avgHistMin, holding the
+        // win-bonus portion flat. Walk-forward over 1,329 fights says the ratio carries
+        // no usable information about FP, and that applying it actively hurts:
+        //
+        //   model                  MAE     bias
+        //   no duration           35.77   -1.87   <- best of seven
+        //   sqrt(ratio)           36.60   -1.13
+        //   damped 0.5            36.68   -2.94
+        //   capped 1.5            37.45   -0.82
+        //   FULL RATIO (was live) 38.83   -4.01   <- worst of seven
+        //
+        //   ratio      n   meanActual  bias_none  bias_full
+        //   0-0.8    468      68.8       -1.5      +17.8
+        //   0.8-1.2  249      69.9       -1.0       -2.6
+        //   1.2-1.6  318      66.8       -3.5      -15.7
+        //   1.6-2.2  180      70.8       -1.8      -24.6
+        //   2.2+     114      72.9       -0.9      -31.6
+        //
+        // bias_none is flat across every bucket, and meanActual barely moves with the
+        // ratio (68.8 / 69.9 / 66.8 / 70.8 / 72.9) — duration simply does not predict
+        // the LEVEL of a fantasy score. bias_full is wrong at both ends, so the step was
+        // not mis-tuned, it was injecting noise. Tuning variants were measured and all
+        // lost to removal; none is kept.
+        //
+        // The mechanism is one this project already knew: FP is FINISH-weighted. A longer
+        // fight means more strikes but a less likely finish bonus; a shorter fight means
+        // fewer strikes but a likelier one, and the two offset. Applying SS-style
+        // duration coupling to FP is exactly what the finish-weighted note warns against.
+        //
+        // estimateExpectedMinutes is still called — predictSS and predictTD both use it,
+        // and pFinish is reported below because it is genuinely informative about SHAPE
+        // even though it does not move the level.
+        const { pFinish, avgFinishMin } = this.estimateExpectedMinutes(fighterDB, opponentDB, scheduledRounds);
         if (pFinish > 0.6) {
             reasons.push(`High P(finish) ${(pFinish * 100).toFixed(0)}% (E[finish] ${avgFinishMin.toFixed(1)}min)`);
         }
