@@ -13604,8 +13604,18 @@ function renderPredictionsHtml(
             nFights <= 2 ? ' Measured: thin-history fighters run roughly 4 points hot at high projections, before the duration adjustment compounds it.'
           : nFights >= 8 ? ' Enough history that the estimate keeps real signal — measured slope 0.42 at 8+ priors, against 0.02-0.23 below.'
           : ' Middling sample: most of the deviation from league average is shrunk away.');
+      // GLOW-UP 251: a signal meter rather than a number in a box. Five ascending
+      // bars, lit by sample size — pre-attentive, so you read evidence depth while
+      // scanning rather than stopping to parse "2f" against "13f". The count stays
+      // beside it for the exact figure. `⌀` for no history matches the symbol the
+      // rest of the app already uses for that state.
+      const evLvl = nFights == null || nFights === 0 ? 0
+        : nFights <= 2 ? 1 : nFights <= 4 ? 2 : nFights <= 7 ? 3 : nFights <= 11 ? 4 : 5;
       const evBadge = evTier
-        ? `<span class="pred-ev pred-ev-${evTier}" title="${evTip.replace(/"/g, '&quot;')}">${nFights === 0 ? 'NO HIST' : `${nFights}f`}</span>`
+        ? `<span class="pred-ev pred-ev-${evTier}" title="${evTip.replace(/"/g, '&quot;')}">`
+          + `<span class="pev-meter" data-lvl="${evLvl}"><i></i><i></i><i></i><i></i><i></i></span>`
+          + `<span class="pev-n">${nFights === 0 ? '⌀' : `${nFights}<b>f</b>`}</span>`
+          + `</span>`
         : '';
       const thinCls = (evTier === 'thin' || evTier === 'none') ? ' pred-val-thin' : '';
 
