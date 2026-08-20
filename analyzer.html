@@ -31097,6 +31097,31 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .pred-row:hover .pred-rank { color: var(--gold); opacity: 1; }
 
+/* ── GLOW-UP 269 · the board was hiding its last two fighters ───────────────
+   `.section-body` carries `overflow: hidden` with `max-height: 2000px` — the
+   finite clamp exists only so the collapse can TRANSITION, since max-height
+   cannot animate to or from `none`. It has quietly become a content limit.
+
+   Measured on the live board: clientHeight 2000, scrollHeight 2169. 169px, which
+   is exactly the last two rows. They are present in the DOM — which is why a
+   `querySelectorAll('.pred-row').length` check reports a healthy 26 and sails
+   straight past it — they are simply clipped. A 26-fighter card is 24 rows plus
+   two invisible ones, and WHICH two depends on the sort: under CARD it hid the
+   Reed/Dyer fight, under CONF it hid Kuse and Dorsainvil. Two fighters silently
+   absent from a board being read before a card.
+
+   Rows have been ~81px since GLOW-UP 255 made them uniform, so the ceiling has
+   been 24 rows for a while; it only bites on cards with more than 24 fighters.
+
+   `interpolate-size: allow-keywords` lets max-height animate to and from an
+   intrinsic keyword, so the clamp can be `max-content` — no magic number to
+   outgrow — and the collapse still animates. Chrome-only extension, Chrome-only
+   feature, so no fallback stack is needed; if it were ever absent the rule would
+   simply be ignored and the 2000px behaviour would return unchanged. */
+:root { interpolate-size: allow-keywords; }
+.section-body { max-height: max-content; }
+.best-picks-section.collapsed .section-body { max-height: 0; }
+
 .pred-row:nth-child(3) { animation-delay: 0.000s; }
 .pred-row:nth-child(4) { animation-delay: 0.012s; }
 .pred-row:nth-child(5) { animation-delay: 0.024s; }
