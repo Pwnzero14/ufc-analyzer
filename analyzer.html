@@ -30392,6 +30392,36 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    with a media-query override at 1100px, and widening it is the failure mode
    recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
    and the fade lands on the FP value itself. */
+/* ── GLOW-UP 257 · a sort that explains itself ─────────────────────────────
+   Δ BOOK read the FP gap only. On a card where Betr has not posted FP — which is
+   this one — every row scored -Infinity, the sort ran, nothing moved, and nothing
+   said why. It now falls back FP → SS → TD to whichever stat has a posted line,
+   the chip it is reading gets a ring so the ordering explains itself, and when no
+   stat has a line anywhere the button goes dark rather than pretending. */
+
+/* The driving chip, ringed while the gap sort is active. */
+.pred-book.is-driver {
+  outline: 1px solid var(--gold);
+  outline-offset: 1px;
+  box-shadow: 0 0 9px -2px var(--gold);
+}
+
+/* "no line" repeated up to 52 times a card was the loudest quiet thing on the
+   board. A dash carries the same information at a fraction of the ink. */
+.pred-book.none {
+  color: var(--text4) !important; opacity: 0.4;
+  background: none !important; border-color: transparent !important;
+  letter-spacing: 0.1em; cursor: help;
+}
+
+/* A control that cannot act should look like it. */
+.psort.is-off {
+  opacity: 0.35; cursor: not-allowed;
+  border-style: dashed; text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.psort.is-off:hover { background: rgba(255,255,255,0.035); color: var(--text3); }
+
 /* ── GLOW-UP 256 · sort, and a sub-row that cannot wrap ────────────────────
    255 made every rail one line, but the FIGHTER cell could still wrap: a long
    opponent name plus the evidence badge pushed "5R" onto a second line, so
