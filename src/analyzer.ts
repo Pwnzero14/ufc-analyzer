@@ -13562,7 +13562,9 @@ function renderPredictionsHtml(
     const bookCell = (fighterName: string, src: 'ss' | 'td' | 'fp', pred: number): string => {
       const f = predByName.get((normalizeName(fighterName) || fighterName).toLowerCase());
       const book = f ? getSourceActiveLine(f, src) : null;
-      if (book == null || !Number.isFinite(Number(pred))) return `<div class="pred-book none">no line</div>`;
+      // A dash rather than the words "no line" — this state repeats up to 52 times
+      // on a card and was the loudest quiet thing on the board.
+      if (book == null || !Number.isFinite(Number(pred))) return `<div class="pred-book none" title="No posted line for this prop yet">—</div>`;
       const d = pred - book;
       const thr = src === 'td' ? 0.5 : 2;
       const cls = d >= thr ? 'pos' : d <= -thr ? 'neg' : 'flat';
@@ -13571,26 +13573,48 @@ function renderPredictionsHtml(
       // "BK" hid which one, and the whole point of the chip is comparing to a real line.
       const bookKey = f ? getSourceActivePlatformKey(f, src) : null;
       const bookTag = bookKey ? platformKeyShort(bookKey) : 'BK';
-      return `<div class="pred-book ${cls}" title="Model ${pred} vs ${bookTag} line ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
+      const driving = _predSort === 'gap' && gapSrcByFighter.get(fighterName) === src ? ' is-driver' : '';
+      return `<div class="pred-book ${cls}${driving}" title="Model ${pred} vs ${bookTag} line ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
     };
 
     // Model-vs-book gap on FP, used by the GAP sort. Signed by the model's own
     // direction, so "biggest edge" means biggest gap IN THE DIRECTION IT LEANS —
     // a 20-point gap the model is on the wrong side of is not an edge.
-    const fpGapOf = (p: PropPrediction): number => {
+    // GLOW-UP 257: this used to read the FP gap only, and on a card where Betr has
+    // not posted FP every row scored -Infinity — the sort ran, changed nothing, and
+    // said nothing about why. A control that silently does nothing is worse than no
+    // control. Now it walks FP → SS → TD and uses the first stat that actually has a
+    // posted line, so it degrades to whatever the board knows instead of to noise.
+    // Still signed by the model's own direction: a gap it sits on the wrong side of
+    // is not an edge and sorts last.
+    const gapOf = (p: PropPrediction): { v: number; src: 'ss' | 'td' | 'fp' | null } => {
       const f = predByName.get((normalizeName(p.fighter) || p.fighter).toLowerCase());
-      const book = f ? getSourceActiveLine(f, 'fp') : null;
-      if (book == null) return -Infinity;
-      const d = p.fantasy.line - book;
-      return p.fantasy.lean === 'over' ? d : -d;
+      if (!f) return { v: -Infinity, src: null };
+      const tries: Array<['fp' | 'ss' | 'td', number, string]> = [
+        ['fp', p.fantasy.line, p.fantasy.lean],
+        ['ss', p.ss.line, p.ss.lean],
+        ['td', p.td.line, p.td.lean],
+      ];
+      for (const [src, line, lean] of tries) {
+        const book = getSourceActiveLine(f, src);
+        if (book == null || !Number.isFinite(Number(line))) continue;
+        const d = line - book;
+        return { v: lean === 'over' ? d : -d, src };
+      }
+      return { v: -Infinity, src: null };
     };
+    // Which stat the gap sort is reading per fighter — used to ring the driving
+    // book chip so the ordering is self-explaining rather than mysterious.
+    const gapSrcByFighter = new Map<string, 'ss' | 'td' | 'fp' | null>();
+    for (const p of latest.predictions) gapSrcByFighter.set(p.fighter, gapOf(p).src);
+    const gapUsable = latest.predictions.some(p => gapOf(p).src != null);
     const eviDOf = (p: PropPrediction): number =>
       p.fantasy.sampleSize ?? Number((p.fantasy.reasons.join(' ').match(/\((\d+)\s*fights?\)/) || [])[1] ?? 0);
     const sorted = _predSort === 'card' ? latest.predictions : [...latest.predictions].sort((a, b) =>
         _predSort === 'fp'   ? b.fantasy.line - a.fantasy.line
       : _predSort === 'conf' ? b.fantasy.confidence - a.fantasy.confidence
       : _predSort === 'eviD' ? eviDOf(b) - eviDOf(a)
-      : fpGapOf(b) - fpGapOf(a));
+      : gapOf(b).v - gapOf(a).v);
     const rows = sorted.map(p => {
       const ssArrow = p.ss.lean === 'over' ? '▲' : '▼';
       const tdArrow = p.td.lean === 'over' ? '▲' : '▼';
@@ -13719,7 +13743,9 @@ function renderPredictionsHtml(
       <span class="pred-sortbar">
         <span class="pred-sortlab">SORT</span>
         ${sortBtn('card', 'CARD', 'Fight order, main event down — the order the night runs in')}
-        ${sortBtn('gap', 'Δ BOOK', 'Biggest FP gap between the model and the posted line, signed by the direction the model leans. A gap it is on the wrong side of is not an edge, so those sort last.')}
+        ${gapUsable
+          ? sortBtn('gap', 'Δ BOOK', 'Biggest gap between the model and the posted line, signed by the direction the model leans — a gap it sits on the wrong side of is not an edge and sorts last. Reads FP where a line exists, otherwise SS, otherwise TD; the chip it is reading gets a ring.')
+          : `<button class="psort is-off" disabled title="No posted lines on this card yet, so there is nothing to measure a gap against. Load lines and this becomes available.">Δ BOOK</button>`}
         ${sortBtn('fp', 'FP', 'Highest projected fantasy score first')}
         ${sortBtn('conf', 'CONF', 'Highest model confidence first')}
         ${sortBtn('eviD', 'EVIDENCE', 'Most past fights behind the projection first — the inverse tells you which rows to distrust')}
