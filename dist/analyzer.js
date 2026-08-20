@@ -11548,8 +11548,15 @@ function renderParlayLab(container) {
         const placedTag = isLegPlaced(a.leg)
             ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. Flagged on the row so a leg you already hold is findable without hunting the confidence order — the ● PLACED chip in the strip filters to just these.">●</span>`
             : '';
-        const warnTag = conflict ? `<span class="parlay-leg-warn" title="${conflict.replace(/"/g, '&quot;')}">✗ vs slip</span>` : '';
-        const synTag = synergy ? `<span class="parlay-leg-syn" title="${synergy.replace(/"/g, '&quot;')}">🔗 synergy</span>` : '';
+        // ── GLOW-UP 282 — the last two words that cost a fighter his name ─────
+        // These appear only once a slip exists, which is why 281's measurements did
+        // not see them: on the rows that earn one, `🔗 synergy` adds ~70px to an
+        // identity cell that has no slack left, and the name goes back to
+        // `Shamil Gazi...`. Same trade the `off-board` tag lost in 281 — the word
+        // duplicates the icon, and the sentence that actually explains the
+        // relationship was always in the tooltip, never on the row.
+        const warnTag = conflict ? `<span class="parlay-leg-warn" title="Conflicts with your slip. ${conflict.replace(/"/g, '&quot;')}">✗</span>` : '';
+        const synTag = synergy ? `<span class="parlay-leg-syn" title="Synergy with your slip. ${synergy.replace(/"/g, '&quot;')}">🔗</span>` : '';
         // EV was already computed for the pool's EV sort but never shown — the sort
         // ranked by a number the row didn't display.
         const evTag = legEv != null
