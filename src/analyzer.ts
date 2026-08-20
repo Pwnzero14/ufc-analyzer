@@ -13451,6 +13451,12 @@ function clearLineHistory(): void {
 
 // ── PROP LINE PREDICTOR ──────────────────────────────────────────────────
 let _cachedPredictions: PredictionEvent[] | null = null;
+// GLOW-UP 256: predictions sort. Session-scoped and draw-only, the same contract
+// the report card and Parlay Lab sorts use — it changes what is DRAWN, never what
+// the model produced, so it resets on reload. CARD stays the default because the
+// board is read alongside a fight order; the rest deliberately flatten.
+type PredSort = 'card' | 'fp' | 'gap' | 'conf' | 'eviD';
+let _predSort: PredSort = 'card';
 let _cachedLearningLog: LearningResult[] | null = null;
 
 async function generatePredictions(container: HTMLElement): Promise<void> {
@@ -13568,7 +13574,24 @@ function renderPredictionsHtml(
       return `<div class="pred-book ${cls}" title="Model ${pred} vs ${bookTag} line ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
     };
 
-    const rows = latest.predictions.map(p => {
+    // Model-vs-book gap on FP, used by the GAP sort. Signed by the model's own
+    // direction, so "biggest edge" means biggest gap IN THE DIRECTION IT LEANS —
+    // a 20-point gap the model is on the wrong side of is not an edge.
+    const fpGapOf = (p: PropPrediction): number => {
+      const f = predByName.get((normalizeName(p.fighter) || p.fighter).toLowerCase());
+      const book = f ? getSourceActiveLine(f, 'fp') : null;
+      if (book == null) return -Infinity;
+      const d = p.fantasy.line - book;
+      return p.fantasy.lean === 'over' ? d : -d;
+    };
+    const eviDOf = (p: PropPrediction): number =>
+      p.fantasy.sampleSize ?? Number((p.fantasy.reasons.join(' ').match(/\((\d+)\s*fights?\)/) || [])[1] ?? 0);
+    const sorted = _predSort === 'card' ? latest.predictions : [...latest.predictions].sort((a, b) =>
+        _predSort === 'fp'   ? b.fantasy.line - a.fantasy.line
+      : _predSort === 'conf' ? b.fantasy.confidence - a.fantasy.confidence
+      : _predSort === 'eviD' ? eviDOf(b) - eviDOf(a)
+      : fpGapOf(b) - fpGapOf(a));
+    const rows = sorted.map(p => {
       const ssArrow = p.ss.lean === 'over' ? '▲' : '▼';
       const tdArrow = p.td.lean === 'over' ? '▲' : '▼';
       const fpArrow = p.fantasy.lean === 'over' ? '▲' : '▼';
@@ -13679,7 +13702,7 @@ function renderPredictionsHtml(
         `<div class="pcell${extra}"><span class="pcell-lab">${lab}</span>`
         + `<span class="pcell-val" style="color:${color}">${val}<i>${arrow}</i></span>${book}</div>`;
       return `<div class="pred-row pr-${p.fantasy.lean}" data-jump="${p.fighter}" title="Open fighter card">
-        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R ${evBadge}</div></div></div>
+        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub"><span class="pf-vs">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</span>${evBadge}</div></div></div>
         ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line))}
         ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line))}
         ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ` pcell-fp${thinCls}`, bookCell(p.fighter, 'fp', p.fantasy.line))}
@@ -13688,9 +13711,19 @@ function renderPredictionsHtml(
       </div>`;
     }).join('');
 
-    predBody = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <button id="predictorGenerateBtn" class="btn btn-sm" style="background:var(--accent);color:#fff;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600">⚡ Generate Predictions</button>
-      <span style="font-size:10px;color:var(--text-muted)">Generated ${agoLabel}${latest.settled ? ' · settled' : ''}</span>
+    const sortBtn = (k: PredSort, lab: string, tip: string) =>
+      `<button class="psort${_predSort === k ? ' on' : ''}" data-psort="${k}" title="${tip}">${lab}</button>`;
+    predBody = `<div class="pred-bar">
+      <button id="predictorGenerateBtn" class="btn btn-sm pred-gen">⚡ Generate Predictions</button>
+      <span class="pred-age">Generated ${agoLabel}${latest.settled ? ' · settled' : ''}</span>
+      <span class="pred-sortbar">
+        <span class="pred-sortlab">SORT</span>
+        ${sortBtn('card', 'CARD', 'Fight order, main event down — the order the night runs in')}
+        ${sortBtn('gap', 'Δ BOOK', 'Biggest FP gap between the model and the posted line, signed by the direction the model leans. A gap it is on the wrong side of is not an edge, so those sort last.')}
+        ${sortBtn('fp', 'FP', 'Highest projected fantasy score first')}
+        ${sortBtn('conf', 'CONF', 'Highest model confidence first')}
+        ${sortBtn('eviD', 'EVIDENCE', 'Most past fights behind the projection first — the inverse tells you which rows to distrust')}
+      </span>
     </div>
     <div class="pred-head">
       <div>Fighter</div><div>SS</div><div>TD</div><div>FP</div><div>Conf</div>
@@ -15518,6 +15551,13 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   container.querySelectorAll<HTMLElement>('.pred-row[data-jump]').forEach(el => {
     el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+  });
+
+  container.querySelectorAll<HTMLElement>('[data-psort]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset['psort'] as PredSort;
+      if (v && v !== _predSort) { _predSort = v; void renderArchivePanel(container); }
+    });
   });
 
   // Predictor: Generate Predictions button
