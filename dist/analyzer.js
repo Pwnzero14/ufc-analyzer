@@ -13321,15 +13321,35 @@ function renderPredictionsHtml(cSec) {
                 ? `<span class="pred-factor pred-factor-shrink" title="${(shrinkReason || '').replace(/"/g, '&quot;')}">${Number(shrinkM[1]) > Number(shrinkM[2]) ? '↓' : '↑'} ${shrinkM[1]}→${shrinkM[2]}</span>`
                 : '';
             const otherFp = p.fantasy.reasons.filter(r => r !== shrinkReason).slice(0, 2);
+            // GLOW-UP 254: the rail was six identical grey pills per row, which meant
+            // `Duration adj ×2.22` — the multiplier that inflates thin-history fighters,
+            // and the open finding from tonight — carried exactly the same visual weight
+            // as `Avg TD/fight: 0.0`. Classify by what a factor IS so the row can be
+            // scanned instead of read. Colours follow the app's existing axes: opponent
+            // violet, duration amber (it is the one that distorts), history dim because
+            // it is context rather than a finding.
+            const factorCls = (r) => /^Duration adj/.test(r) ? ' pf-duration'
+                : /^Opp |opponent/i.test(r) ? ' pf-opp'
+                    : /SS\/min|Output/.test(r) ? ' pf-rate'
+                        : /P\(finish\)|Finish synergy|No history/i.test(r) ? ' pf-finish'
+                            : /Betr avg|Recency-weighted|Avg TD|Career avg/.test(r) ? ' pf-hist'
+                                : '';
             const reasons = shrinkChip + [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
-                .map(r => `<span class="pred-factor">${r}</span>`).join('');
-            return `<div class="pred-row" data-jump="${p.fighter}" title="Open fighter card">
-        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text)">${prettyName(p.fighter)}</div><div style="font-size:9px;color:var(--text-muted)">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R ${evBadge}</div></div></div>
-        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">SS</div><div style="font-size:12px;font-weight:700;color:${ssColor}">${p.ss.line} ${ssArrow}</div>${bookCell(p.fighter, 'ss', p.ss.line)}</div>
-        <div style="min-width:56px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">TD</div><div style="font-size:12px;font-weight:700;color:${tdColor}">${p.td.line} ${tdArrow}</div>${bookCell(p.fighter, 'td', p.td.line)}</div>
-        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div class="pred-fp-val${thinCls}" style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div>${bookCell(p.fighter, 'fp', p.fantasy.line)}</div>
-        <div style="min-width:70px"><div style="font-size:10px;color:var(--text-muted)">Conf</div><div style="background:rgba(255,255,255,0.06);border-radius:3px;height:10px;margin-top:2px;overflow:hidden"><div style="width:${confWidth}%;height:100%;background:${confColor};border-radius:3px"></div></div><div style="font-size:9px;color:${confColor};margin-top:1px">${confWidth}%</div></div>
-        <div style="flex:1;min-width:0"><div style="display:flex;flex-wrap:wrap;margin-top:2px">${reasons}</div></div>
+                .map(r => `<span class="pred-factor${factorCls(r)}">${r}</span>`).join('');
+            // Confidence as a ten-cell gauge in the same language as the evidence meter,
+            // so the two instruments on a row read as one system. Same six grid children
+            // in the same order — the track list is untouched.
+            const confCells = Array.from({ length: 10 }, (_, i) => `<i${i < Math.round(confWidth / 10) ? ' class="on"' : ''}></i>`).join('');
+            const confTier = confWidth >= 65 ? 'hi' : confWidth >= 45 ? 'mid' : 'lo';
+            const statCell = (lab, val, color, arrow, extra, book) => `<div class="pcell${extra}"><span class="pcell-lab">${lab}</span>`
+                + `<span class="pcell-val" style="color:${color}">${val}<i>${arrow}</i></span>${book}</div>`;
+            return `<div class="pred-row pr-${p.fantasy.lean}" data-jump="${p.fighter}" title="Open fighter card">
+        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R ${evBadge}</div></div></div>
+        ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line))}
+        ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line))}
+        ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ` pcell-fp${thinCls}`, bookCell(p.fighter, 'fp', p.fantasy.line))}
+        <div class="pconf pconf-${confTier}"><span class="pcell-lab">CONF</span><span class="pconf-gauge">${confCells}</span><span class="pconf-n">${confWidth}<b>%</b></span></div>
+        <div class="prail">${reasons}</div>
       </div>`;
         }).join('');
         predBody = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
