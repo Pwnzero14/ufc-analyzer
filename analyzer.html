@@ -30392,6 +30392,49 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    with a media-query override at 1100px, and widening it is the failure mode
    recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
    and the fade lands on the FP value itself. */
+/* ── GLOW-UP 256 · sort, and a sub-row that cannot wrap ────────────────────
+   255 made every rail one line, but the FIGHTER cell could still wrap: a long
+   opponent name plus the evidence badge pushed "5R" onto a second line, so
+   Gregory Rodrigues sat taller than every row around him. The vs-line is its own
+   element now and ellipsizes; the badge never shrinks. Uniform height is
+   guaranteed by construction rather than by whether a name happens to be short.
+
+   And 26 rows in card order meant finding the biggest model-vs-book gaps was a
+   scroll-and-squint exercise. Same session-scoped, draw-only sort contract the
+   report card and Parlay Lab use. */
+.pred-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
+.pred-gen {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #000));
+  color: #fff; padding: 5px 14px; border-radius: 5px; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  box-shadow: 0 2px 10px -2px var(--accent);
+}
+.pred-gen:hover { filter: brightness(1.12); }
+.pred-age { font-size: 10px; color: var(--text4); font-family: 'JetBrains Mono', monospace; }
+
+.pred-sortbar { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.pred-sortlab {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 800;
+  letter-spacing: 0.22em; color: var(--text4); margin-right: 2px;
+}
+.psort {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+  letter-spacing: 0.1em; cursor: pointer; padding: 3px 9px; border-radius: 3px;
+  background: rgba(255,255,255,0.035); border: 1px solid rgba(125,145,190,0.16);
+  color: var(--text3); transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.psort:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.psort.on {
+  background: rgba(248,198,74,0.14); border-color: rgba(248,198,74,0.5);
+  color: var(--gold); box-shadow: 0 0 10px -3px rgba(248,198,74,0.8);
+}
+
+/* The vs-line truncates; the badge is fixed. One line, always, regardless of
+   how long an opponent's name happens to be. */
+.pf-sub { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pf-vs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pf-sub .pred-ev { flex: 0 0 auto; margin-left: 0; }
+
 /* ── GLOW-UP 255 · rhythm, alignment, and a legend ─────────────────────────
    Three things 254 left on the table.
 
