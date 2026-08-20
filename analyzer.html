@@ -30960,8 +30960,8 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    header in 272. `--plr-tracks` is defined once so the three can never disagree:
    restating a track list in three places is the drift that 260 was about. */
 .parlay-lab {
-  --plr-tracks: 18px minmax(150px, 1.85fr) 58px 52px minmax(118px, 1.15fr) 54px 46px 42px 78px;
-  --plr-gap: 8px;
+  --plr-tracks: 20px minmax(150px, 1.85fr) 52px 48px minmax(118px, 1.15fr) 50px 44px 36px 70px;
+  --plr-gap: 7px;
 }
 .parlay-leg-row {
   display: grid;
@@ -31004,7 +31004,12 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .plr-id .parlay-leg-vs {
-  flex: 0 6 auto; min-width: 0;
+  /* GLOW-UP 283: shrink 6 still let the name absorb ~20% of any deficit, because
+     flex distributes shortfall by shrink-factor TIMES basis and the name's basis
+     is the larger of the two. At 60 the `vs` label takes essentially all of it,
+     so the name only starts shrinking once the opponent label is gone — which is
+     the priority the cell is supposed to encode. */
+  flex: 0 60 auto; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .plr-id > *:not(.parlay-leg-name):not(.parlay-leg-vs):not(.bp-avatar) { flex: 0 0 auto; }
@@ -31037,8 +31042,31 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   padding: 1px 4px; letter-spacing: 0; font-size: 9.5px; line-height: 1;
   cursor: help;
 }
+
+/* ── GLOW-UP 283 · the columns were sized by guess, not by content ─────────
+   282 verified the worst case with no slip on the board. Selecting two legs
+   brings the Δ track back and takes the identity cell from 339px to 308px, and
+   at 308 the fullest possible row — long name, `vs`, placed dot, ⊘, 🔗 — cuts the
+   name again. Which is exactly what a slip-active screenshot showed:
+   `Anthony Hernan...`, `Shamil Gazi...`.
+
+   So instead of guessing again, every fixed track was measured against the
+   WIDEST content it actually holds across all 103 rows:
+
+     track   was   widest content   now
+     check    18   19 (☑)            20   <- was clipping by 1px
+     side     58   49 (UNDER)        52
+     stat     52   26 (FT) / ~40 (R1 SS)  48
+     you      54   48 (YOU 4/7)      50
+     ev       46   40 (+74%)         44
+     delta    42   33 (▼-10)         36
+     conf     78   54 (92% + bar)    70
+
+   Plus a gap of 7 rather than 8 across eight gutters. 38px back, all of it to
+   the one cell that had none — and the check column stops clipping its own
+   glyph on the way past. */
 .parlay-lab.no-delta {
-  --plr-tracks: 18px minmax(150px, 1.85fr) 58px 52px minmax(118px, 1.15fr) 54px 46px 78px;
+  --plr-tracks: 20px minmax(150px, 1.85fr) 52px 48px minmax(118px, 1.15fr) 50px 44px 70px;
 }
 .parlay-lab.no-delta .parlay-leg-marg,
 .parlay-lab.no-delta .plr-head > span:nth-child(8) { display: none; }
