@@ -13645,8 +13645,30 @@ function renderPredictionsHtml(
         : /P\(finish\)|Finish synergy|No history/i.test(r) ? ' pf-finish'
         : /Betr avg|Recency-weighted|Avg TD|Career avg/.test(r) ? ' pf-hist'
         : '';
-      const reasons = shrinkChip + [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
-        .map(r => `<span class="pred-factor${factorCls(r)}">${r}</span>`).join('');
+      // GLOW-UP 255: the rail wrapped to two lines on eight of 26 rows, which broke
+      // the scan rhythm, and it spent that space on chips like `Avg TD/fight: 0.0`
+      // — a fighter with no takedowns, stated at the same weight as a finding.
+      // Drop the no-signal ones, order by what actually moves a projection, and
+      // clamp to a single line so every row is the same height. Priority ordering
+      // is what makes the clamp safe: the duration and shrink chips can never be
+      // the ones pushed out of view.
+      const PRIORITY: Record<string, number> = {
+        ' pf-duration': 1, ' pf-finish': 2, ' pf-opp': 3, ' pf-rate': 4, ' pf-hist': 5,
+      };
+      const isNoise = (r: string): boolean => /:\s*0(\.0)?$/.test(r.trim());
+      const ranked = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
+        .filter(r => !isNoise(r))
+        .map(r => ({ r, cls: factorCls(r) }))
+        .sort((a, b) => (PRIORITY[a.cls] ?? 9) - (PRIORITY[b.cls] ?? 9));
+      const SHOWN = 5;
+      const shown = ranked.slice(0, SHOWN);
+      const hidden = ranked.slice(SHOWN);
+      const moreChip = hidden.length
+        ? `<span class="pred-factor pf-more" title="${hidden.map(h => h.r).join(' · ').replace(/"/g, '&quot;')}">+${hidden.length}</span>`
+        : '';
+      const reasons = shrinkChip
+        + shown.map(({ r, cls }) => `<span class="pred-factor${cls}" title="${r.replace(/"/g, '&quot;')}">${r}</span>`).join('')
+        + moreChip;
       // Confidence as a ten-cell gauge in the same language as the evidence meter,
       // so the two instruments on a row read as one system. Same six grid children
       // in the same order — the track list is untouched.
@@ -13670,13 +13692,15 @@ function renderPredictionsHtml(
       <button id="predictorGenerateBtn" class="btn btn-sm" style="background:var(--accent);color:#fff;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600">⚡ Generate Predictions</button>
       <span style="font-size:10px;color:var(--text-muted)">Generated ${agoLabel}${latest.settled ? ' · settled' : ''}</span>
     </div>
-    <div style="display:flex;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px">
-      <div style="min-width:110px;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Fighter</div>
-      <div style="min-width:55px;text-align:center;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">SS</div>
-      <div style="min-width:45px;text-align:center;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">TD</div>
-      <div style="min-width:55px;text-align:center;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">FP</div>
-      <div style="min-width:70px;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Conf</div>
-      <div style="flex:1;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Factors</div>
+    <div class="pred-head">
+      <div>Fighter</div><div>SS</div><div>TD</div><div>FP</div><div>Conf</div>
+      <div class="pred-head-rail">Factors
+        <span class="pkey"><i class="pf-shrinkkey"></i>shrink</span>
+        <span class="pkey"><i class="pf-durationkey"></i>duration</span>
+        <span class="pkey"><i class="pf-oppkey"></i>opponent</span>
+        <span class="pkey"><i class="pf-ratekey"></i>rate</span>
+        <span class="pkey"><i class="pf-histkey"></i>history</span>
+      </div>
     </div>
     ${rows}`;
   } else {
