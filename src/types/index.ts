@@ -358,6 +358,12 @@ export interface StatPrediction {
   lean: 'over' | 'under';
   confidence: number;
   reasons: string[];
+  /** GLOW-UP 250 — how many past fights the estimate rests on. 0 means the model
+   *  had no history and built the number from components. Surfaced in the UI so a
+   *  projection off one fight cannot look identical to one off thirteen. Optional
+   *  because predictions stored before v28 predate the field; the panel falls back
+   *  to parsing the reason string. */
+  sampleSize?: number;
 }
 
 export interface PropPrediction {

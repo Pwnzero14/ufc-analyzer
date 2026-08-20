@@ -893,7 +893,7 @@ export class PropLinePredictorService {
     const line = round1(clamp(predicted, 5, 250));
     const lean = predicted > historicalAvg ? 'over' : 'under';
 
-    return { line, lean, confidence: Math.round(confidence), reasons };
+    return { line, lean, confidence: Math.round(confidence), reasons, sampleSize: fightScores.length };
   }
 
   // ── Predict All Stats for a Fighter ─────────────────────────────────

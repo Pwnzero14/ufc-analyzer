@@ -30379,6 +30379,53 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .rc-books { justify-content: flex-end; }
 
+/* ── GLOW-UP 250 · evidence weight on the predictions board ─────────────────
+   Every projection rendered with identical authority regardless of what it was
+   built on. Wint's 99.5 came off ONE fight and sat beside Hernandez's 102 off
+   thirteen, same size, same colour, the count buried as the fifth grey pill in
+   the factor rail. The walk-forward measured thin-history fighters running ~4pts
+   hot at high baselines before the duration step compounds it, and four of this
+   card's top FP numbers were fighters with <=2 fights.
+
+   Same rule the calibration surface got tonight: a display should show its own
+   uncertainty. Deliberately NOT a new grid column — .pred-row is a 6-track grid
+   with a media-query override at 1100px, and widening it is the failure mode
+   recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
+   and the fade lands on the FP value itself. */
+.pred-ev {
+  display: inline-block; margin-left: 3px; padding: 0 4px;
+  border-radius: 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 800; letter-spacing: 0.04em;
+  vertical-align: 1px; cursor: help;
+}
+/* 8+ priors is where the measurement says real signal survives (slope 0.42
+   against 0.02-0.23 below), so that is where the badge stops warning. */
+.pred-ev-solid { color: #6fe8a8; background: rgba(0,232,122,0.10); border: 1px solid rgba(0,232,122,0.25); }
+.pred-ev-mid   { color: var(--gold); background: rgba(248,198,74,0.10); border: 1px solid rgba(248,198,74,0.28); }
+.pred-ev-thin  { color: #ffaab9; background: rgba(255,58,96,0.10); border: 1px solid rgba(255,58,96,0.35); }
+.pred-ev-none  { color: #ffaab9; background: rgba(255,58,96,0.16); border: 1px solid rgba(255,58,96,0.5); letter-spacing: 0.08em; }
+
+/* The number itself carries the doubt — dashed underline rather than a heavy
+   dim, because the value still has to be readable at a glance. */
+.pred-fp-val { transition: opacity 0.15s ease; }
+.pred-val-thin {
+  opacity: 0.62;
+  text-decoration: underline dotted rgba(255,120,145,0.55);
+  text-underline-offset: 3px;
+}
+.pred-row:hover .pred-val-thin { opacity: 0.85; }
+
+/* The shrink is the largest single adjustment the model makes to an FP number,
+   and slice(0,2) was truncating it out of the rail for the fighters who needed
+   it most. Pulled out, pinned first, and given its own colour so it reads as an
+   ADJUSTMENT rather than one more descriptive chip. */
+.pred-factor-shrink {
+  color: var(--gold) !important;
+  background: rgba(248,198,74,0.10) !important;
+  border-color: rgba(248,198,74,0.32) !important;
+  font-weight: 700;
+}
+
 /* ── GLOW-UP 248 · the Archive calibration curve, which never had a stylesheet ──
    Two renderers draw this chart. The Calibration TAB uses inline styles, so it has
    always looked right. The ARCHIVE copy is the richer of the two — score ring,
