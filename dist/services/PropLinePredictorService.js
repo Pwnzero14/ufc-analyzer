@@ -773,7 +773,7 @@ export class PropLinePredictorService {
         const historicalAvg = fighterDB.avgFP_betr ?? fighterDB.avgFP ?? predicted;
         const line = round1(clamp(predicted, 5, 250));
         const lean = predicted > historicalAvg ? 'over' : 'under';
-        return { line, lean, confidence: Math.round(confidence), reasons };
+        return { line, lean, confidence: Math.round(confidence), reasons, sampleSize: fightScores.length };
     }
     // ── Predict All Stats for a Fighter ─────────────────────────────────
     static predictFighter(fighter, opponent, fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, bookPriorFP, marketFtMin, marketExpectedMin) {

@@ -13577,13 +13577,55 @@ function renderPredictionsHtml(
       const fpColor = p.fantasy.lean === 'over' ? 'var(--green)' : 'var(--red)';
       const confWidth = Math.round(p.fantasy.confidence);
       const confColor = confWidth >= 65 ? 'var(--green)' : confWidth >= 45 ? 'var(--amber)' : 'var(--red)';
-      const reasons = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...p.fantasy.reasons.slice(0, 2)]
+      // ── GLOW-UP 250 — evidence weight ──────────────────────────────────
+      // A projection off ONE fight rendered identically to one off thirteen: same
+      // size, same weight, same colour, with the count buried as the fifth grey
+      // pill in the factor rail. On this card that put Wint (1 fight, 99.5),
+      // McVey (3, 95), Douglas (2, 94) and Barbosa (2, 93) among the highest FP
+      // numbers on the board, indistinguishable from Hernandez's 102 off 13.
+      // The walk-forward measured thin-history fighters running ~4pts hot at high
+      // baselines BEFORE the duration step compounds it. Same principle the
+      // calibration panel got tonight: thin evidence should LOOK thin.
+      //
+      // sampleSize is populated from v28 on; predictions stored before that lack
+      // it, so fall back to the reason string, which already carries the count.
+      const fpReasonText = p.fantasy.reasons.join(' ');
+      const nFights = p.fantasy.sampleSize ?? (() => {
+        const m = fpReasonText.match(/\((\d+)\s*fights?\)/);
+        if (m) return Number(m[1]);
+        return /no history/i.test(fpReasonText) ? 0 : null;
+      })();
+      const evTier = nFights == null ? null
+        : nFights === 0 ? 'none' : nFights <= 2 ? 'thin' : nFights <= 7 ? 'mid' : 'solid';
+      const evTip = nFights === 0
+        ? 'No fight history at all — this number is built from components and shrunk hard toward the league mean. Read it as a prior, not a projection.'
+        : nFights == null ? ''
+        : `${nFights} past fight${nFights === 1 ? '' : 's'} behind this projection.` + (
+            nFights <= 2 ? ' Measured: thin-history fighters run roughly 4 points hot at high projections, before the duration adjustment compounds it.'
+          : nFights >= 8 ? ' Enough history that the estimate keeps real signal — measured slope 0.42 at 8+ priors, against 0.02-0.23 below.'
+          : ' Middling sample: most of the deviation from league average is shrunk away.');
+      const evBadge = evTier
+        ? `<span class="pred-ev pred-ev-${evTier}" title="${evTip.replace(/"/g, '&quot;')}">${nFights === 0 ? 'NO HIST' : `${nFights}f`}</span>`
+        : '';
+      const thinCls = (evTier === 'thin' || evTier === 'none') ? ' pred-val-thin' : '';
+
+      // The shrink is the single largest adjustment the model makes to an FP number,
+      // and it was being truncated out of the rail by slice(0,2) on the fighters who
+      // needed it most — Hernandez's "Betr avg" and "Recency-weighted" ate both slots.
+      // Pull it out and always show it, with the two numbers legible at a glance.
+      const shrinkReason = p.fantasy.reasons.find(r => r.startsWith('Regression to mean'));
+      const shrinkM = shrinkReason?.match(/([\d.]+)→([\d.]+)/);
+      const shrinkChip = shrinkM
+        ? `<span class="pred-factor pred-factor-shrink" title="${(shrinkReason || '').replace(/"/g, '&quot;')}">${Number(shrinkM[1]) > Number(shrinkM[2]) ? '↓' : '↑'} ${shrinkM[1]}→${shrinkM[2]}</span>`
+        : '';
+      const otherFp = p.fantasy.reasons.filter(r => r !== shrinkReason).slice(0, 2);
+      const reasons = shrinkChip + [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
         .map(r => `<span class="pred-factor">${r}</span>`).join('');
       return `<div class="pred-row" data-jump="${p.fighter}" title="Open fighter card">
-        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text)">${prettyName(p.fighter)}</div><div style="font-size:9px;color:var(--text-muted)">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</div></div></div>
+        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text)">${prettyName(p.fighter)}</div><div style="font-size:9px;color:var(--text-muted)">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R ${evBadge}</div></div></div>
         <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">SS</div><div style="font-size:12px;font-weight:700;color:${ssColor}">${p.ss.line} ${ssArrow}</div>${bookCell(p.fighter, 'ss', p.ss.line)}</div>
         <div style="min-width:56px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">TD</div><div style="font-size:12px;font-weight:700;color:${tdColor}">${p.td.line} ${tdArrow}</div>${bookCell(p.fighter, 'td', p.td.line)}</div>
-        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div>${bookCell(p.fighter, 'fp', p.fantasy.line)}</div>
+        <div style="min-width:64px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">FP</div><div class="pred-fp-val${thinCls}" style="font-size:12px;font-weight:700;color:${fpColor}">${p.fantasy.line} ${fpArrow}</div>${bookCell(p.fighter, 'fp', p.fantasy.line)}</div>
         <div style="min-width:70px"><div style="font-size:10px;color:var(--text-muted)">Conf</div><div style="background:rgba(255,255,255,0.06);border-radius:3px;height:10px;margin-top:2px;overflow:hidden"><div style="width:${confWidth}%;height:100%;background:${confColor};border-radius:3px"></div></div><div style="font-size:9px;color:${confColor};margin-top:1px">${confWidth}%</div></div>
         <div style="flex:1;min-width:0"><div style="display:flex;flex-wrap:wrap;margin-top:2px">${reasons}</div></div>
       </div>`;
