@@ -422,7 +422,7 @@ export const NAME_ALIASES: Record<string, string> = {
 //   control. Both halves of the blend are now expressed against THIS fight's
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
-export const MODEL_VERSION = 26;
+export const MODEL_VERSION = 27;
 
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.

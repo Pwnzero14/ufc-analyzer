@@ -116,6 +116,43 @@ const LEAGUE_SS_RATE = 3.9;     // league-typical SS landed (and absorbed) per m
 // zero-data FALLBACK and is left at 3.9 — moving it is a separate, unvalidated change
 // affecting fighters with no history at all. Worth revisiting together.)
 const SS_RATE_LEAGUE_MEAN = 4.55;
+
+// ── MODEL v27 — FP regression to the mean ────────────────────────────────
+// Mean Betr FP across the walk-forward population (1,307 fights / 272 fighters
+// in the cached histories). Measured, and deliberately its own constant for the
+// same reason SS_RATE_LEAGUE_MEAN is separate from LEAGUE_SS_RATE: the retention
+// below was fitted against THIS number, so substituting another FP average would
+// re-bias every shrunk projection.
+const FP_LEAGUE_MEAN = 69.4;
+
+// How much of a fighter's deviation from the league mean survives. Same
+// walk-forward test SS v15 used — rebuild the baseline from PRIOR fights only,
+// compare to that fight's actual Betr score:
+//
+//   regression slope of actual on predicted:  0.267
+//   bucket residual (mean / median / trimmed), predicted FP:
+//     0-40   +32.09 / +36.44 / +32.41      40-60  +13.44 / +16.96 / +14.12
+//     60-80   -3.43 /  +3.79 /  -2.85      80-100 -16.60 /  -5.77 / -15.85
+//     100-130 -23.85 / -12.61 / -22.97
+//
+// Monotonic across every bucket, and mean agrees with trimmed everywhere, so it
+// is not outlier-driven — that is the check v15 insists on before trusting a
+// correction. Unlike SS, BOTH tails are evidenced (the 40-60 cell alone is
+// n=263 with all three statistics agreeing), so this is two-sided where SS's
+// shrinkage had to be one-sided.
+//
+// Fitted by sweeping retention against residual spread across buckets, which is
+// what decides OVER vs UNDER against a line. MAE cannot choose here — every
+// candidate sits at 35.75-35.88, indistinguishable — but spread collapses from
+// 46.8 (uncorrected) to ~8, and bias from -4.54 to -1.59. 0.30/0.35/0.40 all land
+// within noise of each other; 0.35 sits mid-range and stays deliberately ABOVE
+// the raw 0.267 fit, keeping more of the model's own signal than the pure
+// regression would.
+//
+// Shrinkage is a monotonic linear transform, so it cannot reorder picks — the
+// correlation with actual is unchanged. It moves only the LEVEL, which is
+// exactly what was wrong.
+const FP_SHRINK_RETENTION = 0.35;
 // Shrinkage strength in "phantom minutes at the league mean": a fighter with 36 logged
 // minutes gets a 50/50 blend, a veteran with 150 keeps ~80% of their own rate. Fitted
 // by MAE sweep on the same 1,891 observations (best at 36; the curve is flat from
@@ -170,6 +207,31 @@ export class PropLinePredictorService {
         clampModifier(merged.ss_pace_modifier, 0.7, 1.4);
       }
       merged.ssPaceRenormalizedV13 = true;
+      await this.saveWeights(merged);
+    }
+
+    // MODEL v27 — same scar, this time on FP. 18 learning cycles spent damping an
+    // over-predicting baseline into fp_global_modifier: every class landed under
+    // 1.0 (default 0.892, lightweight 0.810, womenFlyweight 0.771 against a 0.75
+    // clamp floor — saturating, exactly as lightHeavyweight did for SS). Those
+    // values are the shape of the bug, not learned signal. Now that Step 2b
+    // corrects the bias at its source and level-dependently, the flat damp is
+    // double-correction and has to come off.
+    //
+    // Rescale once so `default` returns to 1.0, applying the SAME factor to every
+    // class so relative per-class learning survives. Own marker, never `version`
+    // — that is a learning-RUN counter.
+    if (!merged.fpModRenormalizedV27) {
+      const anchor = merged.fp_global_modifier.default;
+      if (Number.isFinite(anchor) && anchor > 0 && Math.abs(anchor - 1) > 0.02) {
+        const factor = 1 / anchor;
+        for (const k of Object.keys(merged.fp_global_modifier) as Array<keyof PerClassModifier>) {
+          const v = merged.fp_global_modifier[k];
+          if (typeof v === 'number' && Number.isFinite(v)) merged.fp_global_modifier[k] = v * factor;
+        }
+        clampModifier(merged.fp_global_modifier, 0.75, 1.30);
+      }
+      merged.fpModRenormalizedV27 = true;
       await this.saveWeights(merged);
     }
     return merged;
@@ -631,6 +693,28 @@ export class PropLinePredictorService {
                + tdLine * FANTASY_SCORING.takedown
                + FANTASY_SCORING.winBonus.decision * 0.5;
       reasons.push('No history — component estimate');
+    }
+
+    // ── Step 2b: Shrink toward the league mean (MODEL v27) ───────────
+    // A recency-weighted average of past Betr scores badly over-states how much
+    // of a fighter's level repeats. FP is dominated by win bonuses, which are
+    // lumpy and largely non-repeatable: three straight R1 finishes build a ~130
+    // baseline out of points that mostly will not recur. The walk-forward test
+    // measures the surviving signal at 0.267 of the deviation from league mean.
+    //
+    // Paired with the fp_global_modifier renormalisation in getWeights(). They
+    // ship together and must stay together: that modifier had been absorbing this
+    // same bias as a flat per-class damp (every class under 1.0 after 18 cycles,
+    // womenFlyweight pinned near the 0.75 floor). A flat multiplier is the wrong
+    // instrument for a level-dependent bias — it drags the low end further down
+    // when the data says it should come UP — and applying shrinkage on top of the
+    // damp, without the renorm, would double-correct.
+    if (fightScores.length >= 1) {
+      const shrunk = FP_LEAGUE_MEAN + FP_SHRINK_RETENTION * (baseline - FP_LEAGUE_MEAN);
+      if (Math.abs(shrunk - baseline) > 1) {
+        reasons.push(`Regression to mean: ${baseline.toFixed(1)}→${shrunk.toFixed(1)} (keeps ${(FP_SHRINK_RETENTION * 100).toFixed(0)}% of the gap to league ${FP_LEAGUE_MEAN})`);
+      }
+      baseline = shrunk;
     }
 
     // ── Step 3: Expected-duration adjustment ─────────────────────────
