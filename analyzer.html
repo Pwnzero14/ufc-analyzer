@@ -31104,6 +31104,59 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .plr-market .plg-books::-webkit-scrollbar-thumb { background: rgba(125,145,190,0.35); border-radius: 2px; }
 .plr-market .plg-book { flex: 0 0 auto; }
 
+/* ── GLOW-UP 284 · both sides of a prop are one prop ───────────────────────
+   The off-board tier collects every side the ranked pool did not take, so a prop
+   the model has no read on arrived as TWO rows — same fighter, same stat,
+   adjacent, differing only in the direction chip. De Ridder ran five consecutive
+   rows on this card, Wint four, `OVER SS 16.5 −8%` sitting directly on top of
+   `UNDER SS 16.5 −8%`.
+
+   Nothing is removed: both sides stay fully selectable, which is the entire
+   point of this tier. They just stop being two unrelated-looking ideas. The
+   fighter, the stat and the checkbox are shared; each side keeps its own books,
+   YOU record, EV and confidence, because those genuinely differ.
+
+   Placement is grid auto-flow — the three shared cells span two rows and every
+   other cell falls into place after them. Explicit column numbers would break
+   the moment `.no-delta` or the narrow variant drops a track; auto-flow is
+   correct on all three lists because the per-side cell count always equals the
+   number of non-shared columns. */
+.parlay-leg-row.is-paired {
+  grid-template-rows: auto auto;
+  row-gap: 5px;
+  align-items: center;
+}
+.parlay-leg-row.is-paired > .plr-span2 { grid-row: span 2; }
+/* The row body is not a click target here — the two side labels are, and 246's
+   lesson was that a dead row body must not wear a pointer. */
+.parlay-leg-row.is-paired { cursor: default; }
+.parlay-leg-row.is-paired .plr-side,
+.parlay-leg-row.is-paired .plg-book { cursor: pointer; }
+
+/* A side label is a button now, so it has to look like one that can be pressed
+   and can be "on" — same gold the selected rows use. */
+.plr-side {
+  border: 1px solid transparent; background: none; font: inherit;
+  display: inline-flex; align-items: center; gap: 3px;
+  transition: border-color 0.14s, box-shadow 0.14s, filter 0.14s;
+}
+.plr-side:hover { filter: brightness(1.25); border-color: currentColor; }
+.plr-side.has-sel {
+  border-color: rgba(248,198,74,0.55);
+  box-shadow: 0 0 9px -3px rgba(248,198,74,0.9);
+}
+.plr-side i {
+  font-style: normal; font-size: 8px; font-weight: 800;
+  color: var(--gold); opacity: 0.95;
+}
+/* The two sides of one prop are a pair — a hairline between them says so without
+   spending a whole separator row. */
+.parlay-leg-row.is-paired > .plr-side:last-of-type { position: relative; }
+.parlay-leg-row.is-paired > .plr-side:last-of-type::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -3px;
+  border-top: 1px dashed rgba(125,145,190,0.22);
+}
+
 /* The two optional chips hold their tracks open when they have nothing to say.
    Without this, grid auto-placement pulls every later column one track left on
    the rows that lack them — which is the original bug in miniature. */

@@ -11964,18 +11964,113 @@ function renderParlayLab(container: HTMLElement): void {
       <span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>
     </div>`;
   };
-  const renderOffBoardRows = (legs: typeof offBoardLegs): string => {
-    const groups = new Map<string, typeof offBoardLegs>();
-    for (const a of legs) {
-      const gk = groupKeyOf(a);
-      const cur = groups.get(gk);
-      if (cur) cur.push(a); else groups.set(gk, [a]);
-    }
-    return [...groups.values()]
-      .map(g => (g.length === 1 ? renderPoolRow(g[0]) : renderGroupedOffRow(g)))
-      .join('');
+  // ── GLOW-UP 284 — both sides of a prop are ONE prop ──────────────────────
+  // The off-board tier collects every side the ranked pool did not take, so a
+  // prop the model has no read on arrives as TWO rows — identical fighter,
+  // identical stat, adjacent, differing only in the direction chip. Reinier De
+  // Ridder ran five consecutive rows on this card, Anthony Wint four, with
+  // `OVER SS 16.5 −8%` sitting directly on top of `UNDER SS 16.5 −8%`.
+  //
+  // Nothing is dropped — both sides stay fully selectable, because the whole
+  // point of this tier is being able to take either one. They just stop being
+  // presented as two unrelated ideas. One prop, one row, one identity, with each
+  // side keeping its own books, its own YOU record, its own EV and confidence:
+  // those genuinely differ (Gaziev's FT sides price at −14% and −4% off two
+  // different lines), so they are shown per side rather than merged away.
+  //
+  // Placement is left to grid auto-flow with `grid-row: span 2` on the three
+  // shared cells. Explicit column numbers would have been wrong the moment the
+  // no-delta and narrow variants drop tracks; auto-flow lands correctly on all
+  // three track lists because the per-side cell count always matches the number
+  // of non-shared columns.
+  const sideCells = (g: typeof offBoardLegs, dir: 'over' | 'under'): { dirBtn: string; rest: string } => {
+    const head = g[0];
+    const legEv = evOf(head);
+    const books = [...g].sort((a, b) => dir === 'over'
+      ? (a.leg.line ?? 0) - (b.leg.line ?? 0)
+      : (b.leg.line ?? 0) - (a.leg.line ?? 0));
+    const chips = books.map((a, i) => {
+      const k = parlayLegKeyOf(a.leg);
+      const on = parlaySelectedLegs.has(k);
+      const pk = parlayLegBook(a.leg, a.fighter);
+      const label = pk ? platformKeyShort(pk) : 'NO BK';
+      const tip = `${pk ? (PL_BOOK_NAME[pk] || pk) : 'No book the scraper can see'} ${a.leg.line}`
+        + `${i === 0 ? ` — best ${dir.toUpperCase()} entry of the ${books.length}` : ''}`
+        + `${pk != null ? '' : ' · queue it anyway if you have it somewhere'}`
+        + ` · ${on ? 'in your slip — click to remove' : 'click to add this book to your slip'}`;
+      return `<button type="button" class="plg-book plat-${pk || 'none'}${on ? ' on' : ''}${i === 0 ? ' is-best' : ''}${isBookPlaced(a.leg) ? ' is-placed' : ''}"`
+        + ` data-parlay-key="${k}" title="${tip.replace(/"/g, '&quot;')}">${label} <b>${a.leg.line}</b>${on ? '<i>✓</i>' : ''}</button>`;
+    }).join('');
+    const pick = books.find(a => isBookPlaced(a.leg)) || books[0];
+    const pickKey = parlayLegKeyOf(pick.leg);
+    const pickBk = parlayLegBook(pick.leg, pick.fighter);
+    const nSel = g.filter(a => parlaySelectedLegs.has(parlayLegKeyOf(a.leg))).length;
+    const evTag = legEv != null
+      ? `<span class="parlay-leg-ev ${legEv > 0 ? 'pos' : legEv < 0 ? 'neg' : ''}" title="Calibrated EV for this side as a single pick. Identical across the books on this side — EV prices the model's confidence, not the line.">${legEv > 0 ? '+' : ''}${legEv}%</span>`
+      : '<span class="parlay-leg-ev plr-empty"></span>';
+    const dirBtn = `<button type="button" class="parlay-leg-dir ${dir} plr-side${nSel ? ' has-sel' : ''}" data-parlay-key="${pickKey}"`
+      + ` title="${dir.toUpperCase()} — ${nSel} of ${books.length} book${books.length === 1 ? '' : 's'} on this side are in your slip. Click to ${parlaySelectedLegs.has(pickKey) ? 'remove' : 'add'} ${isBookPlaced(pick.leg) ? 'the book you placed at' : `the best ${dir.toUpperCase()} entry`} (${pickBk ? (PL_BOOK_NAME[pickBk] || pickBk) : 'no book'} ${pick.leg.line}), or click any book chip for that specific number.">${dir.toUpperCase()}${nSel ? `<i>${nSel}</i>` : ''}</button>`;
+    const rest = `<span class="plr-market"><span class="plg-books" title="Every book posting this side. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>`
+      + parlayYouTag(head.leg.stat, dir)
+      + evTag
+      + '<span class="parlay-leg-marg plr-empty"></span>'
+      + `<span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>`;
+    // Split, because grid auto-flow places by DOM order and the shared `stat`
+    // cell sits BETWEEN the direction column and the market column in the track
+    // list. Emitting a side as one blob put stat in the confidence column.
+    return { dirBtn, rest };
   };
-  const offPropCount = new Set(displayOffLegs.map(groupKeyOf)).size;
+
+  const renderPairedOffRow = (over: typeof offBoardLegs, under: typeof offBoardLegs): string => {
+    const head = over[0];
+    const all = [...over, ...under];
+    const nSel = all.filter(a => parlaySelectedLegs.has(parlayLegKeyOf(a.leg))).length;
+    const topConf = Math.max(over[0].leg.confidence, under[0].leg.confidence);
+    const confClass = topConf >= 72 ? 'conf-high' : topConf >= 58 ? 'conf-med' : 'conf-low';
+    const vsTag = head.leg.opponent
+      ? `<span class="parlay-leg-vs" title="Opponent: ${prettyName(head.leg.opponent)}">vs ${prettyName(head.leg.opponent).split(' ').slice(-1)[0]}</span>`
+      : '';
+    const placedTag = isLegPlaced(head.leg)
+      ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. A book chip outlined in gold is the one you placed at.">●</span>`
+      : '';
+    const overCells = sideCells(over, 'over');
+    const underCells = sideCells(under, 'under');
+    return `<div class="parlay-leg-row is-paired off-board ${confClass}${nSel ? ' selected' : ''}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}">
+      <span class="parlay-leg-check is-multi plr-span2" title="${nSel} of ${all.length} book${all.length === 1 ? '' : 's'} across both sides of this prop are in your slip. Both sides stay available — click a side label to take its best entry, or any book chip for that exact number.">${nSel ? `☑<i>${nSel}</i>` : '☐'}</span>
+      <span class="plr-id plr-span2">
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(head.leg.fighter)}">${prettyName(head.leg.fighter)}</span>
+        ${vsTag}${placedTag}
+        <span class="parlay-leg-off" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>
+      </span>
+      ${overCells.dirBtn}
+      <span class="parlay-leg-stat src-${head.leg.stat} plr-span2">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
+      ${overCells.rest}
+      ${underCells.dirBtn}${underCells.rest}
+    </div>`;
+  };
+
+  const renderOffBoardRows = (legs: typeof offBoardLegs): string => {
+    // Group by PROP (fighter + stat), then split the sides inside it, so a prop
+    // with both sides available renders once instead of twice.
+    const props = new Map<string, { over: typeof offBoardLegs; under: typeof offBoardLegs }>();
+    const order: string[] = [];
+    for (const a of legs) {
+      const pk = `${a.leg.fighter}|${a.leg.stat}`;
+      let cur = props.get(pk);
+      if (!cur) { cur = { over: [], under: [] }; props.set(pk, cur); order.push(pk); }
+      (a.leg.direction === 'over' ? cur.over : cur.under).push(a);
+    }
+    const one = (g: typeof offBoardLegs): string =>
+      (g.length === 1 ? renderPoolRow(g[0]) : renderGroupedOffRow(g));
+    return order.map(pk => {
+      const { over, under } = props.get(pk)!;
+      // Only pair when BOTH sides survived the direction filter — with OVER or
+      // UNDER selected in the strip there is only ever one side to show.
+      if (over.length && under.length) return renderPairedOffRow(over, under);
+      return over.length ? one(over) : one(under);
+    }).join('');
+  };
+  const offPropCount = new Set(displayOffLegs.map(a => `${a.leg.fighter}|${a.leg.stat}`)).size;
 
   // Rendered here (not at the map above) so the row can name its book via
   // PL_BOOK_NAME without tripping over the const's temporal dead zone.
@@ -12386,7 +12481,7 @@ function renderParlayLab(container: HTMLElement): void {
 
   // GLOW-UP 228 L1 — the book chips on a grouped off-board row each toggle their
   // OWN leg, so the click must not also reach the row (whose own key is absent).
-  container.querySelectorAll<HTMLElement>('.plg-book').forEach(btn => {
+  container.querySelectorAll<HTMLElement>('.plg-book, .plr-side').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const key = btn.dataset['parlayKey'];
