@@ -11832,7 +11832,7 @@ function renderParlayLab(container: HTMLElement): void {
       // is reported, not enforced — same call the two-sided slate picker makes).
       : (a.leg.offBoard ? '<span class="parlay-leg-plat plat-none" title="No book the scraper can see posts this side. The line shown is the prop\'s active line; queue it anyway if you have it somewhere else.">NO BK</span>' : '');
     const offTag = a.leg.offBoard
-      ? `<span class="parlay-leg-off" title="${(a.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>`
+      ? `<span class="parlay-leg-off" title="Off-board. ${(a.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>`
       : '';
     const placedTag = isLegPlaced(a.leg)
       ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. Flagged on the row so a leg you already hold is findable without hunting the confidence order — the ● PLACED chip in the strip filters to just these.">●</span>`
@@ -11947,7 +11947,7 @@ function renderParlayLab(container: HTMLElement): void {
       <span class="plr-id">
         <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(head.leg.fighter)}">${prettyName(head.leg.fighter)}</span>
         ${vsTag}${placedTag}
-        <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
+        <span class="parlay-leg-off" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>
       </span>
       <span class="parlay-leg-dir ${dir}">${dir.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
@@ -12321,7 +12321,15 @@ function renderParlayLab(container: HTMLElement): void {
     </div>`;
   }
 
-  container.innerHTML = `<div class="parlay-lab">
+  // ── GLOW-UP 281 — stop reserving a column for nothing ─────────────────
+  // The marginal-delta chip only exists once the slip has two legs to re-score
+  // against; below that EVERY row renders the empty placeholder, and the track
+  // holds 50px of blank across a hundred rows — on the row that most needs the
+  // width, because the fighter's name is the cell being squeezed for it. The
+  // whole board knows at render time whether a single Δ can exist, so it can
+  // drop the track outright rather than paying for the possibility.
+  const noDeltaCls = baseHealthScore == null ? ' no-delta' : '';
+  container.innerHTML = `<div class="parlay-lab${noDeltaCls}">
     <div class="parlay-lab-header">
       <div>
         <div class="parlay-lab-title">PARLAY LAB</div>
