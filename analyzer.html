@@ -30960,7 +30960,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    header in 272. `--plr-tracks` is defined once so the three can never disagree:
    restating a track list in three places is the drift that 260 was about. */
 .parlay-lab {
-  --plr-tracks: 18px minmax(0, 1fr) 58px 52px minmax(122px, 1.25fr) 54px 46px 42px 78px;
+  --plr-tracks: 18px minmax(150px, 1.75fr) 58px 52px minmax(118px, 1fr) 54px 46px 42px 78px;
   --plr-gap: 8px;
 }
 .parlay-leg-row {
@@ -30979,11 +30979,35 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    name truncates now and the tags after it can never be pushed into a second
    line, so height is guaranteed by construction rather than by whether a card
    happens to be full of short names. */
+/* ── GLOW-UP 280 · the fix that ate the fighters ───────────────────────────
+   270 shipped two mistakes that only a real board makes obvious, and both hit
+   the one field nothing else can replace.
+
+   First, the fr split was backwards: identity was `minmax(0, 1fr)` against a
+   market track of `minmax(122px, 1.25fr)`, so the column holding `54.5 P6` took
+   a LARGER share of the free space than the column holding the fighter's name.
+   Almost every row on the ranked board came back as `Marquel...`, `Nasrat...`,
+   `Anthony...`.
+
+   Second, and worse, `min-width: 0` on the name with every tag pinned at
+   `flex: 0 0 auto` meant the name was the ONLY thing in the cell that could
+   shrink — so it absorbed all of it. On off-board rows, which carry an extra
+   `off-board` tag, that drove names down to a single letter and in places to
+   nothing at all: rows reading `vs Nzechukwu` with no fighter on them.
+
+   The rule this encodes: in a cell that must shrink, the identifier shrinks
+   LAST. The name holds a floor it may never go below, and the `vs Opponent`
+   label — recoverable from the row's own tooltip and from the fight itself —
+   gives way six times faster. */
 .plr-id .parlay-leg-name {
-  flex: 0 1 auto; min-width: 0;
+  flex: 0 1 auto; min-width: 88px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.plr-id > *:not(.parlay-leg-name):not(.bp-avatar) { flex: 0 0 auto; }
+.plr-id .parlay-leg-vs {
+  flex: 0 6 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.plr-id > *:not(.parlay-leg-name):not(.parlay-leg-vs):not(.bp-avatar) { flex: 0 0 auto; }
 .plr-id .bp-avatar { flex: 0 0 auto; }
 
 /* The market cell: a line plus its book on a ranked row, the whole book rail on
@@ -31074,7 +31098,17 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    sticky resolves against the page again. Parked at the real bottom of the
    chrome stack, and above the rows it has to cover. */
 .parlay-pool { overflow: clip; }
-.parlay-pool-head-sticky { top: 98px; z-index: 6; }
+/* GLOW-UP 280: the head's background fades to transparent over its last 8px —
+   harmless for two years because the element never actually held position, and
+   immediately visible once 274 made it stick: rows slid UP THROUGH the filter
+   chips and the column header. A sticky element has to be opaque; that is not a
+   style choice, it is the price of leaving the flow. */
+.parlay-pool-head-sticky {
+  top: 98px; z-index: 6;
+  background: var(--bg2, #0d1221);
+  box-shadow: 0 6px 14px -8px rgba(0,0,0,0.85);
+}
+.plr-head { background: var(--bg2, #0d1221); }
 @media (max-width: 1100px) { .parlay-pool-head-sticky { top: 64px; } }
 
 /* ── GLOW-UP 275 · the pool cut off the number it is sorted by ─────────────
@@ -31092,7 +31126,7 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .parlay-lab-cols { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
 @media (max-width: 1500px) {
   .parlay-lab {
-    --plr-tracks: 16px minmax(0, 1fr) 52px 46px minmax(104px, 1.1fr) 44px 72px;
+    --plr-tracks: 16px minmax(112px, 1.7fr) 52px 46px minmax(102px, 1fr) 44px 72px;
     --plr-gap: 6px;
   }
   .parlay-leg-row > .bp-you,
