@@ -409,7 +409,7 @@ export const NAME_ALIASES = {
 //   control. Both halves of the blend are now expressed against THIS fight's
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
-export const MODEL_VERSION = 27;
+export const MODEL_VERSION = 28;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

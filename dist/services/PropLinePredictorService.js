@@ -129,6 +129,20 @@ const FP_LEAGUE_MEAN = 69.4;
 // correlation with actual is unchanged. It moves only the LEVEL, which is
 // exactly what was wrong.
 const FP_SHRINK_RETENTION = 0.35;
+// Retention for the no-history path, where the baseline is not a historical average
+// at all but a construction from the model's own SS/TD lines. Those lines are
+// themselves built from league fallbacks when the fighter is unknown — Terrance
+// Chatman on the Hernandez card read `output 3.90 SS/min` against `opp absorbs 3.90`,
+// both literally LEAGUE_SS_RATE — so the estimate carried no fighter-specific signal
+// and still emitted 27.5 against a league mean of 69.4. With no information the honest
+// projection is the mean, not 42 points under it.
+//
+// Cannot be measured directly: a fighter with no history cannot be walk-forward
+// tested. Bounded by argument instead — zero priors cannot carry MORE signal than
+// one prior, whose slope measured 0.212 (n=215), so 0.20 is an upper bound rather
+// than a fitted value. What survives is the little that is real: opponent absorption
+// still separates these fighters (Kuse's opponent absorbs 6.65 S/min, Chatman's 3.90).
+const FP_NO_HISTORY_RETENTION = 0.20;
 // Shrinkage strength in "phantom minutes at the league mean": a fighter with 36 logged
 // minutes gets a 50/50 blend, a veteran with 150 keeps ~80% of their own rate. Fitted
 // by MAE sweep on the same 1,891 observations (best at 36; the curve is flat from
@@ -561,6 +575,7 @@ export class PropLinePredictorService {
         // ── Step 2: Recency-weighted average ────────────────────────────
         // Weights: most recent fight = 1.0, then 0.85, 0.72, 0.61, 0.52, etc.
         let baseline;
+        let usedComponentEstimate = false;
         if (fightScores.length > 0) {
             let weightSum = 0;
             let fpSum = 0;
@@ -590,6 +605,7 @@ export class PropLinePredictorService {
                 + ssLine * 0.3 * FANTASY_SCORING.nonSigStrike
                 + tdLine * FANTASY_SCORING.takedown
                 + FANTASY_SCORING.winBonus.decision * 0.5;
+            usedComponentEstimate = true;
             reasons.push('No history — component estimate');
         }
         // ── Step 2b: Shrink toward the league mean (MODEL v27) ───────────
@@ -606,10 +622,15 @@ export class PropLinePredictorService {
         // instrument for a level-dependent bias — it drags the low end further down
         // when the data says it should come UP — and applying shrinkage on top of the
         // damp, without the renorm, would double-correct.
-        if (fightScores.length >= 1) {
-            const shrunk = FP_LEAGUE_MEAN + FP_SHRINK_RETENTION * (baseline - FP_LEAGUE_MEAN);
+        // v28: applies to EVERY baseline, not just the fightScores branch. The
+        // avgFP_betr / avgFP fallbacks are career averages too and regress the same way;
+        // they were skipping the correction purely because of how the branch was written.
+        // The component-estimate branch retains less, per FP_NO_HISTORY_RETENTION.
+        {
+            const retention = usedComponentEstimate ? FP_NO_HISTORY_RETENTION : FP_SHRINK_RETENTION;
+            const shrunk = FP_LEAGUE_MEAN + retention * (baseline - FP_LEAGUE_MEAN);
             if (Math.abs(shrunk - baseline) > 1) {
-                reasons.push(`Regression to mean: ${baseline.toFixed(1)}→${shrunk.toFixed(1)} (keeps ${(FP_SHRINK_RETENTION * 100).toFixed(0)}% of the gap to league ${FP_LEAGUE_MEAN})`);
+                reasons.push(`Regression to mean: ${baseline.toFixed(1)}→${shrunk.toFixed(1)} (keeps ${(retention * 100).toFixed(0)}% of the gap to league ${FP_LEAGUE_MEAN}${usedComponentEstimate ? ', no history' : ''})`);
             }
             baseline = shrunk;
         }
