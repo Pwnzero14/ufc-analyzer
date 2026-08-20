@@ -410,6 +410,13 @@ export const NAME_ALIASES = {
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
 export const MODEL_VERSION = 29;
+// Ceiling on the FP predictor's confidence score. Exported because the
+// predictions panel needs to know when a 92 is an EARNED 92 and when it is the
+// clamp — on a typical card roughly a third of the board sits exactly here, and
+// a gauge that renders the cap identically to a genuine top score is claiming a
+// distinction the number does not make. Keep in step with the clamp in
+// PropLinePredictorService.predictFantasyPoints.
+export const FP_CONFIDENCE_CEILING = 92;
 // ── PICK-EM PAYOUT TABLES ───────────────────────────────────────────────
 // Stake-inclusive multiplier by slip size: byLegs[legCount][hitCount] → payout.
 // Standard published tables — VERIFY IN-APP before big slips; promos, boosts,

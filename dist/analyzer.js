@@ -1,4 +1,4 @@
-import { NAME_ALIASES, MODEL_VERSION, PICKEM_PAYOUTS } from './config/index.js';
+import { NAME_ALIASES, MODEL_VERSION, FP_CONFIDENCE_CEILING, PICKEM_PAYOUTS } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import { _weightMissSignals, parseWeightMissFromTitle, severityFromLbs, MANUAL_WEIGHT_MISS_KEY } from './analyzer/weight-miss.js';
@@ -13162,6 +13162,89 @@ function clearLineHistory() {
 }
 // ── PROP LINE PREDICTOR ──────────────────────────────────────────────────
 let _cachedPredictions = null;
+// ── GLOW-UP 260 · factor lanes ────────────────────────────────────────────
+// Three separate lists encoded the same thing and had drifted apart: a regex
+// that assigned a colour, a hard-coded legend in the header, and a PRIORITY map
+// deciding which chips survive the five-chip clamp. The drift was not cosmetic.
+//
+//   · MODEL v29 removed the FP duration adjustment, so no reason string starts
+//     with `Duration adj` on a freshly generated board — yet DURATION kept its
+//     amber key in the legend and rank 1 in the priority list. The legend was
+//     advertising a lane that could not light.
+//   · `pf-finish` renders green on every finisher and was in neither the legend
+//     nor the priority map.
+//   · Worst of the three: `No history — component estimate` matched the finish
+//     lane's /No history/i and came out GREEN — the app's over/good colour — on
+//     exactly the rows GLOW-UP 250 exists to make look THIN. The one chip that
+//     says "there is nothing behind this number" was styled as a positive.
+//
+// One ordered table now owns all three jobs. Array order IS truncation priority
+// AND legend order, so a lane cannot be ranked without being labelled. The legend
+// is derived from the lanes actually drawn (see `lanesSeen`), which is why
+// `duration` can stay: stored pre-v29 boards still carry those chips, and the
+// amber key now appears on exactly the boards that have them.
+const FACTOR_LANES = [
+    // A hard rule replaced or capped the number. Rose, never green: this is the
+    // opposite of a finding — a warning that the model had little to work with.
+    { cls: 'pf-guard', label: 'guard', test: /^No history|^Clamped to historic/i },
+    // Post-hoc multipliers on the level — calibration, the book prior, the learned
+    // trend. Same family as the shrink, so they share its gold.
+    { cls: 'pf-cal', label: 'correction', test: /^FP cal|^Book prior|^Trend/i },
+    // Legacy: pre-v29 boards only.
+    { cls: 'pf-duration', label: 'duration', test: /^Duration adj/ },
+    // Anchored so it cannot swallow `Opp adj: x1.09 (... Finish synergy ...)`, an
+    // opponent chip that merely mentions finish synergy inside its parenthetical.
+    { cls: 'pf-finish', label: 'finish', test: /^High P\(finish\)/ },
+    { cls: 'pf-opp', label: 'opponent', test: /^Opp |opponent|style|^vs (Grappler|Striker)|(Grappler|Striker) vs/i },
+    { cls: 'pf-rate', label: 'rate', test: /SS\/min|^Output/ },
+    { cls: 'pf-hist', label: 'history', test: /Betr (platform )?avg|Recency-weighted|Avg TD|Career avg/ },
+];
+const SHRINK_LANE = { cls: 'pred-factor-shrink', label: 'shrink' };
+// ── GLOW-UP 263 · the rail was mostly label ───────────────────────────────
+// Every row carried the same six phrasings — `Opp absorbs`, `SS/min`, `Output`,
+// `Avg TD/fight`, `Betr avg`, `(N fights)`, `Recency-weighted` — around about four
+// characters of actual number. Twenty-six rows of that is one sentence repeated
+// twenty-six times with a different digit in it, and it cost real information:
+// the top row was spending its whole 569px rail on five chips and folding four
+// more into `+4`.
+//
+// The lane colour and the header legend already say WHICH quantity a chip is, so
+// the chip only has to say HOW MUCH. Full strings stay in every `title`, and any
+// reason with no entry here falls through unchanged — an unrecognised factor is
+// printed in full rather than silently mangled.
+//
+// `(N fights)` is dropped from the Betr average specifically because the evidence
+// meter beside the fighter's name already states the sample size; it was the same
+// number printed twice on the same row.
+const FACTOR_SHORT = [
+    [/^No history/i, () => 'NO HISTORY'],
+    [/^Clamped to historic range:\s*(.+)$/i, m => `CLAMP ${m[1].replace('-', '–')}`],
+    [/^FP cal \([^)]*\): ×([\d.]+)/, m => `CAL ×${Number(m[1]).toFixed(2)}`],
+    [/^Book prior: ([\d.]+)/, m => `BOOK ${m[1]}`],
+    [/^Trend(?: adj)?:\s*([+-][\d.]+)/, m => `TREND ${m[1]}`],
+    [/^Duration adj:.*\(×([\d.]+)\)/, m => `DUR ×${m[1]}`],
+    [/^High P\(finish\) (\d+)%/, m => `FIN ${m[1]}%`],
+    [/^Opp adj: ×([\d.]+)/, m => `OPP× ${m[1]}`],
+    [/^Opp absorbs ([\d.]+) SS\/min/, m => `OPP ${m[1]}/m`],
+    [/^Opp TD Def: (\d+%)/, m => `OPP TD ${m[1]}`],
+    [/^Output ([\d.]+) SS\/min/, m => `OUT ${m[1]}/m`],
+    [/^Avg TD\/fight: ([\d.]+)/, m => `TD ${m[1]}`],
+    [/^Betr (?:platform )?avg: ([\d.]+)/, m => `AVG ${m[1]}`],
+    [/^Career avg fallback: ([\d.]+)/, m => `AVG ${m[1]}†`],
+    [/^Recency-weighted: ([\d.]+)/, m => `REC ${m[1]}`],
+    [/^(?:Striker|Grappler) style \(([+-][\d.]+%)\)/, m => `STYLE ${m[1]}`],
+    [/^vs (Striker|Grappler) \(([+-][\d.]+%)\)/, m => `vs ${m[1].slice(0, 4).toUpperCase()} ${m[2]}`],
+    [/^(?:Striker|Grappler) vs \w+ \(([+-][\d.]+%)\)/, m => `MIRROR ${m[1]}`],
+    [/^5-round fight$/, () => '5R'],
+];
+const compressFactor = (r) => {
+    for (const [re, fmt] of FACTOR_SHORT) {
+        const m = r.match(re);
+        if (m)
+            return fmt(m);
+    }
+    return r;
+};
 let _predSort = 'card';
 let _cachedLearningLog = null;
 async function generatePredictions(container) {
@@ -13241,19 +13324,47 @@ function renderPredictionsHtml(cSec) {
     if (latest && latest.predictions.length > 0) {
         const age = Date.now() - latest.generatedAt;
         const agoLabel = age < 3600000 ? `${Math.round(age / 60000)}m ago` : `${Math.round(age / 3600000)}h ago`;
+        // ── GLOW-UP 259 — which model built this board ─────────────────────────
+        // "Generated 45m ago" measures the wrong axis. A board is stale when the
+        // MODEL moved under it, not when the clock did — and the model moved three
+        // times in one night (v27 regression-to-mean, v28 no-history prior, v29 the
+        // duration removal, which alone took Hernandez 102→~80 and McVey 95→~60).
+        // A board carrying those old numbers rendered pixel-for-pixel identical to a
+        // fresh one, and it is the number you would have bet off. The rows have
+        // carried `modelVersion` since stamping began; the panel simply never read
+        // it. Missing on pre-stamping rows, which read as v1 by the type's own note.
+        const boardVersions = [...new Set(latest.predictions.map(p => p.modelVersion ?? 1))].sort((a, b) => a - b);
+        const boardV = boardVersions[boardVersions.length - 1] ?? 1;
+        const modelStale = boardV < MODEL_VERSION;
+        // A board built by two different models is a partial regenerate — rarer, and
+        // worse, because half the rows are comparable and half are not.
+        const modelMixed = boardVersions.length > 1;
+        const modelTip = modelStale
+            ? `This board was built by MODEL v${boardV}. The predictor is now v${MODEL_VERSION}, so every number here predates ${MODEL_VERSION - boardV} model change${MODEL_VERSION - boardV === 1 ? '' : 's'} and is not what the current model would produce. Regenerate before reading it as a projection.`
+            : `Built by MODEL v${boardV} — the current predictor. Numbers on this board are what the model produces today.`;
+        const modelChip = `<span class="pred-model${modelStale ? ' is-stale' : ''}" title="${(modelTip + (modelMixed ? ` Mixed board: rows span v${boardVersions.join(', v')} — a partial regenerate. Regenerate the whole card so every row is comparable.` : '')).replace(/"/g, '&quot;')}">`
+            + `MODEL v${boardV}${modelStale ? ` <b>→ v${MODEL_VERSION}</b>` : ''}${modelMixed ? ' <i>mixed</i>' : ''}</span>`;
         // Model-vs-book: the predictor ran pre-lines; once books post, the gap
         // between predicted and posted line IS the signal. Green = model sees
         // more than the book (over-shaded), red = less (under-shaded).
         const predByName = new Map(allFighters.map(f => [(normalizeName(f.name) || f.name).toLowerCase(), f]));
+        const bookLineOf = (fighterName, src) => {
+            const f = predByName.get((normalizeName(fighterName) || fighterName).toLowerCase());
+            return f ? getSourceActiveLine(f, src) : null;
+        };
+        // The gap that counts as a gap. Shared by the book chip's colour and by the
+        // split flag below, so a chip that reads "book agrees" can never also be
+        // flagged as disagreeing.
+        const gapThreshold = (src) => (src === 'td' ? 0.5 : 2);
         const bookCell = (fighterName, src, pred) => {
             const f = predByName.get((normalizeName(fighterName) || fighterName).toLowerCase());
-            const book = f ? getSourceActiveLine(f, src) : null;
+            const book = bookLineOf(fighterName, src);
             // A dash rather than the words "no line" — this state repeats up to 52 times
             // on a card and was the loudest quiet thing on the board.
             if (book == null || !Number.isFinite(Number(pred)))
                 return `<div class="pred-book none" title="No posted line for this prop yet">—</div>`;
             const d = pred - book;
-            const thr = src === 'td' ? 0.5 : 2;
+            const thr = gapThreshold(src);
             const cls = d >= thr ? 'pos' : d <= -thr ? 'neg' : 'flat';
             // Name the actual book instead of a generic "BK". getSourceActiveLine walks the
             // platform priority, so the number can come from any of P6/UD/PP/BT/DK — printing
@@ -13302,7 +13413,19 @@ function renderPredictionsHtml(cSec) {
             : _predSort === 'conf' ? b.fantasy.confidence - a.fantasy.confidence
                 : _predSort === 'eviD' ? eviDOf(b) - eviDOf(a)
                     : gapOf(b).v - gapOf(a).v);
-        const rows = sorted.map(p => {
+        // ── GLOW-UP 265 — a gauge that reads the same on a third of the board ───
+        // Confidence is clamped at 92, and it is dominated by sample size: 30 + 4 per
+        // past fight, plus consistency and a flat bonus for knowing the opponent. Any
+        // fighter with nine or more fights lands on the ceiling, which on this card is
+        // eight of twenty-six rows — and under the EVIDENCE sort those eight are the
+        // entire first screen, ten identical lit cells stacked one above the other.
+        // Rendering the clamp exactly like an earned score claims a distinction the
+        // number does not make. The gauge now shows where the rail is, and the tooltip
+        // counts the rows tied at it, so the reader knows what they are looking at.
+        const cappedCount = latest.predictions.filter(p => Math.round(p.fantasy.confidence) >= FP_CONFIDENCE_CEILING).length;
+        // Populated during the row map; the header legend is built from it afterwards.
+        const lanesSeen = new Set();
+        const rows = sorted.map((p, rowIdx) => {
             const ssArrow = p.ss.lean === 'over' ? '▲' : '▼';
             const tdArrow = p.td.lean === 'over' ? '▲' : '▼';
             const fpArrow = p.fantasy.lean === 'over' ? '▲' : '▼';
@@ -13372,63 +13495,117 @@ function renderPredictionsHtml(cSec) {
             // theirs, purely by accident of list position. Rank the full set; the SHOWN
             // cap below is what does the trimming, after priority has had its say.
             const otherFp = p.fantasy.reasons.filter(r => r !== shrinkReason);
-            // GLOW-UP 254: the rail was six identical grey pills per row, which meant
-            // `Duration adj ×2.22` — the multiplier that inflates thin-history fighters,
-            // and the open finding from tonight — carried exactly the same visual weight
-            // as `Avg TD/fight: 0.0`. Classify by what a factor IS so the row can be
-            // scanned instead of read. Colours follow the app's existing axes: opponent
-            // violet, duration amber (it is the one that distorts), history dim because
-            // it is context rather than a finding.
-            const factorCls = (r) => /^Duration adj/.test(r) ? ' pf-duration'
-                : /^Opp |opponent/i.test(r) ? ' pf-opp'
-                    : /SS\/min|Output/.test(r) ? ' pf-rate'
-                        : /P\(finish\)|Finish synergy|No history/i.test(r) ? ' pf-finish'
-                            : /Betr avg|Recency-weighted|Avg TD|Career avg/.test(r) ? ' pf-hist'
-                                : '';
+            // Lane assignment, truncation priority and the legend all come from one
+            // ordered table (FACTOR_LANES) — see the note there for what drifting apart
+            // had cost. First match wins, so the table's order is also its precedence.
+            const laneOf = (r) => FACTOR_LANES.findIndex(l => l.test.test(r));
+            const factorCls = (r) => {
+                const i = laneOf(r);
+                return i < 0 ? '' : ` ${FACTOR_LANES[i].cls}`;
+            };
             // GLOW-UP 255: the rail wrapped to two lines on eight of 26 rows, which broke
             // the scan rhythm, and it spent that space on chips like `Avg TD/fight: 0.0`
             // — a fighter with no takedowns, stated at the same weight as a finding.
             // Drop the no-signal ones, order by what actually moves a projection, and
             // clamp to a single line so every row is the same height. Priority ordering
-            // is what makes the clamp safe: the duration and shrink chips can never be
+            // is what makes the clamp safe: the guard and correction chips can never be
             // the ones pushed out of view.
-            const PRIORITY = {
-                ' pf-duration': 1, ' pf-finish': 2, ' pf-opp': 3, ' pf-rate': 4, ' pf-hist': 5,
-            };
             const isNoise = (r) => /:\s*0(\.0)?$/.test(r.trim());
             const ranked = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
                 .filter(r => !isNoise(r))
-                .map(r => ({ r, cls: factorCls(r) }))
-                .sort((a, b) => (PRIORITY[a.cls] ?? 9) - (PRIORITY[b.cls] ?? 9));
-            const SHOWN = 5;
+                .map(r => ({ r, cls: factorCls(r), rank: laneOf(r) }))
+                .sort((a, b) => (a.rank < 0 ? 99 : a.rank) - (b.rank < 0 ? 99 : b.rank));
+            // 5 was set when a chip averaged ~110px. Compressed they average ~52px, so
+            // the same rail holds seven — which is the whole factor set for most rows,
+            // and `+N` now means something unusual rather than "this is a normal row".
+            const SHOWN = 7;
             const shown = ranked.slice(0, SHOWN);
             const hidden = ranked.slice(SHOWN);
             const moreChip = hidden.length
                 ? `<span class="pred-factor pf-more" title="${hidden.map(h => h.r).join(' · ').replace(/"/g, '&quot;')}">+${hidden.length}</span>`
                 : '';
+            // Only lanes actually DRAWN feed the legend — a key for a colour that is not
+            // on screen is the exact failure this replaces. Chips folded into `+N` do not
+            // count: their colour is not visible either.
+            if (shrinkChip)
+                lanesSeen.add(SHRINK_LANE.cls);
+            for (const { cls } of shown)
+                if (cls)
+                    lanesSeen.add(cls.trim());
             const reasons = shrinkChip
-                + shown.map(({ r, cls }) => `<span class="pred-factor${cls}" title="${r.replace(/"/g, '&quot;')}">${r}</span>`).join('')
+                + shown.map(({ r, cls }) => `<span class="pred-factor${cls}" title="${r.replace(/"/g, '&quot;')}">${compressFactor(r)}</span>`).join('')
                 + moreChip;
             // Confidence as a ten-cell gauge in the same language as the evidence meter,
             // so the two instruments on a row read as one system. Same six grid children
             // in the same order — the track list is untouched.
             const confCells = Array.from({ length: 10 }, (_, i) => `<i${i < Math.round(confWidth / 10) ? ' class="on"' : ''}></i>`).join('');
             const confTier = confWidth >= 65 ? 'hi' : confWidth >= 45 ? 'mid' : 'lo';
-            const statCell = (lab, val, color, arrow, extra, book) => `<div class="pcell${extra}"><span class="pcell-lab">${lab}</span>`
-                + `<span class="pcell-val" style="color:${color}">${val}<i>${arrow}</i></span>${book}</div>`;
-            return `<div class="pred-row pr-${p.fantasy.lean}" data-jump="${p.fighter}" title="Open fighter card">
-        <div class="pred-fighter"><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub"><span class="pf-vs">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</span>${evBadge}</div></div></div>
-        ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line))}
-        ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line))}
-        ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ` pcell-fp${thinCls}`, bookCell(p.fighter, 'fp', p.fantasy.line))}
-        <div class="pconf pconf-${confTier}"><span class="pcell-lab">CONF</span><span class="pconf-gauge">${confCells}</span><span class="pconf-n">${confWidth}<b>%</b></span></div>
+            const confCapped = confWidth >= FP_CONFIDENCE_CEILING;
+            const confTip = confCapped
+                ? `${confWidth}% is the model's confidence CEILING, not a top score — ${cappedCount} of ${latest.predictions.length} rows on this board read exactly the same number, and they do not have the same evidence behind them. Confidence is driven mostly by how many past fights the estimate rests on, so read the meter beside the fighter's name for the part that still separates them.`
+                : `Model confidence ${confWidth}%. Driven mostly by how many past fights the estimate rests on, plus how consistent that history is and whether the opponent is known. It caps at ${FP_CONFIDENCE_CEILING}%.`;
+            // GLOW-UP 262: `thinCls` used to be passed in `extra`, which put it on the
+            // `.pcell` CONTAINER. `.pred-val-thin` sets `opacity` and a dotted underline,
+            // and both inherit — so the doubt marker landed on the "FP" label and on the
+            // book chip as well as on the number. The book line is a fact posted by a
+            // sportsbook; dimming it as unreliable because the MODEL is short of history
+            // is exactly backwards. Its own rule says "the number itself carries the
+            // doubt", so give it a slot on the number.
+            // ── GLOW-UP 266 — two directions wearing the same colour ────────────
+            // The ▲/▼ beside a projection answers "is this ABOVE this fighter's own
+            // career norm?" The book chip under it answers "is this above the POSTED
+            // LINE?" Those are different questions, and on this card they disagree on
+            // four rows — Jamall Emmers renders a red ▼ on an SS projection of 39
+            // against a posted 29.5, nine and a half points the other way. Both
+            // statements are correct; the problem is that the arrow, the value colour
+            // and the row's whole accent beam all speak the app's direction axis, so a
+            // scan reads "under" on a prop where the model is well over the line.
+            // Nothing about the model changes here. The cell just stops presenting one
+            // comparison in a way that will be read as the other.
+            const splitMark = (src, pred, lean) => {
+                const book = bookLineOf(p.fighter, src);
+                if (book == null || !Number.isFinite(Number(pred)))
+                    return '';
+                const d = pred - book;
+                if (Math.abs(d) < gapThreshold(src))
+                    return '';
+                const bookSide = d > 0 ? 'over' : 'under';
+                if (bookSide === lean)
+                    return '';
+                const tip = `Split read. The arrow says ${lean.toUpperCase()} because ${pred} is ${lean === 'over' ? 'above' : 'below'} ${prettyName(p.fighter)}'s own ${src.toUpperCase()} norm. But the posted line is ${book}, so against the BOOK this projection sits ${d > 0 ? 'over' : 'under'} by ${Math.abs(d).toFixed(1)}. The line is the side you can bet; the arrow is context about the fighter.`;
+                return `<i class="pcell-split" title="${tip.replace(/"/g, '&quot;')}">⇅</i>`;
+            };
+            const statCell = (lab, val, color, arrow, extra, book, valCls = '', mark = '') => `<div class="pcell${extra}${mark ? ' has-split' : ''}"><span class="pcell-lab">${lab}${mark}</span>`
+                + `<span class="pcell-val${valCls}" style="color:${color}">${val}<i>${arrow}</i></span>${book}</div>`;
+            // GLOW-UP 264: both halves of a fight are on this board, and every sort
+            // except CARD scatters them. Under EVIDENCE, Hernandez sits at row 6 and
+            // Rodrigues at row 4; under FP they can be twenty rows apart. Two
+            // projections priced against each other are the pair you most want to read
+            // together — the opponent adjustment on one row IS the other row's fighter.
+            // Same key and the same hover treatment Best Picks has used since GLOW-UP
+            // 169, so the gesture transfers rather than being a second thing to learn.
+            const fightKey = [p.fighter.toLowerCase(), (p.opponent || '').toLowerCase()].sort().join('|');
+            return `<div class="pred-row pr-${p.fantasy.lean}" data-jump="${p.fighter}" data-fightkey="${fightKey.replace(/"/g, '&quot;')}" title="Open fighter card">
+        <div class="pred-fighter"><span class="pred-rank" title="${_predSort === 'card' ? 'Position on the card, main event first' : `Rank ${rowIdx + 1} of ${sorted.length} under the current sort`}">${rowIdx + 1}</span><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub"><span class="pf-vs">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</span>${evBadge}</div></div></div>
+        ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line), '', splitMark('ss', p.ss.line, p.ss.lean))}
+        ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line), '', splitMark('td', p.td.line, p.td.lean))}
+        ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ' pcell-fp', bookCell(p.fighter, 'fp', p.fantasy.line), thinCls, splitMark('fp', p.fantasy.line, p.fantasy.lean))}
+        <div class="pconf pconf-${confTier}${confCapped ? ' is-capped' : ''}" title="${confTip.replace(/"/g, '&quot;')}"><span class="pcell-lab">CONF</span><span class="pconf-gauge">${confCells}</span><span class="pconf-n">${confWidth}<b>%</b></span></div>
         <div class="prail">${reasons}</div>
       </div>`;
         }).join('');
+        // The key dot carries the LANE'S OWN CLASS, so it inherits the same `color`
+        // declaration the chips do. A legend swatch cannot drift from the chip it
+        // describes when there is only one place the colour is written down.
+        const legendKeys = [SHRINK_LANE, ...FACTOR_LANES]
+            .filter(l => lanesSeen.has(l.cls))
+            .map(l => `<span class="pkey"><i class="pkey-dot ${l.cls}"></i>${l.label}</span>`)
+            .join('');
         const sortBtn = (k, lab, tip) => `<button class="psort${_predSort === k ? ' on' : ''}" data-psort="${k}" title="${tip}">${lab}</button>`;
         predBody = `<div class="pred-bar">
       <button id="predictorGenerateBtn" class="btn btn-sm pred-gen">⚡ Generate Predictions</button>
       <span class="pred-age">Generated ${agoLabel}${latest.settled ? ' · settled' : ''}</span>
+      ${modelChip}
       <span class="pred-sortbar">
         <span class="pred-sortlab">SORT</span>
         ${sortBtn('card', 'CARD', 'Fight order, main event down — the order the night runs in')}
@@ -13442,13 +13619,7 @@ function renderPredictionsHtml(cSec) {
     </div>
     <div class="pred-head">
       <div>Fighter</div><div>SS</div><div>TD</div><div>FP</div><div>Conf</div>
-      <div class="pred-head-rail">Factors
-        <span class="pkey"><i class="pf-shrinkkey"></i>shrink</span>
-        <span class="pkey"><i class="pf-durationkey"></i>duration</span>
-        <span class="pkey"><i class="pf-oppkey"></i>opponent</span>
-        <span class="pkey"><i class="pf-ratekey"></i>rate</span>
-        <span class="pkey"><i class="pf-histkey"></i>history</span>
-      </div>
+      <div class="pred-head-rail">Factors${legendKeys}</div>
     </div>
     ${rows}`;
     }
@@ -15240,6 +15411,23 @@ async function renderArchivePanel(container) {
     });
     container.querySelectorAll('.pred-row[data-jump]').forEach(el => {
         el.addEventListener('click', () => jumpToFighterCard(el.dataset['jump'] || ''));
+    });
+    // GLOW-UP 264: hovering a prediction row lights its opponent's row. Same
+    // mechanism as GLOW-UP 169 on Best Picks — the pair is only adjacent under the
+    // CARD sort, and every other sort splits it.
+    container.querySelectorAll('.pred-row[data-fightkey]').forEach(row => {
+        const fk = row.dataset['fightkey'] || '';
+        if (!fk)
+            return;
+        row.addEventListener('mouseenter', () => {
+            container.querySelectorAll(`.pred-row[data-fightkey="${CSS.escape(fk)}"]`).forEach(r => {
+                if (r !== row)
+                    r.classList.add('fight-glow');
+            });
+        });
+        row.addEventListener('mouseleave', () => {
+            container.querySelectorAll('.pred-row.fight-glow').forEach(r => r.classList.remove('fight-glow'));
+        });
     });
     container.querySelectorAll('[data-psort]').forEach(btn => {
         btn.addEventListener('click', () => {

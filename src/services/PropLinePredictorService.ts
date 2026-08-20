@@ -3,7 +3,7 @@
 // opponent data, and self-learned weights. After settlement, runs a learning
 // cycle to update fighter trends and formula weights.
 
-import { FANTASY_SCORING, MODEL_VERSION } from '../config/index.js';
+import { FANTASY_SCORING, MODEL_VERSION, FP_CONFIDENCE_CEILING } from '../config/index.js';
 import type {
   FighterDB,
   FighterTrend,
@@ -894,7 +894,7 @@ export class PropLinePredictorService {
     const recentBonus = sampleSize >= 3 ? 5 : 0;
     const confidence = clamp(
       30 + sampleSize * 4 + consistencyBonus + oppBonus + recentBonus,
-      20, 92,
+      20, FP_CONFIDENCE_CEILING,
     );
 
     const historicalAvg = fighterDB.avgFP_betr ?? fighterDB.avgFP ?? predicted;

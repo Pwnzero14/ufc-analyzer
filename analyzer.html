@@ -7977,7 +7977,6 @@ html { scroll-behavior: smooth; }
 }
 
 
-
 /* ── GLOW-UP 104: Command Center V2 — cinematic header, pill holographics, tab arena ── */
 /* Header bar deeper atmosphere with animated accent spine, logo icon pulse,
    platform pills holographic glass with per-platform colored aura, ACTIVE badge beacon,
@@ -8965,15 +8964,8 @@ html { scroll-behavior: smooth; }
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
-.pred-row:nth-child(2)  { animation-delay: 0.03s; }
-.pred-row:nth-child(3)  { animation-delay: 0.06s; }
-.pred-row:nth-child(4)  { animation-delay: 0.09s; }
-.pred-row:nth-child(5)  { animation-delay: 0.12s; }
-.pred-row:nth-child(6)  { animation-delay: 0.15s; }
-.pred-row:nth-child(7)  { animation-delay: 0.18s; }
-.pred-row:nth-child(8)  { animation-delay: 0.21s; }
-.pred-row:nth-child(9)  { animation-delay: 0.24s; }
-.pred-row:nth-child(10) { animation-delay: 0.27s; }
+/* Delays live with GLOW-UP 268 below — this list was written when the first row
+   was the second child of the panel, which stopped being true in GLOW-UP 254. */
 @media (prefers-reduced-motion: reduce) {
   .pred-row { animation: none; }
 }
@@ -9019,48 +9011,6 @@ html { scroll-behavior: smooth; }
   text-shadow: 0 0 16px rgba(248,198,74,0.35), 0 0 4px rgba(255,255,255,0.15) !important;
 }
 
-/* --- SS stat column: cyan glow tint --- */
-.pred-row > div[style*="min-width:55px"]:nth-of-type(2) div[style*="font-weight:700"][style*="color:var(--green)"] {
-  text-shadow: 0 0 10px rgba(44,212,208,0.35);
-}
-.pred-row > div[style*="min-width:55px"]:nth-of-type(2) div[style*="font-weight:700"][style*="color:var(--red)"] {
-  text-shadow: 0 0 10px rgba(255,91,120,0.35);
-}
-
-/* --- Stat column glass pills: deeper glass --- */
-.pred-row > div[style*="min-width:55px"], .pred-row > div[style*="min-width:45px"] {
-  background: rgba(255,255,255,0.035) !important;
-  border-color: rgba(255,255,255,0.06) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 1px 4px rgba(0,0,0,0.12);
-}
-.pred-row:hover > div[style*="min-width:55px"], .pred-row:hover > div[style*="min-width:45px"] {
-  background: rgba(255,255,255,0.06) !important;
-  border-color: rgba(248,198,74,0.12) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 10px rgba(0,0,0,0.2), 0 0 6px rgba(248,198,74,0.06) !important;
-}
-
-/* --- Confidence bar: stronger halo glow on fill --- */
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] {
-  background: rgba(255,255,255,0.035) !important;
-  border-color: rgba(255,255,255,0.07) !important;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
-}
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] > div {
-  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor, 0 0 1px currentColor !important;
-}
-
-/* --- Reason tags: glass evolution with category feel --- */
-.pred-row span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(255,255,255,0.045) !important;
-  border-color: rgba(255,255,255,0.09) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.04) !important;
-}
-.pred-row:hover span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(248,198,74,0.08) !important;
-  border-color: rgba(248,198,74,0.18) !important;
-  color: rgba(255,255,255,0.8) !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2), 0 0 8px rgba(248,198,74,0.08) !important;
-}
 
 /* --- Generate button: sharper glass with icon glow --- */
 #predictorGenerateBtn {
@@ -11000,7 +10950,7 @@ html { scroll-behavior: smooth; }
 /* ── GLOW-UP 13: Archive predictions table ── */
 .pred-row {
   display: grid;
-  grid-template-columns: minmax(180px, 230px) 64px 56px 64px 96px 1fr;
+  grid-template-columns: minmax(180px, 230px) 86px 76px 86px 96px 1fr;
   gap: 10px; align-items: center;
   padding: 8px 14px; border-bottom: 1px solid var(--border);
   cursor: pointer; transition: background 0.12s;
@@ -11009,7 +10959,7 @@ html { scroll-behavior: smooth; }
 .pred-row:last-child { border-bottom: none; }
 .pred-fighter { display: flex; align-items: center; gap: 8px; min-width: 0; }
 @media (max-width: 1100px) {
-  .pred-row { grid-template-columns: minmax(150px, 1fr) 60px 50px 60px 90px; }
+  .pred-row { grid-template-columns: minmax(150px, 1fr) 82px 72px 82px 90px; }
   .pred-row > :last-child { grid-column: 1 / -1; }
 }
 
@@ -18429,49 +18379,6 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   text-shadow: 0 0 12px rgba(248,198,74,0.3);
 }
 
-/* === SS/TD/FP stat columns: glass pill containers === */
-.pred-row > div[style*="min-width:55px"], .pred-row > div[style*="min-width:45px"] {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 8px;
-  padding: 4px 6px;
-  margin: 0 1px;
-  transition: all 0.18s ease;
-}
-.pred-row:hover > div[style*="min-width:55px"], .pred-row:hover > div[style*="min-width:45px"] {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-/* === Confidence bar: thicker glass track with halo glow === */
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 5px !important;
-  height: 12px !important;
-}
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"] > div {
-  border-radius: 5px !important;
-  box-shadow: 0 0 8px currentColor, 0 0 3px currentColor;
-}
-
-/* === Reason tags: luminous glass pills === */
-.pred-row span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 6px !important;
-  padding: 2px 8px !important;
-  backdrop-filter: blur(4px);
-  transition: all 0.18s ease;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-}
-.pred-row:hover span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(248,198,74,0.07) !important;
-  border-color: rgba(248,198,74,0.15) !important;
-  color: rgba(255,255,255,0.75) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 6px rgba(248,198,74,0.06);
-}
 
 /* === Generate button: premium amber glass === */
 #predictorGenerateBtn {
@@ -18822,32 +18729,6 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   background: linear-gradient(135deg, rgba(248,198,74,0.08), rgba(248,198,74,0.04)) !important;
   border-color: rgba(248,198,74,0.22) !important;
   box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 20px rgba(248,198,74,0.08), inset 0 1px 0 rgba(248,198,74,0.06) !important;
-}
-/* Stat pills: gold border */
-.pred-row > div[style*="min-width:55px"], .pred-row > div[style*="min-width:45px"] {
-  background: rgba(248,198,74,0.03) !important;
-  border: 1px solid rgba(248,198,74,0.08) !important;
-}
-.pred-row:hover > div[style*="min-width:55px"], .pred-row:hover > div[style*="min-width:45px"] {
-  background: rgba(248,198,74,0.06) !important;
-  border-color: rgba(248,198,74,0.15) !important;
-}
-/* Factor/reason tags: gold border */
-.pred-row span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(248,198,74,0.03) !important;
-  border: 1px solid rgba(248,198,74,0.08) !important;
-  color: rgba(255,248,230,0.55) !important;
-}
-.pred-row:hover span[style*="display:inline-block;font-size:9px"] {
-  background: rgba(248,198,74,0.06) !important;
-  border-color: rgba(248,198,74,0.15) !important;
-  color: rgba(255,248,230,0.75) !important;
-}
-/* Confidence bar track: gold glass */
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.06)"],
-.pred-row div[style*="min-width:70px"] > div[style*="background:rgba(255,255,255,0.04)"] {
-  background: rgba(248,198,74,0.05) !important;
-  border: 1px solid rgba(248,198,74,0.08) !important;
 }
 
 /* ── GLOW-UP 116: Learning Summary — gold-accent glass cohesion ── */
@@ -30484,7 +30365,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    inference. The header carries a key now. */
 .pred-head {
   display: grid;
-  grid-template-columns: minmax(180px, 230px) 64px 56px 64px 96px 1fr;
+  grid-template-columns: minmax(180px, 230px) 86px 76px 86px 96px 1fr;
   gap: 10px; align-items: center;
   padding: 5px 14px 6px;
   border-bottom: 1px solid rgba(125,145,190,0.16);
@@ -30498,18 +30379,17 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .pred-head > div:nth-child(3),
 .pred-head > div:nth-child(4) { text-align: center; }
 @media (max-width: 1100px) {
-  .pred-head { grid-template-columns: minmax(150px, 1fr) 60px 50px 60px 90px; }
+  .pred-head { grid-template-columns: minmax(150px, 1fr) 82px 72px 82px 90px; }
   .pred-head > :last-child { display: none; }
 }
-/* Legend — the chip colours were learnable only by inference before this. */
+/* Legend — the chip colours were learnable only by inference before this.
+   GLOW-UP 260 replaced the five hand-written swatch classes with a dot that
+   carries the LANE'S OWN class, so the swatch and the chip read their colour
+   from the same declaration and cannot drift. */
 .pred-head-rail { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .pkey { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0.08em; opacity: 0.75; }
 .pkey i { width: 7px; height: 7px; border-radius: 1.5px; display: block; box-shadow: 0 0 5px currentColor; }
-.pf-shrinkkey   { background: var(--gold); color: var(--gold); }
-.pf-durationkey { background: #ffa94a;  color: #ffa94a; }
-.pf-oppkey      { background: #b07cff;  color: #b07cff; }
-.pf-ratekey     { background: #5ac8fa;  color: #5ac8fa; }
-.pf-histkey     { background: #7d8fb3;  color: #7d8fb3; opacity: 0.6; }
+.pkey-dot { background: currentColor !important; }
 
 /* One line, always. Long chips ellipsize rather than wrap the row. */
 .prail { flex-wrap: nowrap; overflow: hidden; }
@@ -30970,7 +30850,6 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-fighter-row { cursor: help; }
 
 
-
 /* ══ GLOW-UP 240: ten levels of look ═════════════════════════════════════
    239 made the row informationally right and still left a third of it empty,
    which is most of why it read bland — a row that ends two thirds across looks
@@ -31078,6 +30957,176 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-line, .rc-avg, .rc-delta, .rc-conf b, .rc-bk b, .rc-sec-stat { font-variant-numeric: tabular-nums; }
 .rc-avg { font-size: 8.5px; letter-spacing: 0.03em; }
 .rc-delta { min-width: 52px; }
+
+/* ══ PROP LINE PREDICTIONS · GLOW-UP 259-268 ══════════════════════════════ */
+
+/* ── GLOW-UP 259 · which model built this board ────────────────────────────
+   The panel's only freshness signal was "Generated 45m ago", which measures the
+   clock. A predictions board goes stale when the MODEL moves under it, and the
+   model moved three times in one night — v27, v28, then v29's duration removal,
+   which alone took Hernandez 102→~80 and McVey 95→~60. A board carrying the old
+   numbers rendered pixel-for-pixel identical to a fresh one. Every row has
+   carried `modelVersion` since stamping began; the panel just never read it.
+
+   Quiet when current, loud when not: this is a chip you should only ever notice
+   on the day it matters. */
+.pred-model {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.1em; padding: 2px 7px; border-radius: 3px;
+  color: var(--text4); border: 1px solid rgba(125,145,190,0.16);
+  background: rgba(255,255,255,0.025); cursor: help;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.pred-model.is-stale {
+  color: #ffb454; border-color: rgba(255,169,74,0.5);
+  background: rgba(255,169,74,0.10);
+  box-shadow: 0 0 10px -3px rgba(255,169,74,0.85);
+  animation: pred-model-pulse 2.4s ease-in-out infinite;
+}
+.pred-model b { font-weight: 800; color: #ffd08a; }
+.pred-model i { font-style: normal; opacity: 0.72; letter-spacing: 0.06em; }
+@keyframes pred-model-pulse {
+  0%, 100% { box-shadow: 0 0 10px -3px rgba(255,169,74,0.85); }
+  50%      { box-shadow: 0 0 15px -2px rgba(255,169,74,1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pred-model.is-stale { animation: none; }
+}
+
+/* ── GLOW-UP 260 · two lanes the rail was missing, one it was mis-colouring ──
+   `No history — component estimate` matched the finish lane's /No history/i and
+   rendered GREEN. Green is this app's over/good colour, so the single chip that
+   means "there is nothing behind this number" was drawn as a positive, on
+   exactly the rows GLOW-UP 250 exists to make look thin. `Clamped to historic
+   range` — a hard cap that CHANGED the projection — was unclassified grey and
+   ranked last, so it was first out of the five-chip clamp.
+
+   Both are now the `guard` lane: rose, ranked first, unmissable. Rose rather
+   than red because red is the under-lean colour and this is not directional. */
+.pf-guard {
+  color: #ff8a97; font-weight: 700;
+  border-color: rgba(255,138,151,0.45) !important;
+  background: rgba(255,138,151,0.09) !important;
+}
+/* Calibration, book prior and the learned trend are all post-hoc multipliers on
+   the level — the same kind of thing the shrink is, so they share its gold at a
+   lower intensity. Gold with no glow reads as "corrected", gold WITH the glow
+   (.pred-factor-shrink) stays reserved for the largest correction the model makes. */
+.pf-cal { color: #d4b45f; }
+
+/* ── GLOW-UP 261 · a frame that did not contain its own contents ────────────
+   Measured on the live board, first row: the SS cell's border box is 64px wide
+   and the book chip inside it is 81.9px. The TD cell is 56px against 71.7px.
+   `.pcell` is a centred flex column, so a child wider than the track does not
+   stretch it — it overhangs both borders. Every stat cell on the board with a
+   posted line had `P6 48.5 +11.0` sticking visibly out of its own frame, which
+   is why the cells read as loose text rather than as instruments.
+
+   Two fixes, because widening alone would have cost the rail 66px: the tracks
+   grow to fit the widest real chip (`P6 46.5 +11.5`, 13 mono glyphs), and the
+   chip gives back the horizontal padding it was carrying for no reason. The rail
+   loses 66px of 569 and still holds five chips — verified, not assumed. */
+.pcell { overflow: hidden; }
+.pcell .pred-book { max-width: 100%; padding-left: 3px; padding-right: 3px; letter-spacing: 0.02em; }
+
+/* ── GLOW-UP 264 · the other half of the fight ──────────────────────────────
+   Violet, matching `.best-pick-row.fight-glow`, because it is the same
+   relationship being shown by the same gesture. `!important` on the border only:
+   the row's own border is set with `!important` by GLOW-UP 101, and losing that
+   fight silently is the documented failure mode in this file. */
+.pred-row.fight-glow {
+  outline: 1px solid rgba(160,140,255,0.55);
+  outline-offset: -1px;
+  border-color: rgba(160,140,255,0.35) !important;
+}
+.pred-row.fight-glow .pf-vs { color: #d0b3ff; }
+
+/* ── GLOW-UP 265 · the gauge shows where its rail is ────────────────────────
+   Confidence clamps at FP_CONFIDENCE_CEILING, and sample size dominates the
+   formula, so every fighter with nine-plus fights lands on exactly the same
+   number — a third of the board, and the whole first screen under the EVIDENCE
+   sort. The final cell is drawn as a hard stop rather than a lit segment: the
+   meter has hit the end of its travel, which is a different fact from scoring
+   high, and the tooltip says how many rows are tied there. */
+.pconf.is-capped .pconf-gauge i:last-child {
+  background: repeating-linear-gradient(135deg,
+    currentColor 0 1px, transparent 1px 3px) !important;
+  box-shadow: none !important;
+  outline: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  outline-offset: -1px;
+}
+.pconf.is-capped .pconf-n::after {
+  content: '⊤';
+  font-size: 8px; margin-left: 2px; opacity: 0.6; vertical-align: 1px;
+}
+.pconf { cursor: help; }
+
+/* ── GLOW-UP 266 · the cell where the two readings disagree ─────────────
+   Amber, not green or red: the whole point is that this cell's green/red answers
+   a different question than the one the reader is about to ask, so the marker has
+   to sit OUTSIDE the direction axis rather than picking a side on it. It rides the
+   label row, where every cell has dead space, so no row changes height and the
+   four affected cells stand out against the twenty-two that look unchanged. */
+.pcell-split {
+  font-style: normal; color: #ffb454; cursor: help;
+  margin-left: 3px; font-size: 8px; vertical-align: 1px;
+  text-shadow: 0 0 6px rgba(255,180,84,0.85);
+}
+.pcell.has-split { border-color: rgba(255,180,84,0.32); }
+.pred-row:hover .pcell.has-split { border-color: rgba(255,180,84,0.55); }
+
+/* ── GLOW-UP 268 · where a row sits, and the stagger that lost count ────────
+   Twenty-six rows and five sorts, and no row said what position it held. Under
+   CARD that number is the fight order; under EVIDENCE or Δ BOOK it is the rank
+   the sort just produced, which is the whole reason you pressed the button. Best
+   Picks has carried a rank since it had ten rows; this board has more.
+
+   And the stagger was counting the wrong children. GLOW-UP 254 and 256 inserted
+   `.pred-bar` and `.pred-head` ahead of the rows, so `:nth-child(2)` — written
+   when the first row really was the second child — now lands on the header. The
+   measured result: the first row animated in at 0.06s instead of 0s, and rows 9
+   through 26 shared a delay of 0s, so two thirds of the board arrived in one
+   block while the top eight cascaded. Re-based by two and extended to sixteen,
+   with the step tightened so the last row still lands inside a third of a second. */
+.pred-rank {
+  flex: 0 0 auto; min-width: 15px; text-align: right;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800;
+  color: var(--text4); font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em; opacity: 0.55; cursor: help;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.pred-row:hover .pred-rank { color: var(--gold); opacity: 1; }
+
+.pred-row:nth-child(3) { animation-delay: 0.000s; }
+.pred-row:nth-child(4) { animation-delay: 0.012s; }
+.pred-row:nth-child(5) { animation-delay: 0.024s; }
+.pred-row:nth-child(6) { animation-delay: 0.036s; }
+.pred-row:nth-child(7) { animation-delay: 0.048s; }
+.pred-row:nth-child(8) { animation-delay: 0.060s; }
+.pred-row:nth-child(9) { animation-delay: 0.072s; }
+.pred-row:nth-child(10) { animation-delay: 0.084s; }
+.pred-row:nth-child(11) { animation-delay: 0.096s; }
+.pred-row:nth-child(12) { animation-delay: 0.108s; }
+.pred-row:nth-child(13) { animation-delay: 0.120s; }
+.pred-row:nth-child(14) { animation-delay: 0.132s; }
+.pred-row:nth-child(15) { animation-delay: 0.144s; }
+.pred-row:nth-child(16) { animation-delay: 0.156s; }
+.pred-row:nth-child(17) { animation-delay: 0.168s; }
+.pred-row:nth-child(18) { animation-delay: 0.180s; }
+.pred-row:nth-child(19) { animation-delay: 0.192s; }
+.pred-row:nth-child(20) { animation-delay: 0.204s; }
+.pred-row:nth-child(21) { animation-delay: 0.216s; }
+.pred-row:nth-child(22) { animation-delay: 0.228s; }
+.pred-row:nth-child(23) { animation-delay: 0.240s; }
+.pred-row:nth-child(24) { animation-delay: 0.252s; }
+.pred-row:nth-child(25) { animation-delay: 0.264s; }
+.pred-row:nth-child(26) { animation-delay: 0.276s; }
+.pred-row:nth-child(27) { animation-delay: 0.288s; }
+.pred-row:nth-child(28) { animation-delay: 0.300s; }
+/* Past the 26 a full card holds, hold at the last step — a row with no delay
+   at all would arrive BEFORE the rows above it, which is how the old list
+   behaved for two thirds of this board. */
+.pred-row:nth-child(n+29) { animation-delay: 0.300s; }
 
 </style>
 </head>

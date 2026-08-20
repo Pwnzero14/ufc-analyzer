@@ -2,7 +2,7 @@
 // Predicts SS, TD, and Fantasy lines for upcoming fights using fighter history,
 // opponent data, and self-learned weights. After settlement, runs a learning
 // cycle to update fighter trends and formula weights.
-import { FANTASY_SCORING, MODEL_VERSION } from '../config/index.js';
+import { FANTASY_SCORING, MODEL_VERSION, FP_CONFIDENCE_CEILING } from '../config/index.js';
 // ── Storage Keys ────────────────────────────────────────────────────────
 const PREDICTIONS_KEY = 'prop_predictions_v1';
 const WEIGHTS_KEY = 'prop_predictor_weights_v1';
@@ -773,7 +773,7 @@ export class PropLinePredictorService {
         const consistencyBonus = (fighterDB.fpConsistency ?? 50) * 0.25;
         const oppBonus = opponentDB ? 10 : 0;
         const recentBonus = sampleSize >= 3 ? 5 : 0;
-        const confidence = clamp(30 + sampleSize * 4 + consistencyBonus + oppBonus + recentBonus, 20, 92);
+        const confidence = clamp(30 + sampleSize * 4 + consistencyBonus + oppBonus + recentBonus, 20, FP_CONFIDENCE_CEILING);
         const historicalAvg = fighterDB.avgFP_betr ?? fighterDB.avgFP ?? predicted;
         const line = round1(clamp(predicted, 5, 250));
         const lean = predicted > historicalAvg ? 'over' : 'under';
