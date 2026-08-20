@@ -30960,7 +30960,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    header in 272. `--plr-tracks` is defined once so the three can never disagree:
    restating a track list in three places is the drift that 260 was about. */
 .parlay-lab {
-  --plr-tracks: 18px minmax(150px, 2fr) 58px 52px minmax(118px, 1fr) 54px 46px 42px 78px;
+  --plr-tracks: 18px minmax(150px, 1.85fr) 58px 52px minmax(118px, 1.15fr) 54px 46px 42px 78px;
   --plr-gap: 8px;
 }
 .parlay-leg-row {
@@ -31029,8 +31029,16 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
   padding: 1px 4px; letter-spacing: 0; font-size: 10px; line-height: 1;
   cursor: help;
 }
+/* GLOW-UP 282: the slip-relationship flags get the same treatment — icon plus
+   tooltip, no word. They only render once a slip exists, so they were the one
+   thing 281 could not have measured. */
+.plr-id .parlay-leg-warn,
+.plr-id .parlay-leg-syn {
+  padding: 1px 4px; letter-spacing: 0; font-size: 9.5px; line-height: 1;
+  cursor: help;
+}
 .parlay-lab.no-delta {
-  --plr-tracks: 18px minmax(150px, 2fr) 58px 52px minmax(118px, 1fr) 54px 46px 78px;
+  --plr-tracks: 18px minmax(150px, 1.85fr) 58px 52px minmax(118px, 1.15fr) 54px 46px 78px;
 }
 .parlay-lab.no-delta .parlay-leg-marg,
 .parlay-lab.no-delta .plr-head > span:nth-child(8) { display: none; }
