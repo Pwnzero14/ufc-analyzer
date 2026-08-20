@@ -6396,14 +6396,9 @@ html { scroll-behavior: smooth; }
   to   { opacity: 1; transform: translateX(0); }
 }
 .parlay-leg-row { animation: parlayLegSlideIn 0.25s ease both; }
-.parlay-leg-row:nth-child(1)  { animation-delay: 0s; }
-.parlay-leg-row:nth-child(2)  { animation-delay: 0.03s; }
-.parlay-leg-row:nth-child(3)  { animation-delay: 0.06s; }
-.parlay-leg-row:nth-child(4)  { animation-delay: 0.09s; }
-.parlay-leg-row:nth-child(5)  { animation-delay: 0.12s; }
-.parlay-leg-row:nth-child(6)  { animation-delay: 0.15s; }
-.parlay-leg-row:nth-child(7)  { animation-delay: 0.18s; }
-.parlay-leg-row:nth-child(n+8) { animation-delay: 0.21s; }
+/* Delays are stamped per row in GLOW-UP 279 — see the note there. A
+   :nth-child list also OUTRANKS a plain-class rule on specificity, so leaving
+   one here would have silently beaten the stamped value. */
 @media (prefers-reduced-motion: reduce) {
   .parlay-leg-row { animation: none; }
 }
@@ -24437,16 +24432,7 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   animation: parlay-row-enter 0.25s ease-out both;
   transition: background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
-.parlay-leg-row:nth-child(1)  { animation-delay: 0.02s; }
-.parlay-leg-row:nth-child(2)  { animation-delay: 0.04s; }
-.parlay-leg-row:nth-child(3)  { animation-delay: 0.06s; }
-.parlay-leg-row:nth-child(4)  { animation-delay: 0.08s; }
-.parlay-leg-row:nth-child(5)  { animation-delay: 0.10s; }
-.parlay-leg-row:nth-child(6)  { animation-delay: 0.12s; }
-.parlay-leg-row:nth-child(7)  { animation-delay: 0.14s; }
-.parlay-leg-row:nth-child(8)  { animation-delay: 0.16s; }
-.parlay-leg-row:nth-child(9)  { animation-delay: 0.18s; }
-.parlay-leg-row:nth-child(10) { animation-delay: 0.20s; }
+/* Delays are stamped per row in GLOW-UP 279 — see the note there. */
 .parlay-leg-row:hover {
   background: rgba(255,255,255,0.03);
   transform: translateX(3px);
@@ -30957,6 +30943,202 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .rc-line, .rc-avg, .rc-delta, .rc-conf b, .rc-bk b, .rc-sec-stat { font-variant-numeric: tabular-nums; }
 .rc-avg { font-size: 8.5px; letter-spacing: 0.03em; }
 .rc-delta { min-width: 52px; }
+
+/* ══ PARLAY LAB · GLOW-UP 270-279 ═════════════════════════════════════════ */
+
+/* ── GLOW-UP 270 · the pool is a table that was never aligned ───────────────
+   Measured across the 103 rows this board renders at 1900px: the OVER/UNDER chip
+   begins anywhere across a 159px band and the stat label across 153px. The row
+   was `display:flex` with the NAME at `flex:1`, so every column after the name
+   was positioned by subtraction — its x depended on the length of the fighter's
+   name, how many tags the leg carried, and whether the optional YOU and marginal
+   -delta chips existed on that row. A hundred rows sorted by confidence whose
+   most important token — which SIDE you are backing — never lands twice in the
+   same place cannot be scanned, only read one row at a time.
+
+   One track list, shared by ranked rows and grouped off-board rows, and by the
+   header in 272. `--plr-tracks` is defined once so the three can never disagree:
+   restating a track list in three places is the drift that 260 was about. */
+.parlay-lab {
+  --plr-tracks: 18px minmax(0, 1fr) 58px 52px minmax(122px, 1.25fr) 54px 46px 42px 78px;
+  --plr-gap: 8px;
+}
+.parlay-leg-row {
+  display: grid;
+  grid-template-columns: var(--plr-tracks);
+  gap: var(--plr-gap);
+  align-items: center;
+}
+/* Identity keeps its own flex run — avatar, name, then however many tags this
+   leg happens to carry. It is the ONLY cell allowed to be elastic. */
+.plr-id { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+/* ── GLOW-UP 271 · a long name grew the row ────────────────────────────────
+   `Reinier De Ridder` wrapped to a second line and took his row to 62px against
+   the 54px every other row held. Uniform height is what makes a long list feel
+   like one object; one tall row in twenty-seven reads as a rendering fault. The
+   name truncates now and the tags after it can never be pushed into a second
+   line, so height is guaranteed by construction rather than by whether a card
+   happens to be full of short names. */
+.plr-id .parlay-leg-name {
+  flex: 0 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.plr-id > *:not(.parlay-leg-name):not(.bp-avatar) { flex: 0 0 auto; }
+.plr-id .bp-avatar { flex: 0 0 auto; }
+
+/* The market cell: a line plus its book on a ranked row, the whole book rail on
+   a grouped one. Both live in the same track. */
+.plr-market { display: flex; align-items: center; gap: 5px; min-width: 0; }
+/* ── GLOW-UP 276 · the book rail wrapped instead of scrolling ──────────────
+   Every one of the 44 grouped rows wrapped its rail onto a second line at 1280px
+   — two chips was enough — which pushed those rows to 88px against 64px for the
+   rest. Wrapping trades a fixed cost (a row you can scan) for a variable one (a
+   row you cannot). The rail scrolls inside its own cell instead: at 1900 nothing
+   moves, and below that you slide the books rather than reflowing the table. */
+.plr-market .plg-books {
+  display: flex; flex-wrap: nowrap; gap: 4px;
+  overflow-x: auto; scrollbar-width: thin; min-width: 0;
+  scrollbar-color: rgba(125,145,190,0.35) transparent;
+}
+.plr-market .plg-books::-webkit-scrollbar { height: 3px; }
+.plr-market .plg-books::-webkit-scrollbar-thumb { background: rgba(125,145,190,0.35); border-radius: 2px; }
+.plr-market .plg-book { flex: 0 0 auto; }
+
+/* The two optional chips hold their tracks open when they have nothing to say.
+   Without this, grid auto-placement pulls every later column one track left on
+   the rows that lack them — which is the original bug in miniature. */
+.plr-empty { visibility: hidden; pointer-events: none; }
+
+/* Numeric columns behave like numbers. */
+.parlay-leg-dir, .parlay-leg-stat, .parlay-leg-line,
+.parlay-leg-ev, .parlay-leg-marg, .parlay-leg-conf, .bp-you {
+  font-variant-numeric: tabular-nums;
+}
+.parlay-leg-conf { justify-self: end; text-align: right; }
+.parlay-leg-ev, .parlay-leg-marg { justify-self: end; }
+.parlay-leg-dir, .parlay-leg-stat { justify-self: start; }
+
+/* ── GLOW-UP 272 · labels, now that there is something to label ────────────
+   A hundred rows of `UNDER · SS · 54.5 · BT · YOU 4/7 · +52% · 81%` and not one
+   word saying which number is which — with TWO different percentages sitting
+   side by side. The header inherits the row's track list through the same custom
+   property rather than restating it, so it cannot drift out of step. */
+.plr-head {
+  display: grid;
+  grid-template-columns: var(--plr-tracks);
+  gap: var(--plr-gap);
+  align-items: center;
+  padding: 5px 14px 5px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(125,145,190,0.14);
+  border-bottom: 1px solid rgba(125,145,190,0.14);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text4);
+  background: linear-gradient(180deg, rgba(255,255,255,0.026), transparent);
+}
+.plr-head > span:nth-child(3),
+.plr-head > span:nth-child(4) { text-align: left; }
+.plr-head > span:nth-child(6),
+.plr-head > span:nth-child(7),
+.plr-head > span:nth-child(8),
+.plr-head > span:nth-child(9) { text-align: right; }
+.plr-head > span[title] { cursor: help; }
+
+/* Numeric chips right-align with their labels rather than starting at the track
+   edge — a column of figures is compared on its right side. */
+.parlay-leg-row > .bp-you { justify-self: end; }
+
+/* ── GLOW-UP 273 · a column header for a table that isn't here ──────────────
+   `.fighter-header-row` labels FIGHTER / LINES / AVG FP · SS · TDS · CONSIST /
+   LEAN and sticks at 88px. Parlay Lab renders none of those columns, and the row
+   was pinned across the top of every screenshot of this view. The DATA views
+   already solve this exactly this way — `body:has(#cardContainer > .data-subnav)`
+   — so this is the same rule with this view's own marker. `:has()` self-clears
+   on view switch, which is why there is no class to remember to strip. */
+body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
+
+/* ── GLOW-UP 274 · the sticky head that never stuck ────────────────────────
+   `.parlay-pool-head-sticky` is `position: sticky; top: 0` — and it has never
+   held once. Two independent reasons, either of which alone is fatal:
+
+     · Its ancestor `.parlay-pool` is `overflow: hidden`, which makes that box the
+       sticky scrollport. The box never scrolls, so the header scrolls away with
+       the page. Same mechanism that hid two fighters in GLOW-UP 269 — an
+       overflow declared for rounded corners quietly changing layout semantics.
+     · `top: 0` aims at the viewport edge, which on this app is under 98px of
+       chrome (header 54 + filter bar 44) at z-index 100/95 against this
+       element's 4. Even sticking perfectly it would stick out of sight.
+
+   `overflow: clip` still clips to the radius but is NOT a scroll container, so
+   sticky resolves against the page again. Parked at the real bottom of the
+   chrome stack, and above the rows it has to cover. */
+.parlay-pool { overflow: clip; }
+.parlay-pool-head-sticky { top: 98px; z-index: 6; }
+@media (max-width: 1100px) { .parlay-pool-head-sticky { top: 64px; } }
+
+/* ── GLOW-UP 275 · the pool cut off the number it is sorted by ─────────────
+   At 1280px the two columns split 1fr/1fr — 572px each — while a leg row needs
+   621px. `.parlay-pool` clipped the difference, and what fell off the right edge
+   was `.parlay-leg-conf`: on 57 of the 103 rows the confidence readout, the
+   value the list is ORDERED by, was partly or wholly outside the clip box. Above
+   ~1500px it fits and nothing is wrong, which is why it survived this long.
+
+   The pool gets the larger share, because it holds a nine-column table while the
+   right column holds a stack of cards that reflow happily. Below 1500 the two
+   informational chips fold away — YOU and the marginal delta are the two a
+   builder can most afford to lose — and the header drops the same two cells, so
+   both track lists stay nine-wide-minus-two and cannot fall out of step. */
+.parlay-lab-cols { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
+@media (max-width: 1500px) {
+  .parlay-lab {
+    --plr-tracks: 16px minmax(0, 1fr) 52px 46px minmax(104px, 1.1fr) 44px 72px;
+    --plr-gap: 6px;
+  }
+  .parlay-leg-row > .bp-you,
+  .parlay-leg-row > .parlay-leg-marg,
+  .plr-head > span:nth-child(6),
+  .plr-head > span:nth-child(8) { display: none; }
+}
+@media (max-width: 1100px) { .parlay-lab-cols { grid-template-columns: 1fr; } }
+
+/* ── GLOW-UP 279 · the entry stagger stopped at row 10 ─────────────────────
+   The cascade was written for a pool that had ten rows in it. This board renders
+   103, and the delay list ends at `:nth-child(10)` — measured, 93 of them shared
+   a single 0.21s delay and arrived in one slab while the top ten cascaded. Same
+   defect GLOW-UP 268 fixed on the predictions board, from the same cause: a
+   hand-written list that the data outgrew.
+
+   Extending the list was the obvious fix and it was WRONG, which is worth the
+   note: `:nth-child` counts among SIBLINGS, and these rows live in two different
+   parents — the ranked ones under `.parlay-pool`, the off-board ones under
+   `.parlay-offboard`. Measured after extending it to thirty: row 10 sat at
+   0.080s and row 30 at 0.032s, because row 30 was the fifth child of the second
+   container. The cascade ran backwards across the boundary.
+
+   The index is stamped on each row after render instead, so it counts the LIST
+   rather than the markup, and cannot be outgrown or broken by a new wrapper. */
+.parlay-leg-row.parlay-leg-row { animation-delay: calc(var(--plr-i, 0) * 8ms); }
+
+/* ── GLOW-UP 278 · three cards, one bet ────────────────────────────────────
+   Amber and above the cards, because it changes how every card below it should
+   be read rather than commenting on any one of them. */
+.psg-core {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.02em; line-height: 1.5;
+  color: #ffb454; cursor: help;
+  padding: 5px 9px; margin-bottom: 7px;
+  border: 1px solid rgba(255,180,84,0.34); border-radius: 4px;
+  background: rgba(255,180,84,0.07);
+}
+
+/* The LOAD affordance was a bare `float: right` in a block with nothing to clear
+   it — a float that outgrows its line box escapes into the legs beneath. It is
+   absolutely positioned in the card's own corner now, which is where it always
+   looked like it was. */
+.parlay-suggest-card { position: relative; }
+.psg-load { float: none; position: absolute; top: 8px; right: 10px; }
+.parlay-suggest-label { padding-right: 52px; }
 
 /* ══ PROP LINE PREDICTIONS · GLOW-UP 259-268 ══════════════════════════════ */
 

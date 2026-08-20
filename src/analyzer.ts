@@ -11361,7 +11361,12 @@ function renderParlayLab(container: HTMLElement): void {
   // rule: never mutates model confidence); needs 2+ settled legs.
   const parlayYouTag = (stat: string, dir: string): string => {
     const r = placedPersonalRecord.get(`${stat}|${dir}`);
-    if (!r || r.total < 2) return '';
+    // GLOW-UP 270: an EMPTY span rather than nothing. The row is a grid now, and
+    // grid auto-placement fills tracks in source order — a missing optional chip
+    // does not leave a hole, it pulls every column after it one track to the left.
+    // That is precisely how the old flex row drifted, so the fix has to hold the
+    // slot open, not merely name it.
+    if (!r || r.total < 2) return '<span class="bp-you plr-empty"></span>';
     const lbl = stat === 'ss_r1' ? 'R1 SS' : stat.toUpperCase();
     return `<span class="bp-you ${r.hits * 2 >= r.total ? 'good' : 'bad'}" title="Your settled record on ${lbl} ${dir.toUpperCase()} legs you placed (from My Placed Ledger) — informational only, does not affect model confidence or health">YOU ${r.hits}/${r.total}</span>`;
   };
@@ -11720,6 +11725,17 @@ function renderParlayLab(container: HTMLElement): void {
   const PL_STAT_LABEL: Record<string, string> = { fp: 'FP', ss: 'SS', ss_r1: 'R1 SS', td: 'TD', ft: 'FT', ctrl: 'CTRL', kd: 'KD' };
   const plStatCounts = new Map<string, number>();
   for (const a of poolLegs) plStatCounts.set(a.leg.stat, (plStatCounts.get(a.leg.stat) || 0) + 1);
+  // ── GLOW-UP 277 — the only two chips that would not say how many ─────────
+  // Every other chip in the strip carries its count: ALL 308, SS 198, TD 14,
+  // FT 28, PLACED 33. OVER and UNDER — the split you most want to know before
+  // you touch anything, because it tells you which way the whole board leans —
+  // were bare. You had to click one to find out, and clicking is what you were
+  // trying to decide about.
+  const plDirCounts = { over: 0, under: 0 };
+  for (const a of poolLegs) {
+    if (a.leg.direction === 'over') plDirCounts.over++;
+    else if (a.leg.direction === 'under') plDirCounts.under++;
+  }
   const plStatChips = Object.keys(PL_STAT_LABEL)
     .filter(s => (plStatCounts.get(s) || 0) > 0)
     .map(s => `<button class="plq-chip${parlayPoolStat === s ? ' on' : ''}" data-plq-stat="${s}" title="Show only ${PL_STAT_LABEL[s]} legs (click again for all)">${PL_STAT_LABEL[s]} <i>${plStatCounts.get(s)}</i></button>`)
@@ -11737,12 +11753,32 @@ function renderParlayLab(container: HTMLElement): void {
       ${plStatChips}
     </span>
     <span class="plq-group">
-      <button class="plq-chip${parlayPoolDir === 'over' ? ' on' : ''}" data-plq-dir="over" title="Only OVER legs">OVER</button>
-      <button class="plq-chip${parlayPoolDir === 'under' ? ' on' : ''}" data-plq-dir="under" title="Only UNDER legs">UNDER</button>
+      <button class="plq-chip${parlayPoolDir === 'over' ? ' on' : ''}" data-plq-dir="over" title="Only OVER legs">OVER <i>${plDirCounts.over}</i></button>
+      <button class="plq-chip${parlayPoolDir === 'under' ? ' on' : ''}" data-plq-dir="under" title="Only UNDER legs">UNDER <i>${plDirCounts.under}</i></button>
     </span>
     ${placedPropKeys.size ? `<span class="plq-group">
       <button class="plq-chip plq-placed${parlayPoolPlacedOnly ? ' on' : ''}" data-plq-placed title="Show only props you marked placed for this event — the fastest way to rebuild a ticket from legs you already hold, since a leg placed against the model's lean sorts to the bottom of the pool.${placedInPool < placedPropKeys.size ? ` ${placedPropKeys.size - placedInPool} of your ${placedPropKeys.size} placed props aren't in the pool at all — no book the scraper can see still posts them.` : ''}">● PLACED <i>${placedInPool}</i></button>
     </span>` : ''}
+  </div>`;
+
+  // ── GLOW-UP 272 — labels, now that there is something to label ───────────
+  // A hundred rows of `UNDER · SS · 54.5 · BT · YOU 4/7 · +52% · 81%` and not one
+  // word saying which number is which. You could work out that the last figure is
+  // confidence because it has a bar under it, and that `+52%` is EV because the EV
+  // sort reorders by it — but both are inferences, and the row carries two
+  // different percentages side by side. A header was impossible while the columns
+  // drifted; GLOW-UP 270 makes it both possible and obvious. Same track list,
+  // inherited rather than restated, so it cannot fall out of step with the rows.
+  const parlayPoolColumnHead = `<div class="plr-head" aria-hidden="true">
+    <span></span>
+    <span>Fighter</span>
+    <span title="Which side of the line you are backing">Side</span>
+    <span title="Stat family">Stat</span>
+    <span title="The posted line and the book it comes from. Off-board rows show every book on the prop — click a chip to take that number.">Line · Book</span>
+    <span title="Your own settled record on this stat and side, from the Placed ledger. Informational only.">You</span>
+    <span title="Calibrated expected value for the leg on its own">EV</span>
+    <span title="What adding the leg would do to slip health, correlation included">Δ</span>
+    <span title="Model confidence in the leg">Conf</span>
   </div>`;
 
   // GLOW-UP 197 L2 — the row never said who the opponent was, so fight membership was
@@ -11777,7 +11813,7 @@ function renderParlayLab(container: HTMLElement): void {
     const mDelta = sel ? null : marginalDelta(a.leg);
     const mTag = mDelta != null
       ? `<span class="parlay-leg-marg ${mDelta > 0 ? 'pos' : mDelta < 0 ? 'neg' : 'flat'}" title="Adding this leg would take slip health from ${baseHealthScore} to ${baseHealthScore! + mDelta} — correlation with the legs you've already picked included. A strong leg can still score negative here if it rides a fight you're already on.">${mDelta > 0 ? '▲' : mDelta < 0 ? '▼' : '·'}${mDelta > 0 ? '+' : ''}${mDelta}</span>`
-      : '';
+      : '<span class="parlay-leg-marg plr-empty"></span>';
     const legFightKey = legFightKeyOf(a.leg);
     const inSlipFight = !sel ? (slipFightCount.get(legFightKey) || 0) : 0;
     const vsTag = a.leg.opponent
@@ -11808,14 +11844,28 @@ function renderParlayLab(container: HTMLElement): void {
     const evTag = legEv != null
       ? `<span class="parlay-leg-ev ${legEv > 0 ? 'pos' : legEv < 0 ? 'neg' : ''}" title="Calibrated EV for this leg as a single pick — same pipeline as the Best Picks board. Parlay EV is the slip deck on the right; this prices the leg on its own.">${legEv > 0 ? '+' : ''}${legEv}%</span>`
       : '';
+    // ── GLOW-UP 270 — the pool is a table that was never aligned ──────────
+    // Measured across the 103 rows this board renders at 1900px: the OVER/UNDER
+    // chip starts anywhere across a 159px band, the stat label across 153px. The
+    // row was `display:flex` with the NAME set to `flex:1`, so every column after
+    // it was positioned by subtraction — its x depended on how long the fighter's
+    // name was, how many tags the leg carried, and whether the optional YOU and
+    // marginal-delta chips happened to exist. A list of a hundred rows sorted by
+    // confidence, whose most important token (which SIDE you are backing) never
+    // lands twice in the same place, cannot be scanned; it can only be read.
+    //
+    // Three wrappers give the grid stable slots: identity, market, and the two
+    // always-emitted placeholders above. Grouped off-board rows use the same
+    // wrappers, so the two row shapes finally share one track list.
     return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
-      <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
-      ${vsTag}${placedTag}${offTag}${warnTag}${synTag}
+      <span class="plr-id">
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
+        ${vsTag}${placedTag}${offTag}${warnTag}${synTag}
+      </span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${a.leg.stat}">${a.leg.stat === 'ss_r1' ? 'R1 SS' : a.leg.stat.toUpperCase()}</span>
-      <span class="parlay-leg-line">${a.leg.line}</span>
-      ${platChip}
+      <span class="plr-market"><span class="parlay-leg-line">${a.leg.line}</span>${platChip}</span>
       ${parlayYouTag(a.leg.stat, a.leg.direction)}
       ${evTag}${mTag}
       <span class="parlay-leg-conf">${a.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, a.leg.confidence))}%"></b></i></span>
@@ -11894,14 +11944,16 @@ function renderParlayLab(container: HTMLElement): void {
       : '';
     return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
       <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} ${rowIsYours ? 'the book you placed at' : `the best ${dir.toUpperCase()} entry`} (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${rowPick.leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
-      <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(head.leg.fighter)}</span>
-      ${vsTag}${placedTag}
-      <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
+      <span class="plr-id">
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(head.leg.fighter)}</span>
+        ${vsTag}${placedTag}
+        <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
+      </span>
       <span class="parlay-leg-dir ${dir}">${dir.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
-      <span class="plg-books" title="Every book posting this prop. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span>
+      <span class="plr-market"><span class="plg-books" title="Every book posting this prop. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>
       ${parlayYouTag(head.leg.stat, dir)}
-      ${evTag}
+      ${evTag}<span class="parlay-leg-marg plr-empty"></span>
       <span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>
     </div>`;
   };
@@ -12188,8 +12240,27 @@ function renderParlayLab(container: HTMLElement): void {
       </div>`;
     }).join('');
 
+    // ── GLOW-UP 278 — three cards, one bet ───────────────────────────────
+    // On this board #1 is Gaziev TD UNDER + Reed SS UNDER, and #2 and #3 are that
+    // exact pair plus one extra leg. Measured: #1∩#2 = 2 of 2, #1∩#3 = 2 of 2 —
+    // the whole of the first suggestion is contained in both the others. Three
+    // cards stacked vertically read as three independent ideas to compare; they
+    // are one idea with two garnishes, and if the core is wrong all three die
+    // together. That is the single most useful thing about the section and it
+    // was the one thing it did not say. Only stated when the overlap is real —
+    // a genuinely diverse set of suggestions shows nothing.
+    const sugSets = suggestions.map(s2 => s2.legs.map(l => parlayLegKeyOf(l)));
+    const sharedCore = sugSets.length > 1
+      ? sugSets.reduce((acc, cur) => acc.filter(k => cur.includes(k)))
+      : [];
+    const minLen = sugSets.length ? Math.min(...sugSets.map(x => x.length)) : 0;
+    const coreNote = sharedCore.length >= 2
+      ? `<div class="psg-core" title="Every suggestion below is built on the same ${sharedCore.length} legs${sharedCore.length === minLen ? ', and the shortest of them is nothing but that core' : ''}. They are variations on one bet, not ${sugSets.length} independent reads — if the shared core misses, all ${sugSets.length} miss together. Compare them on what they ADD, not as alternatives.">⚠ All ${sugSets.length} share the same ${sharedCore.length}-leg core — variations on one bet, not ${sugSets.length} separate reads</div>`
+      : '';
+
     suggestHtml = `<div class="parlay-suggest-section">
       <div class="parlay-suggest-title">AI SUGGESTED PARLAYS</div>
+      ${coreNote}
       ${!anySuggestionPositive
         ? `<div class="psg-none-positive" title="These are ranked on STRUCTURE — leg confidence, correlation, spread — because nothing available clears breakeven on price. They are the best-BUILT combinations on the board, not profitable ones. Shown so you can see what the model likes; the honest read is that this slate does not offer a priced parlay.">⚠ Nothing on this board clears breakeven — these are the best-built, not the best-priced</div>`
         : ''}
@@ -12265,6 +12336,7 @@ function renderParlayLab(container: HTMLElement): void {
         <div class="parlay-pool-head-sticky">
           <div class="parlay-pool-title">RANKED LEGS <span class="parlay-count-pill">${displayLegs.length !== availableLegs.length ? `${displayLegs.length}/${availableLegs.length}` : availableLegs.length}</span></div>
           ${poolLegs.length ? parlayPoolControls : ''}
+          ${poolLegs.length ? parlayPoolColumnHead : ''}
         </div>
         ${poolRows || (availableLegs.length
           ? '<div class="parlay-slip-empty">No ranked legs match the current filter — <button class="plq-reset">reset</button></div>'
@@ -12288,6 +12360,14 @@ function renderParlayLab(container: HTMLElement): void {
 
   // ── Bind click handlers ──
   hydrateAvatarImgs(container);
+
+  // GLOW-UP 279: stamp each row's position in the LIST, not in its markup. The
+  // pool and the off-board tier are separate containers, so `:nth-child` restarts
+  // halfway down and the cascade ran backwards across the boundary. Capped so a
+  // hundred-row board still finishes arriving in about a quarter second.
+  container.querySelectorAll<HTMLElement>('.parlay-leg-row').forEach((row, i) => {
+    row.style.setProperty('--plr-i', String(Math.min(i, 29)));
+  });
 
   // GLOW-UP 228 L1 — the book chips on a grouped off-board row each toggle their
   // OWN leg, so the click must not also reach the row (whose own key is absent).
