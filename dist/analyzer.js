@@ -11571,7 +11571,7 @@ function renderParlayLab(container) {
         return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="plr-id">
-        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(a.leg.fighter)}</span>
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(a.leg.fighter)}">${prettyName(a.leg.fighter)}</span>
         ${vsTag}${placedTag}${offTag}${warnTag}${synTag}
       </span>
       <span class="parlay-leg-dir ${a.leg.direction}">${a.leg.direction.toUpperCase()}</span>
@@ -11653,7 +11653,7 @@ function renderParlayLab(container) {
         return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
       <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} ${rowIsYours ? 'the book you placed at' : `the best ${dir.toUpperCase()} entry`} (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${rowPick.leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
       <span class="plr-id">
-        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name">${prettyName(head.leg.fighter)}</span>
+        <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(head.leg.fighter)}">${prettyName(head.leg.fighter)}</span>
         ${vsTag}${placedTag}
         <span class="parlay-leg-off" title="${(head.leg.offReason || '').replace(/"/g, '&quot;')}">off-board</span>
       </span>
