@@ -30392,6 +30392,60 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    with a media-query override at 1100px, and widening it is the failure mode
    recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
    and the fade lands on the FP value itself. */
+/* ── GLOW-UP 255 · rhythm, alignment, and a legend ─────────────────────────
+   Three things 254 left on the table.
+
+   The header did not line up with the columns it labelled. It was a flex row with
+   min-widths 110/55/45/55/70 sitting above a GRID of 230/64/56/64/96/1fr, so "SS",
+   "TD", "FP" and "Conf" all floated left of their cells. It inherits the row's
+   track list now, so labels sit over their columns by construction and cannot
+   drift if the tracks ever change.
+
+   The rail wrapped to a second line on eight of 26 rows, breaking the scan rhythm,
+   and spent that space on chips like `Avg TD/fight: 0.0`. Those are dropped, the
+   rest are ordered by what actually moves a projection, and the rail is clamped to
+   one line. Priority ordering is what makes clamping safe — shrink and duration
+   can never be the chips pushed out of sight.
+
+   And the six chip colours were unlabelled, so they had to be learned by
+   inference. The header carries a key now. */
+.pred-head {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) 64px 56px 64px 96px 1fr;
+  gap: 10px; align-items: center;
+  padding: 5px 14px 6px;
+  border-bottom: 1px solid rgba(125,145,190,0.16);
+  margin-bottom: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 800; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text4);
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), transparent);
+}
+.pred-head > div:nth-child(2),
+.pred-head > div:nth-child(3),
+.pred-head > div:nth-child(4) { text-align: center; }
+@media (max-width: 1100px) {
+  .pred-head { grid-template-columns: minmax(150px, 1fr) 60px 50px 60px 90px; }
+  .pred-head > :last-child { display: none; }
+}
+/* Legend — the chip colours were learnable only by inference before this. */
+.pred-head-rail { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.pkey { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0.08em; opacity: 0.75; }
+.pkey i { width: 7px; height: 7px; border-radius: 1.5px; display: block; box-shadow: 0 0 5px currentColor; }
+.pf-shrinkkey   { background: var(--gold); color: var(--gold); }
+.pf-durationkey { background: #ffa94a;  color: #ffa94a; }
+.pf-oppkey      { background: #b07cff;  color: #b07cff; }
+.pf-ratekey     { background: #5ac8fa;  color: #5ac8fa; }
+.pf-histkey     { background: #7d8fb3;  color: #7d8fb3; opacity: 0.6; }
+
+/* One line, always. Long chips ellipsize rather than wrap the row. */
+.prail { flex-wrap: nowrap; overflow: hidden; }
+.pred-factor { max-width: 250px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.pf-more {
+  color: var(--text4); font-weight: 800; letter-spacing: 0.06em;
+  flex: 0 0 auto; cursor: help;
+}
+
 /* ── GLOW-UP 254 · Prop Line Predictions, brought up to the meter's language ──
    253 left one instrument sitting in a plain table. This makes the row a panel:
    stat readouts in framed cells, confidence as a ten-segment gauge in the same
