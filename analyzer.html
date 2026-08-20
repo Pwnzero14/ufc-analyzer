@@ -30960,7 +30960,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    header in 272. `--plr-tracks` is defined once so the three can never disagree:
    restating a track list in three places is the drift that 260 was about. */
 .parlay-lab {
-  --plr-tracks: 18px minmax(150px, 1.75fr) 58px 52px minmax(118px, 1fr) 54px 46px 42px 78px;
+  --plr-tracks: 18px minmax(150px, 2fr) 58px 52px minmax(118px, 1fr) 54px 46px 42px 78px;
   --plr-gap: 8px;
 }
 .parlay-leg-row {
@@ -31009,6 +31009,46 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 .plr-id > *:not(.parlay-leg-name):not(.parlay-leg-vs):not(.bp-avatar) { flex: 0 0 auto; }
 .plr-id .bp-avatar { flex: 0 0 auto; }
+
+/* ── GLOW-UP 281 · two columns of nothing, charged to the fighter's name ────
+   280 stopped the name collapsing, but on off-board rows it still sat pinned at
+   its 88px floor while two things that carry no information took 104px between
+   them. Measured on a live off-board row: identity 318px total — avatar 34,
+   name 89, `vs` 72, placed dot 5, `off-board` tag 54.
+
+   The word `off-board` repeats on all ~120 rows of a section headed OFF-BOARD
+   PROPS, under a note that already says "Hover for why". It is the label of the
+   section printed once per row. As a glyph it keeps the per-leg reason in its
+   tooltip — which was the only thing it actually carried — and gives the name
+   back 34px.
+
+   And the Δ column reserved 50px on every row for a chip that cannot exist
+   until the slip holds two legs. `.no-delta` drops the track entirely rather
+   than paying for the possibility. */
+.plr-id .parlay-leg-off {
+  padding: 1px 4px; letter-spacing: 0; font-size: 10px; line-height: 1;
+  cursor: help;
+}
+.parlay-lab.no-delta {
+  --plr-tracks: 18px minmax(150px, 2fr) 58px 52px minmax(118px, 1fr) 54px 46px 78px;
+}
+.parlay-lab.no-delta .parlay-leg-marg,
+.parlay-lab.no-delta .plr-head > span:nth-child(8) { display: none; }
+/* No narrow override for `.no-delta`: below 1500 the Δ cell is ALREADY hidden by
+   the media query above, so the 7-track list there is correct for both states.
+   Declaring a 6-track list here left seven children in six tracks — grid opened
+   an implicit second row and every row went from 53px to 80px. A track list and
+   the number of children it has to place are one fact; writing it twice is how
+   they disagree. */
+
+/* A rail that scrolls should look scrollable rather than truncated — the last
+   chip was being sliced mid-number with nothing to say there was more. */
+.plr-market .plg-books {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
+          mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
+}
+.plr-market .plg-books:not(:hover) { scrollbar-width: none; }
+.plr-market .plg-books:not(:hover)::-webkit-scrollbar { height: 0; }
 
 /* The market cell: a line plus its book on a ranked row, the whole book rail on
    a grouped one. Both live in the same track. */
@@ -31134,7 +31174,12 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   .plr-head > span:nth-child(6),
   .plr-head > span:nth-child(8) { display: none; }
 }
-@media (max-width: 1100px) { .parlay-lab-cols { grid-template-columns: 1fr; } }
+/* GLOW-UP 281: stack at 1400, not 1100. Below ~1400 the pool column is under
+   630px and cannot hold nine columns AND a readable fighter name — measured, 61
+   of 103 names ellipsized there. Stacked, the pool takes the full width and
+   every name fits. A two-up that cannot show its own primary field is worse than
+   a single column. */
+@media (max-width: 1400px) { .parlay-lab-cols { grid-template-columns: 1fr; } }
 
 /* ── GLOW-UP 279 · the entry stagger stopped at row 10 ─────────────────────
    The cascade was written for a pool that had ten rows in it. This board renders
