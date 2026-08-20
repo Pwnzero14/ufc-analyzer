@@ -13304,7 +13304,7 @@ function renderPredictionsHtml(cSec) {
                 : nFights <= 2 ? 1 : nFights <= 4 ? 2 : nFights <= 7 ? 3 : nFights <= 11 ? 4 : 5;
             const evBadge = evTier
                 ? `<span class="pred-ev pred-ev-${evTier}" title="${evTip.replace(/"/g, '&quot;')}">`
-                    + `<i class="pev-sheen"></i>`
+                    + `<i class="pev-frame"></i><i class="pev-sheen"></i>`
                     + `<span class="pev-meter" data-lvl="${evLvl}"><i></i><i></i><i></i><i></i><i></i></span>`
                     + `<span class="pev-sep"></span>`
                     + `<span class="pev-n">${nFights === 0 ? '⌀' : `${nFights}<b>f</b>`}</span>`
