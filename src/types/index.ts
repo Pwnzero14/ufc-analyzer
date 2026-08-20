@@ -413,6 +413,9 @@ export interface PredictorWeights {
   /** Set once when the MODEL v13 renormalisation has been applied to
    *  ss_pace_modifier (see PropLinePredictorService.getWeights). */
   ssPaceRenormalizedV13?: boolean;
+  /** MODEL v27 one-time fp_global_modifier renormalisation. Like the marker above,
+   *  this is NOT `version` — that field is a learning-RUN counter. */
+  fpModRenormalizedV27?: boolean;
 }
 
 export interface FighterTrend {
