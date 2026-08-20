@@ -30392,6 +30392,105 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    with a media-query override at 1100px, and widening it is the failure mode
    recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
    and the fade lands on the FP value itself. */
+/* ── GLOW-UP 254 · Prop Line Predictions, brought up to the meter's language ──
+   253 left one instrument sitting in a plain table. This makes the row a panel:
+   stat readouts in framed cells, confidence as a ten-segment gauge in the same
+   LED idiom as the evidence meter, and — the part that actually matters — a
+   factor rail you can SCAN.
+
+   The rail was six identical grey pills per row, which put `Duration adj ×2.22`
+   (the multiplier inflating thin-history fighters, and tonight's open finding) at
+   exactly the same weight as `Avg TD/fight: 0.0`. Now each chip is coloured by
+   what it IS, on the app's existing axes: opponent violet, rate cyan, duration
+   amber because it is the one that distorts, history dim because it is context
+   rather than a finding, and the shrink gold because it is the model's own
+   largest correction. Six greys become a shape you read at a glance.
+
+   Grid untouched — same six children, same track list. */
+
+/* ── fighter cell ─────────────────────────────────────────────────────── */
+.pf-name { font-size: 11.5px; font-weight: 700; color: var(--text); letter-spacing: 0.01em; line-height: 1.25; }
+.pf-sub  { font-size: 9px; color: var(--text4); display: flex; align-items: center; line-height: 1.5; }
+
+/* ── stat readout cells ───────────────────────────────────────────────── */
+.pcell {
+  text-align: center; display: flex; flex-direction: column;
+  align-items: center; gap: 1px; padding: 3px 2px 4px;
+  border-radius: 3px; position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(0,0,0,0.14));
+  border: 1px solid rgba(125,145,190,0.10);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.pred-row:hover .pcell { border-color: rgba(125,145,190,0.2); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.16)); }
+.pcell-lab {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 800;
+  letter-spacing: 0.18em; color: var(--text4); text-transform: uppercase;
+}
+.pcell-val {
+  font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 800;
+  line-height: 1.05; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px currentColor;
+}
+.pcell-val i { font-style: normal; font-size: 8px; margin-left: 1px; vertical-align: 2px; opacity: 0.85; }
+/* FP is the stat being bet most, so it carries slightly more weight than SS/TD. */
+.pcell-fp .pcell-val { font-size: 15px; }
+.pcell-fp { border-color: rgba(125,145,190,0.18); }
+
+/* ── confidence as a ten-segment gauge ────────────────────────────────── */
+.pconf { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.pconf-gauge { display: inline-flex; gap: 1.5px; align-items: center; }
+.pconf-gauge i {
+  display: block; width: 5px; height: 9px; border-radius: 1px;
+  background: rgba(125,145,190,0.16);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.3);
+}
+.pconf-gauge i.on {
+  background: linear-gradient(180deg, color-mix(in srgb, currentColor 85%, #fff), currentColor);
+  box-shadow: 0 0 5px currentColor;
+}
+.pconf-n {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 800;
+  color: currentColor; font-variant-numeric: tabular-nums; text-shadow: 0 0 7px currentColor;
+}
+.pconf-n b { font-weight: 600; opacity: 0.42; }
+.pconf-hi  { color: #3fe895; }
+.pconf-mid { color: #f8c64a; }
+.pconf-lo  { color: #ff6d88; }
+
+/* ── the factor rail ──────────────────────────────────────────────────── */
+.prail { min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; align-content: center; }
+.pred-factor {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600;
+  letter-spacing: 0.02em; padding: 2px 6px; border-radius: 2.5px;
+  border: 1px solid; white-space: nowrap;
+  border-color: color-mix(in srgb, currentColor 26%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: var(--text3);
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.pred-row:hover .pred-factor { border-color: color-mix(in srgb, currentColor 40%, transparent); }
+/* Context, not a finding — deliberately the quietest thing in the rail. */
+.pf-hist     { color: #7d8fb3; opacity: 0.72; }
+.pf-rate     { color: #5ac8fa; }
+.pf-opp      { color: #b07cff; }
+/* Amber because this is the multiplier that inflates thin-history fighters —
+   the one open item from the v27/v28 work, and the one worth catching by eye. */
+.pf-duration { color: #ffa94a; font-weight: 700; }
+.pf-finish   { color: #3fe895; }
+.pred-factor-shrink {
+  color: var(--gold) !important; font-weight: 800;
+  border-color: rgba(248,198,74,0.42) !important;
+  background: rgba(248,198,74,0.10) !important;
+  box-shadow: 0 0 8px -2px rgba(248,198,74,0.7);
+}
+
+/* ── row: lean-tinted accent beam ─────────────────────────────────────── */
+/* !important because GLOW-UP 101's `.pred-row::before` rule is itself !important;
+   specificity alone loses to it. Documented rather than silently worked around —
+   that exact cascade collision cost real time earlier in this file's history. */
+.pred-row.pr-over::before  { background: linear-gradient(180deg, rgba(38,224,124,0.75) 0%, rgba(38,224,124,0.12) 100%) !important; box-shadow: 0 0 9px rgba(38,224,124,0.28) !important; }
+.pred-row.pr-under::before { background: linear-gradient(180deg, rgba(255,109,136,0.75) 0%, rgba(255,109,136,0.12) 100%) !important; box-shadow: 0 0 9px rgba(255,109,136,0.28) !important; }
+
 /* ── GLOW-UP 253 · the evidence meter, fully evolved ───────────────────────
    252 made it hardware; this makes it a readout. Four-corner reticle, LED bars
    split into stacked cells, an ambient tier glow bleeding past the frame, and a
