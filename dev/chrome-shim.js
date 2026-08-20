@@ -7,6 +7,30 @@
 // runtime/tabs/alarms calls are inert no-ops: nothing can reach the real
 // extension, real storage, or open real tabs from the preview.
 (() => {
+  // ── rAF fallback while the pane is hidden ────────────────────────────────
+  // A hidden Browser pane never composites, so requestAnimationFrame callbacks
+  // never fire. renderFighters() coalesces through rAF behind a `_renderScheduled`
+  // latch that is set BEFORE the frame is requested — one un-fired frame leaves
+  // the latch stuck true and the board never renders again, silently, with no
+  // console error. That is the "harness renders NO fighters" regression logged
+  // 2026-08-06: storage, lines and the header were all fine; the render simply
+  // never ran. Route rAF through a timer whenever the document is hidden so the
+  // preview keeps rendering in a backgrounded pane. Real extension is untouched
+  // — analyzer.html never references this file.
+  const _raf = window.requestAnimationFrame.bind(window);
+  const _caf = window.cancelAnimationFrame.bind(window);
+  const timerIds = new Set();
+  window.requestAnimationFrame = (cb) => {
+    if (document.visibilityState !== 'hidden') return _raf(cb);
+    const id = window.setTimeout(() => { timerIds.delete(id); cb(performance.now()); }, 16);
+    timerIds.add(id);
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => {
+    if (timerIds.has(id)) { timerIds.delete(id); window.clearTimeout(id); return; }
+    _caf(id);
+  };
+
   if (window.chrome && window.chrome.storage && window.chrome.storage.local && window.chrome.storage.local.__ufcShim) return;
 
   const store = Object.create(null);
