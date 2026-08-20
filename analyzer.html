@@ -30392,18 +30392,67 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    with a media-query override at 1100px, and widening it is the failure mode
    recorded in the dense-grid note. The badge rides the existing "vs X · 3R" line
    and the fade lands on the FP value itself. */
+/* ── GLOW-UP 251 · the evidence badge as a signal meter ─────────────────────
+   The first pass was a number in a rounded box — it worked but read like a form
+   field, and comparing "2f" to "13f" still meant stopping to parse. Five ascending
+   bars lit by sample size is pre-attentive: depth of evidence registers while
+   scanning, and the exact count stays beside it for when you want the figure.
+   Angular corner cuts and a lit-bar glow to sit with the HUD language the rest of
+   the board uses. No idle animation — 26 of these pulsing would be noise; the
+   sheen is hover-only. */
 .pred-ev {
-  display: inline-block; margin-left: 3px; padding: 0 4px;
-  border-radius: 3px; font-family: 'JetBrains Mono', monospace;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 4px; padding: 1px 5px 1px 4px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 8px; font-weight: 800; letter-spacing: 0.04em;
-  vertical-align: 1px; cursor: help;
+  vertical-align: 0; cursor: help; position: relative; overflow: hidden;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(125,145,190,0.22);
+  /* cut corners — the cheapest way to read as instrumentation rather than a chip */
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
+.pred-ev .pev-n { line-height: 1; }
+.pred-ev .pev-n b { font-weight: 600; opacity: 0.45; margin-left: 0.5px; }
+
+/* Meter: five bars, ascending, unlit by default. */
+.pev-meter { display: inline-flex; align-items: flex-end; gap: 1px; height: 8px; }
+.pev-meter i {
+  display: block; width: 2px; border-radius: 0.5px;
+  background: rgba(125,145,190,0.25);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+.pev-meter i:nth-child(1) { height: 3px; }
+.pev-meter i:nth-child(2) { height: 4px; }
+.pev-meter i:nth-child(3) { height: 5.5px; }
+.pev-meter i:nth-child(4) { height: 7px; }
+.pev-meter i:nth-child(5) { height: 8px; }
+.pev-meter[data-lvl="1"] i:nth-child(-n+1),
+.pev-meter[data-lvl="2"] i:nth-child(-n+2),
+.pev-meter[data-lvl="3"] i:nth-child(-n+3),
+.pev-meter[data-lvl="4"] i:nth-child(-n+4),
+.pev-meter[data-lvl="5"] i:nth-child(-n+5) { background: currentColor; box-shadow: 0 0 4px currentColor; }
+
 /* 8+ priors is where the measurement says real signal survives (slope 0.42
-   against 0.02-0.23 below), so that is where the badge stops warning. */
-.pred-ev-solid { color: #6fe8a8; background: rgba(0,232,122,0.10); border: 1px solid rgba(0,232,122,0.25); }
-.pred-ev-mid   { color: var(--gold); background: rgba(248,198,74,0.10); border: 1px solid rgba(248,198,74,0.28); }
-.pred-ev-thin  { color: #ffaab9; background: rgba(255,58,96,0.10); border: 1px solid rgba(255,58,96,0.35); }
-.pred-ev-none  { color: #ffaab9; background: rgba(255,58,96,0.16); border: 1px solid rgba(255,58,96,0.5); letter-spacing: 0.08em; }
+   against 0.02-0.23 below), so that is where the meter stops warning. */
+.pred-ev-solid { color: #4fe39a; border-color: rgba(0,232,122,0.32); background: rgba(0,232,122,0.07); }
+.pred-ev-mid   { color: var(--gold); border-color: rgba(248,198,74,0.34); background: rgba(248,198,74,0.07); }
+.pred-ev-thin  { color: #ff8098; border-color: rgba(255,58,96,0.42); background: rgba(255,58,96,0.09); }
+/* Zero bars lit, and the ⌀ carries it instead — an empty meter IS the message. */
+.pred-ev-none  { color: #ff8098; border-color: rgba(255,58,96,0.55); background: rgba(255,58,96,0.13); }
+.pred-ev-none .pev-n { font-size: 10px; line-height: 1; text-shadow: 0 0 6px rgba(255,58,96,0.6); }
+
+/* Hover sheen — a single pass across the badge, not a loop. */
+.pred-ev::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%);
+  pointer-events: none;
+}
+.pred-row:hover .pred-ev::after { transition: transform 0.55s ease; transform: translateX(120%); }
+.pred-row:hover .pred-ev { background: rgba(255,255,255,0.06); }
+@media (prefers-reduced-motion: reduce) {
+  .pred-row:hover .pred-ev::after { transition: none; transform: translateX(-120%); }
+}
 
 /* The number itself carries the doubt — dashed underline rather than a heavy
    dim, because the value still has to be readable at a glance. */
