@@ -158,6 +158,7 @@ export declare const PRIZEPICKS_SCORING: {
 };
 export declare const NAME_ALIASES: Record<string, string>;
 export declare const MODEL_VERSION = 29;
+export declare const FP_CONFIDENCE_CEILING = 92;
 export declare const PICKEM_PAYOUTS: Record<string, {
     label: string;
     byLegs: Record<number, Record<number, number>>;
