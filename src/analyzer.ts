@@ -13677,7 +13677,15 @@ function renderPredictionsHtml(
       const shrinkChip = shrinkM
         ? `<span class="pred-factor pred-factor-shrink" title="${(shrinkReason || '').replace(/"/g, '&quot;')}">${Number(shrinkM[1]) > Number(shrinkM[2]) ? '↓' : '↑'} ${shrinkM[1]}→${shrinkM[2]}</span>`
         : '';
-      const otherFp = p.fantasy.reasons.filter(r => r !== shrinkReason).slice(0, 2);
+      // GLOW-UP 258: was `.slice(0, 2)` — which truncated the FP reasons BEFORE the
+      // priority sort could see them, defeating the whole point of ranking. Any
+      // fighter carrying both `Betr avg` and `Recency-weighted` had those two eat
+      // the budget and lost their `Duration adj` chip entirely. Hernandez (×1.48,
+      // 79.7→101.6) and McVey (×2.05, 64.9→101.8) were both silently missing the
+      // single largest adjustment on their row while Barbosa and Douglas showed
+      // theirs, purely by accident of list position. Rank the full set; the SHOWN
+      // cap below is what does the trimming, after priority has had its say.
+      const otherFp = p.fantasy.reasons.filter(r => r !== shrinkReason);
       // GLOW-UP 254: the rail was six identical grey pills per row, which meant
       // `Duration adj ×2.22` — the multiplier that inflates thin-history fighters,
       // and the open finding from tonight — carried exactly the same visual weight
