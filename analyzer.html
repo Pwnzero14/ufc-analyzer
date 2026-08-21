@@ -31405,6 +31405,22 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   animation: pred-model-pulse 2.4s ease-in-out infinite;
 }
 .pred-model b { font-weight: 800; color: #ffd08a; }
+
+/* MODEL v30b: the board's own median gap against the fair line. Quiet when the
+   model and the market agree on the level; amber when they do not, because a
+   board-wide offset masquerades as a screen full of edges. */
+.pred-board-skew {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.08em; padding: 2px 7px; border-radius: 3px;
+  color: var(--text4); border: 1px solid rgba(125,145,190,0.16);
+  background: rgba(255,255,255,0.025); cursor: help; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pred-board-skew i { font-style: normal; opacity: 0.6; letter-spacing: 0.02em; }
+.pred-board-skew.is-skewed {
+  color: #ffb454; border-color: rgba(255,169,74,0.5);
+  background: rgba(255,169,74,0.10);
+}
 .pred-model i { font-style: normal; opacity: 0.72; letter-spacing: 0.06em; }
 @keyframes pred-model-pulse {
   0%, 100% { box-shadow: 0 0 10px -3px rgba(255,169,74,0.85); }
