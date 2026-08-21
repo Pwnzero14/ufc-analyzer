@@ -31808,6 +31808,48 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   font-style: normal; font-size: 8px; opacity: .7; margin-left: 3px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── GLOW-UP 311 · your entry against the close, per leg ──────────────────────
+   Sits left of `actual` so the row reads in time order: what you took, where it
+   closed, what happened. Green/rose by whether the market moved toward your side,
+   NOT by whether the leg won — those are different questions and the row already
+   answers the second one to its right. */
+.plg-clv {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  padding: 1px 5px; border-radius: 3px; margin-right: 6px;
+  cursor: help; white-space: nowrap; font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+.plg-clv.pos {
+  color: var(--green, #26d07c);
+  border-color: color-mix(in srgb, var(--green, #26d07c) 30%, transparent);
+  background: color-mix(in srgb, var(--green, #26d07c) 8%, transparent);
+}
+.plg-clv.neg {
+  color: var(--red, #ff5b78);
+  border-color: color-mix(in srgb, var(--red, #ff5b78) 28%, transparent);
+  background: color-mix(in srgb, var(--red, #ff5b78) 7%, transparent);
+}
+.plg-clv b { font-weight: 700; margin-left: 2px; }
+
+/* ── GLOW-UP 314 · does beating the close actually predict a hit? ─────────────
+   Grey for NOISE on purpose: the honest answer for every stat on this board today
+   is "not yet", and a coloured chip would dress that as a finding. Green and rose
+   are reserved for a gap the sample can actually support. */
+.asb-gap {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 700;
+  letter-spacing: .05em; padding: 1px 4px; border-radius: 3px; margin-left: 4px;
+  cursor: help; white-space: nowrap; border: 1px solid transparent;
+}
+.asb-gap.noise { color: var(--text3); border-color: rgba(255,255,255,0.12); }
+.asb-gap.confirms {
+  color: var(--green, #26d07c);
+  border-color: color-mix(in srgb, var(--green, #26d07c) 38%, transparent);
+}
+.asb-gap.inverts {
+  color: var(--red, #ff5b78);
+  border-color: color-mix(in srgb, var(--red, #ff5b78) 38%, transparent);
+}
 </style>
 </head>
 <body>

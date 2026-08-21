@@ -14826,6 +14826,21 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     _archiveIdx = m;
     return m;
   };
+  // ── GLOW-UP 311 · the CLOSING line for a leg, not just its outcome ────────
+  // resolveVsArchive answers "did it hit". This answers "where did the line end
+  // up", which is what turns an entry price into CLV. Same index, same candidate
+  // priority, same first-row-wins — it is the identical lookup, returning a
+  // different field, so the two can never disagree about which row they mean.
+  const closeLineFor = (evDk: string, fighterRaw: string, candidates: string[]): number | null => {
+    if (!candidates.length) return null;
+    const fighterNorm = normalizeName(fighterRaw)?.toLowerCase() || fighterRaw.toLowerCase();
+    const idx = archiveIdx();
+    for (const want of candidates) {
+      const m = idx.get(`${evDk}|${fighterNorm}|${want}`);
+      if (m && Number.isFinite(Number(m.line))) return Number(m.line);
+    }
+    return null;
+  };
   // Shared date-guarded resolver — used by the placed ledger, the board
   // baseline, and the parlay ledger so nothing can be graded differently.
   const resolveVsArchive = (evDk: string, fighterRaw: string, candidates: string[], line: number | null, dir: 'over' | 'under'): { outcome: 'hit' | 'miss' | 'pending'; actual: number | null } => {
@@ -15058,6 +15073,28 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const actualHtml = l.actual != null
           ? `<span class="plg-actual">actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
           : '';
+        // ── GLOW-UP 311 · YOUR entry against the close, on the row ─────────────
+        // The CLV panel above this reads ai_lean_snapshots — the BOARD's lines. On
+        // 62% of placed legs that is not the line you took (Edson Barboza SS UNDER:
+        // entered 63.5, board snapshot 32.5), so it never answered "did I get a good
+        // price". This does, per leg, from the line actually stored on the record.
+        //
+        // Signed by direction so positive ALWAYS means the market moved your way:
+        // an OVER wants the close ABOVE your entry, an UNDER wants it below. The
+        // >20 bound is the existing sanity rule — a gap that large is a name or
+        // platform mismatch, not real movement.
+        const closeLn = closeLineFor(eventDedupeKey(e.evKey), r.name, propTypesFor(r.source, r.book));
+        const entryLn = Number(r.line);
+        let clvHtml = '';
+        if (closeLn != null && Number.isFinite(entryLn)) {
+          const delta = (r.dir === 'OVER' ? 1 : -1) * (closeLn - entryLn);
+          if (Math.abs(delta) <= 20 && Math.abs(delta) >= 0.5) {
+            const good = delta > 0;
+            clvHtml = `<span class="plg-clv ${good ? 'pos' : 'neg'}" title="You entered at ${entryLn}${unit}; the line closed at ${closeLn}${unit}. ${good
+              ? `The market moved TOWARD your side by ${Math.abs(delta).toFixed(1)} — you took a better price than the close.`
+              : `The market moved AGAINST your side by ${Math.abs(delta).toFixed(1)} — the close was a better price than you got.`} This is your ACTUAL entry against the close; the CLV panel above measures the board's lines, which differ from yours on most legs.">${entryLn}→${closeLn} <b>${good ? '▲' : '▼'}${Math.abs(delta).toFixed(1)}</b></span>`;
+          }
+        }
         // GLOW-UP 309: the count rides the FIRST row of each group, so a fight you
         // are three legs deep on announces itself once instead of tagging every row.
         const groupTag = isGroupHead && nFight > 1
@@ -15065,7 +15102,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           : '';
         return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}">
           <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span>${groupTag}</span>
-          ${actualHtml}${status}
+          ${clvHtml}${actualHtml}${status}
         </div>`;
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
@@ -15704,19 +15741,49 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     // CLV validation split: hit rate when the entry beat the close vs when it
     // didn't. A real gap means line movement is confirming the picks; no gap
     // means CLV is noise for this stat. Same 5-sample color floor as elsewhere.
+    // GLOW-UP 313: a one-sample cell printed "0%" (TD BEAT 0% 0/1). Greying the
+    // colour was not enough — the number itself is the claim, and 0/1 has no rate.
+    // Under 5 the fraction stands alone.
     const clvSplit = (splitLabel: string, h: number, t: number, tip: string): string => {
       if (!t) return '';
       const p = Math.round((h / t) * 100);
       const low = t < 5;
       const c = low ? 'var(--text-muted)' : p >= 55 ? 'var(--green)' : p >= 45 ? 'var(--amber)' : 'var(--red)';
-      return `<span class="asb-split" title="${tip}: ${h}/${t} hit${low ? ' (low sample)' : ''}">${splitLabel} <b style="color:${c}">${p}%</b><i>${h}/${t}</i></span>`;
+      const val = low ? '—' : `${p}%`;
+      return `<span class="asb-split" title="${tip}: ${h}/${t} hit${low ? ' — too few to state a rate, so the fraction is shown bare' : ''}">${splitLabel} <b style="color:${c}">${val}</b><i>${h}/${t}</i></span>`;
     };
+    // ── GLOW-UP 314 · the gap was the point, and nothing measured it ──────────
+    // This panel's own reasoning is that a real BEAT-vs-OTHER gap means line
+    // movement is confirming the picks, and no gap means CLV is noise for that
+    // stat. It then rendered both cells and left the comparison to the eye — so a
+    // +17pt gap on n=12 looked stronger than a -5pt gap on n=346, when only the
+    // second is a large enough sample to mean anything.
+    //
+    // Same 1.5-SE rule as the ledger's ALPHA chip, for the same reason: a verdict
+    // the sample cannot support is worse than no verdict.
+    const gapVerdict = ((): string => {
+      const pr = d.posResolved, nr = d.nonPosResolved;
+      if (!pr || !nr || pr < 5 || nr < 5) return '';
+      const p1 = d.posHit / pr, p2 = d.nonPosHit / nr;
+      const se = Math.sqrt((p1 * (1 - p1)) / pr + (p2 * (1 - p2)) / nr);
+      const gap = (p1 - p2) * 100;
+      if (!Number.isFinite(se) || se <= 0) return '';
+      const strong = Math.abs(gap) >= 1.5 * se * 100;
+      const cls = !strong ? 'noise' : gap > 0 ? 'confirms' : 'inverts';
+      const label = !strong ? 'CLV NOISE' : gap > 0 ? `CLV CONFIRMS +${gap.toFixed(0)}` : `CLV INVERTS ${gap.toFixed(0)}`;
+      const tip = !strong
+        ? `Beating the close is worth ${gap > 0 ? '+' : ''}${gap.toFixed(0)}pts of hit rate here, against a standard error of ${(se * 100).toFixed(0)}pts — under 1.5 SE, so it is not distinguishable from no effect. For this stat, CLV is not yet predicting whether a pick lands.`
+        : gap > 0
+          ? `Picks whose entry beat the close hit ${gap.toFixed(0)}pts more often (±${(se * 100).toFixed(0)}pts). Line movement is confirming this stat — beating the close is a real signal here.`
+          : `Picks whose entry beat the close hit ${Math.abs(gap).toFixed(0)}pts LESS often (±${(se * 100).toFixed(0)}pts). The movement is going against the result on this stat, which is the opposite of what CLV is supposed to mean — worth understanding before trusting it.`;
+      return `<span class="asb-gap ${cls}" title="${tip.replace(/"/g, '&quot;')}">${label}</span>`;
+    })();
     const splits = (d.posResolved || d.nonPosResolved)
       ? `<span class="asb-splits">${
           clvSplit('BEAT', d.posHit, d.posResolved, 'Picks where your entry beat the close — hit rate')
         }${
           clvSplit('OTHER', d.nonPosHit, d.nonPosResolved, 'Picks where the close was flat or moved against you — hit rate')
-        }</span>`
+        }${gapVerdict}</span>`
       : '';
     return `<span class="archive-stat-badge"><span class="asb-label">${label}</span><span class="asb-val"><span style="color:${clvColor};font-weight:700">${avgClv > 0 ? '+' : ''}${avgClv.toFixed(2)}</span> <span style="opacity:0.7;font-size:9px">· <span style="color:${beatColor}">${beatPct}% beat</span>${hitStr}${nTag}</span></span>${splits}</span>`;
   };
@@ -16354,7 +16421,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     ${predictionsHtml}
     ${cSec('events', '', '', 'Per-Event Results', `${resolvedRows.length} resolved`, eventHtml, 'margin-bottom:12px')}
     ${cSec('ai-accuracy', '', '', 'AI Pick Accuracy by Stat Type', `<span style="font-size:10px;color:var(--text-muted)">lean direction correct (over + under)</span>`, statSummaryHtml, 'margin-bottom:12px')}
-    ${cSec('entry-clv', '', '', 'Your CLV (entry → close)', `<span style="font-size:10px;color:var(--text-muted)">avg Δ from entry line · positive = you beat the close</span>`, entryClvHtml, 'margin-bottom:12px')}
+    ${cSec('entry-clv', '', '', 'Board CLV (model line → close)', `<span style="font-size:10px;color:var(--text-muted)" title="Measured from the line the BOARD held when each lean was snapshotted, not from the line you entered at — those differ on 62% of placed legs. Your own entry-vs-close is on each row of the Placed Ledger below.">avg Δ from the board's line · positive = the board's number beat the close · <b>not your entries</b></span>`, entryClvHtml, 'margin-bottom:12px')}
     ${cSec('placed-ledger', '', '', 'My Placed Ledger', placedLedgerSummary, placedLedgerData.html, 'margin-bottom:12px')}
     ${cSec('parlay-ledger', '', '', 'My Parlay Ledger', parlayLedgerSummary, parlayLedgerData.html, 'margin-bottom:12px')}
     <div class="best-picks-grid">
