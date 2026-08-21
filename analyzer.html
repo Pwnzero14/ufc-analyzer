@@ -32008,6 +32008,72 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .plg-leg:hover {
   background: linear-gradient(90deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012) 45%, transparent 80%);
 }
+
+/* ═══ GLOW-UP 317 · the placed ledger becomes a table ═════════════════════════
+   Every field used to flow inside one wrapper, so the line under "Myktybek Orolbai
+   Uulu" sat 90px right of the line under "Neil Magny" and nothing down 99 rows
+   could be compared without reading it. Real columns now.
+
+   Track sizing is defensive on purpose. GLOW-UP 280 destroyed the Parlay Lab rows
+   by making the NAME the only thing that could shrink, so it absorbed every
+   shortfall and collapsed to single letters. Here the name carries a hard 130px
+   floor and the OPPONENT is the designated victim at minmax(0,1fr) — it is the one
+   field that repeats inside a fight group, where the spine already says these rows
+   belong together, so it is the one that can afford to go. */
+.plg-leg {
+  display: grid;
+  grid-template-columns:
+    minmax(130px, 1.5fr)   /* fighter  — hard floor, never the shrink victim */
+    46px                   /* side     */
+    54px                   /* line     */
+    46px                   /* stat     */
+    minmax(0, 1fr)         /* opponent — absorbs the shortfall */
+    88px                   /* book     */
+    46px                   /* N legs   */
+    108px                  /* entry → close */
+    76px                   /* actual   */
+    66px;                  /* result   */
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.plg-leg > * { min-width: 0; }
+.plc-name {
+  font-weight: 600; color: var(--text1, #e8eefc);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plg-leg .bps-line { text-align: right; }
+.plg-leg .bps-vs   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plc-book-cell, .plc-tag { display: flex; justify-content: flex-start; }
+/* The trailing three right-align so their values stack into a rule down the page —
+   that edge is what makes a column of misses findable at a glance. */
+.plc-clv, .plc-actual, .plc-status { display: flex; justify-content: flex-end; }
+.plc-clv .plg-clv, .plc-status .plg-status { margin: 0; }
+
+/* Column header — same grid, so it cannot drift from the rows it labels. */
+.plg-leg.plg-colhead {
+  font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 700;
+  letter-spacing: .09em; color: var(--text3); opacity: .62;
+  padding-top: 6px; padding-bottom: 3px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  animation: none; background: none;
+}
+.plg-leg.plg-colhead:hover { background: none; }
+.plg-leg.plg-colhead .bps-dir,
+.plg-leg.plg-colhead .bps-stat { color: inherit; font-weight: 700; }
+
+/* Narrow: drop the two columns that are context rather than content, in that
+   order. Opponent first — it repeats within a group. Then the leg count, which the
+   spine already communicates. Nothing that identifies or prices the bet is ever
+   dropped. */
+@media (max-width: 1500px) {
+  .plg-leg { grid-template-columns: minmax(120px,1.5fr) 44px 52px 44px minmax(0,1fr) 84px 108px 74px 64px; }
+  .plc-tag { display: none; }
+}
+@media (max-width: 1180px) {
+  .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px 104px 70px 62px; gap: 6px; }
+  .plg-leg .bps-vs { display: none; }
+}
 </style>
 </head>
 <body>

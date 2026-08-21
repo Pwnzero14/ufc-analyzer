@@ -15113,12 +15113,39 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const groupTag = isGroupHead && nFight > 1
           ? `<i class="plg-fight-n" title="You hold ${nFight} legs on this one fight. They share a duration and a pace, so they are not independent — an early finish, or a slow round, moves all ${nFight} together.">${nFight} legs</i>`
           : '';
+        // ── GLOW-UP 317 · the row becomes columns ────────────────────────────
+        // Every field used to live inside one .plg-leg-main that flowed as a
+        // sentence, so the line under a long name sat further right than the line
+        // under a short one and nothing down 99 rows could be compared without
+        // reading it. These are now direct grid children — the wrapper is gone,
+        // because a grid cannot align what a flex wrapper has already laid out.
+        //
+        // The trailing three cells stay in the markup even when empty. That is the
+        // point: a pending row and a settled row occupy the same columns, so the
+        // ledger reads as one table rather than two shapes.
         return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" style="--plg-i:${Math.min(rowI, 28)}">
-          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat st-${r.source}">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book ${bookTone(r.book)}">${r.bookLabel}</span>${groupTag}</span>
-          ${clvHtml}${actualHtml}${status}
+          <span class="plc-name">${r.pretty}</span>
+          <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b>
+          <span class="bps-line">${r.line ?? '—'}</span>
+          <i class="bps-stat st-${r.source}">${r.statLabel}</i>
+          <span class="bps-vs">${r.opponent ? `vs ${r.opponent}` : ''}</span>
+          <span class="plc-book-cell">${r.bookLabel ? `<span class="plg-book ${bookTone(r.book)}">${r.bookLabel}</span>` : ''}</span>
+          <span class="plc-tag">${groupTag}</span>
+          <span class="plc-clv">${clvHtml}</span>
+          <span class="plc-actual">${actualHtml}</span>
+          <span class="plc-status">${status}</span>
         </div>`;
       }).join('');
-      return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${rows}</div>`;
+      // One header per event rather than one for the whole ledger: the columns are
+      // the same, but each event is its own scroll destination and a table you have
+      // scrolled into needs its headings within reach.
+      const colHead = `<div class="plg-leg plg-colhead">
+        <span class="plc-name">FIGHTER</span><b class="bps-dir">SIDE</b><span class="bps-line">LINE</span>
+        <i class="bps-stat">STAT</i><span class="bps-vs">OPPONENT</span><span class="plc-book-cell">BOOK</span>
+        <span class="plc-tag"></span><span class="plc-clv">ENTRY → CLOSE</span>
+        <span class="plc-actual">ACTUAL</span><span class="plc-status">RESULT</span>
+      </div>`;
+      return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${colHead}${rows}</div>`;
     }).join('');
     return { html: selection.html + html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
   })();
