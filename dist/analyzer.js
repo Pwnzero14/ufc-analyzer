@@ -13500,6 +13500,14 @@ async function generatePredictions(container) {
     const archiveRaw = await new Promise(res => chrome.storage.local.get(['prop_archive_v1'], res));
     const propArchive = Array.isArray(archiveRaw.prop_archive_v1) ? archiveRaw.prop_archive_v1 : [];
     const predictions = [];
+    // MODEL v31 — the market anchor needs the posted fantasy line and the learned
+    // shading. Same accessor shape as marketFt below, and the same getSourceActiveLine
+    // the board's book chip reads, so the number capped against is the number shown.
+    const fpShift = PropLinePredictorService.computeMarketFpShift(propArchive).shift;
+    const postedFp = (name) => {
+        const entry = allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(name) || ''));
+        return entry ? getSourceActiveLine(entry, 'fp') : null;
+    };
     const headliner = findHeadlinerPair();
     for (const pair of upcomingCardPairs) {
         const isMainEvent = headliner != null && headliner.f1 === pair.f1 && headliner.f2 === pair.f2;
@@ -13528,8 +13536,16 @@ async function generatePredictions(container) {
         // Go-the-Distance, both full-slate). Falls back to the pick-em FT line, then to
         // the career-based estimate, so it's inert until those markets post.
         const mktMin = (name) => marketExpectedFightMinutesDirect(name, rounds) ?? marketExpectedFightMinutesFromLadder(name, rounds);
-        predictions.push(PropLinePredictorService.predictFighter(pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1), mktMin(pair.f1)));
-        predictions.push(PropLinePredictorService.predictFighter(pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2), mktMin(pair.f2)));
+        const p1 = PropLinePredictorService.predictFighter(pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1), mktMin(pair.f1));
+        const p2 = PropLinePredictorService.predictFighter(pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2), mktMin(pair.f2));
+        // MODEL v31: pull the fantasy number toward the fair line before it is stored.
+        // Done HERE rather than inside the predictor because this is where the posted
+        // lines live, and done BEFORE the save so that Best Picks, EV and the parlay
+        // maths all read the anchored number — a cap that only trimmed the display
+        // would leave the manufactured edge running underneath it.
+        p1.fantasy = PropLinePredictorService.applyMarketAnchor(p1.fantasy, postedFp(pair.f1), fpShift);
+        p2.fantasy = PropLinePredictorService.applyMarketAnchor(p2.fantasy, postedFp(pair.f2), fpShift);
+        predictions.push(p1, p2);
     }
     const eventName = upcomingEventName || 'Unknown Event';
     const predEvent = {
@@ -13836,6 +13852,18 @@ function renderPredictionsHtml(cSec) {
                 const tip = `Split read. The arrow says ${lean.toUpperCase()} because ${pred} is ${lean === 'over' ? 'above' : 'below'} ${prettyName(p.fighter)}'s own ${src.toUpperCase()} norm. But the posted line is ${book}, so against the BOOK this projection sits ${d > 0 ? 'over' : 'under'} by ${Math.abs(d).toFixed(1)}. The line is the side you can bet; the arrow is context about the fighter.`;
                 return `<i class="pcell-split" title="${tip.replace(/"/g, '&quot;')}">⇅</i>`;
             };
+            // MODEL v31: the cap changed the number on this row, so the row says so.
+            // A silently-capped projection is worse than an uncapped one — it looks like
+            // the model's own view while being the market's, and there would be no way
+            // to tell the two apart on a board where both are just numbers.
+            const anchorMark = (fp) => {
+                if (fp.anchoredFrom == null)
+                    return '';
+                const tip = `Model said ${fp.anchoredFrom.toFixed(1)}; pulled to ${fp.line.toFixed(1)}, the furthest MODEL v31 lets a fantasy projection sit from the fair line.`
+                    + ` Across 133 settled props the model was beaten by the bare line in every gap bucket and beaten worst where it disagreed most — 48.8 MAE against 32.7 on gaps past +30, and its OVER calls hit 37%.`
+                    + ` So the size of a disagreement is not evidence for it. The direction here still stands; only the magnitude was market-anchored.`;
+                return `<i class="pcell-anchor" title="${tip.replace(/"/g, '&quot;')}">⚓</i>`;
+            };
             const statCell = (lab, val, color, arrow, extra, book, valCls = '', mark = '') => `<div class="pcell${extra}${mark ? ' has-split' : ''}"><span class="pcell-lab">${lab}${mark}</span>`
                 + `<span class="pcell-val${valCls}" style="color:${color}">${val}<i>${arrow}</i></span>${book}</div>`;
             // GLOW-UP 264: both halves of a fight are on this board, and every sort
@@ -13850,7 +13878,7 @@ function renderPredictionsHtml(cSec) {
         <div class="pred-fighter"><span class="pred-rank" title="${_predSort === 'card' ? 'Position on the card, main event first' : `Rank ${rowIdx + 1} of ${sorted.length} under the current sort`}">${rowIdx + 1}</span><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub"><span class="pf-vs">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</span>${evBadge}</div></div></div>
         ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line), '', splitMark('ss', p.ss.line, p.ss.lean))}
         ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line), '', splitMark('td', p.td.line, p.td.lean))}
-        ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ' pcell-fp', bookCell(p.fighter, 'fp', p.fantasy.line), thinCls, splitMark('fp', p.fantasy.line, p.fantasy.lean))}
+        ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ' pcell-fp' + (p.fantasy.anchoredFrom != null ? ' is-anchored' : ''), bookCell(p.fighter, 'fp', p.fantasy.line), thinCls, splitMark('fp', p.fantasy.line, p.fantasy.lean) + anchorMark(p.fantasy))}
         <div class="pconf pconf-${confTier}${confCapped ? ' is-capped' : ''}" title="${confTip.replace(/"/g, '&quot;')}"><span class="pcell-lab">CONF</span><span class="pconf-gauge">${confCells}</span><span class="pconf-n">${confWidth}<b>%</b></span></div>
         <div class="prail">${reasons}</div>
       </div>`;
@@ -13889,7 +13917,8 @@ function renderPredictionsHtml(cSec) {
             const tip = `Across the ${fairGaps.length} fighters with a posted fantasy line, the model sits a median of ${med > 0 ? '+' : ''}${med.toFixed(1)} against the fair line, above it on ${above} of them.`
                 + (skewed
                     ? ` That is a LEVEL disagreement between the model and the market, not ${above} separate edges — a real edge shows up on a few rows, not on most of them. Read each row's gap RELATIVE to this number: a fighter at +${med.toFixed(0)} is average for this board and carries no signal, and the informative rows are the ones far from it in either direction.`
-                        + ` Which side is wrong is genuinely unknown: the ${Math.abs(fpShift).toFixed(0)}-point market shift was measured against stored predictions from MODEL v1-v22, the only versions with settled results, and this board is v${MODEL_VERSION}. A v${MODEL_VERSION} card has not settled yet.`
+                        + ` Which side is wrong is genuinely unknown: the ${Math.abs(fpShift).toFixed(0)}-point market shift was measured against stored predictions from MODEL v7-v22, the only versions with settled results, and this board is v${MODEL_VERSION}. A v${MODEL_VERSION} card has not settled yet.`
+                        + ` MODEL v31 caps how far any single row may sit from its fair line (⚓ marks the rows it moved), because across those 133 settled props a bigger disagreement was reliably a WORSE one — the model's OVER calls hit 37%. The cap limits each row; it cannot correct a board-wide level, which is what this number is.`
                     : ` Small enough that the model and the market broadly agree on the level, so row-level gaps can be read at face value.`);
             boardChip = `<span class="pred-board-skew${skewed ? ' is-skewed' : ''}" title="${tip.replace(/"/g, '&quot;')}">`
                 + `${skewed ? '⚠ ' : ''}BOARD ${med > 0 ? '+' : ''}${med.toFixed(1)} <i>${above}/${fairGaps.length} above fair</i></span>`;

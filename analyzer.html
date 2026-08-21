@@ -31596,6 +31596,30 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    behaved for two thirds of this board. */
 .pred-row:nth-child(n+29) { animation-delay: 0.300s; }
 
+
+/* ── MODEL v31 — the anchored fantasy projection ──────────────────────────────
+   The cap rewrites the number this cell exists to show, so the cell has to admit
+   it. Deliberately quiet: an anchored row is not a warning, it is a row where the
+   model's magnitude was overruled and its direction kept. Amber because that is
+   already this board's "read this differently" lane (⚠ BOARD, NO HISTORY), not a
+   new colour to learn. */
+.pcell-anchor {
+  font-style: normal;
+  font-size: 9px;
+  line-height: 1;
+  margin-left: 3px;
+  color: var(--amber, #e0a33e);
+  opacity: .8;
+  cursor: help;
+  vertical-align: 1px;
+}
+.pcell-anchor:hover { opacity: 1; }
+/* A hairline under the value, not a fill: the number is still the model's answer,
+   just a bounded one. A background here would read as "invalid". */
+.pcell.pcell-fp.is-anchored .pcell-val {
+  text-decoration: underline dotted var(--amber, #e0a33e);
+  text-underline-offset: 3px;
+}
 </style>
 </head>
 <body>
