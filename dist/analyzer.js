@@ -18536,6 +18536,22 @@ function _renderFightersImpl() {
     const container = document.getElementById('cardContainer');
     if (!container)
         return;
+    // ── GLOW-UP 320 · four of six views never primed the lean cache ───────────
+    // primeCaches() sat AFTER the view dispatch, and bestpicks / parlaylab /
+    // calibration / archive all `return` before reaching it. So loading straight
+    // into any of those left _leanCache null and the weight-miss adjustments
+    // unapplied for the whole session — and updateViewTabCounts(), which ran
+    // earlier still, counted leans against that un-primed state. The nav read
+    // LEAN OVER 0 · LEAN UNDER 0 · AI BEST PICKS 0 beside ALL FIGHTERS 26.
+    //
+    // It looked intermittent because a single visit to a fighters view primed the
+    // module state for the rest of the session, so the counts were right or wrong
+    // depending on where you had been, not on the data.
+    //
+    // Priming first is also the correct order regardless: the counts are DERIVED
+    // from the leans, so computing them before the leans exist could only ever have
+    // been right by accident.
+    primeCaches();
     updateViewTabCounts();
     container.innerHTML = '';
     if (currentView === 'bestpicks') {
@@ -18563,7 +18579,6 @@ function _renderFightersImpl() {
     if (_fighterClvDrift === null) {
         void loadFighterClvDrift();
     }
-    primeCaches();
     const _q = currentSearch.toLowerCase().trim();
     // Parse advanced filter tags: conf:70+, lean:over, fp:under, ss:over, td:under, split:yes, ev:+
     const _tagRe = /\b(conf|lean|fp|ss|td|ft|split|ev):([^\s]+)/gi;
