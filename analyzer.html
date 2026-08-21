@@ -31024,8 +31024,23 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    LAST. The name holds a floor it may never go below, and the `vs Opponent`
    label — recoverable from the row's own tooltip and from the fight itself —
    gives way six times faster. */
+/* ── GLOW-UP 291 · the name took a share of every deficit ──────────────────
+   283 set `vs` to shrink 60 against the name's 1 so the label would yield first.
+   It does — but flex distributes a shortfall across EVERY shrinkable item in
+   proportion to shrink-factor × basis, so the name still absorbed a sliver of
+   each one. On a 12px deficit that sliver is about a third of a pixel, and a
+   third of a pixel is enough to trigger `text-overflow: ellipsis`. That is why
+   `Anthony Hernand...` rendered clipped while a name one character shorter did
+   not: not too little room, just barely too little, on a row where the answer
+   should have been to shave the opponent label instead.
+
+   `flex-shrink: 0` takes the name out of the distribution entirely. `vs` now
+   absorbs 100% of any deficit, and the name is untouched until the label is gone
+   — which is what "the identifier shrinks last" was supposed to mean in 280, 283
+   and 287. `max-width: 100%` keeps the last-resort case honest: if the cell is
+   ever smaller than the name alone it still ellipsizes rather than clipping. */
 .plr-id .parlay-leg-name {
-  flex: 0 1 auto; min-width: 88px;
+  flex: 0 0 auto; min-width: 0; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .plr-id .parlay-leg-vs {
