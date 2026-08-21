@@ -73,6 +73,13 @@ interface LeanResult {
   confidenceGrade?: 'A'|'B'|'C'|'D'|'F';
   memoryDelta?: number;
   memoryNote?: string | null;
+  /** MODEL v32 — the moneyline-consistency demotion. Carried on the lean and not
+   *  only inside its reason text, because the "considered but cut" audit list
+   *  reads the lean and never sees reasons: a pick demoted OUT of the board would
+   *  otherwise be cut for an invisible reason, which is the one thing that list
+   *  exists to prevent. */
+  mlGuardDelta?: number;
+  mlGuardNote?: string | null;
   rivalryModels?: ModelRivalryOpinion[];
   rivalrySummary?: string;
   rivalryDissent?: string | null;
@@ -5390,6 +5397,8 @@ function calcLean(
     confidenceGrade: confidenceModel.grade,
     memoryDelta: confidenceModel.memoryDelta,
     memoryNote: confidenceModel.memoryNote,
+    mlGuardDelta: confidenceModel.mlGuardDelta,
+    mlGuardNote: confidenceModel.mlGuardNote,
     rivalryModels: rivalry.models,
     rivalrySummary: rivalry.summary,
     rivalryDissent: rivalry.dissentSummary,
@@ -10049,9 +10058,15 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         const blockedBy = fk ? keptFights.get(fk) : undefined;
         const conf = Number(el.conf) || 0;
         const stat = el._source === 'ss_r1' ? 'R1 SS' : (el._source || 'fp').toUpperCase();
+        // MODEL v32: a pick the moneyline guard pushed under the bar was cut for a
+        // specific, measured reason. Naming it here is the difference between an
+        // audit trail and a list of things that vanished.
+        const mlg = Number(el.mlGuardDelta) || 0;
         const reason = blockedBy && blockedBy.toLowerCase() !== f.name.toLowerCase()
           ? `same fight as ${prettyName(blockedBy)}, who ranked higher`
-          : 'below the cut for this column';
+          : mlg < 0
+            ? `below the cut — ${mlg} for ${el.lean === 'over' ? 'an FP over priced to lose' : 'an FP under against a comfortable win'} (was ${conf - mlg})`
+            : 'below the cut for this column';
         // GLOW-UP 200 L4 — the audit trail was honest but inert: you could read
         // that a fighter was cut and had no way to go look at them. Rows now jump
         // to the card, and a cut that OUTRANKS its winner on confidence says so
