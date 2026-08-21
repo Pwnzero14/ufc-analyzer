@@ -31620,6 +31620,50 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   text-decoration: underline dotted var(--amber, #e0a33e);
   text-underline-offset: 3px;
 }
+
+/* ── GLOW-UP 294 · the factors the rail could not fit ─────────────────────────
+   Deliberately the quietest chip in the row: it is a pointer to more, not more.
+   Same shape as its neighbours so the rail keeps one rhythm, but hollow and
+   dimmed so it never reads as a factor in its own right. */
+.bp-factor.bp-factor-more {
+  background: transparent;
+  border-style: dashed;
+  opacity: .58;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+.bp-factor.bp-factor-more:hover { opacity: 1; }
+
+/* ── GLOW-UP 296 · the caveat now carries its size ────────────────────────────
+   The number is the point — a 25.3 disagreement and a 3.0 one are different
+   objects. Tabular so the digits line up down the column and can be compared
+   without reading, and heavier than the label because the label repeats and the
+   number does not. `is-wide` (12+) is where the projection is not quibbling. */
+.bp-proj-split b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin-left: 1px;
+}
+.bp-proj-split.is-wide {
+  border-color: color-mix(in srgb, var(--warn, #e0a33e) 62%, transparent);
+}
+
+/* ── GLOW-UP 297 · the cut list's evidence vs its bookkeeping ─────────────────
+   Most rows here are seating order — "same fight as X, who ranked higher". A row
+   the moneyline guard demoted is the model reporting that it overruled a pick,
+   and it was rendered in the same 9px --text3 as everything else. Amber left rule
+   mirrors bpnm-inverted's purple one: the list already had a vocabulary for "this
+   line is different", so this borrows it rather than inventing a second. */
+.bpnm-row.bpnm-guarded {
+  border-left: 2px solid color-mix(in srgb, var(--warn, #e0a33e) 55%, transparent);
+  padding-left: 6px;
+}
+.bpnm-row.bpnm-guarded .bpnm-why { color: var(--text2); opacity: 1; }
+.bpnm-why b.bpnm-guard {
+  color: var(--warn, #e0a33e);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 </style>
 </head>
 <body>
