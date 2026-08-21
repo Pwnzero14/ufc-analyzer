@@ -30960,7 +30960,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    header in 272. `--plr-tracks` is defined once so the three can never disagree:
    restating a track list in three places is the drift that 260 was about. */
 .parlay-lab {
-  --plr-tracks: 20px minmax(150px, 1.65fr) 52px 48px minmax(118px, 1.35fr) 50px 44px 36px 70px;
+  --plr-tracks: 20px minmax(180px, 1fr) 52px 48px minmax(200px, 1.06fr) 50px 44px 36px 70px;
   --plr-gap: 7px;
 }
 .parlay-leg-row {
@@ -31066,7 +31066,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    the one cell that had none — and the check column stops clipping its own
    glyph on the way past. */
 .parlay-lab.no-delta {
-  --plr-tracks: 20px minmax(150px, 1.65fr) 52px 48px minmax(118px, 1.35fr) 50px 44px 70px;
+  --plr-tracks: 20px minmax(180px, 1fr) 52px 48px minmax(200px, 1.06fr) 50px 44px 70px;
 }
 .parlay-lab.no-delta .parlay-leg-marg,
 .parlay-lab.no-delta .plr-head > span:nth-child(8) { display: none; }
@@ -31252,8 +31252,8 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    informational chips fold away — YOU and the marginal delta are the two a
    builder can most afford to lose — and the header drops the same two cells, so
    both track lists stay nine-wide-minus-two and cannot fall out of step. */
-.parlay-lab-cols { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
-@media (max-width: 1500px) {
+.parlay-lab-cols { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+@media (max-width: 1100px) {
   .parlay-lab {
     --plr-tracks: 16px minmax(112px, 1.5fr) 52px 46px minmax(102px, 1.2fr) 44px 72px;
     --plr-gap: 6px;
@@ -31268,7 +31268,7 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    of 103 names ellipsized there. Stacked, the pool takes the full width and
    every name fits. A two-up that cannot show its own primary field is worse than
    a single column. */
-@media (max-width: 1400px) { .parlay-lab-cols { grid-template-columns: 1fr; } }
+@media (max-width: 1500px) { .parlay-lab-cols { grid-template-columns: 1fr; } }
 
 /* ── GLOW-UP 279 · the entry stagger stopped at row 10 ─────────────────────
    The cascade was written for a pool that had ten rows in it. This board renders
