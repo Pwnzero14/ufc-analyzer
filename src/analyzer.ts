@@ -13778,6 +13778,10 @@ const compressFactor = (r: string): string => {
 };
 let _predSort: PredSort = 'card';
 let _cachedLearningLog: LearningResult[] | null = null;
+// MODEL v30 — how far posted FP lines sit above outcomes, learned from the
+// archive. Loaded alongside the predictions so the board can show a FAIR line
+// next to the posted one. See computeMarketFpShift for the measurement.
+let _marketFpShift: { shift: number; sampleCount: number } | null = null;
 
 async function generatePredictions(container: HTMLElement): Promise<void> {
   // Always force-refresh to get the nearest upcoming event (not a stale cached card)
@@ -13908,13 +13912,31 @@ function renderPredictionsHtml(
     // split flag below, so a chip that reads "book agrees" can never also be
     // flagged as disagreeing.
     const gapThreshold = (src: 'ss' | 'td' | 'fp'): number => (src === 'td' ? 0.5 : 2);
+    // ── MODEL v30 — a posted fantasy line is not a fair line ────────────────
+    // Measured over 354 settled Pick6 FP props, recomputed from raw UFCStats with
+    // the current scorer: the posted line runs about eleven points ABOVE the
+    // outcome, and it does so persistently — all twelve event-clusters from April
+    // to August came in negative, over-rate 38-48%. Fantasy points are dominated
+    // by the win bonus, so clearing a line means winning the fight: winners clear
+    // 81.7% of the time, losers 2.9%. A book setting the line near the mean is
+    // setting it well above the median result.
+    //
+    // The board was comparing the model against that shaded number, so every
+    // "model is under the book" reading carried eleven points of market shading
+    // inside it. The gap is measured against the FAIR line now, and the posted
+    // line is still shown because it is the number you actually bet.
+    //
+    // FP only. The same shading has NOT been measured on SS or TD and is not
+    // assumed — those still compare against the posted line.
+    const fpShift = _marketFpShift && Number.isFinite(_marketFpShift.shift) ? _marketFpShift.shift : 0;
     const bookCell = (fighterName: string, src: 'ss' | 'td' | 'fp', pred: number): string => {
       const f = predByName.get((normalizeName(fighterName) || fighterName).toLowerCase());
       const book = bookLineOf(fighterName, src);
       // A dash rather than the words "no line" — this state repeats up to 52 times
       // on a card and was the loudest quiet thing on the board.
       if (book == null || !Number.isFinite(Number(pred))) return `<div class="pred-book none" title="No posted line for this prop yet">—</div>`;
-      const d = pred - book;
+      const fair = src === 'fp' ? book + fpShift : book;
+      const d = pred - fair;
       const thr = gapThreshold(src);
       const cls = d >= thr ? 'pos' : d <= -thr ? 'neg' : 'flat';
       // Name the actual book instead of a generic "BK". getSourceActiveLine walks the
@@ -13923,7 +13945,10 @@ function renderPredictionsHtml(
       const bookKey = f ? getSourceActivePlatformKey(f, src) : null;
       const bookTag = bookKey ? platformKeyShort(bookKey) : 'BK';
       const driving = _predSort === 'gap' && gapSrcByFighter.get(fighterName) === src ? ' is-driver' : '';
-      return `<div class="pred-book ${cls}${driving}" title="Model ${pred} vs ${bookTag} line ${book} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'book shaded under the model — over-side value' : d <= -thr ? 'book shaded over the model — under-side value' : 'book agrees with the model'})">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
+      const fairNote = src === 'fp' && fpShift !== 0
+        ? ` Posted ${book}, but fantasy lines have run ${Math.abs(fpShift).toFixed(1)} points ABOVE the outcome across every settled card measured — winners clear a fantasy line 82% of the time, losers 3%, so a line set near the mean sits well above the median. Fair line ≈ ${fair.toFixed(1)}, and the gap shown is measured against that. You still bet the posted ${book}.`
+        : '';
+      return `<div class="pred-book ${cls}${driving}${src === 'fp' && fpShift !== 0 ? ' is-fair' : ''}" title="Model ${pred} vs ${bookTag} ${src === 'fp' && fpShift !== 0 ? `fair line ${fair.toFixed(1)}` : `line ${book}`} — gap ${d > 0 ? '+' : ''}${d.toFixed(1)} (${d >= thr ? 'line shaded under the model — over-side value' : d <= -thr ? 'line shaded over the model — under-side value' : 'line agrees with the model'}).${fairNote}">${bookTag} ${book} <b>${d > 0 ? '+' : ''}${d.toFixed(1)}</b></div>`;
     };
 
     // Model-vs-book gap on FP, used by the GAP sort. Signed by the model's own
@@ -13947,7 +13972,9 @@ function renderPredictionsHtml(
       for (const [src, line, lean] of tries) {
         const book = getSourceActiveLine(f, src);
         if (book == null || !Number.isFinite(Number(line))) continue;
-        const d = line - book;
+        // MODEL v30: same fair-line basis the chip uses, so the sort and the number
+        // it is sorting by can never tell different stories.
+        const d = line - (src === 'fp' ? book + fpShift : book);
         return { v: lean === 'over' ? d : -d, src };
       }
       return { v: -Infinity, src: null };
@@ -15810,6 +15837,11 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // ── Load prediction data for the Predictions section ──
   _cachedPredictions = await PropLinePredictorService.getPredictions();
+  try {
+    const arcRaw = await new Promise<Record<string, any>>(res => chrome.storage.local.get(['prop_archive_v1'], res));
+    const arc = Array.isArray(arcRaw.prop_archive_v1) ? arcRaw.prop_archive_v1 as PropArchiveRecord[] : [];
+    _marketFpShift = PropLinePredictorService.computeMarketFpShift(arc);
+  } catch { _marketFpShift = null; }
   // Auto-correct event name if prediction fighters match the current upcoming card
   const curEventName = (upcomingEventName || '').trim();
   debugLog(`Prediction auto-correct check: curEvent="${curEventName}" cardPairs=${upcomingCardPairs.length} preds=${_cachedPredictions.length}`);

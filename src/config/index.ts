@@ -422,7 +422,7 @@ export const NAME_ALIASES: Record<string, string> = {
 //   control. Both halves of the blend are now expressed against THIS fight's
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
-export const MODEL_VERSION = 29;
+export const MODEL_VERSION = 30;
 
 // Ceiling on the FP predictor's confidence score. Exported because the
 // predictions panel needs to know when a 92 is an EARNED 92 and when it is the
