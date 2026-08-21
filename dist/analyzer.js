@@ -9526,7 +9526,25 @@ function renderBestPicks(container, renderSeq = 0) {
                     return '';
                 const avgD = ds.reduce((a, b) => a + b, 0) / ds.length;
                 const stretched = avgD >= 10;
-                return `<span class="bph-avgd${stretched ? ' warn' : ''}" title="Mean gap between the model's projection and the line you'd enter, across this column's ${ds.length} picks.${stretched ? ' Above 10 the column is disagreeing with the books broadly rather than on a few spots — the pattern MODEL v15 measured as over-projection, so treat it as a prompt to check rather than a signal to press.' : ''}">${stretched ? '⚠ ' : ''}avg Δ ${avgD > 0 ? '+' : ''}${avgD.toFixed(1)}</span>`;
+                // ── GLOW-UP 298 · only one end of this number was ever flagged ─────────
+                // `edge` is signed so POSITIVE always means favourable. A big positive
+                // average was flagged as possible over-projection, and a NEGATIVE one —
+                // the column's own projections arguing against its own picks, on average,
+                // across every row — rendered in the same quiet grey as a healthy board.
+                // On the live card the overs column sat at -3.7 with three rows already
+                // carrying ⚠ PROJ SAYS individually, and the header said nothing.
+                //
+                // Same 2.5 floor as the per-row flag, applied to the mean: this IS that
+                // flag aggregated, so the two should agree about what counts as opposition.
+                const opposed = avgD <= -PROJ_CONFLICT_MIN_GAP;
+                const cls = stretched ? ' warn' : opposed ? ' opposed' : '';
+                const tip = `Mean gap between the model's projection and the line you'd enter, across this column's ${ds.length} picks. Positive is favourable on either side.`
+                    + (stretched
+                        ? ` Above 10 the column is disagreeing with the books broadly rather than on a few spots — the pattern MODEL v15 measured as over-projection, so treat it as a prompt to check rather than a signal to press.`
+                        : opposed
+                            ? ` Negative means the projections behind this column point AGAINST its own picks on average — not a few contrarian rows, the whole column. The individual ⚠ PROJ SAYS chips are the same fact per row; this is what they sum to. The lean can still be right (projection-vs-line moves the score by at most ±2.5) but a column that argues with itself is worth reading before pressing.`
+                            : ``);
+                return `<span class="bph-avgd${cls}" title="${tip.replace(/"/g, '&quot;')}">${stretched ? '⚠ ' : opposed ? '⚠ ' : ''}avg Δ ${avgD > 0 ? '+' : ''}${avgD.toFixed(1)}</span>`;
             })()}${
             // GLOW-UP 187 (L5): "best" ranks by model, not by price — 5 of 7 picks
             // sitting at EV -12% under a header that says BEST reads as an

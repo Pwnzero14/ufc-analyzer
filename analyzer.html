@@ -31664,6 +31664,22 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── GLOW-UP 298 · a column that argues with itself ───────────────────────────
+   Rose rather than the amber `warn` uses, because these are different findings:
+   amber says the model may be over-projecting (too much edge claimed), rose says
+   the projections oppose the picks (edge claimed in the wrong direction). Reusing
+   amber would have merged two opposite diagnoses into one colour. */
+.bph-avgd.opposed {
+  color: var(--danger, #ff5b78);
+  border-color: color-mix(in srgb, var(--danger, #ff5b78) 45%, transparent);
+  background: color-mix(in srgb, var(--danger, #ff5b78) 10%, transparent);
+}
+
+/* GLOW-UP 299 — the +N chip was too quiet to find. .58 on a small dashed chip
+   read as a rendering artefact rather than a control; still the quietest thing
+   in the rail, but now locatable without hunting. */
+.bp-factor.bp-factor-more { opacity: .72; }
 </style>
 </head>
 <body>
