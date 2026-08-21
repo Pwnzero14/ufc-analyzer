@@ -31279,7 +31279,15 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    both track lists stay nine-wide-minus-two and cannot fall out of step. */
 .parlay-lab-cols { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
 @media (max-width: 1100px) {
-  .parlay-lab {
+  /* GLOW-UP 289: BOTH selectors, and `.no-delta` is not optional here. A media
+     query adds no specificity, so `.parlay-lab` (0,1,0) inside one still loses to
+     the plain `.parlay-lab.no-delta` (0,2,0) rule above. With an empty slip —
+     which is the state the board opens in — the WIDE track list therefore stayed
+     active at every width, collapsed to its 180px/200px floors, and overflowed
+     the row. Measured on a real 806px viewport: identity 180, market 200, 17 of
+     107 names truncated, the opponent hidden on all 107. */
+  .parlay-lab,
+  .parlay-lab.no-delta {
     --plr-tracks: 16px minmax(112px, 1.5fr) 52px 46px minmax(102px, 1.2fr) 44px 72px;
     --plr-gap: 6px;
   }
