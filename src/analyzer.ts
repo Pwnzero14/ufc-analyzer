@@ -15050,7 +15050,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         return String(a.rec.name).localeCompare(String(b.rec.name));
       });
       let lastFight = '';
-      const rows = sortedLegs.map(l => {
+      const rows = sortedLegs.map((l, rowI) => {
         const r = l.rec;
         const fk = fightKeyOf(r);
         const nFight = fightCount.get(fk) || 1;
@@ -15100,7 +15100,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const groupTag = isGroupHead && nFight > 1
           ? `<i class="plg-fight-n" title="You hold ${nFight} legs on this one fight. They share a duration and a pace, so they are not independent — an early finish, or a slow round, moves all ${nFight} together.">${nFight} legs</i>`
           : '';
-        return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}">
+        return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" style="--plg-i:${Math.min(rowI, 28)}">
           <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span>${groupTag}</span>
           ${clvHtml}${actualHtml}${status}
         </div>`;
@@ -15194,6 +15194,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const containsIdx = slipSets.map((_, i) => insideOf.reduce<number[]>((a, v, j) => (v === i ? [...a, j] : a), []));
       const cards = e.list.map((p, pi) => {
         count++;
+        const cardI = Math.min(pi, 20);
         const legs = (p.legs || []).map(l => {
           const dir = l.dir === 'OVER' ? 'over' as const : 'under' as const;
           const res = resolveVsArchive(evDk, l.fighter, propTypesFor(l.stat, l.book), l.line, dir);
@@ -15242,7 +15243,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           : holds.length
           ? `<span class="plp-contain holds" title="${holds.length} smaller slip${holds.length === 1 ? '' : 's'} (${holds.map(j => `${e.list[j]?.legs.length}-leg`).join(', ')}) sit entirely inside this one — they cannot cash unless this one's shared legs do, so they add exposure to the same position rather than diversifying it.">⊃ HOLDS ${holds.length}</span>`
           : '';
-        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
+        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
     }).join('');
