@@ -5,6 +5,7 @@
   "description": "Auto-fetches UFC fantasy lines from Pick6 & Underdog, detects upcoming cards, and updates the analyzer automatically.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "tabs",
     "scripting",
     "alarms",
