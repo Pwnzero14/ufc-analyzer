@@ -31733,6 +31733,16 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   color: var(--red, #ff5b78);
   border-color: color-mix(in srgb, var(--red, #ff5b78) 40%, transparent);
 }
+
+/* GLOW-UP 304 — the two halves of the hidden-factor tally, coloured rather than
+   left to a glyph that does not resolve at 9px. Same green/rose the ✓/✗ factor
+   chips beside it use, so the rail keeps one vocabulary. */
+.bp-factor-more i { font-style: normal; font-variant-numeric: tabular-nums; }
+.bp-factor-more i.hm-sup { color: var(--green, #26d07c); }
+.bp-factor-more i.hm-opp { color: var(--red, #ff5b78); }
+/* With both halves carrying their own colour the chip must not tint them. */
+.bp-factor.bp-factor-more.hid-sup i.hm-sup,
+.bp-factor.bp-factor-more.hid-opp i.hm-opp { color: inherit; }
 </style>
 </head>
 <body>
