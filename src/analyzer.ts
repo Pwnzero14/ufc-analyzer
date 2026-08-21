@@ -8347,6 +8347,40 @@ const BOOK_COLORS: Record<string, string> = {
  *  disagreement cannot fully express itself in the number either. */
 const PROJ_CONFLICT_MIN_GAP = 2.5;
 
+/**
+ * PERF — group archive rows by event ONCE per scope.
+ *
+ * Eight sites ran the identical `allRows.filter(r => eventDedupeKey(r.event) === key)`,
+ * each a full scan of a 38,689-row archive calling a regex on every row, and every one
+ * sat inside a `for (const snap of aiSnapshots)` loop of up to 80 snapshots — roughly
+ * 3.1M eventDedupeKey calls per site. Same class of cost as the resolveVsArchive scan,
+ * spread across the rest of the Archive render.
+ *
+ * Lazy, so a view that never asks for an event's rows pays nothing. One instance per
+ * `allRows` scope, because the archive is re-read in several of them.
+ *
+ * Returns the SHARED array rather than a copy — verified no caller mutates it (they
+ * only .find/.filter over it). If that ever changes, copy HERE rather than at the call
+ * sites, or the sharing becomes a very quiet bug.
+ */
+function makeRowsByEvent(
+  rows: PropArchiveRecord[],
+  keyOf: (event: string) => string,
+): (key: string) => PropArchiveRecord[] {
+  let idx: Map<string, PropArchiveRecord[]> | null = null;
+  return (key: string): PropArchiveRecord[] => {
+    if (!idx) {
+      idx = new Map<string, PropArchiveRecord[]>();
+      for (const r of rows) {
+        const k = keyOf(r.event || '');
+        const list = idx.get(k);
+        if (list) list.push(r); else idx.set(k, [r]);
+      }
+    }
+    return idx.get(key) || [];
+  };
+}
+
 function projOpposesLean(
   reason: string,
   side: string | null | undefined,
@@ -14698,6 +14732,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   ]);
   const allRowsRaw = result[STORAGE_PROP_ARCHIVE_KEY];
   const allRows = Array.isArray(allRowsRaw) ? (allRowsRaw as PropArchiveRecord[]) : [];
+  const rowsForEvent = makeRowsByEvent(allRows, eventDedupeKey);
 
   // Lines staleness — find most recent capturedAt across all platform payloads
   const linesCapturedAt = Math.max(0, ...STORAGE_LINE_KEYS.map(k => {
@@ -15272,7 +15307,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || aiAccuracyMap.has(key)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    const eventArchiveRows = rowsForEvent(key);
     const acc = computeAiAccuracy(snap, eventArchiveRows);
     if (acc.total > 0) aiAccuracyMap.set(key, acc);
   }
@@ -15319,7 +15354,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || aiClvAgreementMap.has(key)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    const eventArchiveRows = rowsForEvent(key);
     const agg = computeAiClvAgreement(snap, eventArchiveRows);
     if (agg.total > 0) aiClvAgreementMap.set(key, agg);
   }
@@ -15370,7 +15405,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || !pastEventKeys.has(key)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    const eventArchiveRows = rowsForEvent(key);
     for (const pick of (snap?.picks ?? []) as any[]) {
       const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
       const lean = String(pick?.lean || '');
@@ -15418,7 +15453,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || !pastEventKeys.has(key)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === key);
+    const eventArchiveRows = rowsForEvent(key);
     for (const pick of (snap?.picks ?? []) as any[]) {
       const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
       const lean = String(pick?.lean || '');
@@ -15822,7 +15857,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const snapEventKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapEventKey || !pastEventKeys.has(snapEventKey)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === snapEventKey);
+    const eventArchiveRows = rowsForEvent(snapEventKey);
     if (!eventArchiveRows.length) continue;
 
     for (const pick of (snap?.picks ?? []) as Array<Record<string, any>>) {
@@ -16093,7 +16128,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const snapKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapKey || !pastEventKeys.has(snapKey)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === snapKey);
+    const eventArchiveRows = rowsForEvent(snapKey);
 
     for (const pick of (snap?.picks ?? []) as Array<Record<string, any>>) {
       const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
@@ -16766,6 +16801,7 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   ]);
   const allRows = Array.isArray(archivePayload[STORAGE_PROP_ARCHIVE_KEY])
     ? (archivePayload[STORAGE_PROP_ARCHIVE_KEY] as PropArchiveRecord[]) : [];
+  const rowsForEvent = makeRowsByEvent(allRows, eventDedupeKey);
   const aiSnapshots: any[] = Array.isArray(aiSnapshotPayload[STORAGE_AI_LEAN_SNAPSHOT_KEY])
     ? (aiSnapshotPayload[STORAGE_AI_LEAN_SNAPSHOT_KEY] as any[]) : [];
 
@@ -16829,7 +16865,7 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   for (const snap of aiSnapshots) {
     const snapEventKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapEventKey || !pastEventKeys.has(snapEventKey)) continue;
-    const eventArchiveRows = allRows.filter(r => eventDedupeKey(r.event || '') === snapEventKey);
+    const eventArchiveRows = rowsForEvent(snapEventKey);
     if (!eventArchiveRows.length) continue;
 
     for (const pick of (snap?.picks ?? []) as Array<Record<string, any>>) {
@@ -23991,6 +24027,7 @@ async function initRecalibrationMap(): Promise<void> {
     ]);
     const allRows = Array.isArray(archivePayload[STORAGE_PROP_ARCHIVE_KEY])
       ? (archivePayload[STORAGE_PROP_ARCHIVE_KEY] as PropArchiveRecord[]) : [];
+    const rowsForEvent = makeRowsByEvent(allRows, eventDedupeKey);
     const aiSnapshots: any[] = Array.isArray(aiSnapshotPayload[STORAGE_AI_LEAN_SNAPSHOT_KEY])
       ? (aiSnapshotPayload[STORAGE_AI_LEAN_SNAPSHOT_KEY] as any[]) : [];
 
@@ -24021,7 +24058,7 @@ async function initRecalibrationMap(): Promise<void> {
     for (const snap of aiSnapshots) {
       const snapKey = eventDedupeKey(String(snap?.event || ''));
       if (!snapKey || !pastEventKeys.has(snapKey)) continue;
-      const eventRows = allRows.filter(r => eventDedupeKey(r.event || '') === snapKey);
+      const eventRows = rowsForEvent(snapKey);
       for (const pick of (snap?.picks ?? []) as Array<Record<string, any>>) {
         const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
         const lean = String(pick?.lean || '').toLowerCase();
