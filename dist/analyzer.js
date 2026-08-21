@@ -11525,7 +11525,10 @@ function renderParlayLab(container) {
         const legFightKey = legFightKeyOf(a.leg);
         const inSlipFight = !sel ? (slipFightCount.get(legFightKey) || 0) : 0;
         const vsTag = a.leg.opponent
-            ? `<span class="parlay-leg-vs${inSlipFight ? ' shared' : ''}" title="Opponent: ${prettyName(a.leg.opponent)}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}</span>`
+            // GLOW-UP 291: the `shared` treatment goes too. It boxed the opponent label
+            // when the slip already held that fight — which the ↺ on the Δ chip now says,
+            // and the box was spending padding in the one cell that cannot afford any.
+            ? `<span class="parlay-leg-vs" title="Opponent: ${prettyName(a.leg.opponent)}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}</span>`
             : '';
         const conflict = sel ? null : conflictsWithSlip(a.leg);
         // GLOW-UP 191 (L1): only look for synergy when there's no conflict — a leg
