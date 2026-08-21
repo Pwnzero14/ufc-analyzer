@@ -12,7 +12,8 @@
     "archive:import:settle:dry": "node import-betr-settle-lines.js --file betr-settle-input.json --dry-run",
     "archive:backfill": "node backfill-archive-results.js",
     "report:london": "node grade-london-best-picks.js",
-    "prebuild": "npm run clean",
+    "prebuild": "npm run clean && npm run guard",
+    "guard": "node scripts/guard-invariants.js",
     "checkpoint:save": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode save",
     "checkpoint:save:snapshot": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode save -CreateSnapshot",
     "checkpoint:resume": "powershell -ExecutionPolicy Bypass -File .\\resume.ps1 -Mode resume"
