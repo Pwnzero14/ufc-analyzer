@@ -14756,6 +14756,41 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     if (source === 'kd') return ['KD'];
     return [];
   };
+  // ── PERF · the Archive's freeze was 246 million string compares ──────────
+  // resolveVsArchive ran `allRows.find(...)` once per candidate propType, and the
+  // predicate did a Date.parse AND a normalizeName on every row it touched. One
+  // render issues ~3,200 of those calls — 91 placed legs, 91 parlay legs, 811
+  // snapshot picks walked twice (board baseline and selection diagnostics), 1,375
+  // ai-lean picks — against a 38,689-row archive. Worst case a quarter of a
+  // billion predicate evaluations before the first pixel, which is the blank
+  // skeleton you sit through after clicking ARCHIVE.
+  //
+  // The lookup is exact-match on three fields, so it wants a Map, not a scan.
+  // Built once per render, lazily, so a view that never resolves anything pays
+  // nothing for it.
+  //
+  // Two behaviours preserved deliberately, both load-bearing:
+  //  · FIRST row wins for a duplicate key, because `.find` returned the earliest
+  //    row in allRows order and duplicate-event shadow rows are a real thing here.
+  //  · The candidate list stays PRIORITY-ORDERED at the call site below. The index
+  //    keys propType so 'Fantasy' before 'Fantasy_PP' (and 'ctrl' before
+  //    'Control') still resolves in the caller's order, not the archive's.
+  // The date guard and the finite-result guard move into the build, where they
+  // run once per row instead of once per row per call.
+  let _archiveIdx: Map<string, typeof allRows[number]> | null = null;
+  const archiveIdx = (): Map<string, typeof allRows[number]> => {
+    if (_archiveIdx) return _archiveIdx;
+    const m = new Map<string, typeof allRows[number]>();
+    for (const r of allRows) {
+      if (!Number.isFinite(Number(r.result))) continue;
+      const ts = Date.parse(r.date);
+      if (!Number.isFinite(ts) || ts > nowTs) continue;
+      const k = `${eventDedupeKey(r.event || '')}|${normalizeName(r.fighter)?.toLowerCase() || ''}|${String(r.propType)}`;
+      if (!m.has(k)) m.set(k, r);
+    }
+    _archiveIdx = m;
+    return m;
+  };
   // Shared date-guarded resolver — used by the placed ledger, the board
   // baseline, and the parlay ledger so nothing can be graded differently.
   const resolveVsArchive = (evDk: string, fighterRaw: string, candidates: string[], line: number | null, dir: 'over' | 'under'): { outcome: 'hit' | 'miss' | 'pending'; actual: number | null } => {
@@ -14782,17 +14817,12 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     //
     // Now also load-bearing for CTRL, whose candidates are ['ctrl','Control'] —
     // 'ctrl' is the settled row that carries the line and must win.
+    // Same candidate priority as before — the loop order IS the preference, and
+    // the index only replaces the scan inside it.
+    const idx = archiveIdx();
     let match: typeof allRows[number] | undefined;
     for (const want of candidates) {
-      match = allRows.find(r => {
-        const ts = Date.parse(r.date);
-        return eventDedupeKey(r.event || '') === evDk
-          && (normalizeName(r.fighter)?.toLowerCase() || '') === fighterNorm
-          && String(r.propType) === want
-          && Number.isFinite(Number(r.result))
-          && Number.isFinite(ts)
-          && ts <= nowTs;
-      });
+      match = idx.get(`${evDk}|${fighterNorm}|${want}`);
       if (match) break;
     }
     if (!match) return { outcome: 'pending', actual: null };
