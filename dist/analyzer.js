@@ -11518,6 +11518,21 @@ function renderParlayLab(container) {
         const withLeg = analyzeParlayHealth([...selectedLegs, leg], visibleFighters);
         return withLeg.score - baseHealthScore;
     };
+    // ── GLOW-UP 292 — the off-board tier never showed its slip impact ───────
+    // Ranked rows have carried the marginal-delta chip since GLOW-UP 197; grouped
+    // and paired off-board rows hardcoded an empty placeholder and rendered a blank
+    // Δ column. That is the tier where the number matters MOST: these are the sides
+    // the model is against or silent on, so the only honest reason to take one is
+    // what it does to the ticket you are building — and that was the one thing the
+    // row would not say. Same helper for both shapes, same pipeline as the ranked
+    // rows, and it goes quiet when the leg is already in the slip or the slip is
+    // too short to score against.
+    const offMargTag = (leg, alreadySelected) => {
+        const d = alreadySelected ? null : marginalDelta(leg);
+        if (d == null)
+            return '<span class="parlay-leg-marg plr-empty"></span>';
+        return `<span class="parlay-leg-marg ${d > 0 ? 'pos' : d < 0 ? 'neg' : 'flat'}" title="Adding this side would take slip health from ${baseHealthScore} to ${baseHealthScore + d} — correlation with the legs you've already picked included. Priced on this side's best entry; the other books on the row score the same.">${d > 0 ? '▲' : d < 0 ? '▼' : '·'}${d > 0 ? '+' : ''}${d}</span>`;
+    };
     const renderPoolRow = (a) => {
         const key = parlayLegKeyOf(a.leg);
         const sel = parlaySelectedLegs.has(key);
@@ -11695,7 +11710,7 @@ function renderParlayLab(container) {
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
       <span class="plr-market"><span class="plg-books" title="Every book posting this prop. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>
       ${parlayYouTag(head.leg.stat, dir)}
-      ${evTag}<span class="parlay-leg-marg plr-empty"></span>
+      ${evTag}${offMargTag(rowPick.leg, parlaySelectedLegs.has(bestKey))}
       <span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>
     </div>`;
     };
@@ -11748,7 +11763,7 @@ function renderParlayLab(container) {
         const rest = `<span class="plr-market"><span class="plg-books" title="Every book posting this side. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>`
             + parlayYouTag(head.leg.stat, dir)
             + evTag
-            + '<span class="parlay-leg-marg plr-empty"></span>'
+            + offMargTag(pick.leg, parlaySelectedLegs.has(pickKey))
             + `<span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>`;
         // Split, because grid auto-flow places by DOM order and the shared `stat`
         // cell sits BETWEEN the direction column and the market column in the track
