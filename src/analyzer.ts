@@ -9766,8 +9766,27 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const factors = pickDistinctFactors(el.reasons, FACTOR_CAP);
       const factorsAll = pickDistinctFactors(el.reasons, 99);
       const factorMore = Math.max(0, factorsAll.length - factors.length);
+      // ── GLOW-UP 303 · the visible four were an arbitrary prefix ─────────────
+      // pickDistinctFactors is `.slice(0, 4)` — the first four in array order,
+      // which is the lean builder's code-execution order, not importance and not
+      // a balanced sample. So Dolidze's rail reads ✗ DURATION ✗ OPPONENT ✗ MODEL
+      // ✓ STYLE on a pick showing 80% WIN and +100% EV: three visible factors
+      // arguing against a pick the model is confident in, with whatever supports
+      // it inside the +2.
+      //
+      // Reordering the four would be worse, not better. Sorting by contribution
+      // is impossible — reasons carry no magnitude — and sorting for polarity
+      // balance would be manufacturing a summary, either burying real warnings or
+      // inventing reassurance. So the imbalance is DISCLOSED rather than dressed:
+      // the +N chip says what is behind it, and reads ✓2 when the hidden factors
+      // are the supporting ones. A reader who sees three ✗ and a ✓2 knows the
+      // visible rail is not the whole argument; today they could only assume it was.
+      const hiddenFactors = factorsAll.slice(FACTOR_CAP);
+      const hidSup = hiddenFactors.filter(r => factorPolarity(r.icon, el.lean) === 'sup').length;
+      const hidOpp = hiddenFactors.filter(r => factorPolarity(r.icon, el.lean) === 'opp').length;
+      const hidTally = hidSup && hidOpp ? `✓${hidSup} ✗${hidOpp}` : hidSup ? `✓${hidSup}` : hidOpp ? `✗${hidOpp}` : `+${factorMore}`;
       const factorMoreChip = factorMore > 0
-        ? `<span class="bp-factor bp-factor-more" title="${factorMore} further factor${factorMore === 1 ? '' : 's'} behind this pick, hidden to keep the row one line: ${factorsAll.slice(FACTOR_CAP).map(r => reasonHeadline(r.text)).join(' · ').replace(/"/g, '&quot;')}">+${factorMore}</span>`
+        ? `<span class="bp-factor bp-factor-more${hidSup && !hidOpp ? ' hid-sup' : hidOpp && !hidSup ? ' hid-opp' : ''}" title="${factorMore} further factor${factorMore === 1 ? '' : 's'} behind this pick, hidden to keep the row short — ${hidSup} supporting, ${hidOpp} against${hiddenFactors.length - hidSup - hidOpp > 0 ? `, ${hiddenFactors.length - hidSup - hidOpp} context` : ''}. The four shown are the first four the model recorded, not the four that mattered most, so read this chip before concluding the visible rail is the whole argument: ${hiddenFactors.map(r => reasonHeadline(r.text)).join(' · ').replace(/"/g, '&quot;')}">${hidTally}</span>`
         : '';
       // Polarity resolves against el.lean — the raw icon is directional, so an
       // UNDER pick used to render every reason driving it as ✗ (GLOW-UP 184).
