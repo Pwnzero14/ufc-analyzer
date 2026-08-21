@@ -31850,6 +31850,105 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   color: var(--red, #ff5b78);
   border-color: color-mix(in srgb, var(--red, #ff5b78) 38%, transparent);
 }
+
+/* ═══ GLOW-UP 315 · the ledgers as instrumentation ═════════════════════════════
+   The ask was "something futuristic". The trap with that word is seven unrelated
+   effects layered until nothing is readable, on panels whose entire job this
+   session has been legibility. So this is ONE idea applied consistently: these are
+   readouts on an instrument, not rows in a spreadsheet. Structure and light, no
+   noise — every rule below either adds signal or gets out of the way.
+
+   Nothing here changes a layout box, so the row geometry verified over the last
+   several passes is untouched. */
+
+/* ── the panel reads as a housing, not a card ──────────────────────────────── */
+.best-picks-section[data-section-id="placed-ledger"],
+.best-picks-section[data-section-id="parlay-ledger"],
+.best-picks-section[data-section-id="entry-clv"] {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.022) 0%, transparent 42%),
+    var(--panel, rgba(255,255,255,0.02));
+}
+/* Corner brackets — a reticle, drawn in one element each so there is no extra
+   markup and nothing to keep in sync with the content. */
+.best-picks-section[data-section-id="placed-ledger"]::before,
+.best-picks-section[data-section-id="parlay-ledger"]::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background:
+    linear-gradient(90deg, var(--gold, #e0a33e) 0 14px, transparent 14px) 0 0/100% 1px no-repeat,
+    linear-gradient(90deg, var(--gold, #e0a33e) 0 14px, transparent 14px) 100% 0/100% 1px no-repeat,
+    linear-gradient(180deg, var(--gold, #e0a33e) 0 14px, transparent 14px) 0 0/1px 100% no-repeat,
+    linear-gradient(180deg, var(--gold, #e0a33e) 0 14px, transparent 14px) 100% 0/1px 100% no-repeat;
+  opacity: .5;
+}
+
+/* ── the fight group's spine ───────────────────────────────────────────────────
+   309 tied grouped legs with a flat 2px rule. As a lit spine it reads as a bus the
+   legs hang off, which is exactly the relationship: one fight, several positions. */
+.plg-leg.in-group {
+  border-left: none;
+  box-shadow: inset 2px 0 0 -0.5px color-mix(in srgb, var(--accent, #6ee7a8) 34%, transparent);
+}
+.plg-leg.in-group.group-head { box-shadow: inset 2px 0 0 -0.5px var(--accent, #6ee7a8); }
+.plg-leg.in-group.group-head::before {
+  content: ''; position: absolute; left: -1px; top: 50%; width: 5px; height: 5px;
+  transform: translateY(-50%); border-radius: 50%;
+  background: var(--accent, #6ee7a8);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent, #6ee7a8) 70%, transparent);
+}
+.plg-leg { position: relative; }
+
+/* ── settled status as a lit indicator ─────────────────────────────────────────
+   A hit and a miss were two flat pills differing only in hue. Lit from within they
+   separate at a glance down a 99-row column, which is how this list is actually
+   read — scanning for the misses. */
+.plg-status.hit {
+  box-shadow: inset 0 0 12px -6px var(--green, #26d07c), 0 0 0 1px color-mix(in srgb, var(--green, #26d07c) 22%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--green, #26d07c) 45%, transparent);
+}
+.plg-status.miss {
+  box-shadow: inset 0 0 12px -6px var(--red, #ff5b78), 0 0 0 1px color-mix(in srgb, var(--red, #ff5b78) 20%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--red, #ff5b78) 40%, transparent);
+}
+.plg-status.pending { opacity: .55; }
+
+/* CLV carries a directional sweep — the gradient runs the way the line moved, so
+   the chip's shape says which way before the arrow is read. */
+.plg-clv.pos { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--green, #26d07c) 14%, transparent)); }
+.plg-clv.neg { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--red, #ff5b78) 13%, transparent)); }
+
+/* ── event header as a channel bar ─────────────────────────────────────────── */
+.plg-ev-head {
+  position: relative;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold, #e0a33e) 9%, transparent), transparent 60%);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.plg-ev-name { letter-spacing: .08em; }
+
+/* ── parlay slips as modules ───────────────────────────────────────────────── */
+.plp-parlay {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent 60%);
+  border-radius: 5px;
+}
+.plp-parlay:hover { background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent 70%); }
+.plp-head { letter-spacing: .05em; }
+.plp-title { text-shadow: 0 0 10px rgba(255,255,255,0.12); }
+
+/* ── staggered reveal ──────────────────────────────────────────────────────────
+   Per-row --plg-i stamped in JS, never nth-child: these rows live in one container
+   PER EVENT, so a global nth-child would restart the count at every event header
+   and the cascade would visibly reset mid-list. Capped so a 99-leg ledger does not
+   take three seconds to finish arriving. */
+@keyframes plgIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+.plg-leg, .plp-parlay {
+  animation: plgIn .26s cubic-bezier(.2,.7,.3,1) both;
+  animation-delay: calc(var(--plg-i, 0) * 14ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .plg-leg, .plp-parlay { animation: none; }
+}
 </style>
 </head>
 <body>
