@@ -14805,6 +14805,7 @@ async function renderArchivePanel(container) {
           <span class="bps-vs">${r.opponent ? `vs ${r.opponent}` : ''}</span>
           <span class="plc-book-cell">${r.bookLabel ? `<span class="plg-book ${bookTone(r.book)}">${r.bookLabel}</span>` : ''}</span>
           <span class="plc-tag">${groupTag}</span>
+          <span class="plc-gap"></span>
           <span class="plc-clv">${clvHtml}</span>
           <span class="plc-actual">${actualHtml}</span>
           <span class="plc-status">${status}</span>
@@ -14816,7 +14817,7 @@ async function renderArchivePanel(container) {
             const colHead = `<div class="plg-leg plg-colhead">
         <span class="plc-name">FIGHTER</span><b class="bps-dir">SIDE</b><span class="bps-line">LINE</span>
         <i class="bps-stat">STAT</i><span class="bps-vs">OPPONENT</span><span class="plc-book-cell">BOOK</span>
-        <span class="plc-tag"></span><span class="plc-clv">ENTRY → CLOSE</span>
+        <span class="plc-tag"></span><span class="plc-gap"></span><span class="plc-clv">ENTRY → CLOSE</span>
         <span class="plc-actual">ACTUAL</span><span class="plc-status">RESULT</span>
       </div>`;
             return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${colHead}${rows}</div>`;

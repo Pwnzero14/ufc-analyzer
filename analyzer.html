@@ -32074,6 +32074,37 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px 104px 70px 62px; gap: 6px; }
   .plg-leg .bps-vs { display: none; }
 }
+
+/* ── GLOW-UP 318 · the columns were right, the widths were not ────────────────
+   317 gave fighter 1.5fr and opponent 1fr, so on a ~1850px panel they split ~1250px
+   of slack between them: names ending at x=250 inside a column running to x=760,
+   and 330px of dead air before BOOK. Correct structure, wrong distribution — the
+   flexible tracks were absorbing space nobody asked them to hold.
+
+   Both are capped at what their content actually needs, and the slack moves to an
+   explicit gap cell before the trailing three. Those stay pinned to the panel edge,
+   so the right-hand rule of results survives while the left block tightens into
+   something scannable. */
+.plg-leg {
+  grid-template-columns:
+    minmax(130px, 260px)  /* fighter  — floor unchanged, now with a ceiling */
+    46px                  /* side     */
+    54px                  /* line     */
+    46px                  /* stat     */
+    minmax(0, 210px)      /* opponent — still the shrink victim, no longer greedy */
+    92px                  /* book     */
+    46px                  /* N legs   */
+    minmax(0, 1fr)        /* slack    — collects everything the table does not need */
+    108px                 /* entry → close */
+    76px                  /* actual   */
+    66px;                 /* result   */
+}
+@media (max-width: 1500px) {
+  .plg-leg { grid-template-columns: minmax(120px,240px) 44px 52px 44px minmax(0,190px) 88px minmax(0,1fr) 108px 74px 64px; }
+}
+@media (max-width: 1180px) {
+  .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px minmax(0,1fr) 104px 70px 62px; gap: 6px; }
+}
 </style>
 </head>
 <body>
