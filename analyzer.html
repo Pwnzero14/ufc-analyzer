@@ -30971,7 +30971,27 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 }
 /* Identity keeps its own flex run — avatar, name, then however many tags this
    leg happens to carry. It is the ONLY cell allowed to be elastic. */
-.plr-id { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.plr-id {
+  display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;
+  /* GLOW-UP 287: makes the cell queryable by its own width, so the `vs` label can
+     be dropped OUTRIGHT when the cell is tight rather than ellipsized into `v…`. */
+  container-type: inline-size;
+}
+/* ── GLOW-UP 287 · a truncated opponent label is not a smaller opponent label ──
+   283 gave `vs` a shrink factor of 60 so it would yield before the name. It does
+   — but it yields by ELLIPSIZING, and `v…` is 12px of pure noise that still holds
+   its place in the row. On a narrow pool the sequence was: `vs` grinds down to
+   `v…`, and only THEN does the name start losing characters, so the reader ends
+   up with `Kennedy Nzechuk...` sitting next to a label that says nothing.
+
+   Below the width where the label can still carry a readable surname it is
+   removed entirely, which hands the name ~70px in one step instead of bleeding it
+   away. The opponent stays on the row's other affordances — the fight is in the
+   paired sides, the tooltip, and the slip. The name is the one thing that has no
+   substitute. */
+@container (max-width: 272px) {
+  .plr-id .parlay-leg-vs { display: none; }
+}
 /* ── GLOW-UP 271 · a long name grew the row ────────────────────────────────
    `Reinier De Ridder` wrapped to a second line and took his row to 62px against
    the 54px every other row held. Uniform height is what makes a long list feel
