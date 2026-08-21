@@ -11710,7 +11710,7 @@ function renderParlayLab(container) {
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
       <span class="plr-market"><span class="plg-books" title="Every book posting this prop. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>
       ${parlayYouTag(head.leg.stat, dir)}
-      ${evTag}${offMargTag(rowPick.leg, parlaySelectedLegs.has(bestKey))}
+      ${evTag}${offMargTag(rowPick.leg, selected.length > 0)}
       <span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>
     </div>`;
     };
@@ -11763,7 +11763,12 @@ function renderParlayLab(container) {
         const rest = `<span class="plr-market"><span class="plg-books" title="Every book posting this side. Confidence and EV are the same whichever you take — only the number moves.">${chips}</span></span>`
             + parlayYouTag(head.leg.stat, dir)
             + evTag
-            + offMargTag(pick.leg, parlaySelectedLegs.has(pickKey))
+            // GLOW-UP 293: keyed on whether ANY book on this side is in the slip, not on
+            // whether the row's default pick happens to be. Taking PP 50.5 rather than the
+            // best-value UD 47.5 left the side reading `·0` — an invitation to add a side
+            // already held — while sides taken at their default pick correctly showed
+            // nothing. The side is the unit here; which book you took is not.
+            + offMargTag(pick.leg, nSel > 0)
             + `<span class="parlay-leg-conf">${head.leg.confidence}%<i class="plc-bar"><b style="width:${Math.min(100, Math.max(8, head.leg.confidence))}%"></b></i></span>`;
         // Split, because grid auto-flow places by DOM order and the shared `stat`
         // cell sits BETWEEN the direction column and the market column in the track
