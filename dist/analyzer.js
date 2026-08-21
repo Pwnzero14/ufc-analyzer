@@ -11522,13 +11522,10 @@ function renderParlayLab(container) {
         const key = parlayLegKeyOf(a.leg);
         const sel = parlaySelectedLegs.has(key);
         const mDelta = sel ? null : marginalDelta(a.leg);
-        const mTag = mDelta != null
-            ? `<span class="parlay-leg-marg ${mDelta > 0 ? 'pos' : mDelta < 0 ? 'neg' : 'flat'}" title="Adding this leg would take slip health from ${baseHealthScore} to ${baseHealthScore + mDelta} — correlation with the legs you've already picked included. A strong leg can still score negative here if it rides a fight you're already on.">${mDelta > 0 ? '▲' : mDelta < 0 ? '▼' : '·'}${mDelta > 0 ? '+' : ''}${mDelta}</span>`
-            : '<span class="parlay-leg-marg plr-empty"></span>';
         const legFightKey = legFightKeyOf(a.leg);
         const inSlipFight = !sel ? (slipFightCount.get(legFightKey) || 0) : 0;
         const vsTag = a.leg.opponent
-            ? `<span class="parlay-leg-vs${inSlipFight ? ' shared' : ''}" title="${inSlipFight ? `Your slip already has ${inSlipFight} leg${inSlipFight === 1 ? '' : 's'} on this fight — adding this one stakes the same outcome again rather than diversifying. The marginal health delta already prices it.` : `Opponent: ${prettyName(a.leg.opponent)}`}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}${inSlipFight ? ` <i>↺${inSlipFight}</i>` : ''}</span>`
+            ? `<span class="parlay-leg-vs${inSlipFight ? ' shared' : ''}" title="Opponent: ${prettyName(a.leg.opponent)}">vs ${prettyName(a.leg.opponent).split(' ').slice(-1)[0]}</span>`
             : '';
         const conflict = sel ? null : conflictsWithSlip(a.leg);
         // GLOW-UP 191 (L1): only look for synergy when there's no conflict — a leg
@@ -11561,8 +11558,30 @@ function renderParlayLab(container) {
         // `Shamil Gazi...`. Same trade the `off-board` tag lost in 281 — the word
         // duplicates the icon, and the sentence that actually explains the
         // relationship was always in the tooltip, never on the row.
-        const warnTag = conflict ? `<span class="parlay-leg-warn" title="Conflicts with your slip. ${conflict.replace(/"/g, '&quot;')}">✗</span>` : '';
-        const synTag = synergy ? `<span class="parlay-leg-syn" title="Synergy with your slip. ${synergy.replace(/"/g, '&quot;')}">🔗</span>` : '';
+        // ── GLOW-UP 290 — three ways of saying what the Δ chip already says ───
+        // `🔗 synergy`, `✗ vs slip` and the `↺N` suffix on the opponent label are all
+        // answers to one question: what does adding this leg do to the slip I have?
+        // The Δ column answers exactly that, numerically, and only exists when a slip
+        // does — the same condition all three of these flags need. So they were three
+        // extra objects in the identity cell restating the sign of a number two
+        // columns over.
+        //
+        // It is not merely redundant, it is the thing that broke the cell. Measured at
+        // the real window width, two-column, slip live: identity 249px against a
+        // worst-case 304px once a row carries `vs Rodrigues ↺2`, the placed dot and
+        // 🔗 — a 55px deficit, which is why `Anthony Hernand...` and `Shamil Gazi...`
+        // truncated while their neighbours did not. Folding all three into the Δ chip
+        // returns ~48px to identity and leaves it holding identity alone.
+        const warnTag = '';
+        const synTag = '';
+        const slipRelCls = `${conflict ? ' is-conflict' : ''}${synergy ? ' is-syn' : ''}${inSlipFight ? ' is-samefight' : ''}`;
+        const slipRelIcon = conflict ? '✗' : synergy ? '🔗' : inSlipFight ? '↺' : '';
+        const slipRelWhy = (conflict ? ` ✗ CONFLICT: ${conflict}` : '')
+            + (synergy ? ` 🔗 SYNERGY: ${synergy}` : '')
+            + (inSlipFight ? ` ↺ Your slip already holds ${inSlipFight} leg${inSlipFight === 1 ? '' : 's'} on this fight — adding this one stakes the same outcome again rather than diversifying, and the delta already prices it.` : '');
+        const mTag = mDelta != null
+            ? `<span class="parlay-leg-marg ${mDelta > 0 ? 'pos' : mDelta < 0 ? 'neg' : 'flat'}${slipRelCls}" title="${`Adding this leg would take slip health from ${baseHealthScore} to ${baseHealthScore + mDelta} — correlation with the legs you've already picked included.${slipRelWhy}`.replace(/"/g, '&quot;')}">${slipRelIcon}${mDelta > 0 ? '▲' : mDelta < 0 ? '▼' : '·'}${mDelta > 0 ? '+' : ''}${mDelta}</span>`
+            : '<span class="parlay-leg-marg plr-empty"></span>';
         // EV was already computed for the pool's EV sort but never shown — the sort
         // ranked by a number the row didn't display.
         const evTag = legEv != null
