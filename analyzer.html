@@ -32105,6 +32105,38 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 @media (max-width: 1180px) {
   .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px minmax(0,1fr) 104px 70px 62px; gap: 6px; }
 }
+
+/* ── GLOW-UP 319 · the slack was in the middle of the table ───────────────────
+   318 capped the flexible columns and parked the leftover in a gap cell before the
+   trailing three, so those stayed pinned to the panel edge. On an 1850px panel the
+   table only needs ~1200px, which put ~650px of nothing between "4 legs" and
+   "ENTRY → CLOSE" — a hole through the middle of every row.
+
+   The slack moves to the END. The table left-packs, the columns still align down
+   the page (that was never about where the trailing block sits, only that it sits
+   in the same place on every row), and the leftover reads as page margin instead
+   of a gap. The caps also loosen, since there is room to spend and the earlier
+   problem was distribution rather than size. */
+.plg-leg {
+  grid-template-columns:
+    minmax(130px, 300px)  /* fighter  */
+    46px                  /* side     */
+    54px                  /* line     */
+    46px                  /* stat     */
+    minmax(0, 240px)      /* opponent */
+    92px                  /* book     */
+    46px                  /* N legs   */
+    112px                 /* entry → close */
+    78px                  /* actual   */
+    66px                  /* result   */
+    minmax(0, 1fr);       /* margin   */
+}
+@media (max-width: 1500px) {
+  .plg-leg { grid-template-columns: minmax(120px,260px) 44px 52px 44px minmax(0,200px) 88px 108px 74px 64px minmax(0,1fr); }
+}
+@media (max-width: 1180px) {
+  .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px 104px 70px 62px minmax(0,0.001fr); gap: 6px; }
+}
 </style>
 </head>
 <body>
