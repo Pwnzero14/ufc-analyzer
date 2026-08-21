@@ -31720,6 +31720,19 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .best-picks-grid {
   grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
 }
+
+/* ── GLOW-UP 303 · what the hidden factors were ───────────────────────────────
+   Tinted toward the polarity it is hiding, so a rail showing three ✗ beside a
+   green ✓2 reads as incomplete rather than as a verdict. Kept dashed and dimmer
+   than a real factor chip: it is still a pointer, not a factor. */
+.bp-factor.bp-factor-more.hid-sup {
+  color: var(--green, #26d07c);
+  border-color: color-mix(in srgb, var(--green, #26d07c) 40%, transparent);
+}
+.bp-factor.bp-factor-more.hid-opp {
+  color: var(--red, #ff5b78);
+  border-color: color-mix(in srgb, var(--red, #ff5b78) 40%, transparent);
+}
 </style>
 </head>
 <body>
