@@ -31743,6 +31743,57 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 /* With both halves carrying their own colour the chip must not tint them. */
 .bp-factor.bp-factor-more.hid-sup i.hm-sup,
 .bp-factor.bp-factor-more.hid-opp i.hm-opp { color: inherit; }
+
+/* ══ GLOW-UP 305-310 · the ledgers ══════════════════════════════════════════ */
+
+/* 305 — containment. Rose for the contained slip because it is the one carrying a
+   false sense of a second bet; amber on the container, which is information rather
+   than a warning. The slip that is inside another is also dimmed at the card level
+   so a scan down the ledger finds it without reading badges. */
+.plp-contain {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+  letter-spacing: .06em; padding: 1px 5px; border-radius: 3px; cursor: help;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.plp-contain.inside {
+  color: var(--red, #ff5b78);
+  border-color: color-mix(in srgb, var(--red, #ff5b78) 42%, transparent);
+  background: color-mix(in srgb, var(--red, #ff5b78) 10%, transparent);
+}
+.plp-contain.holds {
+  color: var(--warn, #e0a33e);
+  border-color: color-mix(in srgb, var(--warn, #e0a33e) 38%, transparent);
+}
+.plp-parlay.is-inside { border-left: 2px solid color-mix(in srgb, var(--red, #ff5b78) 45%, transparent); }
+
+/* 306 — a leg carrying more than one slip. Sits on the leg, not the header: when
+   you read down a busted slip looking for what hurt, this is the row that matters. */
+.plp-shared {
+  font-style: normal; font-size: 8px; font-weight: 700;
+  color: var(--warn, #e0a33e); margin-left: 3px; cursor: help;
+  font-variant-numeric: tabular-nums;
+}
+.plp-leg.is-shared { background: color-mix(in srgb, var(--warn, #e0a33e) 7%, transparent); border-radius: 3px; }
+
+/* 307 — one leg away. Toned BACK from a full bust rather than up: the point is that
+   these two outcomes are not the same, and the near miss is the one that says the
+   read was right and the slip was too long. */
+.plg-status.miss.near { opacity: .92; }
+.plg-status.miss.near i {
+  font-style: normal; font-size: 8px; font-weight: 700;
+  opacity: .8; margin-left: 2px;
+}
+
+/* 309 — legs on one fight, now adjacent. A hairline rule ties the group without
+   drawing a box around it; the count rides the first row only. */
+.plg-leg.in-group { border-left: 2px solid color-mix(in srgb, var(--accent, #6ee7a8) 22%, transparent); padding-left: 6px; }
+.plg-leg.in-group.group-head { margin-top: 4px; }
+.plg-fight-n {
+  font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .04em;
+  color: var(--warn, #e0a33e); margin-left: 6px; cursor: help;
+  padding: 0 4px; border-radius: 3px;
+  background: color-mix(in srgb, var(--warn, #e0a33e) 12%, transparent);
+}
 </style>
 </head>
 <body>

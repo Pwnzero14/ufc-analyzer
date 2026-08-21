@@ -14571,19 +14571,56 @@ async function renderArchivePanel(container) {
             const evSummary = evSettled
                 ? `<span class="plg-ev-record ${youRate != null && (boardRate == null || youRate >= boardRate) ? 'good' : 'bad'}" title="Your placed legs for this event: ${evHits}/${evSettled} hit${boardRate != null ? ` · board baseline ${Math.round(boardRate * 100)}%` : ''}">YOU ${evHits}/${evSettled}</span>${boardChip}`
                 : `<span class="plg-ev-record">all pending</span>${boardChip}`;
-            const rows = e.legs.map(l => {
+            // ── GLOW-UP 309 · your exposure is per FIGHT, and the ledger hid it ──────
+            // Legs render in storage-key order, which reads alphabetically by fighter. So
+            // Anthony Hernandez sits at row 1 and Gregory Rodrigues — the other half of
+            // the same fight — at row 11, and the three legs you hold on one fight are
+            // scattered down a 40-row list. Correlation is the whole reason to look at a
+            // ledger rather than a bet slip, and this was the one view that could show it.
+            // Sorted by fight, then by fighter so the order inside a group is stable.
+            const fightKeyOf = (r) => [String(r.name || '').toLowerCase(), String(r.opponent || '').toLowerCase()].sort().join('|');
+            const fightCount = new Map();
+            for (const l of e.legs) {
+                const k = fightKeyOf(l.rec);
+                fightCount.set(k, (fightCount.get(k) || 0) + 1);
+            }
+            const sortedLegs = [...e.legs].sort((a, b) => {
+                const ka = fightKeyOf(a.rec), kb = fightKeyOf(b.rec);
+                if (ka !== kb)
+                    return ka < kb ? -1 : 1;
+                return String(a.rec.name).localeCompare(String(b.rec.name));
+            });
+            let lastFight = '';
+            const rows = sortedLegs.map(l => {
                 const r = l.rec;
+                const fk = fightKeyOf(r);
+                const nFight = fightCount.get(fk) || 1;
+                const isGroupHead = fk !== lastFight;
+                lastFight = fk;
                 const unit = r.source === 'ft' ? 'm' : '';
                 const status = l.outcome === 'hit'
                     ? `<span class="plg-status hit" title="Settled: actual ${l.actual}${unit} vs line ${r.line} — your ${r.dir} hit">✓ HIT</span>`
                     : l.outcome === 'miss'
                         ? `<span class="plg-status miss" title="Settled: actual ${l.actual}${unit} vs line ${r.line} — your ${r.dir} missed">✗ MISS</span>`
-                        : `<span class="plg-status pending" title="No settled archive result for this prop yet">○ PENDING</span>`;
+                        // GLOW-UP 308: when NOTHING in the event has settled, the event header
+                        // already says "all pending" and these repeat it once per row — on the live
+                        // card that is forty identical grey chips down the right edge, a column of
+                        // pure repetition where the settled events carry real results. Rendered
+                        // only when the event is mixed, i.e. when pending actually distinguishes
+                        // this leg from its neighbours.
+                        : evSettled > 0
+                            ? `<span class="plg-status pending" title="No settled archive result for this prop yet">○ PENDING</span>`
+                            : '';
                 const actualHtml = l.actual != null
                     ? `<span class="plg-actual">actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
                     : '';
-                return `<div class="plg-leg">
-          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span></span>
+                // GLOW-UP 309: the count rides the FIRST row of each group, so a fight you
+                // are three legs deep on announces itself once instead of tagging every row.
+                const groupTag = isGroupHead && nFight > 1
+                    ? `<i class="plg-fight-n" title="You hold ${nFight} legs on this one fight. They share a duration and a pace, so they are not independent — an early finish, or a slow round, moves all ${nFight} together.">${nFight} legs</i>`
+                    : '';
+                return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}">
+          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span>${groupTag}</span>
           ${actualHtml}${status}
         </div>`;
             }).join('');
@@ -14647,7 +14684,38 @@ async function renderArchivePanel(container) {
         let count = 0, cashed = 0, settledSlips = 0;
         const html = evs.map(e => {
             const evDk = eventDedupeKey(e.evKey);
-            const cards = e.list.map(p => {
+            // ── GLOW-UP 305/306 · slips are not independent, and the ledger said nothing
+            // Two facts live ACROSS slips, so no per-slip renderer could ever surface
+            // them, and this ledger only ever rendered one slip at a time:
+            //
+            //  1. CONTAINMENT. On the live card the 4-leg Betr slip's legs are all four
+            //     inside the 7-leg Betr slip. That is not two bets — it is one bet plus a
+            //     rider. Every leg that busts the small one busts the big one too, so the
+            //     "diversification" of holding both is entirely illusory.
+            //  2. SHARED LEGS. Vitor Petrino OVER 73.5 FP sits in three separate slips.
+            //     One prop missing takes all three down, and nothing on screen said so.
+            //
+            // Both are computed once per event, before any card renders.
+            const legKeyOf = (l) => `${String(l.fighter || '').toLowerCase()}|${l.dir}|${l.line}|${l.stat}`;
+            const slipSets = e.list.map(p => new Set((p.legs || []).map(legKeyOf)));
+            const legSlipCount = new Map();
+            for (const set of slipSets)
+                for (const k of set)
+                    legSlipCount.set(k, (legSlipCount.get(k) || 0) + 1);
+            // Strictly smaller AND fully contained. Equal-size duplicates are a different
+            // problem (the same slip placed twice) and would report each as inside the other.
+            const insideOf = slipSets.map((set, i) => {
+                for (let j = 0; j < slipSets.length; j++) {
+                    if (i === j)
+                        continue;
+                    const other = slipSets[j];
+                    if (set.size < other.size && [...set].every(k => other.has(k)))
+                        return j;
+                }
+                return -1;
+            });
+            const containsIdx = slipSets.map((_, i) => insideOf.reduce((a, v, j) => (v === i ? [...a, j] : a), []));
+            const cards = e.list.map((p, pi) => {
                 count++;
                 const legs = (p.legs || []).map(l => {
                     const dir = l.dir === 'OVER' ? 'over' : 'under';
@@ -14666,11 +14734,23 @@ async function renderArchivePanel(container) {
                 const statusChip = anyPending
                     ? `<span class="plg-status pending" title="${legs.length - settledN} leg(s) not settled yet">○ ${settledN}/${legs.length} SETTLED</span>`
                     : anyMiss
-                        ? `<span class="plg-status miss" title="${legs.length - hitN} leg(s) missed — the full slip busts (in-app partial pick'em payouts may still apply)">✗ BUST ${hitN}/${legs.length}</span>`
+                        // GLOW-UP 307: a slip one leg from cashing and a slip that missed
+                        // everything both read "✗ BUST" in the same weight. The near miss is the
+                        // more informative outcome of the two — it says the read was right and the
+                        // slip was too long — so it now says so and is toned back from the full
+                        // bust rather than shouting equally.
+                        ? `<span class="plg-status miss${legs.length - hitN === 1 ? ' near' : ''}" title="${legs.length - hitN} leg(s) missed — the full slip busts (in-app partial pick'em payouts may still apply).${legs.length - hitN === 1 ? ` ONE leg away: ${hitN} of ${legs.length} landed. The read was right and the slip was one leg too long — worth checking whether that leg was the one you were least sure of.` : ''}">✗ BUST ${hitN}/${legs.length}${legs.length - hitN === 1 ? ' <i>1 away</i>' : ''}</span>`
                         : `<span class="plg-status hit" title="All ${legs.length} legs hit — slip cashes">✓ CASH ${hitN}/${legs.length}</span>`;
                 const legRows = legs.map(x => {
                     const st = x.outcome === 'hit' ? '<span class="plp-mini hit">✓</span>' : x.outcome === 'miss' ? '<span class="plp-mini miss">✗</span>' : '<span class="plp-mini pending">○</span>';
-                    return `<span class="plp-leg">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat">${x.l.statLabel}</i></span>`;
+                    // GLOW-UP 306: this exact leg also carries other slips. Marked ON the leg
+                    // rather than only summarised on the header, because when you are reading
+                    // down a slip deciding what hurt, the shared one is the row that matters.
+                    const shared = legSlipCount.get(legKeyOf(x.l)) || 1;
+                    const sharedTag = shared > 1
+                        ? `<i class="plp-shared" title="This same leg is in ${shared} of your slips for this event. They are not independent bets — if this prop misses, all ${shared} die together.">×${shared}</i>`
+                        : '';
+                    return `<span class="plp-leg${shared > 1 ? ' is-shared' : ''}">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat">${x.l.statLabel}</i>${sharedTag}</span>`;
                 }).join('');
                 // Plain-text summary for the confirm dialog — the user should see exactly
                 // which slip they are about to drop, not just "this parlay".
@@ -14679,7 +14759,17 @@ async function renderArchivePanel(container) {
                     .join('  +  ');
                 const esc = (x) => String(x).replace(/"/g, '&quot;');
                 const removeBtn = `<button class="plp-remove" data-plp-ev="${esc(e.evKey)}" data-plp-id="${esc(String(p.id))}" data-plp-sum="${esc(legSummary)}" title="Remove this parlay from the ledger — use when the book voided it (a fight falling off the card) or it was placed by mistake. Re-place from Parlay Lab if needed.">✕</button>`;
-                return `<div class="plp-parlay"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
+                // GLOW-UP 305: the containment badge. Deliberately on BOTH slips — from the
+                // small one you need to know it buys you nothing the big one didn't already
+                // have; from the big one you need to know a second slip dies with it.
+                const inIdx = insideOf[pi] ?? -1;
+                const holds = containsIdx[pi] || [];
+                const containTag = inIdx >= 0
+                    ? `<span class="plp-contain inside" title="Every leg of this slip is also in your ${e.list[inIdx]?.legs.length}-leg slip. These are not two independent bets — anything that busts this one busts that one too, so holding both concentrates the same position rather than spreading it.">⊂ INSIDE ${e.list[inIdx]?.legs.length}-LEG</span>`
+                    : holds.length
+                        ? `<span class="plp-contain holds" title="${holds.length} smaller slip${holds.length === 1 ? '' : 's'} (${holds.map(j => `${e.list[j]?.legs.length}-leg`).join(', ')}) sit entirely inside this one — they cannot cash unless this one's shared legs do, so they add exposure to the same position rather than diversifying it.">⊃ HOLDS ${holds.length}</span>`
+                        : '';
+                return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
             }).join('');
             return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
         }).join('');
