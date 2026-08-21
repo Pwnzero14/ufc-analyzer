@@ -974,10 +974,38 @@ function storageGet(keys) {
         return Promise.resolve({});
     return new Promise((resolve) => chrome.storage.local.get(keys, (data) => resolve(data)));
 }
+// A failed write used to be indistinguishable from a successful one: the callback
+// resolved without ever reading chrome.runtime.lastError, so `await storageSet(...)`
+// returned normally whether or not anything was stored.
+//
+// That turned a full quota into a ghost. Storage sat at 9.94MB against the 10MB
+// default; every ○ PLACE click rewrote the whole placed store, went over, was
+// rejected, and reported success — the in-memory Map updated, the row re-rendered
+// (the "flicker"), and the next read showed the leg unplaced again. The catch in
+// persistBestPicksPlaced never fired because nothing ever threw.
+//
+// Fixed at the root rather than per-caller: ~50 call sites share this wrapper, and
+// any of them could have been losing writes the same way. Still resolves rather
+// than rejecting — callers await this without try/catch and a reject would turn a
+// lost write into a broken render — but it can no longer do so silently.
 function storageSet(values) {
     if (typeof chrome === 'undefined' || !chrome.storage)
         return Promise.resolve();
-    return new Promise((resolve) => chrome.storage.local.set(values, () => resolve()));
+    return new Promise((resolve) => chrome.storage.local.set(values, () => {
+        const err = chrome.runtime?.lastError;
+        if (err) {
+            const keys = Object.keys(values).join(', ');
+            console.error(`[storage] WRITE FAILED for ${keys}: ${err.message}`);
+            const quota = /quota/i.test(err.message || '');
+            try {
+                showToast(quota
+                    ? `⚠ STORAGE FULL — "${keys}" was NOT saved. Back up, then clear space.`
+                    : `⚠ Save failed for "${keys}" — ${err.message}`);
+            }
+            catch { /* toast unavailable this early — the console line still lands */ }
+        }
+        resolve();
+    }));
 }
 function storageRemove(keys) {
     if (typeof chrome === 'undefined' || !chrome.storage)
