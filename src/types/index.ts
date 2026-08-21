@@ -364,6 +364,10 @@ export interface StatPrediction {
    *  because predictions stored before v28 predate the field; the panel falls back
    *  to parsing the reason string. */
   sampleSize?: number;
+  /** MODEL v31 - the model's own number before it was pulled toward the fair
+   *  line. Present only when the +/-15 cap actually bit, so the UI can mark the
+   *  row and show what the model wanted to say. See applyMarketAnchor. */
+  anchoredFrom?: number;
 }
 
 export interface PropPrediction {

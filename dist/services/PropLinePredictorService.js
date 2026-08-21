@@ -326,6 +326,25 @@ export class PropLinePredictorService {
         const shift = (n * empirical + SHRINK_K * MEASURED_DEFAULT) / (n + SHRINK_K);
         return { shift, sampleCount: n };
     }
+    static applyMarketAnchor(fantasy, postedLine, shift) {
+        if (postedLine == null || !Number.isFinite(postedLine) || !Number.isFinite(shift))
+            return fantasy;
+        const fair = postedLine + shift;
+        const cap = this.FP_GAP_CAP;
+        const gap = fantasy.line - fair;
+        if (Math.abs(gap) <= cap)
+            return fantasy;
+        const anchored = round1(clamp(fair + Math.sign(gap) * cap, 5, 250));
+        return {
+            ...fantasy,
+            line: anchored,
+            anchoredFrom: fantasy.line,
+            reasons: [
+                ...fantasy.reasons,
+                `Anchored to market: model said ${fantasy.line.toFixed(1)}, ${Math.abs(gap).toFixed(1)} from the fair line ${fair.toFixed(1)} — capped at ${cap}`,
+            ],
+        };
+    }
     static computeBookPriorFP(archive, fighter) {
         const MIN_BOOK_SAMPLES = 5;
         const RECENCY_DAYS = 730;
@@ -1049,4 +1068,41 @@ export class PropLinePredictorService {
         return learningResult;
     }
 }
+/**
+ * MODEL v31 — the model may disagree with the fair line, but only so far.
+ *
+ * v30 fixed WHERE the gap is measured from. This fixes HOW BIG the gap is
+ * allowed to be, which turned out to be the larger error.
+ *
+ * Measured on 133 strict same-event joins of a stored prediction to a settled
+ * outcome (8 cards, model versions 7-22), bucketed by the gap between the
+ * model and the fair line:
+ *
+ *   gap        n    over%   MAE model   MAE fair line
+ *   below 0    63    43%      36.7          32.1
+ *   0..+15     36    33%      28.4          27.3
+ *   +15..+30   15    47%      39.3          37.5
+ *   +30 up     19    37%      48.8          32.7
+ *
+ * Two things to read there. The model is beaten by the bare line in every
+ * bucket, and it is beaten WORST exactly where it disagrees most — a 48.8 MAE
+ * against the line's 32.7 on the rows the board was presenting as its biggest
+ * edges. And the over-rate never clears 50% in any bucket: across the 70 rows
+ * where the model called OVER, the prop went over 26 times, 37%.
+ *
+ * So the distance between the model and the line is not signal. Capping it
+ * improves accuracy monotonically (MAE 36.5 uncapped -> 33.0 at +/-15 -> 31.5
+ * at zero), but a zero cap makes the board mute, so this keeps a +/-15 voice:
+ * wide enough to be a real fantasy edge (a takedown is 5 points), narrow
+ * enough that the +47s stop being manufactured.
+ *
+ * Symmetric on purpose. The model loses to the line on the under side too
+ * (36.7 against 32.1), so there is no case for a one-sided cap.
+ *
+ * Caveat, stated because it is load-bearing: every stored prediction with a
+ * settled result comes from MODEL v7-v22, the only versions old enough to have
+ * been graded. The MAE ordering is consistent and large, but it has not been
+ * confirmed on a v31 board, and cannot be until one settles.
+ */
+PropLinePredictorService.FP_GAP_CAP = 15;
 //# sourceMappingURL=PropLinePredictorService.js.map
