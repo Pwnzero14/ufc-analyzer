@@ -15050,6 +15050,19 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         return String(a.rec.name).localeCompare(String(b.rec.name));
       });
       let lastFight = '';
+      // GLOW-UP 316: the design system defines --book-* and --stat-* hues and the
+      // rest of the app uses them; both ledgers rendered every book and every stat
+      // in the same grey. These map the stored keys onto the existing tokens — no
+      // new colours, just the ones this codebase already committed to.
+      const bookTone = (bk: string | null | undefined): string => {
+        const k = String(bk || '').toLowerCase();
+        return k === 'pick6' ? 'bk-p6'
+          : k === 'underdog' ? 'bk-ud'
+          : k === 'prizepicks' ? 'bk-pp'
+          : k === 'betr' ? 'bk-betr'
+          : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk'
+          : '';
+      };
       const rows = sortedLegs.map((l, rowI) => {
         const r = l.rec;
         const fk = fightKeyOf(r);
@@ -15101,7 +15114,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           ? `<i class="plg-fight-n" title="You hold ${nFight} legs on this one fight. They share a duration and a pace, so they are not independent — an early finish, or a slow round, moves all ${nFight} together.">${nFight} legs</i>`
           : '';
         return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" style="--plg-i:${Math.min(rowI, 28)}">
-          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book">@ ${r.bookLabel}</span>${groupTag}</span>
+          <span class="plg-leg-main">${r.pretty} <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b> <span class="bps-line">${r.line ?? '—'}</span> <i class="bps-stat st-${r.source}">${r.statLabel}</i>${r.opponent ? `<span class="bps-vs"> vs ${r.opponent}</span>` : ''} <span class="plg-book ${bookTone(r.book)}">${r.bookLabel}</span>${groupTag}</span>
           ${clvHtml}${actualHtml}${status}
         </div>`;
       }).join('');
@@ -15224,7 +15237,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           const sharedTag = shared > 1
             ? `<i class="plp-shared" title="This same leg is in ${shared} of your slips for this event. They are not independent bets — if this prop misses, all ${shared} die together.">×${shared}</i>`
             : '';
-          return `<span class="plp-leg${shared > 1 ? ' is-shared' : ''}">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat">${x.l.statLabel}</i>${sharedTag}</span>`;
+          return `<span class="plp-leg${shared > 1 ? ' is-shared' : ''}">${st} ${prettyName(x.l.fighter)} <b class="bps-dir ${x.l.dir === 'OVER' ? 'ov' : 'un'}">${x.l.dir}</b> <span class="bps-line">${x.l.line ?? '—'}</span> <i class="bps-stat st-${x.l.stat}">${x.l.statLabel}</i>${sharedTag}</span>`;
         }).join('');
         // Plain-text summary for the confirm dialog — the user should see exactly
         // which slip they are about to drop, not just "this parlay".
@@ -15243,7 +15256,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           : holds.length
           ? `<span class="plp-contain holds" title="${holds.length} smaller slip${holds.length === 1 ? '' : 's'} (${holds.map(j => `${e.list[j]?.legs.length}-leg`).join(', ')}) sit entirely inside this one — they cannot cash unless this one's shared legs do, so they add exposure to the same position rather than diversifying it.">⊃ HOLDS ${holds.length}</span>`
           : '';
-        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG${p.legs[0]?.bookLabel ? ` · ${p.legs[0].bookLabel}` : ''}</span>${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
+        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG</span>${p.legs[0]?.bookLabel ? `<span class="plp-book ${(() => { const k = String(p.legs[0]?.book || '').toLowerCase(); return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp' : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : ''; })()}">${p.legs[0].bookLabel}</span>` : ''}${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
       }).join('');
       return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
     }).join('');
