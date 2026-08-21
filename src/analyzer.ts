@@ -13717,7 +13717,7 @@ type PredSort = 'card' | 'fp' | 'gap' | 'conf' | 'eviD';
 const FACTOR_LANES: Array<{ cls: string; label: string; test: RegExp }> = [
   // A hard rule replaced or capped the number. Rose, never green: this is the
   // opposite of a finding — a warning that the model had little to work with.
-  { cls: 'pf-guard',    label: 'guard',      test: /^No history|^Clamped to historic/i },
+  { cls: 'pf-guard',    label: 'guard',      test: /^No history|^Clamped to historic|^Anchored to market/i },
   // Post-hoc multipliers on the level — calibration, the book prior, the learned
   // trend. Same family as the shrink, so they share its gold.
   { cls: 'pf-cal',      label: 'correction', test: /^FP cal|^Book prior|^Trend/i },
@@ -13751,6 +13751,10 @@ const SHRINK_LANE = { cls: 'pred-factor-shrink', label: 'shrink' };
 const FACTOR_SHORT: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^No history/i,                              () => 'NO HISTORY'],
   [/^Clamped to historic range:\s*(.+)$/i,      m => `CLAMP ${m[1]!.replace('-', '–')}`],
+  // MODEL v31. The chip carries what the MODEL said; the FP cell beside it already
+  // shows what it was pulled to, so the pair reads as a before/after without the
+  // chip having to spell either side out.
+  [/^Anchored to market: model said ([\d.]+)/,   m => `⚓ ${m[1]}`],
   [/^FP cal \([^)]*\): ×([\d.]+)/,              m => `CAL ×${Number(m[1]).toFixed(2)}`],
   [/^Book prior: ([\d.]+)/,                     m => `BOOK ${m[1]}`],
   [/^Trend(?: adj)?:\s*([+-][\d.]+)/,           m => `TREND ${m[1]}`],
