@@ -4701,14 +4701,32 @@ function calcLean(name, db, line_p6, line_ud, line_pp, line_betr, moneyline, opp
     if (confidenceModel.mlGuardNote) {
         reasons.unshift({ icon: 'neg', text: confidenceModel.mlGuardNote });
     }
+    // ── GLOW-UP 295 · the headline that was the same on every row ────────────
+    // The verdict reads `LEAN OVER <line> — <headline of reasons[0]>`. When
+    // reasons[0] is the platform-baseline boilerplate, every row carrying it says
+    // "Platform-aware FP baseline from app-specific scoring profiles across 2
+    // books" — four of eight overs on the live board, two lines each, and not one
+    // word of it distinguishes the pick from any other. The rows that read well
+    // (`Proj FP 63.2 · avg 91.4 + opp allows 35 is 25.3 pts BELOW the line`) simply
+    // got lucky with their ordering.
+    //
+    // The project already decided this string is boilerplate — isBoilerplate in the
+    // Report Card resolver flags it as `generic` — but that verdict never reached
+    // Best Picks. Same test, applied where the headline is chosen: skip it if a real
+    // reason follows, and keep it only when it is genuinely all there is.
+    //
+    // Skips the CHOICE of headline, not the reason itself: it stays in the rail and
+    // the tooltip, so nothing is lost, it just stops speaking first.
+    const isGenericReason = (t) => /^Platform-aware FP baseline/i.test((t ?? '').trim());
+    const headlineReason = reasons.find(r => r.text && !isGenericReason(r.text)) ?? reasons[0];
     const lineStr = selectedLine != null
         ? `${platform === 'pick6' ? 'P6' : platform === 'underdog' ? 'UD' : platform === 'prizepicks' ? 'PP' : platform === 'draftkings_sportsbook' ? 'DK' : 'BTR'} ${selectedLine}`
         : (availableLines.length > 1 ? `avg ${line}` : line_p6 ? `P6 ${line_p6}` : line_ud ? `UD ${line_ud}` : line_pp ? `PP ${line_pp}` : `BTR ${line_betr}`);
     const avgStr = avgFP != null ? ` (avg ${avgFP.toFixed(1)})` : '';
     const verdict = lean === 'over'
-        ? `LEAN OVER ${lineStr}${avgStr} — ${reasonHeadline(reasons[0]?.text) || 'over value identified'}`
+        ? `LEAN OVER ${lineStr}${avgStr} — ${reasonHeadline(headlineReason?.text) || 'over value identified'}`
         : lean === 'under'
-            ? `LEAN UNDER ${lineStr}${avgStr} — ${reasonHeadline(reasons[0]?.text) || 'under value identified'}`
+            ? `LEAN UNDER ${lineStr}${avgStr} — ${reasonHeadline(headlineReason?.text) || 'under value identified'}`
             : `LEAN ${score >= 0 ? 'OVER' : 'UNDER'} ${lineStr}${avgStr} — edge not yet at strong threshold`;
     const ev = lean !== 'push' ? parseFloat(((conf / 100) * 0.1 - (1 - conf / 100) * 1).toFixed(2)) : 0;
     // ── Fair Value Generator ────────────────────────────────────────────────
@@ -7898,6 +7916,10 @@ const BOOK_COLORS = {
 // FP pick — including ones whose own text said the projection sat 27 points the wrong
 // side of the line. FP is also what actually gets placed, so this was the worst place
 // to lose the warning. Now that calcLean exposes `avg`, the check is arithmetic.
+/** GLOW-UP 296 — smallest projection-vs-line gap worth flagging. Matches the ±2.5
+ *  cap on how much projection-vs-line can move the lean score: below it the
+ *  disagreement cannot fully express itself in the number either. */
+const PROJ_CONFLICT_MIN_GAP = 2.5;
 function projOpposesLean(reason, side, displayedLine, projValue) {
     if (displayedLine == null || (side !== 'over' && side !== 'under'))
         return null;
@@ -7914,7 +7936,20 @@ function projOpposesLean(reason, side, displayedLine, projValue) {
     const opposes = side === 'over' ? proj < displayedLine : proj > displayedLine;
     if (!opposes)
         return null;
-    return { proj, gap: Math.abs(proj - displayedLine), implies: proj > displayedLine ? 'OVER' : 'UNDER' };
+    const gap = Math.abs(proj - displayedLine);
+    // ── GLOW-UP 296 · a caveat carried by half a column is not a caveat ───────
+    // This fired on ANY opposition, however small, so ⚠ PROJ SAYS UNDER landed on
+    // four of eight overs — and Hernandez, whose projection sits 25.3 under his
+    // line, flagged identically to Padilla, whose own verdict says "essentially at
+    // the line". A projection a point off the line is agreement with rounding on it.
+    //
+    // 2.5 is not a taste threshold: projection-vs-line contributes at most ±2.5 to
+    // the lean score (the cap the tooltip already cites, and the reason a
+    // "backwards" pick is not a bug). A gap the score itself cannot fully express
+    // is not one worth stopping the reader for.
+    if (gap < PROJ_CONFLICT_MIN_GAP)
+        return null;
+    return { proj, gap, implies: proj > displayedLine ? 'OVER' : 'UNDER' };
 }
 // Stat labels for an EffectiveLean's _source. The "Lean Analysis" panel renders
 // getEffectiveLean(), which is whichever stat is that fighter's strongest signal
@@ -9244,7 +9279,7 @@ function renderBestPicks(container, renderSeq = 0) {
                     : '';
                 const projConflict = projOpposesLean(reason, el.lean, line, el.avg);
                 const projTag = projConflict
-                    ? `<div class="bp-proj-split" title="This pick's own projection (${projConflict.proj}) sits ${projConflict.gap.toFixed(1)} on the ${projConflict.implies} side of the ${line} line — the projection argues ${projConflict.implies}, the pick is ${(el.lean || '').toUpperCase()}. Not necessarily wrong: projection-vs-line contributes at most ±2.5 to the lean score, so hit-rate, opponent and matchup terms can outvote it. Worth checking manually before entering.">⚠ PROJ SAYS ${projConflict.implies}</div>`
+                    ? `<div class="bp-proj-split${projConflict.gap >= 12 ? ' is-wide' : ''}" title="This pick's own projection (${projConflict.proj}) sits ${projConflict.gap.toFixed(1)} on the ${projConflict.implies} side of the ${line} line — the projection argues ${projConflict.implies}, the pick is ${(el.lean || '').toUpperCase()}. Not necessarily wrong: projection-vs-line contributes at most ±2.5 to the lean score, so hit-rate, opponent and matchup terms can outvote it. Gaps under ${PROJ_CONFLICT_MIN_GAP} are not flagged at all — the score cannot fully express them either. Worth checking manually before entering.">⚠ PROJ SAYS ${projConflict.implies} <b>${projConflict.gap.toFixed(1)}</b></div>`
                     : '';
                 const splitNote = evd && evd.ev <= -3 && tier.label !== 'Low'
                     ? `<div class="bp-ev-split" title="${tier.label.toUpperCase()} tier grades signal strength and sample depth; EV prices the calibrated ${Math.round(evd.prob * 100)}% hit probability against the ${evd.isAssumedVig ? 'assumed -110' : 'posted'} odds. Strong directional lean, but the price doesn't clear breakeven — fine as a pick-em leg, not a value play.">LEAN ✓ · VALUE ✗</div>`
@@ -9419,11 +9454,24 @@ function renderBestPicks(container, renderSeq = 0) {
                 const youTag = youRec && youRec.total >= 2
                     ? `<span class="bp-you ${youRec.hits * 2 >= youRec.total ? 'good' : 'bad'}" title="Your settled record on ${youStatLbl} ${(el.lean || '').toUpperCase()} legs you placed across past events (from My Placed Ledger) — informational only, does not affect model confidence">YOU ${youRec.hits}/${youRec.total}</span>`
                     : '';
-                const factors = pickDistinctFactors(el.reasons, 4);
+                // ── GLOW-UP 294 · the rail dropped factors without saying so ───────────
+                // pickDistinctFactors caps at 4. Rows routinely carry eight or more reasons,
+                // so on most picks four were shown and the rest vanished with no mark. The
+                // Predictions rail solved this long ago by printing `+N`; Best Picks — the
+                // board you actually bet from — never got it, so a row with four supporting
+                // factors and a row with four supporting factors and five more looked
+                // identical. Counting DISTINCT reasons, matching what the cap consumes.
+                const FACTOR_CAP = 4;
+                const factors = pickDistinctFactors(el.reasons, FACTOR_CAP);
+                const factorsAll = pickDistinctFactors(el.reasons, 99);
+                const factorMore = Math.max(0, factorsAll.length - factors.length);
+                const factorMoreChip = factorMore > 0
+                    ? `<span class="bp-factor bp-factor-more" title="${factorMore} further factor${factorMore === 1 ? '' : 's'} behind this pick, hidden to keep the row one line: ${factorsAll.slice(FACTOR_CAP).map(r => reasonHeadline(r.text)).join(' · ').replace(/"/g, '&quot;')}">+${factorMore}</span>`
+                    : '';
                 // Polarity resolves against el.lean — the raw icon is directional, so an
                 // UNDER pick used to render every reason driving it as ✗ (GLOW-UP 184).
                 const factorChips = factors.length >= 2
-                    ? `<div class="bp-factors">${factors.map(r => factorChipHtml(r, el.lean, 'bp-factor')).join('')}</div>`
+                    ? `<div class="bp-factors">${factors.map(r => factorChipHtml(r, el.lean, 'bp-factor')).join('')}${factorMoreChip}</div>`
                     : '';
                 // GLOW-UP 196 L1 — numeric edge. The projection and its gap to the line were
                 // already computed but only surfaced inside prose ("edges the line by 12.1"),
@@ -9789,7 +9837,7 @@ function renderBestPicks(container, renderSeq = 0) {
                     const reason = blockedBy && blockedBy.toLowerCase() !== f.name.toLowerCase()
                         ? `same fight as ${prettyName(blockedBy)}, who ranked higher`
                         : mlg < 0
-                            ? `below the cut — ${mlg} for ${el.lean === 'over' ? 'an FP over priced to lose' : 'an FP under against a comfortable win'} (was ${conf - mlg})`
+                            ? `<b class="bpnm-guard">${mlg}</b> ${el.lean === 'over' ? 'FP over priced to lose' : 'FP under against a comfortable win'} — was ${conf - mlg}, below the cut at ${conf}`
                             : 'below the cut for this column';
                     // GLOW-UP 200 L4 — the audit trail was honest but inert: you could read
                     // that a fighter was cut and had no way to go look at them. Rows now jump
@@ -9803,7 +9851,13 @@ function renderBestPicks(container, renderSeq = 0) {
                         cutBelowBar++;
                     if (inverted)
                         cutInverted++;
-                    rows.push(`<div class="bpnm-row${inverted ? ' bpnm-inverted' : ''}" data-bpnm-jump="${f.name.replace(/"/g, '&quot;')}" title="Open ${prettyName(f.name)}'s card">
+                    // GLOW-UP 297: a row cut by a MEASURED rule is not the same kind of row as
+                    // one cut by seating order. "same fight as X, who ranked higher" is
+                    // bookkeeping; "-16 for an FP over priced to lose" is the model telling you
+                    // it overruled something. Both rendered in the same 9px --text3, so the one
+                    // row worth reading was the hardest to find. Marked, like bpnm-inverted
+                    // already is — the list's own precedent for "this line is different".
+                    rows.push(`<div class="bpnm-row${inverted ? ' bpnm-inverted' : ''}${mlg < 0 ? ' bpnm-guarded' : ''}" data-bpnm-jump="${f.name.replace(/"/g, '&quot;')}" title="Open ${prettyName(f.name)}'s card">
           <span class="bpnm-dir ${dir}">${dir.toUpperCase()}</span>
           <span class="bpnm-name">${prettyName(f.name)}</span>
           <span class="bpnm-stat">${stat}</span>
