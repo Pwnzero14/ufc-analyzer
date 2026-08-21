@@ -14870,10 +14870,32 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       if (!taken.settled || !skipped.settled) return { html: '' };
       const takenRate = taken.hits / taken.settled;
       const skippedRate = skipped.hits / skipped.settled;
-      const alphaPts = Math.round((takenRate - skippedRate) * 100);
-      const alphaChip = alphaPts >= 0
-        ? `<span class="plg-alpha pos" title="Your taken picks hit ${Math.round(takenRate * 100)}% vs ${Math.round(skippedRate * 100)}% for the board picks you passed on — your selection is adding ${alphaPts}pts over blind-following the board">ALPHA +${alphaPts}pts</span>`
-        : `<span class="plg-alpha neg" title="Your taken picks hit ${Math.round(takenRate * 100)}% vs ${Math.round(skippedRate * 100)}% for the board picks you passed on — the picks you skip are outhitting the ones you take by ${-alphaPts}pts">ALPHA ${alphaPts}pts</span>`;
+      // ── GLOW-UP 310 · a headline number the sample could not support ─────────
+      // This read ALPHA -21pts on the live ledger, in a rose chip, as the loudest
+      // claim in the panel — off NINE settled taken legs. The standard error of
+      // that gap is 16pts, so -21 sits 1.3 SE from zero: indistinguishable from no
+      // effect at all. "The picks you skip are beating the ones you take" is a
+      // serious thing to tell someone about their own judgement, and it was being
+      // said on noise.
+      //
+      // Two corrections, both already house convention elsewhere. The rates are
+      // Laplace-shrunk (+1 hit / +1 miss, what shrunkHitRate uses) so a thin cohort
+      // cannot claim its extremes; and below 1.5 SE the chip stops taking a side —
+      // neutral, no colour, and it says outright how many legs it is standing on.
+      const lap = (h: number, n: number): number => (h + 1) / (n + 2);
+      const alphaRaw = takenRate - skippedRate;
+      const alphaShrunk = lap(taken.hits, taken.settled) - lap(skipped.hits, skipped.settled);
+      const seDiff = Math.sqrt(
+        (takenRate * (1 - takenRate)) / taken.settled + (skippedRate * (1 - skippedRate)) / skipped.settled,
+      );
+      const conclusive = Number.isFinite(seDiff) && seDiff > 0 && Math.abs(alphaRaw) >= 1.5 * seDiff;
+      const alphaPts = Math.round(alphaShrunk * 100);
+      const rateTxt = `Your taken picks hit ${Math.round(takenRate * 100)}% (${taken.hits}/${taken.settled}) against ${Math.round(skippedRate * 100)}% (${skipped.hits}/${skipped.settled}) for the board picks you passed on.`;
+      const alphaChip = !conclusive
+        ? `<span class="plg-alpha thin" title="${rateTxt} The gap is ${Math.round(alphaRaw * 100)}pts raw, but its standard error is ${Math.round(seDiff * 100)}pts — under 1.5 SE, so it is not distinguishable from no effect. On ${taken.settled} settled taken leg${taken.settled === 1 ? '' : 's'} this cannot yet tell you whether your selection helps or hurts, and the shown figure is Laplace-shrunk so a thin cohort cannot claim its extremes. Read it again around 30 taken legs.">ALPHA ${alphaPts >= 0 ? '+' : ''}${alphaPts}pts <i>±${Math.round(seDiff * 100)} · n=${taken.settled}</i></span>`
+        : alphaPts >= 0
+        ? `<span class="plg-alpha pos" title="${rateTxt} Your selection is adding ${alphaPts}pts over blind-following the board (Laplace-shrunk; ±${Math.round(seDiff * 100)}pts standard error on ${taken.settled} taken legs).">ALPHA +${alphaPts}pts</span>`
+        : `<span class="plg-alpha neg" title="${rateTxt} The picks you skip are outhitting the ones you take by ${-alphaPts}pts (Laplace-shrunk; ±${Math.round(seDiff * 100)}pts standard error on ${taken.settled} taken legs).">ALPHA ${alphaPts}pts</span>`;
       const confNote = taken.confN && skipped.confN
         ? `<span class="plg-sel-conf" title="Average model confidence of the suggestions you take vs the ones you skip — a large gap here means you're selecting on confidence, a small one means you're selecting on something else">conf taken ${Math.round(taken.confSum / taken.confN)}% · skipped ${Math.round(skipped.confSum / skipped.confN)}%</span>`
         : '';

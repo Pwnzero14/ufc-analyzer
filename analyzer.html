@@ -31794,6 +31794,20 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   padding: 0 4px; border-radius: 3px;
   background: color-mix(in srgb, var(--warn, #e0a33e) 12%, transparent);
 }
+
+/* GLOW-UP 310 — an alpha the sample cannot support takes no side. Neutral, not
+   rose: the old chip's colour was itself the overclaim, telling you your selection
+   was hurting when the gap was 1.3 SE from zero. The ± and n ride the chip so the
+   caveat cannot be separated from the number by a screenshot. */
+.plg-alpha.thin {
+  color: var(--text2);
+  border-color: rgba(255,255,255,0.14);
+  background: transparent;
+}
+.plg-alpha.thin i {
+  font-style: normal; font-size: 8px; opacity: .7; margin-left: 3px;
+  font-variant-numeric: tabular-nums;
+}
 </style>
 </head>
 <body>
