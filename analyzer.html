@@ -31949,6 +31949,65 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .plg-leg, .plp-parlay { animation: none; }
 }
+
+/* ═══ GLOW-UP 316 · the ledger joins the design system ═════════════════════════
+   This codebase has a documented semantic palette — --book-* for the five books,
+   --stat-* for the five stat families, with the stated rule that direction beats
+   stat. The rest of the app uses it. Both ledgers rendered every book and every
+   stat in identical grey, which is why 99 rows read as a wall: nothing to scan by.
+
+   No new colours are introduced here. These are the tokens already committed to,
+   finally applied where the density most needs them. Books get the strongest
+   treatment because entering a slate is a per-book task — you work down one book
+   at a time, and the column should let you find it without reading. */
+
+.plg-book, .plp-book {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600;
+  letter-spacing: .04em; padding: 1px 5px; border-radius: 3px;
+  border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  color: var(--text3); white-space: nowrap;
+}
+.plg-book.bk-p6,   .plp-book.bk-p6   { color: var(--book-p6); }
+.plg-book.bk-ud,   .plp-book.bk-ud   { color: var(--book-ud); }
+.plg-book.bk-pp,   .plp-book.bk-pp   { color: var(--book-pp); }
+.plg-book.bk-betr, .plp-book.bk-betr { color: var(--book-betr); }
+.plg-book.bk-dk,   .plp-book.bk-dk   { color: var(--book-dk); }
+.plp-book { margin-left: 6px; }
+
+/* Stat family. Per the system's own rule these chips identify ONE stat each, so
+   the hue is legitimate here — and it is deliberately quieter than the book chip,
+   because direction and book are what you act on; the stat is context. */
+.bps-stat { font-style: normal; opacity: .95; letter-spacing: .03em; }
+.bps-stat.st-fp    { color: var(--stat-fp); }
+.bps-stat.st-ss,
+.bps-stat.st-ss_r1 { color: var(--stat-ss); }
+.bps-stat.st-td    { color: var(--stat-td); }
+.bps-stat.st-ft    { color: var(--stat-ft); }
+.bps-stat.st-ctrl  { color: var(--stat-ctrl); }
+.bps-stat.st-kd    { color: var(--stat-ctrl); }
+
+/* The line is the number you scan for. Tabular so the decimals stack into a
+   column down 99 rows instead of drifting with the name above them. */
+.plg-leg .bps-line, .plp-leg .bps-line {
+  font-variant-numeric: tabular-nums;
+  color: var(--text1, #e8eefc);
+  font-weight: 600;
+}
+/* Direction still outranks everything — the system's rule, and the reason these
+   two stay green/rose while the stat beside them is a family hue. */
+.plg-leg .bps-dir, .plp-leg .bps-dir { letter-spacing: .05em; }
+
+/* Opponent recedes: it repeats within a fight group, where the spine already
+   says these rows belong together. */
+.plg-leg .bps-vs { opacity: .55; }
+
+/* Row rhythm — a hover sweep rather than zebra, so nothing competes with the
+   spine or the status column at rest. */
+.plg-leg { transition: background .12s ease; }
+.plg-leg:hover {
+  background: linear-gradient(90deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012) 45%, transparent 80%);
+}
 </style>
 </head>
 <body>
