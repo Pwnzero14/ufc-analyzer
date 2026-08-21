@@ -2346,6 +2346,9 @@ interface FPConfidenceResult {
   summary: string;
   memoryDelta: number;
   memoryNote: string | null;
+  /** MODEL v32 — the moneyline-consistency demotion, 0 when it did not fire. */
+  mlGuardDelta: number;
+  mlGuardNote: string | null;
   rivalryDelta: number;
   rivalryNote: string | null;
   ensembleAgreement: number;
@@ -3529,6 +3532,60 @@ function calcEnhancedFPConfidence(
     moneyline,
   });
   confidence = memoryAdjustment.confidence;
+
+  // ── MODEL v32 — a fantasy prop is a moneyline bet wearing a costume ───────
+  // Fantasy scoring is dominated by the win bonus (30-90 of a typical 70), so
+  // clearing a fantasy line essentially means winning the fight. That makes an
+  // FP OVER on an underdog a bet on an upset, and an FP UNDER on a heavy
+  // favourite a bet on one too — regardless of what the fighter's output says.
+  //
+  // Measured over 334 settled FP picks from best_picks_snapshots_v1:
+  //
+  //   OVER  + heavy favourite (<=-250)   59%   n=54
+  //   OVER  + favourite       (<=-120)   41%   n=32
+  //   OVER  + underdog        (>=+120)   17%   n=12
+  //   OVER  + heavy underdog  (>=+250)    7%   n=15
+  //   OVER  + posted line under 60        8%   n=26
+  //   UNDER + posted line 90+            26%   n=42
+  //   UNDER + line 60-75                 71%   n=31
+  //
+  // Confidence was not catching any of it — grade B FP OVERs hit 19% (n=21),
+  // worse than C or D — so this cannot be left to the existing pipeline.
+  //
+  // Rates are Laplace-shrunk before sizing (the +1 hit / +1 miss convention the
+  // hit-rate ladders already use) so n=12 cells cannot claim 17% literally, and
+  // the demotion is 40% of the shrunk distance from a coin flip, capped at 20.
+  //
+  // The applicable rules OVERLAP — a heavy dog usually also carries a low line —
+  // so the LARGEST is taken, never the sum. They are one phenomenon measured two
+  // ways, and stacking them would double-count it.
+  //
+  // Demote, never drop: the house idiom is MODEL v9's 8-point NEEDS ROUNDS
+  // demotion, and a previous change that removed a pick outright was reverted.
+  let mlGuardDelta = 0;
+  let mlGuardNote: string | null = null;
+  if (lean !== 'push') {
+    const ml = Number.isFinite(Number(moneyline)) ? Number(moneyline) : null;
+    const cands: Array<{ d: number; note: string }> = [];
+    if (lean === 'over' && ml != null && ml >= 250) {
+      cands.push({ d: 15, note: 'FP over on a heavy underdog — this side has hit 7% (n=15); clearing a fantasy line means winning the fight' });
+    } else if (lean === 'over' && ml != null && ml >= 120) {
+      cands.push({ d: 12, note: 'FP over on an underdog — this side has hit 17% (n=12); clearing a fantasy line means winning the fight' });
+    }
+    if (lean === 'over' && Number.isFinite(line) && line < 60) {
+      cands.push({ d: 16, note: `FP over on a low line (${line}) — the book is pricing him to lose, and this side has hit 8% (n=26)` });
+    }
+    if (lean === 'under' && Number.isFinite(line) && line >= 90) {
+      cands.push({ d: 9, note: `FP under on a 90+ line (${line}) — the book is pricing a comfortable win, and this side has hit 26% (n=42)` });
+    }
+    if (cands.length) {
+      const worst = cands.reduce((a, c) => (c.d > a.d ? c : a));
+      mlGuardDelta = -worst.d;
+      mlGuardNote = worst.note;
+      confidence = Math.round(clampNumber(confidence + mlGuardDelta, 38, 95));
+    }
+  }
+
   const grade = getConfidenceGrade(confidence);
 
   const agreementText = lineCount <= 1
@@ -3567,6 +3624,8 @@ function calcEnhancedFPConfidence(
     summary: `Confidence ${grade} (${confidence}): ${agreementText}, ${sampleText}, ${varianceText}, ${opponentText}, ${formText}, ${roundText}, ${rivalryText}${memoryAdjustment.delta ? `, memory ${memoryAdjustment.delta > 0 ? '+' : ''}${memoryAdjustment.delta}` : ''}`,
     memoryDelta: memoryAdjustment.delta,
     memoryNote: memoryAdjustment.note,
+    mlGuardDelta,
+    mlGuardNote,
     rivalryDelta: rivalry.confidenceDelta,
     rivalryNote: rivalry.confidenceNote,
     ensembleAgreement: parseFloat(ensemble.modelAgreement.toFixed(3)),
@@ -5297,6 +5356,12 @@ function calcLean(
       icon: confidenceModel.memoryDelta > 0 ? 'pos' : 'neg',
       text: confidenceModel.memoryNote,
     });
+  }
+  // MODEL v32. Unshifted to the FRONT deliberately when it fires: it is the
+  // reason the pick sits where it does, and reasonHeadline() reads reasons[0]
+  // to build the verdict line.
+  if (confidenceModel.mlGuardNote) {
+    reasons.unshift({ icon: 'neg', text: confidenceModel.mlGuardNote });
   }
 
   const lineStr = selectedLine != null
