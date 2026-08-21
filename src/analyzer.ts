@@ -14171,6 +14171,45 @@ function renderPredictionsHtml(
       </div>`;
     }).join('');
 
+    // ── MODEL v30b — a board-wide offset is one fact, not twenty-four ───────
+    // With the fair-line correction in, this card shows the model above fair on
+    // 18 of 24 fighters at a median of about +8. Read row by row that looks like
+    // eighteen edges. It is almost certainly one: a disagreement about the LEVEL
+    // between the model and the market, which is a property of the board, not of
+    // any fighter on it.
+    //
+    // It matters here more than usual because the -11 shift was calibrated against
+    // stored predictions from MODEL v1 through v22 — the only versions with
+    // settled results — and this board is v30. The measurement that said "the
+    // model is unbiased" does not automatically transfer across eight model
+    // revisions, several of which moved the FP level deliberately. Until a v30
+    // board settles, the honest position is that the offset might be the market's
+    // shading, might be the model's level, and the board should not pretend to
+    // know which.
+    //
+    // Same principle as the evidence meter and the confidence rail: state the
+    // uncertainty on the surface that would otherwise hide it.
+    const fairGaps: number[] = [];
+    for (const p2 of latest.predictions) {
+      const bk = bookLineOf(p2.fighter, 'fp');
+      if (bk == null || !Number.isFinite(Number(p2.fantasy.line))) continue;
+      fairGaps.push(p2.fantasy.line - (bk + fpShift));
+    }
+    let boardChip = '';
+    if (fairGaps.length >= 6) {
+      const sorted = [...fairGaps].sort((a, b) => a - b);
+      const med = sorted[Math.floor(sorted.length / 2)]!;
+      const above = fairGaps.filter(g => g > 0).length;
+      const skewed = Math.abs(med) >= 5;
+      const tip = `Across the ${fairGaps.length} fighters with a posted fantasy line, the model sits a median of ${med > 0 ? '+' : ''}${med.toFixed(1)} against the fair line, above it on ${above} of them.`
+        + (skewed
+          ? ` That is a LEVEL disagreement between the model and the market, not ${above} separate edges — a real edge shows up on a few rows, not on most of them. Read each row's gap RELATIVE to this number: a fighter at +${med.toFixed(0)} is average for this board and carries no signal, and the informative rows are the ones far from it in either direction.`
+          + ` Which side is wrong is genuinely unknown: the ${Math.abs(fpShift).toFixed(0)}-point market shift was measured against stored predictions from MODEL v1-v22, the only versions with settled results, and this board is v${MODEL_VERSION}. A v${MODEL_VERSION} card has not settled yet.`
+          : ` Small enough that the model and the market broadly agree on the level, so row-level gaps can be read at face value.`);
+      boardChip = `<span class="pred-board-skew${skewed ? ' is-skewed' : ''}" title="${tip.replace(/"/g, '&quot;')}">`
+        + `${skewed ? '⚠ ' : ''}BOARD ${med > 0 ? '+' : ''}${med.toFixed(1)} <i>${above}/${fairGaps.length} above fair</i></span>`;
+    }
+
     // The key dot carries the LANE'S OWN CLASS, so it inherits the same `color`
     // declaration the chips do. A legend swatch cannot drift from the chip it
     // describes when there is only one place the colour is written down.
@@ -14184,7 +14223,7 @@ function renderPredictionsHtml(
     predBody = `<div class="pred-bar">
       <button id="predictorGenerateBtn" class="btn btn-sm pred-gen">⚡ Generate Predictions</button>
       <span class="pred-age">Generated ${agoLabel}${latest.settled ? ' · settled' : ''}</span>
-      ${modelChip}
+      ${modelChip}${boardChip}
       <span class="pred-sortbar">
         <span class="pred-sortlab">SORT</span>
         ${sortBtn('card', 'CARD', 'Fight order, main event down — the order the night runs in')}
