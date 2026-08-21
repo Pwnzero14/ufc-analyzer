@@ -4,6 +4,11 @@
 // cycle to update fighter trends and formula weights.
 
 import { FANTASY_SCORING, MODEL_VERSION, FP_CONFIDENCE_CEILING } from '../config/index.js';
+
+/** Books that score fantasy points with FANTASY_SCORING. PrizePicks is deliberately
+ *  absent: it is a different rulebook (no control time, no non-sig strikes, a
+ *  decision pays 10 against 30) and its totals are archived as `Fantasy_PP`. */
+const FANTASY_SCORING_BOOKS = new Set(['pick6', 'underdog', 'betr']);
 import type {
   FighterDB,
   FighterTrend,
@@ -306,6 +311,56 @@ export class PropLinePredictorService {
   // Returns `{ median, sampleCount }` if ≥ MIN_BOOK_SAMPLES recent records
   // exist, else null. Recency window is 24 months — older lines reflect a
   // different version of the fighter.
+  /**
+   * MODEL v30 — how far a posted FANTASY-POINTS line sits above the outcome.
+   *
+   * Measured over 354 settled Pick6 FP props, recomputed from raw UFCStats with
+   * the current scorer (the archived `result` values predate the 2026-08-16 fix
+   * and grade ~4.4 points light on average, 12% of them by more than 5). The
+   * posted line beat this model on accuracy — MAE 32.7 against 36.2 — but ran a
+   * bias of -10.7, where the model's own bias was ~0.
+   *
+   * Walk-forward, training only on prior events, 308 props:
+   *
+   *   raw posted line        MAE 33.44   bias -10.98
+   *   line + learned shift   MAE 32.66   bias  -1.00
+   *
+   * And the shift is not a fluke of one card: all twelve event-clusters between
+   * April and August came in negative, -4.2 to -21.8, over-rate 38-48%.
+   *
+   * The mechanism is that fantasy points are dominated by the win bonus (30-90),
+   * so clearing a line essentially means winning the fight. Split by outcome:
+   * winners clear 81.7% of the time, losers 2.9%. A pick-em book setting the
+   * line near the mean is therefore setting it well above the median outcome.
+   *
+   * Only rows settled AFTER the scorer fix are learned from; everything earlier
+   * is graded against the wrong rulebook. Until enough of those accumulate the
+   * estimate is shrunk toward the offline-measured value, so this starts correct
+   * and gets more specific rather than starting noisy.
+   */
+  static computeMarketFpShift(
+    archive: PropArchiveRecord[],
+  ): { shift: number; sampleCount: number } {
+    const MEASURED_DEFAULT = -11;
+    const SHRINK_K = 80;
+    const SCORER_FIX_TS = Date.parse('2026-08-16T00:00:00Z');
+    const diffs: number[] = [];
+    for (const r of archive) {
+      if (r.propType !== 'Fantasy') continue;
+      if (!r.platform || !FANTASY_SCORING_BOOKS.has(r.platform)) continue;
+      const line = Number(r.line);
+      const res = Number(r.result);
+      if (!Number.isFinite(line) || !Number.isFinite(res) || line <= 0) continue;
+      const ts = Date.parse(r.date);
+      if (!Number.isFinite(ts) || ts < SCORER_FIX_TS) continue;
+      diffs.push(res - line);
+    }
+    const n = diffs.length;
+    const empirical = n > 0 ? diffs.reduce((a, x) => a + x, 0) / n : MEASURED_DEFAULT;
+    const shift = (n * empirical + SHRINK_K * MEASURED_DEFAULT) / (n + SHRINK_K);
+    return { shift, sampleCount: n };
+  }
+
   static computeBookPriorFP(
     archive: PropArchiveRecord[],
     fighter: string,
@@ -318,7 +373,13 @@ export class PropLinePredictorService {
     const lines: number[] = [];
     for (const r of archive) {
       if (normName(r.fighter) !== key) continue;
-      if (r.platform !== 'betr') continue;
+      // MODEL v30: was `!== 'betr'`. The archive holds 29 Betr FP rows against 553
+      // from Pick6, and measured against the ≥5-per-fighter threshold the Betr-only
+      // filter qualified EXACTLY ZERO fighters — the feature has never once fired in
+      // production. Pick6, Underdog and Betr all score fantasy points with the same
+      // rulebook (see FANTASY_SCORING), so all three are the same quantity; only
+      // PrizePicks, which is a different rulebook, has to stay out.
+      if (!r.platform || !FANTASY_SCORING_BOOKS.has(r.platform)) continue;
       if (r.propType !== 'Fantasy' && r.propType !== 'FP') continue;
       const lineVal = Number(r.line);
       if (!Number.isFinite(lineVal) || lineVal <= 0) continue;
