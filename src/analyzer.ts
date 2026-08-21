@@ -11831,8 +11831,14 @@ function renderParlayLab(container: HTMLElement): void {
       // GLOW-UP 207: an off-board side no book posts still gets a row (placeability
       // is reported, not enforced — same call the two-sided slate picker makes).
       : (a.leg.offBoard ? '<span class="parlay-leg-plat plat-none" title="No book the scraper can see posts this side. The line shown is the prop\'s active line; queue it anyway if you have it somewhere else.">NO BK</span>' : '');
-    const offTag = a.leg.offBoard
-      ? `<span class="parlay-leg-off" title="Off-board. ${(a.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>`
+    // GLOW-UP 288: the ⊘ is gone from the identity cell. Every row it appeared on
+    // is already inside a section headed OFF-BOARD PROPS, so the glyph was the
+    // section's own label reprinted once per row — and it was costing 26px of the
+    // one cell that cannot spare any. Its only real payload, the per-leg reason,
+    // moves to the row's own tooltip.
+    const offTag = '';
+    const offRowTitle = a.leg.offBoard
+      ? ` title="Off-board. ${(a.leg.offReason || '').replace(/"/g, '&quot;')}"`
       : '';
     const placedTag = isLegPlaced(a.leg)
       ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. Flagged on the row so a leg you already hold is findable without hunting the confidence order — the ● PLACED chip in the strip filters to just these.">●</span>`
@@ -11864,7 +11870,7 @@ function renderParlayLab(container: HTMLElement): void {
     // Three wrappers give the grid stable slots: identity, market, and the two
     // always-emitted placeholders above. Grouped off-board rows use the same
     // wrappers, so the two row shapes finally share one track list.
-    return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}" data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
+    return `<div class="parlay-leg-row${sel ? ' selected' : ''}${conflict ? ' leg-conflict' : ''}${a.leg.offBoard ? ' off-board' : ''} ${confClass}"${offRowTitle} data-parlay-key="${key}" data-fighter="${a.leg.fighter}" data-stat="${a.leg.stat}" data-dir="${a.leg.direction}">
       <span class="parlay-leg-check">${sel ? '☑' : '☐'}</span>
       <span class="plr-id">
         <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${a.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(a.leg.fighter)}">${prettyName(a.leg.fighter)}</span>
@@ -11949,12 +11955,11 @@ function renderParlayLab(container: HTMLElement): void {
     const placedTag = isLegPlaced(head.leg)
       ? `<span class="parlay-leg-placed" title="You marked this prop placed for this event. The ● PLACED chip in the strip filters to just these; a book chip outlined in gold is the one you placed at.">●</span>`
       : '';
-    return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
+    return `<div class="parlay-leg-row is-grouped off-board ${confClass}${parlaySelectedLegs.has(bestKey) ? ' selected' : ''}" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}" data-parlay-key="${bestKey}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}" data-dir="${dir}">
       <span class="parlay-leg-check is-multi" data-parlay-key="${bestKey}" title="${selected.length} of ${books.length} books on this prop are in your slip. Click to ${parlaySelectedLegs.has(bestKey) ? 'remove' : 'add'} ${rowIsYours ? 'the book you placed at' : `the best ${dir.toUpperCase()} entry`} (${bestBk ? (PL_BOOK_NAME[bestBk] || bestBk) : 'no book'} ${rowPick.leg.line}) — or click any book chip for that specific number.">${selected.length ? `☑<i>${selected.length}</i>` : '☐'}</span>
       <span class="plr-id">
         <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(head.leg.fighter)}">${prettyName(head.leg.fighter)}</span>
         ${vsTag}${placedTag}
-        <span class="parlay-leg-off" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>
       </span>
       <span class="parlay-leg-dir ${dir}">${dir.toUpperCase()}</span>
       <span class="parlay-leg-stat src-${head.leg.stat}">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
@@ -12035,12 +12040,11 @@ function renderParlayLab(container: HTMLElement): void {
       : '';
     const overCells = sideCells(over, 'over');
     const underCells = sideCells(under, 'under');
-    return `<div class="parlay-leg-row is-paired off-board ${confClass}${nSel ? ' selected' : ''}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}">
+    return `<div class="parlay-leg-row is-paired off-board ${confClass}${nSel ? ' selected' : ''}" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}" data-fighter="${head.leg.fighter}" data-stat="${head.leg.stat}">
       <span class="parlay-leg-check is-multi plr-span2" title="${nSel} of ${all.length} book${all.length === 1 ? '' : 's'} across both sides of this prop are in your slip. Both sides stay available — click a side label to take its best entry, or any book chip for that exact number.">${nSel ? `☑<i>${nSel}</i>` : '☐'}</span>
       <span class="plr-id plr-span2">
         <span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${head.leg.fighter}" alt="" /></span><span class="parlay-leg-name" title="${prettyName(head.leg.fighter)}">${prettyName(head.leg.fighter)}</span>
         ${vsTag}${placedTag}
-        <span class="parlay-leg-off" title="Off-board. ${(head.leg.offReason || '').replace(/"/g, '&quot;')}">⊘</span>
       </span>
       ${overCells.dirBtn}
       <span class="parlay-leg-stat src-${head.leg.stat} plr-span2">${head.leg.stat === 'ss_r1' ? 'R1 SS' : head.leg.stat.toUpperCase()}</span>
@@ -12085,7 +12089,7 @@ function renderParlayLab(container: HTMLElement): void {
         OFF-BOARD PROPS <span class="parlay-count-pill">${displayOffLegs.length}${displayOffLegs.length !== offBoardLegs.length ? `/${offBoardLegs.length}` : ''}</span>
         <span class="pob-props" title="${displayOffLegs.length} legs across ${offPropCount} distinct props — a prop with several books posting it is ONE row with a book rail, not one row per book.">${offPropCount} props</span>
       </button>
-      <div class="parlay-offboard-note" title="These didn't make the ranked pool — the model leans the other side, has no read on the prop, or the market itself won't carry the side (CTRL is over-only, a demon/goblin KD is More-only, a dog's FP UNDER is blocked on Pick6 and Betr). Confidence is the model's own complement, or 50% where it has no read; EV and slip health price them exactly like any other leg, so they simply sort low. Hover any off-board flag for that leg's own reason.">Fully parlayable — they sort low because the model is against them or silent on them. <b>Hover for why.</b>${parlayPoolShowOffBoard ? '' : ' Open to build off them.'}</div>
+      <div class="parlay-offboard-note" title="These didn't make the ranked pool — the model leans the other side, has no read on the prop, or the market itself won't carry the side (CTRL is over-only, a demon/goblin KD is More-only, a dog's FP UNDER is blocked on Pick6 and Betr). Confidence is the model's own complement, or 50% where it has no read; EV and slip health price them exactly like any other leg, so they simply sort low. Hover any off-board flag for that leg's own reason.">Fully parlayable — they sort low because the model is against them or silent on them. <b>Hover a row for why.</b>${parlayPoolShowOffBoard ? '' : ' Open to build off them.'}</div>
       ${offRows}
     </div>` : '';
   const parlayLegClip = (l: ParlayLeg, lf: AnalyzerFighter): string => {
