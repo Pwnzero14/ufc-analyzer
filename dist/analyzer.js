@@ -9483,7 +9483,16 @@ function renderBestPicks(container, renderSeq = 0) {
                 const hiddenFactors = factorsAll.slice(FACTOR_CAP);
                 const hidSup = hiddenFactors.filter(r => factorPolarity(r.icon, el.lean) === 'sup').length;
                 const hidOpp = hiddenFactors.filter(r => factorPolarity(r.icon, el.lean) === 'opp').length;
-                const hidTally = hidSup && hidOpp ? `✓${hidSup} ✗${hidOpp}` : hidSup ? `✓${hidSup}` : hidOpp ? `✗${hidOpp}` : `+${factorMore}`;
+                // GLOW-UP 304: the counts carry COLOUR, not just a glyph. At 9px in the mono
+                // face ✓ and ✗ are near-identical shapes, so the mixed form read as "√3 √2" —
+                // 303 made the chip more informative and less legible in the same move. Green
+                // and rose separate the halves whether or not the glyph resolves, and they are
+                // the same two colours the ✓/✗ factor chips beside it already use.
+                const hidTally = hidSup && hidOpp
+                    ? `<i class="hm-sup">✓${hidSup}</i> <i class="hm-opp">✗${hidOpp}</i>`
+                    : hidSup ? `<i class="hm-sup">✓${hidSup}</i>`
+                        : hidOpp ? `<i class="hm-opp">✗${hidOpp}</i>`
+                            : `+${factorMore}`;
                 const factorMoreChip = factorMore > 0
                     ? `<span class="bp-factor bp-factor-more${hidSup && !hidOpp ? ' hid-sup' : hidOpp && !hidSup ? ' hid-opp' : ''}" title="${factorMore} further factor${factorMore === 1 ? '' : 's'} behind this pick, hidden to keep the row short — ${hidSup} supporting, ${hidOpp} against${hiddenFactors.length - hidSup - hidOpp > 0 ? `, ${hiddenFactors.length - hidSup - hidOpp} context` : ''}. The four shown are the first four the model recorded, not the four that mattered most, so read this chip before concluding the visible rail is the whole argument: ${hiddenFactors.map(r => reasonHeadline(r.text)).join(' · ').replace(/"/g, '&quot;')}">${hidTally}</span>`
                     : '';
