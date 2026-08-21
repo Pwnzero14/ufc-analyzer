@@ -409,7 +409,7 @@ export const NAME_ALIASES = {
 //   control. Both halves of the blend are now expressed against THIS fight's
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
-export const MODEL_VERSION = 31;
+export const MODEL_VERSION = 32;
 // Ceiling on the FP predictor's confidence score. Exported because the
 // predictions panel needs to know when a 92 is an EARNED 92 and when it is the
 // clamp — on a typical card roughly a third of the board sits exactly here, and
