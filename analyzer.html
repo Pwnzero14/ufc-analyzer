@@ -31680,6 +31680,46 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    read as a rendering artefact rather than a control; still the quietest thing
    in the rail, but now locatable without hunting. */
 .bp-factor.bp-factor-more { opacity: .72; }
+
+/* ── GLOW-UP 300 · the verdict clipped mid-parenthetical ──────────────────────
+   .best-pick-reason clamps to 2 lines. Since 295 the verdict actually says
+   something, which made it longer, and at a zoomed / narrow viewport it clips
+   inside a parenthetical — "Proj FP (63.2 …" — which reads as broken rather than
+   truncated. The full string is in the element's title, so nothing is lost, but an
+   unclosed bracket is a bug-shaped thing to leave on screen.
+
+   Narrow only, deliberately. At full width these fit in one or two lines and a
+   third would do nothing but let the longest rows grow, undoing the row-height
+   evenness 295 just bought. */
+@media (max-width: 1500px) {
+  .best-pick-reason { -webkit-line-clamp: 3; }
+}
+@media (max-width: 1100px) {
+  .best-pick-reason { -webkit-line-clamp: 4; }
+}
+
+/* ── GLOW-UP 301 · a side label that broke mid-parenthetical ──────────────────
+   `UNDER (R1 SS line)` wrapped to "UNDER (R1 SS" / "line)" once the column got
+   narrow. Same failure as the clipped verdict: an unclosed bracket reads as a
+   bug, not as a wrap. These labels are short and fixed — there is never a good
+   place to break one. */
+.best-pick-type { white-space: nowrap; }
+
+/* ── GLOW-UP 302 · the columns broke before they collapsed ────────────────────
+   The two-column grid collapsed at a VIEWPORT width of 1100px, but what decides
+   whether a pick row fits is the width of its own COLUMN. At a zoomed viewport
+   just above the breakpoint each column lands around 550px, the row overflows,
+   and the unders column's win/EV block clips off the right edge — two columns
+   held long past the point where either could show a whole row.
+
+   auto-fit + minmax asks the real question ("can two columns each hold 620px?")
+   instead of guessing a viewport number that has to be re-guessed for every zoom
+   level and sidebar state. Below that it is one full-width column, which is what
+   the 1100 rule was reaching for. That rule stays: it is now redundant rather
+   than wrong, and it also carries fighter-row layout this must not disturb. */
+.best-picks-grid {
+  grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+}
 </style>
 </head>
 <body>
