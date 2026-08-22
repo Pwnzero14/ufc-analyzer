@@ -2425,6 +2425,71 @@ function parsePrizePicksApiFighters(data: any): Array<{ name: string; line_fp: n
   return Object.values(fighters).filter((f) => f.line_fp != null || f.line_ss != null || f.line_ss_r1 != null || f.line_ss_body != null || f.line_ss_leg != null || f.line_td != null || f.line_ft != null || f.line_kd != null);
 }
 
+/**
+ * Reconcile REMOVALS for a platform whose scrape is a single authoritative snapshot.
+ *
+ * mergeFighters merges "only non-null properties to avoid nulls overwriting existing
+ * values". That is correct for a platform scraped in PIECES — DK posts props
+ * progressively, and Pick6 runs several tabs whose payloads each carry a subset (the
+ * 2026-07-31 bug where TD and CTRL never coexisted). Under that rule a line can be
+ * added or changed but NEVER removed.
+ *
+ * PrizePicks is not scraped in pieces: one API call returns the whole board. So when
+ * PP takes a line down, the stored copy outlives it forever. Observed 2026-08-21 —
+ * PP posted a Fantasy line of 63.55 against Marquel Mederos, then corrected it onto
+ * Mason Jones. The analyzer kept Mederos at 63.55 through repeated auto-fetches and
+ * went on generating a lean ("UNDER FP 63.55 @ PrizePicks") against a line that no
+ * longer existed anywhere.
+ *
+ * Guarded so a broken scrape cannot wipe real data: a stat is only reconciled if the
+ * fresh payload returned at least one line for it. If PP's FP parse comes back empty
+ * — the failure mode this whole merge-don't-clear rule exists to protect against —
+ * nothing is cleared.
+ */
+const RECONCILABLE_LINE_FIELDS: Array<[string, string | null]> = [
+  ['line_fp', 'fp_under_available'],
+  ['line_ss', 'ss_under_available'],
+  ['line_ss_r1', null],
+  ['line_ss_body', null],
+  ['line_ss_leg', null],
+  ['line_td', 'td_under_available'],
+  ['line_ft', null],
+  ['line_kd', 'kd_under_available'],
+  ['line_ctrl', 'ctrl_under_available'],
+];
+
+function reconcileRemovals(merged: Array<any>, incoming: Array<any>, platform: string): number {
+  const freshByName = new Map<string, any>();
+  for (const f of incoming || []) {
+    const k = normalizeFighterName(f?.name);
+    if (k) freshByName.set(k, f);
+  }
+  // Only stats the fresh payload actually speaks to are eligible.
+  const covered = new Set<string>();
+  for (const [field] of RECONCILABLE_LINE_FIELDS) {
+    if ((incoming || []).some((f) => f?.[field] != null)) covered.add(field);
+  }
+  if (!covered.size) return 0;
+
+  let cleared = 0;
+  for (const f of merged || []) {
+    const k = normalizeFighterName(f?.name);
+    const fresh = k ? freshByName.get(k) : null;
+    for (const [field, availField] of RECONCILABLE_LINE_FIELDS) {
+      if (!covered.has(field)) continue;
+      if (f[field] == null) continue;
+      if (fresh && fresh[field] != null) continue; // still on the board
+      f[field] = null;
+      if (availField) f[availField] = null;
+      cleared++;
+    }
+  }
+  if (cleared) {
+    console.warn(`[UFC] ${platform}: cleared ${cleared} line(s) the board no longer offers`);
+  }
+  return cleared;
+}
+
 async function fetchPrizePicksFromBackground(): Promise<UnderdogCoverage> {
   const endpoints = [
     'https://api.prizepicks.com/projections?per_page=250&single_stat=false',
@@ -2447,6 +2512,9 @@ async function fetchPrizePicksFromBackground(): Promise<UnderdogCoverage> {
       if (!fighters.length) continue;
 
       mergedFighters = mergeOrReplaceFighters(mergedFighters, fighters, 'prizepicks');
+      // PP's board is a single authoritative snapshot, so anything it no longer
+      // carries has genuinely been taken down — not merely un-scraped this pass.
+      reconcileRemovals(mergedFighters, fighters, 'prizepicks');
       const coverage = getUnderdogStatCoverage(mergedFighters);
       console.log(`[UFC Auto-Scrape] prizepicks API endpoint: ${url} -> fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, all3=${coverage.allThreeCount}`);
     } catch (e) {
