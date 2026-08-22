@@ -174,6 +174,16 @@ export const NAME_ALIASES = {
     'Aori Qileng': 'Aoriqileng',
     'Aori Aoriqileng': 'Aoriqileng',
     'Harris Carlston': 'Carlston Harris',
+    // 2026-08-21: PrizePicks lists him "Sergey Spivak"; UFCStats canonical is
+    // "Serghei Spivac". namesMatch is surname-token based, so Spivak/Spivac never
+    // matched and the stale-opponent guard concluded PP had priced Vitor Petrino
+    // against someone off the card — dropping every PrizePicks line on that fight
+    // and showing "⊘ STALE PRIZEPICKS". The data was in storage the whole time.
+    'Sergey Spivak': 'Serghei Spivac',
+    'Sergei Spivak': 'Serghei Spivac',
+    'Serghei Spivak': 'Serghei Spivac',
+    'Sergey Spivac': 'Serghei Spivac',
+    'Sergei Spivac': 'Serghei Spivac',
     'Xiong Jing Nan': 'Xiong Jingnan',
     // Reverse-order variants: platforms sometimes list Chinese fighters in
     // Western order (given-family) while UFCStats uses Chinese order (family-given).
