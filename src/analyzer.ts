@@ -21733,13 +21733,17 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // GLOW-UP 166 (level-up 4): per-book lines for the sensitivity strip —
   // fighter's OWN panels only (opp/R1/body/leg variants would inherit the
   // wrong books, so they don't get one).
-  const sensBooks = (stat: 'fp'|'ss'|'td'|'ft'|'ss_r1'): Array<{ tag: string; line: number }> => {
+  const sensBooks = (stat: 'fp'|'ss'|'td'|'ft'|'ss_r1'|'ss_body'|'ss_leg'): Array<{ tag: string; line: number }> => {
     const defs: Array<[string, number | null | undefined]> =
       // R1 SS carries its OWN per-book lines, so it can have a sensitivity strip
       // like the others. The exclusion above was about opp/body/leg variants
       // inheriting the wrong books; R1 does not — it has PP/UD/DK of its own, and
       // they genuinely differ (De Ridder: PP 11.5, UD 15.5, DK 12.5).
       stat === 'ss_r1' ? [['PP', f.line_pp_ss_r1], ['UD', f.line_ud_ss_r1], ['DK', f.line_dk_ss_r1]]
+      // Body/Leg are UD+PP only. Their LINE already followed the selection via
+      // platformBodyLegLine — they were only missing the per-book record strip.
+      : stat === 'ss_body' ? [['UD', f.line_ud_ss_body], ['PP', f.line_pp_ss_body]]
+      : stat === 'ss_leg' ? [['UD', f.line_ud_ss_leg], ['PP', f.line_pp_ss_leg]]
       : stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
       : stat === 'ss' ? [['P6', f.line_p6_ss], ['UD', f.line_ud_ss], ['PP', f.line_pp_ss], ['BT', f.line_betr_ss], ['DK', f.line_dk_ss]]
       : stat === 'td' ? [['P6', f.line_p6_td], ['UD', f.line_ud_td], ['PP', f.line_pp_td], ['BT', f.line_betr_td], ['DK', f.line_dk_td]]
@@ -21781,7 +21785,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     ...(f.line_ud_ss_body != null ? [{ tag: 'UD', raw: f.line_ud_ss_body }] : []),
     ...(f.line_pp_ss_body != null ? [{ tag: 'PP', raw: f.line_pp_ss_body }] : []),
   ]);
-  const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss');
+  const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss', null, sensBooks('ss_body'));
   const legLine = platformBodyLegLine(f.line_ud_ss_leg, f.line_pp_ss_leg);
   const legSources = [f.line_ud_ss_leg != null ? 'UD' : null, f.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean) as string[];
   const legBadge = legSources.length === 1 ? `${legSources[0]}-only` : legSources.join('+');
@@ -21789,7 +21793,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     ...(f.line_ud_ss_leg != null ? [{ tag: 'UD', raw: f.line_ud_ss_leg }] : []),
     ...(f.line_pp_ss_leg != null ? [{ tag: 'PP', raw: f.line_pp_ss_leg }] : []),
   ]);
-  const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
+  const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss', null, sensBooks('ss_leg'));
   const tdHistoryHTML = buildHistoryBars(fights, h => h.td,     activeLine, ssLine, tdLine, ftLine, 'td', null, sensBooks('td'));
   // Knockdowns (PrizePicks-only prop) — panel only renders when a KD line exists.
   const kdLine = f.line_pp_kd ?? null;

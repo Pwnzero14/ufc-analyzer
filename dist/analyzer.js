@@ -21310,10 +21310,14 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         // inheriting the wrong books; R1 does not — it has PP/UD/DK of its own, and
         // they genuinely differ (De Ridder: PP 11.5, UD 15.5, DK 12.5).
         stat === 'ss_r1' ? [['PP', f.line_pp_ss_r1], ['UD', f.line_ud_ss_r1], ['DK', f.line_dk_ss_r1]]
-            : stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
-                : stat === 'ss' ? [['P6', f.line_p6_ss], ['UD', f.line_ud_ss], ['PP', f.line_pp_ss], ['BT', f.line_betr_ss], ['DK', f.line_dk_ss]]
-                    : stat === 'td' ? [['P6', f.line_p6_td], ['UD', f.line_ud_td], ['PP', f.line_pp_td], ['BT', f.line_betr_td], ['DK', f.line_dk_td]]
-                        : [['P6', f.line_p6_ft], ['UD', f.line_ud_ft], ['PP', f.line_pp_ft], ['BT', f.line_betr_ft], ['DK', f.line_dk_ft]];
+            // Body/Leg are UD+PP only. Their LINE already followed the selection via
+            // platformBodyLegLine — they were only missing the per-book record strip.
+            : stat === 'ss_body' ? [['UD', f.line_ud_ss_body], ['PP', f.line_pp_ss_body]]
+                : stat === 'ss_leg' ? [['UD', f.line_ud_ss_leg], ['PP', f.line_pp_ss_leg]]
+                    : stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
+                        : stat === 'ss' ? [['P6', f.line_p6_ss], ['UD', f.line_ud_ss], ['PP', f.line_pp_ss], ['BT', f.line_betr_ss], ['DK', f.line_dk_ss]]
+                            : stat === 'td' ? [['P6', f.line_p6_td], ['UD', f.line_ud_td], ['PP', f.line_pp_td], ['BT', f.line_betr_td], ['DK', f.line_dk_td]]
+                                : [['P6', f.line_p6_ft], ['UD', f.line_ud_ft], ['PP', f.line_pp_ft], ['BT', f.line_betr_ft], ['DK', f.line_dk_ft]];
         return defs
             .filter((d) => typeof d[1] === 'number' && d[1] > 0)
             .map(([tag, line]) => ({ tag, line }));
@@ -21351,7 +21355,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ...(f.line_ud_ss_body != null ? [{ tag: 'UD', raw: f.line_ud_ss_body }] : []),
         ...(f.line_pp_ss_body != null ? [{ tag: 'PP', raw: f.line_pp_ss_body }] : []),
     ]);
-    const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss');
+    const bodyHistoryHTML = buildHistoryBars(fights, h => h.sigStrBody, bodyLine, bodyLine, null, null, 'ss', null, sensBooks('ss_body'));
     const legLine = platformBodyLegLine(f.line_ud_ss_leg, f.line_pp_ss_leg);
     const legSources = [f.line_ud_ss_leg != null ? 'UD' : null, f.line_pp_ss_leg != null ? 'PP' : null].filter(Boolean);
     const legBadge = legSources.length === 1 ? `${legSources[0]}-only` : legSources.join('+');
@@ -21359,7 +21363,7 @@ function buildFighterRow(f, oppEntry, fightIndex = 0) {
         ...(f.line_ud_ss_leg != null ? [{ tag: 'UD', raw: f.line_ud_ss_leg }] : []),
         ...(f.line_pp_ss_leg != null ? [{ tag: 'PP', raw: f.line_pp_ss_leg }] : []),
     ]);
-    const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss');
+    const legHistoryHTML = buildHistoryBars(fights, h => h.sigStrLeg, legLine, legLine, null, null, 'ss', null, sensBooks('ss_leg'));
     const tdHistoryHTML = buildHistoryBars(fights, h => h.td, activeLine, ssLine, tdLine, ftLine, 'td', null, sensBooks('td'));
     // Knockdowns (PrizePicks-only prop) — panel only renders when a KD line exists.
     const kdLine = f.line_pp_kd ?? null;
