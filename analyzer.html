@@ -20631,36 +20631,35 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   font-weight: 700;
 }
 
-/* Platform chip: book brand colors (same DNA as the lines strip) */
-.best-pick-platform.plat-pick6 {
-  color: #7cc4ff !important;
-  border-color: rgba(86,195,255,0.35) !important;
-  background: rgba(86,195,255,0.07) !important;
-  text-shadow: 0 0 6px rgba(86,195,255,0.3);
-}
-.best-pick-platform.plat-underdog {
-  color: #a8aeff !important;
-  border-color: rgba(127,136,255,0.35) !important;
-  background: rgba(127,136,255,0.07) !important;
-  text-shadow: 0 0 6px rgba(127,136,255,0.3);
-}
-.best-pick-platform.plat-prizepicks {
-  color: #5fe0dc !important;
-  border-color: rgba(44,212,208,0.35) !important;
-  background: rgba(44,212,208,0.07) !important;
-  text-shadow: 0 0 6px rgba(44,212,208,0.3);
-}
-.best-pick-platform.plat-betr {
-  color: #ffa06b !important;
-  border-color: rgba(255,138,61,0.35) !important;
-  background: rgba(255,138,61,0.07) !important;
-  text-shadow: 0 0 6px rgba(255,138,61,0.3);
-}
-.best-pick-platform.plat-draftkings_sportsbook {
-  color: #ffc75e !important;
-  border-color: rgba(245,158,11,0.35) !important;
-  background: rgba(245,158,11,0.07) !important;
-  text-shadow: 0 0 6px rgba(245,158,11,0.3);
+/* ── GLOW-UP 321 · the book chips were impersonating stats ───────────────────
+   These were five hardcoded hexes, each with !important, written before the
+   design system had --book-* tokens. Every one of them had drifted into a stat
+   hue — the exact collision the palette comment warns against ("deliberately
+   offset from the --stat-* hues so a chart series never reads as a stat"):
+
+     Pick6  #7cc4ff  vs --stat-fp   #56c3ff     near-identical blue
+     PP     #5fe0dc  vs --stat-ss   #2cd4d0     near-identical teal
+     UD     #a8aeff  vs --stat-ft   #927dff     purple
+     Betr   #ffa06b  vs --stat-ctrl #ff8345     orange
+     DK     #ffc75e  vs --amber                 reads as CAUTION
+
+   The DK one is the worst: this system reserves amber for "caution that still
+   permits action", so a DK chip was wearing the warning colour on the board where
+   warnings decide whether you place a leg. On a Best Picks row an FP chip and a
+   Pick6 chip sat inches apart in the same blue.
+
+   Now the tokens, and the !important goes with them — it was what would have let
+   this drift survive a palette change. */
+.best-pick-platform.plat-pick6                 { --bk: var(--book-p6); }
+.best-pick-platform.plat-underdog              { --bk: var(--book-ud); }
+.best-pick-platform.plat-prizepicks            { --bk: var(--book-pp); }
+.best-pick-platform.plat-betr                  { --bk: var(--book-betr); }
+.best-pick-platform.plat-draftkings_sportsbook { --bk: var(--book-dk); }
+.best-pick-platform[class*="plat-"] {
+  color: var(--bk, var(--text2));
+  border-color: color-mix(in srgb, var(--bk, var(--text2)) 35%, transparent);
+  background: color-mix(in srgb, var(--bk, var(--text2)) 8%, transparent);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--bk, var(--text2)) 30%, transparent);
 }
 
 /* Better-line tag: green money chip instead of plain blue text */
@@ -32136,6 +32135,69 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 }
 @media (max-width: 1180px) {
   .plg-leg { grid-template-columns: minmax(110px,1.6fr) 42px 50px 42px 80px 104px 70px 62px minmax(0,0.001fr); gap: 6px; }
+}
+
+/* ═══ GLOW-UP 322-326 · Best Picks as an instrument ═══════════════════════════
+   Same idea the ledgers got, applied to the board that decides what you place.
+   Nothing here changes the grid tracks — verified 5 in-flow children against the
+   5 tracks rule 6205 supplies, with both row buttons position:absolute. */
+
+/* ── 322 · the meta run had no column edges ───────────────────────────────────
+   .best-pick-meta was `display:flex; gap:7px` over up to seven chips, three of
+   which appear on EVERY row (side, tier, book) and four of which do not (Δ, book-
+   only, placed, your record). So the book chip sat at a different x on every row
+   and nothing could be compared by running your eye down the column.
+
+   The three constants get floors so they hold a column; the optional four still
+   flow after them. Not a grid — a grid would reserve four slots that are empty on
+   most rows, which is the right call in the ledger (uniform records) and the wrong
+   one here (sparse flags). */
+.best-pick-meta > .best-pick-type     { min-width: 104px; }
+.best-pick-meta > .best-pick-tier     { min-width: 34px; text-align: center; }
+.best-pick-meta > .best-pick-platform { min-width: 104px; }
+.best-pick-meta                       { flex-wrap: nowrap; }
+
+/* ── 323 · the rank gutter ────────────────────────────────────────────────────
+   #1-#4 already went gold. The number is the board's own ordering and deserves to
+   read as a readout rather than body text — tabular so the digits sit still, and
+   the top four get a faint rule that makes the cut visible without a label. */
+.best-pick-rank { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.best-picks-section .best-pick-row:nth-child(-n+4) .best-pick-rank {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--gold, #e0a33e) 45%, transparent);
+}
+
+/* ── 324 · the confidence bar was a bare sliver ───────────────────────────────
+   It carries the number the tier is derived from, so it gets a track to sit in and
+   lights in its tier's colour instead of one flat fill. */
+.best-pick-conf {
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.best-pick-conf > i { display: block; height: 100%; border-radius: 2px; }
+.best-pick-conf.high > i { background: var(--green, #26d07c); box-shadow: 0 0 8px -2px var(--green, #26d07c); }
+.best-pick-conf.med  > i { background: var(--gold, #e0a33e); }
+.best-pick-conf.low  > i { background: var(--text3); }
+
+/* ── 325 · the line, and what it is worth ─────────────────────────────────────
+   The biggest number on a pick row is the LINE, which is the one figure you
+   already know — it is printed on the book chip beside it. WIN and EV are what the
+   row exists to tell you and they were the smallest text in it. The line keeps its
+   size (it is the anchor you scan for) but stops out-shouting: tabular, and the two
+   stats beside it gain the weight. */
+.best-pick-line { font-variant-numeric: tabular-nums; }
+.bp-hs-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.bp-hero-side .bp-hs-val.pos { text-shadow: 0 0 9px color-mix(in srgb, var(--green, #26d07c) 40%, transparent); }
+.bp-hero-side .bp-hs-val.neg { text-shadow: 0 0 9px color-mix(in srgb, var(--red, #ff5b78) 35%, transparent); }
+
+/* ── 326 · placed and in-slate rows should be findable ────────────────────────
+   Both states already exist as classes and neither was legible at a glance down a
+   sixteen-row board — you had to read the ● PLACED chip. A lit left edge in the
+   state's own colour: gold for queued, green for money already down. */
+.best-pick-row.in-slate { box-shadow: inset 3px 0 0 -1px var(--gold, #e0a33e); }
+.best-pick-row.placed   { box-shadow: inset 3px 0 0 -1px var(--green, #26d07c); }
+.best-pick-row.in-slate.placed {
+  box-shadow: inset 3px 0 0 -1px var(--green, #26d07c), inset 6px 0 0 -4px var(--gold, #e0a33e);
 }
 </style>
 </head>
