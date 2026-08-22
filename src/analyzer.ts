@@ -21406,8 +21406,17 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     return `<div class="line-cell ${stat} src-${source}${lineClass}${flashClass}${oneSidedCls}"><div class="line-platform"><span class="line-source-tag src-${source}">${sourceLabel}</span><span>${stat.toUpperCase()}</span>${sideMark}</div><div class="line-value ${source}">${value}${movementHtml}</div>${sparkHtml}${bestBadge}</div>`;
   };
 
-  function platformStatLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td' | 'ft' | 'ctrl'): number | null {
+  function platformStatLine(entry: AnalyzerFighter | null, stat: 'ss' | 'td' | 'ft' | 'ctrl' | 'ss_r1'): number | null {
     if (!entry) return null;
+    // R1 SS is a PP/UD/DK-only market — Pick6 and Betr never post it (there is no
+    // line_p6_ss_r1 or line_betr_ss_r1 anywhere), so those two selections fall
+    // through to a book that does rather than blanking the panel.
+    if (stat === 'ss_r1') {
+      const pp1 = entry.line_pp_ss_r1, ud1 = entry.line_ud_ss_r1, dk1 = entry.line_dk_ss_r1;
+      if (currentPlatform === 'underdog') return ud1 ?? pp1 ?? dk1 ?? null;
+      if (currentPlatform === 'draftkings_sportsbook') return dk1 ?? pp1 ?? ud1 ?? null;
+      return pp1 ?? ud1 ?? dk1 ?? null;
+    }
     const p6 = stat === 'ss' ? entry.line_p6_ss   : stat === 'td' ? entry.line_p6_td   : stat === 'ft' ? entry.line_p6_ft   : entry.line_p6_ctrl;
     const ud = stat === 'ss' ? entry.line_ud_ss   : stat === 'td' ? entry.line_ud_td   : stat === 'ft' ? entry.line_ud_ft   : entry.line_ud_ctrl;
     const pp = stat === 'ss' ? entry.line_pp_ss   : stat === 'td' ? entry.line_pp_td   : stat === 'ft' ? entry.line_pp_ft   : entry.line_pp_ctrl;
@@ -21724,9 +21733,14 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   // GLOW-UP 166 (level-up 4): per-book lines for the sensitivity strip —
   // fighter's OWN panels only (opp/R1/body/leg variants would inherit the
   // wrong books, so they don't get one).
-  const sensBooks = (stat: 'fp'|'ss'|'td'|'ft'): Array<{ tag: string; line: number }> => {
+  const sensBooks = (stat: 'fp'|'ss'|'td'|'ft'|'ss_r1'): Array<{ tag: string; line: number }> => {
     const defs: Array<[string, number | null | undefined]> =
-      stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
+      // R1 SS carries its OWN per-book lines, so it can have a sensitivity strip
+      // like the others. The exclusion above was about opp/body/leg variants
+      // inheriting the wrong books; R1 does not — it has PP/UD/DK of its own, and
+      // they genuinely differ (De Ridder: PP 11.5, UD 15.5, DK 12.5).
+      stat === 'ss_r1' ? [['PP', f.line_pp_ss_r1], ['UD', f.line_ud_ss_r1], ['DK', f.line_dk_ss_r1]]
+      : stat === 'fp' ? [['P6', f.line_p6], ['UD', f.line_ud], ['PP', f.line_pp], ['BT', f.line_betr]]
       : stat === 'ss' ? [['P6', f.line_p6_ss], ['UD', f.line_ud_ss], ['PP', f.line_pp_ss], ['BT', f.line_betr_ss], ['DK', f.line_dk_ss]]
       : stat === 'td' ? [['P6', f.line_p6_td], ['UD', f.line_ud_td], ['PP', f.line_pp_td], ['BT', f.line_betr_td], ['DK', f.line_dk_td]]
       : [['P6', f.line_p6_ft], ['UD', f.line_ud_ft], ['PP', f.line_pp_ft], ['BT', f.line_betr_ft], ['DK', f.line_dk_ft]];
@@ -21736,7 +21750,9 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
   };
   const historyHTML   = buildHistoryBars(fights, h => getFightFantasyValueForPlatform(h, historyPlatform), activeLine, ssLine, tdLine, ftLine, 'fp', null, sensBooks('fp'));
   const ssHistoryHTML = buildHistoryBars(fights, h => h.sigStr, activeLine, ssLine, tdLine, ftLine, 'ss', null, sensBooks('ss'));
-  const ssR1Line = f.line_pp_ss_r1 ?? f.line_ud_ss_r1 ?? f.line_dk_ss_r1 ?? null;
+  // Was a fixed PP ?? UD ?? DK fallback, so selecting DK still graded R1 history
+  // against PrizePicks' line. Follows the selected book now, exactly as SS/TD/FT do.
+  const ssR1Line = platformStatLine(f, 'ss_r1');
   // R1 SS is offered by PrizePicks, Underdog, and DK — label the panel by whichever
   // platform(s) actually supplied a line (PP is shown first when several exist).
   const ssR1Sources = [f.line_pp_ss_r1 != null ? 'PP' : null, f.line_ud_ss_r1 != null ? 'UD' : null, f.line_dk_ss_r1 != null ? 'DK' : null].filter(Boolean) as string[];
@@ -21746,7 +21762,7 @@ function buildFighterRow(f: AnalyzerFighter, oppEntry: AnalyzerFighter|null, fig
     ...(f.line_ud_ss_r1 != null ? [{ tag: 'UD', raw: f.line_ud_ss_r1 }] : []),
     ...(f.line_dk_ss_r1 != null ? [{ tag: 'DK', raw: f.line_dk_ss_r1 }] : []),
   ]);
-  const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss');
+  const ssR1HistoryHTML = buildHistoryBars(fights, h => h.sigStrR1, ssR1Line, ssR1Line, null, null, 'ss', null, sensBooks('ss_r1'));
   // Body/Leg sig strikes (Underdog + PrizePicks only). History bars use per-fight body/leg
   // landed from UFCStats (populated after the v50 cache re-fetch). The displayed line
   // follows the active platform — PrizePicks shows the PP line, every other selection
