@@ -14705,6 +14705,20 @@ function renderPredictionsHtml(
       })
       .sort((a, b) => a.totalErr - b.totalErr);
 
+    // GLOW-UP 336: summary.bestPrediction / worstPrediction are written by the
+    // learning cycle using the OLD mixed-unit score (|dSS| + |dTD| + |dFP|). Once
+    // the table below was renormalised the two disagreed on screen — the hero
+    // called Wes Schultz best while the table ranked him 9th of 26. A panel that
+    // contradicts itself in two places is worse than one that is merely wrong in
+    // one, so both now read the ranking that is actually displayed.
+    const bestRanked = sortedDeltas.length ? sortedDeltas[0]!.fighter : s.bestPrediction;
+    const worstRanked = sortedDeltas.length ? sortedDeltas[sortedDeltas.length - 1]!.fighter : s.worstPrediction;
+    // GLOW-UP 337: six of twenty-six rows land past 100% on this card (up to 237%),
+    // so a bar clamped at 100% flattens the entire tail into one length. Scaled to
+    // the card's own worst instead: the percentage beside it still carries the
+    // absolute reading, and the bar goes back to doing the one thing a bar is for,
+    // which is ordering things against each other.
+    const worstErr = sortedDeltas.length ? Math.max(...sortedDeltas.map(x => x.totalErr), 0.01) : 1;
     const rankedRows = sortedDeltas.map((p, idx) => {
       const ssDelta = Number.isFinite(p.delta.ss) ? `${p.delta.ss > 0 ? '+' : ''}${p.delta.ss.toFixed(1)}` : '—';
       const tdDelta = Number.isFinite(p.delta.td) ? `${p.delta.td > 0 ? '+' : ''}${p.delta.td.toFixed(1)}` : '—';
@@ -14713,7 +14727,7 @@ function renderPredictionsHtml(
       // saturating: the old /45 denominator put nine of eleven rows at full-width
       // red on the settled card, which ranks nothing.
       const errColor = p.totalErr < 0.30 ? 'var(--green)' : p.totalErr < 0.50 ? 'var(--amber)' : 'var(--red)';
-      const barPct = Math.min(100, p.totalErr * 100);
+      const barPct = Math.min(100, (p.totalErr / worstErr) * 100);
       const g = p.totalErr < 0.30 ? 'good' : p.totalErr < 0.50 ? 'mid' : 'bad';
       return `<div class="learn-delta-row" data-grade="${g}">
         <span class="learn-delta-rank">${idx + 1}</span>
@@ -14733,8 +14747,8 @@ function renderPredictionsHtml(
         <div class="learn-hero-title">Prediction Accuracy</div>
         <div class="learn-hero-subtitle" title="Average error across SS, TD and FP, each expressed as a share of a typical value for that stat before being combined. The previous formula averaged the three raw numbers, so a takedown miss of 1.2 counted the same as a fantasy miss of 1.2 — thirty times smaller in proportion. Raw per-stat figures are on the chips below.">Normalised error ${(overallNorm * 100).toFixed(0)}% across ${sortedDeltas.length} fighters${trendTag(overallNorm * 100, prevOverall != null ? prevOverall * 100 : null)}</div>
         <div class="learn-hero-badges">
-          <span class="learn-badge-best">▲ Best · ${s.bestPrediction}</span>
-          <span class="learn-badge-worst">▼ Worst · ${s.worstPrediction}</span>
+          <span class="learn-badge-best" title="Lowest normalised error on this card — the same ranking as the table below.">▲ Best · ${bestRanked}</span>
+          <span class="learn-badge-worst" title="Highest normalised error on this card — the same ranking as the table below.">▼ Worst · ${worstRanked}</span>
         </div>
       </div>
       ${trajHtml}
