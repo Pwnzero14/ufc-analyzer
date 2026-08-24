@@ -14587,36 +14587,102 @@ function renderPredictionsHtml(
       return `<span class="learn-trend-chip ${better ? 'better' : 'worse'}" title="${better ? 'Improved' : 'Regressed'} vs last cycle (${prev.toFixed(1)} → ${cur.toFixed(1)})">${better ? '▼' : '▲'}${Math.abs(d).toFixed(1)}</span>`;
     };
 
-    const chipColor = (v: number) => v < 8 ? 'var(--green)' : v < 16 ? 'var(--amber)' : 'var(--red)';
-    const chipGrade = (v: number) => v < 8 ? 'good' : v < 16 ? 'mid' : 'bad';
+    // ── GLOW-UP 331-334 · this panel was adding strikes to takedowns ──────────
+    // Every aggregate here combined SS, TD and FP as if they shared a unit:
+    //   overallAvg = (SS + TD + FP) / 3        chipColor(v) = v < 8 ? green : ...
+    //   totalErr   = |dSS| + |dTD| + |dFP|     pct = val / 40
+    // On the settled Hernandez card that reads SS ±25.5, TD ±1.2, FP ±35.8. TD is
+    // not thirty times better than FP — it is measured on a scale thirty times
+    // smaller. With one 8/16 threshold for all three, TD renders green with a 3%
+    // stub no matter how wrong it gets, so the stat the model is WORST at
+    // proportionally is the one the panel calls its best.
+    //
+    // Everything below normalises by the stat's own mean actual on the card, so a
+    // ±1.2 takedown error against ~1 takedown a fight reads as what it is.
+    const lrnRows = latestLearn.predictions || [];
+    const meanOf = (pick: (p: typeof lrnRows[number]) => number): number => {
+      const v = lrnRows.map(pick).filter(Number.isFinite);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    };
+    // Signed bias — the number this panel never had. Absolute error says how far
+    // off the model was; only the sign says which WAY, and that is the half that
+    // decides whether a correction gets added, kept or reversed.
+    const biasOf = (pick: (p: typeof lrnRows[number]) => number): number | null => {
+      const v = lrnRows.map(pick).filter(Number.isFinite);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    };
+    const SCALE_FLOOR: Record<string, number> = { SS: 5, TD: 0.5, FP: 10 };
+    const scaleFor = (label: string): number => {
+      const raw = label === 'SS' ? meanOf(p => Math.abs(p.actual.ss))
+        : label === 'TD' ? meanOf(p => Math.abs(p.actual.td))
+        : meanOf(p => Math.abs(p.actual.fp));
+      return Math.max(raw, SCALE_FLOOR[label] ?? 1);
+    };
+    const biasFor = (label: string): number | null =>
+      label === 'SS' ? biasOf(p => p.delta.ss)
+      : label === 'TD' ? biasOf(p => p.delta.td)
+      : biasOf(p => p.delta.fp);
+    // Normalised error: avg |delta| as a share of that stat's own typical size.
+    const normErr = (label: string, val: number): number => val / scaleFor(label);
+    const chipColor = (n: number) => n < 0.30 ? 'var(--green)' : n < 0.50 ? 'var(--amber)' : 'var(--red)';
+    const chipGrade = (n: number) => n < 0.30 ? 'good' : n < 0.50 ? 'mid' : 'bad';
     const statChip = (label: string, val: number, prevVal?: number | null) => {
-      const c = chipColor(val);
-      const g = chipGrade(val);
-      const pct = Math.min(100, Math.round((val / 40) * 100));
+      const n = normErr(label, val);
+      const c = chipColor(n);
+      const g = chipGrade(n);
+      const bias = biasFor(label);
+      // Bar is now the normalised share, so the three chips are finally comparable
+      // to each other rather than each being a fraction of an arbitrary 40.
+      const pct = Math.min(100, Math.round(n * 100));
+      const biasTag = bias != null && Math.abs(bias) >= 0.05
+        ? `<span class="learn-chip-bias ${bias > 0 ? 'under' : 'over'}" title="Signed bias: on average the model predicted ${bias > 0 ? 'BELOW' : 'ABOVE'} the outcome by ${Math.abs(bias).toFixed(1)}. Absolute error tells you how far off; only this tells you which way, which is what decides whether a correction is added, kept or reversed.">${bias > 0 ? '↑' : '↓'}${Math.abs(bias).toFixed(1)}</span>`
+        : '';
       return `<div class="learn-stat-chip" data-grade="${g}">
         <div class="learn-chip-header"><span class="learn-chip-dot" style="background:${c}"></span><span class="learn-chip-label">Avg |Δ| ${label}</span></div>
-        <span class="learn-chip-value" style="color:${c}">±${val.toFixed(1)}</span>${trendTag(val, prevVal)}
-        <div class="learn-chip-bar-track"><div class="learn-chip-bar-fill" style="width:${pct}%;background:${c}"></div></div>
+        <span class="learn-chip-value" style="color:${c}">±${val.toFixed(1)}</span>${biasTag}${trendTag(val, prevVal)}
+        <div class="learn-chip-bar-track" title="${(n * 100).toFixed(0)}% of a typical ${label} on this card (±${val.toFixed(1)} against a mean of ${scaleFor(label).toFixed(1)}). Shown as a share so SS, TD and FP can be compared — a raw ±1.2 on TD and ±35.8 on FP are not thirty times apart in quality."><div class="learn-chip-bar-fill" style="width:${pct}%;background:${c}"></div></div>
       </div>`;
     };
-    const overallAvg = (s.avgAbsDeltaSS + s.avgAbsDeltaTD + s.avgAbsDeltaFP) / 3;
-    const overallGrade = overallAvg < 10 ? 'A' : overallAvg < 18 ? 'B' : overallAvg < 28 ? 'C' : 'D';
-    const overallColor = overallAvg < 10 ? 'var(--green)' : overallAvg < 18 ? 'var(--amber)' : 'var(--red)';
-    const prevOverall = prevS ? (prevS.avgAbsDeltaSS + prevS.avgAbsDeltaTD + prevS.avgAbsDeltaFP) / 3 : null;
+    // GLOW-UP 333: the grade was the mixed-unit average of the three, so it was
+    // effectively (SS + FP)/3 — TD could be arbitrarily wrong and move it by a
+    // rounding error. Normalised per stat first, then averaged, and computed the
+    // same way for past cycles so the trajectory stays internally comparable.
+    const overallNormOf = (entry: LearningResult): number => {
+      const rows = entry.predictions || [];
+      const mean = (pick: (p: typeof rows[number]) => number): number => {
+        const v = rows.map(pick).filter(Number.isFinite);
+        return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+      };
+      const sc = {
+        SS: Math.max(mean(p => Math.abs(p.actual.ss)), SCALE_FLOOR.SS!),
+        TD: Math.max(mean(p => Math.abs(p.actual.td)), SCALE_FLOOR.TD!),
+        FP: Math.max(mean(p => Math.abs(p.actual.fp)), SCALE_FLOOR.FP!),
+      };
+      const e = entry.summary;
+      return (e.avgAbsDeltaSS / sc.SS + e.avgAbsDeltaTD / sc.TD + e.avgAbsDeltaFP / sc.FP) / 3;
+    };
+    const overallNorm = overallNormOf(latestLearn);
+    // Bands are provisional and stated on the ring: they were chosen so the raw
+    // grade on the first normalised card lands where the old formula put it, not
+    // fitted to anything. Revisit once several cycles have been scored this way.
+    const overallGrade = overallNorm < 0.30 ? 'A' : overallNorm < 0.45 ? 'B' : overallNorm < 0.65 ? 'C' : 'D';
+    const overallColor = overallNorm < 0.30 ? 'var(--green)' : overallNorm < 0.45 ? 'var(--amber)' : 'var(--red)';
+    const prevOverall = prevLearn ? overallNormOf(prevLearn) : null;
+    const overallAvg = overallNorm;
 
     // Mini trajectory chart: overall avg |Δ| across the last learning cycles
     // (bar height ∝ error, so a shrinking skyline = an improving model).
     const trajEntries = log.slice(-8);
     let trajHtml = '';
     if (trajEntries.length > 1) {
-      const trajVals = trajEntries.map((e) => (e.summary.avgAbsDeltaSS + e.summary.avgAbsDeltaTD + e.summary.avgAbsDeltaFP) / 3);
+      const trajVals = trajEntries.map((e) => overallNormOf(e));
       const trajMax = Math.max(...trajVals, 1);
       const bars = trajEntries.map((e, i) => {
         const v = trajVals[i];
         const h = Math.max(14, Math.round((v / trajMax) * 100));
-        const g = v < 10 ? 'g-a' : v < 18 ? 'g-b' : v < 28 ? 'g-c' : 'g-d';
+        const g = v < 0.30 ? 'g-a' : v < 0.45 ? 'g-b' : v < 0.65 ? 'g-c' : 'g-d';
         const evName = (e as { event?: string }).event ?? 'earlier cycle';
-        return `<i class="${g}${i === trajEntries.length - 1 ? ' cur' : ''}" style="height:${h}%" title="${String(evName).replace(/"/g, '&quot;')} — avg |Δ| ${v.toFixed(1)}"></i>`;
+        return `<i class="${g}${i === trajEntries.length - 1 ? ' cur' : ''}" style="height:${h}%" title="${String(evName).replace(/"/g, '&quot;')} — normalised error ${(v * 100).toFixed(0)}%"></i>`;
       }).join('');
       trajHtml = `<div class="learn-traj" title="Accuracy trajectory — last ${trajEntries.length} learning cycles (shorter bars = better)">${bars}</div>`;
     }
@@ -14624,7 +14690,17 @@ function renderPredictionsHtml(
     const sortedDeltas = latestLearn.predictions
       .filter(p => Number.isFinite(p.delta.ss) || Number.isFinite(p.delta.fp))
       .map(p => {
-        const totalErr = Math.abs(p.delta.ss || 0) + Math.abs(p.delta.td || 0) + Math.abs(p.delta.fp || 0);
+        // GLOW-UP 335: was |dSS| + |dTD| + |dFP| — strikes plus takedowns plus
+        // fantasy points. TD contributed ~1 of a ~40 sum, so the ranking was
+        // essentially SS+FP and a fighter whose takedowns were badly missed sorted
+        // as if they had been predicted perfectly. Worse, `|| 0` turned an
+        // UNRESOLVED takedown into a perfect one — Kuse and Dorsainvil had no TD
+        // market on the settled card and were scored as exact hits on it.
+        const parts: number[] = [];
+        if (Number.isFinite(p.delta.ss)) parts.push(Math.abs(p.delta.ss) / scaleFor('SS'));
+        if (Number.isFinite(p.delta.td)) parts.push(Math.abs(p.delta.td) / scaleFor('TD'));
+        if (Number.isFinite(p.delta.fp)) parts.push(Math.abs(p.delta.fp) / scaleFor('FP'));
+        const totalErr = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
         return { ...p, totalErr };
       })
       .sort((a, b) => a.totalErr - b.totalErr);
@@ -14633,9 +14709,12 @@ function renderPredictionsHtml(
       const ssDelta = Number.isFinite(p.delta.ss) ? `${p.delta.ss > 0 ? '+' : ''}${p.delta.ss.toFixed(1)}` : '—';
       const tdDelta = Number.isFinite(p.delta.td) ? `${p.delta.td > 0 ? '+' : ''}${p.delta.td.toFixed(1)}` : '—';
       const fpDelta = Number.isFinite(p.delta.fp) ? `${p.delta.fp > 0 ? '+' : ''}${p.delta.fp.toFixed(1)}` : '—';
-      const errColor = p.totalErr < 15 ? 'var(--green)' : p.totalErr < 30 ? 'var(--amber)' : 'var(--red)';
-      const barPct = Math.min(100, (p.totalErr / 45) * 100);
-      const g = p.totalErr < 15 ? 'good' : p.totalErr < 30 ? 'mid' : 'bad';
+      // Thresholds and bar now sit on the normalised share, so they stop
+      // saturating: the old /45 denominator put nine of eleven rows at full-width
+      // red on the settled card, which ranks nothing.
+      const errColor = p.totalErr < 0.30 ? 'var(--green)' : p.totalErr < 0.50 ? 'var(--amber)' : 'var(--red)';
+      const barPct = Math.min(100, p.totalErr * 100);
+      const g = p.totalErr < 0.30 ? 'good' : p.totalErr < 0.50 ? 'mid' : 'bad';
       return `<div class="learn-delta-row" data-grade="${g}">
         <span class="learn-delta-rank">${idx + 1}</span>
         <span class="learn-delta-name">${p.fighter}</span>
@@ -14643,7 +14722,7 @@ function renderPredictionsHtml(
         <span class="learn-delta-stat">TD ${tdDelta}</span>
         <span class="learn-delta-stat">FP ${fpDelta}</span>
         <div class="learn-delta-bar"><div class="learn-delta-bar-fill" style="width:${barPct.toFixed(0)}%;background:${errColor}"></div></div>
-        <span class="learn-delta-total" style="color:${errColor}">±${p.totalErr.toFixed(1)}</span>
+        <span class="learn-delta-total" style="color:${errColor}" title="Average error across this fighter's resolved stats, as a share of a typical performance in each. Stats with no market — so nothing to grade against — are left out rather than counted as perfect.">${Math.round(p.totalErr * 100)}%</span>
       </div>`;
     }).join('');
 
@@ -14652,7 +14731,7 @@ function renderPredictionsHtml(
       <div class="learn-grade-ring" style="--grade-color:${overallColor}"><span class="learn-grade-letter">${overallGrade}</span></div>
       <div class="learn-hero-meta">
         <div class="learn-hero-title">Prediction Accuracy</div>
-        <div class="learn-hero-subtitle">Avg |Δ| ${overallAvg.toFixed(1)} across ${sortedDeltas.length} fighters${trendTag(overallAvg, prevOverall)}</div>
+        <div class="learn-hero-subtitle" title="Average error across SS, TD and FP, each expressed as a share of a typical value for that stat before being combined. The previous formula averaged the three raw numbers, so a takedown miss of 1.2 counted the same as a fantasy miss of 1.2 — thirty times smaller in proportion. Raw per-stat figures are on the chips below.">Normalised error ${(overallNorm * 100).toFixed(0)}% across ${sortedDeltas.length} fighters${trendTag(overallNorm * 100, prevOverall != null ? prevOverall * 100 : null)}</div>
         <div class="learn-hero-badges">
           <span class="learn-badge-best">▲ Best · ${s.bestPrediction}</span>
           <span class="learn-badge-worst">▼ Worst · ${s.worstPrediction}</span>

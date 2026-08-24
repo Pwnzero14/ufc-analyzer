@@ -32199,6 +32199,25 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .best-pick-row.in-slate.placed {
   box-shadow: inset 3px 0 0 -1px var(--green, #26d07c), inset 6px 0 0 -4px var(--gold, #e0a33e);
 }
+
+/* ── GLOW-UP 331 · the signed bias chip ───────────────────────────────────────
+   The panel could say how far the model missed and never which way, so deciding
+   whether a correction gets added, kept or reversed needed a console snippet. Up
+   arrow = the model predicted BELOW the outcome. Deliberately NOT green/red: a
+   bias is a direction, not a good or bad thing, and this system reserves those two
+   for direction-of-bet. Neutral with the arrow carrying the meaning. */
+.learn-chip-bias {
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700;
+  padding: 1px 4px; margin-left: 5px; border-radius: 3px; cursor: help;
+  color: var(--text2); border: 1px solid rgba(255,255,255,0.14);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.learn-chip-bias.under { border-color: color-mix(in srgb, var(--stat-fp, #56c3ff) 40%, transparent); }
+.learn-chip-bias.over  { border-color: color-mix(in srgb, var(--stat-ctrl, #ff8345) 40%, transparent); }
+
+/* The per-fighter total is a percentage now, not a sum of three units. */
+.learn-delta-total { font-variant-numeric: tabular-nums; cursor: help; }
+.learn-chip-bar-track { cursor: help; }
 </style>
 </head>
 <body>
