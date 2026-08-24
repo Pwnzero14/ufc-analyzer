@@ -14360,15 +14360,38 @@ function renderPredictionsHtml(cSec) {
             // as if they had been predicted perfectly. Worse, `|| 0` turned an
             // UNRESOLVED takedown into a perfect one — Kuse and Dorsainvil had no TD
             // market on the settled card and were scored as exact hits on it.
+            // GLOW-UP 338: normalising fixed the old bug and introduced its mirror. A
+            // ratio is unbounded, and TD sits on a scale near 1 — so being off by five
+            // takedowns is 500%, which swamps a three-stat average on its own. Serghei
+            // Spivac predicted SS to within HALF A STRIKE and still ranked 24th of 26,
+            // because one takedown stat contributed 5.0 of his 5.67 total.
+            //
+            // Capped at 2.0 per stat. Past twice a typical performance the prediction is
+            // simply wrong and how wrong stops carrying information about the fighter —
+            // it only reflects how small that stat's denominator is. The cap bounds any
+            // one stat's share of a composite without hiding it: the per-stat chips above
+            // are uncapped, so a catastrophic TD still reads as catastrophic there.
+            const STAT_CAP = 2.0;
             const parts = [];
             if (Number.isFinite(p.delta.ss))
-                parts.push(Math.abs(p.delta.ss) / scaleFor('SS'));
+                parts.push(Math.min(STAT_CAP, Math.abs(p.delta.ss) / scaleFor('SS')));
             if (Number.isFinite(p.delta.td))
-                parts.push(Math.abs(p.delta.td) / scaleFor('TD'));
+                parts.push(Math.min(STAT_CAP, Math.abs(p.delta.td) / scaleFor('TD')));
             if (Number.isFinite(p.delta.fp))
-                parts.push(Math.abs(p.delta.fp) / scaleFor('FP'));
+                parts.push(Math.min(STAT_CAP, Math.abs(p.delta.fp) / scaleFor('FP')));
             const totalErr = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
-            return { ...p, totalErr };
+            // GLOW-UP 340: the cap improves the ranking but conceals a real thing — a
+            // row at 107% could be three mediocre stats or one blown-out stat dragging
+            // two good ones. Recorded so the row can say which, rather than the cap
+            // quietly flattening the difference.
+            const capped = [];
+            if (Number.isFinite(p.delta.ss) && Math.abs(p.delta.ss) / scaleFor('SS') > STAT_CAP)
+                capped.push('SS');
+            if (Number.isFinite(p.delta.td) && Math.abs(p.delta.td) / scaleFor('TD') > STAT_CAP)
+                capped.push('TD');
+            if (Number.isFinite(p.delta.fp) && Math.abs(p.delta.fp) / scaleFor('FP') > STAT_CAP)
+                capped.push('FP');
+            return { ...p, totalErr, capped };
         })
             .sort((a, b) => a.totalErr - b.totalErr);
         // GLOW-UP 336: summary.bestPrediction / worstPrediction are written by the
@@ -14402,7 +14425,7 @@ function renderPredictionsHtml(cSec) {
         <span class="learn-delta-stat">TD ${tdDelta}</span>
         <span class="learn-delta-stat">FP ${fpDelta}</span>
         <div class="learn-delta-bar"><div class="learn-delta-bar-fill" style="width:${barPct.toFixed(0)}%;background:${errColor}"></div></div>
-        <span class="learn-delta-total" style="color:${errColor}" title="Average error across this fighter's resolved stats, as a share of a typical performance in each. Stats with no market — so nothing to grade against — are left out rather than counted as perfect.">${Math.round(p.totalErr * 100)}%</span>
+        <span class="learn-delta-total" style="color:${errColor}" title="Average error across this fighter's resolved stats, as a share of a typical performance in each. Stats with no market — so nothing to grade against — are left out rather than counted as perfect.${p.capped.length ? ` ${p.capped.join(' and ')} exceeded twice a typical performance and was capped at 200% before averaging, so the real miss on ${p.capped.length > 1 ? 'those stats' : 'that stat'} is larger than this figure implies.` : ''}">${p.capped.length ? `<i class="learn-capped" title="">▲${p.capped.join('/')}</i>` : ''}${Math.round(p.totalErr * 100)}%</span>
       </div>`;
         }).join('');
         learnBody = `${pendingBanner}
