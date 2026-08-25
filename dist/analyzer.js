@@ -23186,7 +23186,21 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         if (norm.length < 4 || norm.length > 50)
             return false;
         const words = norm.trim().split(/\s+/);
-        if (words.length < 2 || words.length > 5)
+        if (words.length > 5)
+            return false;
+        // MONONYMS. The two-word floor exists to reject prop labels and stray text-scan
+        // fragments ("OVER", "Significant"), but it also rejected fighters who simply have
+        // one name — and it runs AFTER normalizeName, so an alias resolving a platform's
+        // two-word spelling onto a one-word canonical form destroys the very line it just
+        // repaired. Aoriqileng (2026-08-29 card) was listed "Qileng Aori" on UD and
+        // "Aori Aoriqileng" on Pick6; both aliased to "Aoriqileng", both were then thrown
+        // away here, and his row read "No visible source lines" while the lines sat in
+        // storage on two books. Sumudaerji escaped only because his alias happens to point
+        // at the two-word "Su Mudaerji".
+        // The card roster is the authority on who exists, so a one-word name is admitted
+        // only when UFCStats lists a fighter by it. With no card loaded this falls back to
+        // the old rejection, so junk cannot slip through on an empty roster.
+        if (words.length < 2 && !isUpcomingCardFighter(norm))
             return false;
         if (!/^[A-Z]/.test(norm))
             return false;
