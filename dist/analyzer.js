@@ -15296,14 +15296,29 @@ async function renderArchivePanel(container) {
         Number.isFinite(Date.parse(r.date)) && Date.parse(r.date) >= londonTs &&
         pastEventKeys.has(eventDedupeKey(r.event || '')));
     const unresolvedCount = allRows.filter(r => Number.isFinite(Number(r.line)) && !Number.isFinite(Number(r.result))).length;
+    const upcomingKey = eventDedupeKey(upcomingEventName || '');
     const pendingEventMap = new Map();
     for (const r of allRows) {
         if (!Number.isFinite(Number(r.line)) || Number.isFinite(Number(r.result)))
             continue;
         const key = eventDedupeKey(r.event || '');
         const evData = eventMap.get(key);
-        // Only show banner for PAST events (not upcoming futures)
-        if (!evData || (evData.date > nowTs && evData.total === 0))
+        if (!evData)
+            continue;
+        // ── GLOW-UP 343 · the banner asked to settle a fight that has not happened ──
+        // The guard below intends "past events only", and could never achieve it:
+        // evData.date is the ARCHIVE RECORD's date — when the prop was written — not
+        // when the fight is. Lines for an upcoming card are archived the moment they
+        // post, so `date` is ~now and `date > nowTs` is false. On 2026-08-25 that put
+        // "⏳ AWAITING SETTLEMENT — 23 props · UFC Fight Night: Nurmagomedov vs. Song"
+        // on screen with a SETTLE NOW button, for a card still days away.
+        //
+        // pastEventKeys is built from the same field, so it carries the same flaw and
+        // could not be used to fix this. The upcoming card's NAME is the one
+        // unambiguous signal available, so it is excluded explicitly.
+        if (upcomingKey && key === upcomingKey)
+            continue;
+        if (evData.date > nowTs && evData.total === 0)
             continue;
         const p = pendingEventMap.get(key) || { display: evData.display, total: 0, byType: {} };
         p.total++;
