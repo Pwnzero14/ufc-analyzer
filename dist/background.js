@@ -2256,6 +2256,10 @@ function parseUnderdogApiFighters(data) {
 async function fetchUnderdogFromBackground() {
     const endpoints = CONFIG.api.underdog || [];
     let mergedFighters = store.underdog?.fighters || [];
+    // Every fighter record parsed from ANY endpoint this pass. UD's board is a single
+    // authoritative snapshot per endpoint, so the union of a pass is the full set of
+    // lines UD still offers — anything stored outside it has been taken down.
+    const freshThisPass = [];
     for (const url of endpoints) {
         let parsedAny = false;
         for (let attempt = 1; attempt <= 2; attempt++) {
@@ -2268,6 +2272,7 @@ async function fetchUnderdogFromBackground() {
                 const fighters = parseUnderdogApiFighters(data);
                 if (!fighters.length)
                     continue;
+                freshThisPass.push(...fighters);
                 mergedFighters = mergeOrReplaceFighters(mergedFighters, fighters, 'underdog');
                 const coverage = getUnderdogStatCoverage(mergedFighters);
                 console.log(`[UFC Auto-Scrape] underdog API endpoint: ${url} (try ${attempt}) → fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, all3=${coverage.allThreeCount}`);
@@ -2282,6 +2287,12 @@ async function fetchUnderdogFromBackground() {
         if (!parsedAny) {
             console.warn('[UFC Auto-Scrape] underdog API gave no usable fighters for endpoint:', url);
         }
+    }
+    // Reconcile ONCE, against the union of the whole pass — never per endpoint, or a
+    // v1 payload that is a subset of v2 would clear what v2 had just confirmed.
+    if (freshThisPass.length) {
+        reconcileRemovals(mergedFighters, freshThisPass, 'underdog');
+        mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
     }
     if (mergedFighters.length) {
         store.underdog = { fighters: mergedFighters, capturedAt: Date.now() };
@@ -2441,12 +2452,17 @@ function parsePrizePicksApiFighters(data) {
  * 2026-07-31 bug where TD and CTRL never coexisted). Under that rule a line can be
  * added or changed but NEVER removed.
  *
- * PrizePicks is not scraped in pieces: one API call returns the whole board. So when
- * PP takes a line down, the stored copy outlives it forever. Observed 2026-08-21 —
- * PP posted a Fantasy line of 63.55 against Marquel Mederos, then corrected it onto
- * Mason Jones. The analyzer kept Mederos at 63.55 through repeated auto-fetches and
- * went on generating a lean ("UNDER FP 63.55 @ PrizePicks") against a line that no
- * longer existed anywhere.
+ * PrizePicks and Underdog are not scraped in pieces: one API call returns the whole
+ * board, and UD's parser additionally drops any line whose status is not 'active'. So
+ * when either takes a line down, the stored copy outlives it forever. Observed
+ * 2026-08-21 on PP — a Fantasy line of 63.55 posted against Marquel Mederos, then
+ * corrected onto Mason Jones. The analyzer kept Mederos at 63.55 through repeated
+ * auto-fetches and went on generating a lean ("UNDER FP 63.55 @ PrizePicks") against a
+ * line that no longer existed anywhere. UD carried the identical latent defect and was
+ * brought onto this path 2026-08-25.
+ *
+ * ONLY these two. pick6 and draftkings_sportsbook are scraped in pieces and MUST keep
+ * the merge-don't-clear rule.
  *
  * Guarded so a broken scrape cannot wipe real data: a stat is only reconciled if the
  * fresh payload returned at least one line for it. If PP's FP parse comes back empty
@@ -2454,22 +2470,42 @@ function parsePrizePicksApiFighters(data) {
  * nothing is cleared.
  */
 const RECONCILABLE_LINE_FIELDS = [
-    ['line_fp', 'fp_under_available'],
-    ['line_ss', 'ss_under_available'],
-    ['line_ss_r1', null],
-    ['line_ss_body', null],
-    ['line_ss_leg', null],
-    ['line_td', 'td_under_available'],
-    ['line_ft', null],
-    ['line_kd', 'kd_under_available'],
-    ['line_ctrl', 'ctrl_under_available'],
+    ['line_fp', ['fp_under_available']],
+    ['line_ss', ['ss_under_available', 'ss_over_odds', 'ss_under_odds', 'ud_ss_over_avail', 'ud_ss_under_avail']],
+    ['line_ss_r1', []],
+    ['line_ss_body', []],
+    ['line_ss_leg', []],
+    ['line_td', ['td_under_available', 'td_over_odds', 'td_under_odds', 'ud_td_over_avail', 'ud_td_under_avail']],
+    ['line_ft', ['ft_over_odds', 'ft_under_odds', 'ud_ft_over_avail', 'ud_ft_under_avail']],
+    ['line_kd', ['kd_under_available']],
+    ['line_ctrl', ['ctrl_under_available']],
 ];
+/** Does this record still carry any line at all? Both parsers filter on exactly this
+ *  before returning, so it is the standing invariant for a stored record. Reconcile is
+ *  the only thing that can break it — nulling a fighter's last line leaves an empty
+ *  shell that still counts toward the platform's line badge. */
+function hasAnyReconcilableLine(f) {
+    return RECONCILABLE_LINE_FIELDS.some(([field]) => f?.[field] != null);
+}
 function reconcileRemovals(merged, incoming, platform) {
+    // UNION, not last-wins. Both reconciled platforms poll SEVERAL endpoints per pass
+    // (UD v2 then v1; PP per_page=250 then default paging), and a later endpoint can
+    // legitimately return a subset. Folding duplicates so a non-null from ANY endpoint
+    // survives is what stops endpoint 2 from clearing what endpoint 1 just confirmed.
     const freshByName = new Map();
     for (const f of incoming || []) {
         const k = normalizeFighterName(f?.name);
-        if (k)
-            freshByName.set(k, f);
+        if (!k)
+            continue;
+        const prev = freshByName.get(k);
+        if (!prev) {
+            freshByName.set(k, { ...f });
+            continue;
+        }
+        for (const [field] of RECONCILABLE_LINE_FIELDS) {
+            if (prev[field] == null && f[field] != null)
+                prev[field] = f[field];
+        }
     }
     // Only stats the fresh payload actually speaks to are eligible.
     const covered = new Set();
@@ -2483,7 +2519,7 @@ function reconcileRemovals(merged, incoming, platform) {
     for (const f of merged || []) {
         const k = normalizeFighterName(f?.name);
         const fresh = k ? freshByName.get(k) : null;
-        for (const [field, availField] of RECONCILABLE_LINE_FIELDS) {
+        for (const [field, companions] of RECONCILABLE_LINE_FIELDS) {
             if (!covered.has(field))
                 continue;
             if (f[field] == null)
@@ -2491,8 +2527,12 @@ function reconcileRemovals(merged, incoming, platform) {
             if (fresh && fresh[field] != null)
                 continue; // still on the board
             f[field] = null;
-            if (availField)
-                f[availField] = null;
+            // Everything derived FROM that line goes with it — side-availability flags and
+            // per-side odds alike. Underdog is the reason this is a list: it carries
+            // ud_<stat>_over/under_avail plus <stat>_over/under_odds, and a stale avail flag
+            // keeps a dead line tappable in Best Picks even after the line itself is gone.
+            for (const c of companions)
+                f[c] = null;
             cleared++;
         }
     }
@@ -2507,6 +2547,7 @@ async function fetchPrizePicksFromBackground() {
         'https://api.prizepicks.com/projections?single_stat=false',
     ];
     let mergedFighters = store.prizepicks?.fighters || [];
+    const freshThisPass = [];
     for (const url of endpoints) {
         try {
             const res = await fetch(url, {
@@ -2521,16 +2562,23 @@ async function fetchPrizePicksFromBackground() {
             const fighters = parsePrizePicksApiFighters(data);
             if (!fighters.length)
                 continue;
+            freshThisPass.push(...fighters);
             mergedFighters = mergeOrReplaceFighters(mergedFighters, fighters, 'prizepicks');
-            // PP's board is a single authoritative snapshot, so anything it no longer
-            // carries has genuinely been taken down — not merely un-scraped this pass.
-            reconcileRemovals(mergedFighters, fighters, 'prizepicks');
             const coverage = getUnderdogStatCoverage(mergedFighters);
             console.log(`[UFC Auto-Scrape] prizepicks API endpoint: ${url} -> fighters=${coverage.total}, fp=${coverage.fpCount}, ss=${coverage.ssCount}, td=${coverage.tdCount}, all3=${coverage.allThreeCount}`);
         }
         catch (e) {
             console.warn('[UFC Auto-Scrape] prizepicks API failed for endpoint:', url, e);
         }
+    }
+    // PP's board is a single authoritative snapshot, so anything it no longer carries
+    // has genuinely been taken down — not merely un-scraped this pass. Reconciled once
+    // against the union of the pass: this used to run INSIDE the endpoint loop, where
+    // the second (default-paged) endpoint returning a subset of the first would clear
+    // real lines. Never observed only because the UFC board stayed under one page.
+    if (freshThisPass.length) {
+        reconcileRemovals(mergedFighters, freshThisPass, 'prizepicks');
+        mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
     }
     if (mergedFighters.length) {
         store.prizepicks = { fighters: mergedFighters, capturedAt: Date.now() };
