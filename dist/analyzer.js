@@ -23045,6 +23045,15 @@ function namesMatch(a, b) {
     const bFirst = bParts[0], bLast = bParts[bParts.length - 1];
     if (aLast === bLast && aFirst[0] === bFirst[0])
         return true;
+    // Family-name-first reversal: platforms list Chinese fighters in Western order
+    // ("Xiaonan Yan") where UFCStats uses Chinese order ("Yan Xiaonan"). The two tokens
+    // are the SAME two tokens swapped, which is unambiguous identity — background.ts's
+    // strictCardNameMatch has had this rule since the Cong Wang split; namesMatch never
+    // got it, so every such fighter needed a hand-written NAME_ALIASES entry and only
+    // ever got one AFTER a ghost row appeared on a live card (Yan Xiaonan and Liu Ce,
+    // 2026-08-25). Requires an EXACT two-token swap, so it cannot merge distinct people.
+    if (aParts.length === 2 && bParts.length === 2 && aFirst === bLast && aLast === bFirst)
+        return true;
     if (dedup(a.toLowerCase()) === dedup(b.toLowerCase()))
         return true;
     if (aLast === bLast && (aFirst.startsWith(bFirst) || bFirst.startsWith(aFirst)))

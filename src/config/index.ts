@@ -203,6 +203,15 @@ export const NAME_ALIASES: Record<string, string> = {
   'Meng Ding':        'Ding Meng',
   'Mingyang Zhang':   'Zhang Mingyang',
   'Jingnan Xiong':    'Xiong Jingnan',
+  // 2026-08-25 (Nurmagomedov vs. Song): UD listed her Western-order "Xiaonan Yan"
+  // while UFCStats/Pick6 use "Yan Xiaonan". Surname tokens Yan vs Xiaonan never
+  // matched, so her UD SS 52.5 + FT 12.5 split off into a ghost row of their own and
+  // the real card row showed only the Pick6 line.
+  'Xiaonan Yan':      'Yan Xiaonan',
+  // Same card, same shape: UD writes "CE Liu" (normalizes to "Ce Liu"), the card is
+  // "Liu Ce". Also fixes his opponent string on Levi Rodrigues Jr's UD record.
+  'Ce Liu':           'Liu Ce',
+  'Liu Ce':           'Liu Ce',
   // UFC 329: Pick6 lists her Chinese-order "Wang Cong" (family Wang) while
   // UD/PP/Betr use Western-order "Cong Wang" — the mismatch split her into a real
   // card + a ghost and broke opponent/moneyline resolution (Tracy Cortez's dog-FP
