@@ -14685,8 +14685,28 @@ function renderPredictionsHtml(
     // effectively (SS + FP)/3 — TD could be arbitrarily wrong and move it by a
     // rounding error. Normalised per stat first, then averaged, and computed the
     // same way for past cycles so the trajectory stays internally comparable.
-    const overallNormOf = (entry: LearningResult): number => {
-      const rows = entry.predictions || [];
+    // ── GLOW-UP 342 · ONE measure, everywhere ────────────────────────────────
+    // This panel had grown two normalisations: a per-STAT one for the hero, the
+    // previous-cycle comparison and the trajectory, and a per-FIGHTER capped one
+    // for the table. 341 pointed the hero at the table and left the other two
+    // behind, so the trend chip then compared 63% (per-fighter, this card) against
+    // a per-stat figure for the last one and reported a meaningless ▲0.1.
+    //
+    // That is three times in this pass that fixing one path left a sibling on the
+    // old maths. The cause was a wrong assumption of mine — I kept the per-stat
+    // path believing past cycles stored only summaries. They store `predictions`
+    // too, so every cycle can be scored exactly the way the table is scored, and
+    // there is no reason for a second measure to exist.
+    //
+    // Scales are computed from each entry's OWN card, because a typical SS or FP
+    // differs between slates and normalising last month's card by this month's
+    // means would compare the wrong things.
+    const perFighterNormOf = (entry: LearningResult): number => {
+      // Same filter the table applies, so a cycle scored here and a cycle read off
+      // the column below can never differ by which rows were counted.
+      const rows = (entry.predictions || [])
+        .filter(r => Number.isFinite(r.delta.ss) || Number.isFinite(r.delta.fp));
+      if (!rows.length) return 0;
       const mean = (pick: (p: typeof rows[number]) => number): number => {
         const v = rows.map(pick).filter(Number.isFinite);
         return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
@@ -14696,28 +14716,28 @@ function renderPredictionsHtml(
         TD: Math.max(mean(p => Math.abs(p.actual.td)), SCALE_FLOOR.TD!),
         FP: Math.max(mean(p => Math.abs(p.actual.fp)), SCALE_FLOOR.FP!),
       };
-      const e = entry.summary;
-      return (e.avgAbsDeltaSS / sc.SS + e.avgAbsDeltaTD / sc.TD + e.avgAbsDeltaFP / sc.FP) / 3;
+      const CAP = 2.0;
+      const per = rows.map(r => {
+        const parts: number[] = [];
+        if (Number.isFinite(r.delta.ss)) parts.push(Math.min(CAP, Math.abs(r.delta.ss) / sc.SS));
+        if (Number.isFinite(r.delta.td)) parts.push(Math.min(CAP, Math.abs(r.delta.td) / sc.TD));
+        if (Number.isFinite(r.delta.fp)) parts.push(Math.min(CAP, Math.abs(r.delta.fp) / sc.FP));
+        return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
+      });
+      return per.reduce((a, b) => a + b, 0) / per.length;
     };
-    // GLOW-UP 341: the hero and the table were two different normalisations wearing
-    // the same label. overallNormOf averages the three PER-STAT means (uncapped);
-    // the table averages PER-FIGHTER capped ratios. On the settled card that reads
-    // 77% in the hero above a column whose own mean is 63.4% — the same
-    // self-contradiction as the Best/Worst badges in 336, one layer down.
-    //
-    // The headline is now literally the mean of the column beneath it, so the panel
-    // can be checked by eye. overallNormOf survives for the TRAJECTORY only, where
-    // per-stat summaries are all that past cycles stored — that chart compares
-    // cycles to each other, so it only needs to be internally consistent, and it is.
+    // GLOW-UP 341/342: the headline is the mean of the column beneath it, so the
+    // panel can be checked by eye. Same function scores the previous cycle and the
+    // trajectory, so a trend chip always compares like with like.
     const overallNorm = sortedDeltas.length
       ? sortedDeltas.reduce((a, x) => a + x.totalErr, 0) / sortedDeltas.length
-      : overallNormOf(latestLearn);
+      : perFighterNormOf(latestLearn);
     // Bands are provisional and stated on the ring: they were chosen so the raw
     // grade on the first normalised card lands where the old formula put it, not
     // fitted to anything. Revisit once several cycles have been scored this way.
     const overallGrade = overallNorm < 0.30 ? 'A' : overallNorm < 0.45 ? 'B' : overallNorm < 0.65 ? 'C' : 'D';
     const overallColor = overallNorm < 0.30 ? 'var(--green)' : overallNorm < 0.45 ? 'var(--amber)' : 'var(--red)';
-    const prevOverall = prevLearn ? overallNormOf(prevLearn) : null;
+    const prevOverall = prevLearn ? perFighterNormOf(prevLearn) : null;
     const overallAvg = overallNorm;
 
     // Mini trajectory chart: overall avg |Δ| across the last learning cycles
@@ -14725,7 +14745,7 @@ function renderPredictionsHtml(
     const trajEntries = log.slice(-8);
     let trajHtml = '';
     if (trajEntries.length > 1) {
-      const trajVals = trajEntries.map((e) => overallNormOf(e));
+      const trajVals = trajEntries.map((e) => perFighterNormOf(e));
       const trajMax = Math.max(...trajVals, 1);
       const bars = trajEntries.map((e, i) => {
         const v = trajVals[i];
