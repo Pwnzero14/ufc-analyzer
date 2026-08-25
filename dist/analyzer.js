@@ -14309,48 +14309,6 @@ function renderPredictionsHtml(cSec) {
         <div class="learn-chip-bar-track" title="${(n * 100).toFixed(0)}% of a typical ${label} on this card (±${val.toFixed(1)} against a mean of ${scaleFor(label).toFixed(1)}). Shown as a share so SS, TD and FP can be compared — a raw ±1.2 on TD and ±35.8 on FP are not thirty times apart in quality."><div class="learn-chip-bar-fill" style="width:${pct}%;background:${c}"></div></div>
       </div>`;
         };
-        // GLOW-UP 333: the grade was the mixed-unit average of the three, so it was
-        // effectively (SS + FP)/3 — TD could be arbitrarily wrong and move it by a
-        // rounding error. Normalised per stat first, then averaged, and computed the
-        // same way for past cycles so the trajectory stays internally comparable.
-        const overallNormOf = (entry) => {
-            const rows = entry.predictions || [];
-            const mean = (pick) => {
-                const v = rows.map(pick).filter(Number.isFinite);
-                return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
-            };
-            const sc = {
-                SS: Math.max(mean(p => Math.abs(p.actual.ss)), SCALE_FLOOR.SS),
-                TD: Math.max(mean(p => Math.abs(p.actual.td)), SCALE_FLOOR.TD),
-                FP: Math.max(mean(p => Math.abs(p.actual.fp)), SCALE_FLOOR.FP),
-            };
-            const e = entry.summary;
-            return (e.avgAbsDeltaSS / sc.SS + e.avgAbsDeltaTD / sc.TD + e.avgAbsDeltaFP / sc.FP) / 3;
-        };
-        const overallNorm = overallNormOf(latestLearn);
-        // Bands are provisional and stated on the ring: they were chosen so the raw
-        // grade on the first normalised card lands where the old formula put it, not
-        // fitted to anything. Revisit once several cycles have been scored this way.
-        const overallGrade = overallNorm < 0.30 ? 'A' : overallNorm < 0.45 ? 'B' : overallNorm < 0.65 ? 'C' : 'D';
-        const overallColor = overallNorm < 0.30 ? 'var(--green)' : overallNorm < 0.45 ? 'var(--amber)' : 'var(--red)';
-        const prevOverall = prevLearn ? overallNormOf(prevLearn) : null;
-        const overallAvg = overallNorm;
-        // Mini trajectory chart: overall avg |Δ| across the last learning cycles
-        // (bar height ∝ error, so a shrinking skyline = an improving model).
-        const trajEntries = log.slice(-8);
-        let trajHtml = '';
-        if (trajEntries.length > 1) {
-            const trajVals = trajEntries.map((e) => overallNormOf(e));
-            const trajMax = Math.max(...trajVals, 1);
-            const bars = trajEntries.map((e, i) => {
-                const v = trajVals[i];
-                const h = Math.max(14, Math.round((v / trajMax) * 100));
-                const g = v < 0.30 ? 'g-a' : v < 0.45 ? 'g-b' : v < 0.65 ? 'g-c' : 'g-d';
-                const evName = e.event ?? 'earlier cycle';
-                return `<i class="${g}${i === trajEntries.length - 1 ? ' cur' : ''}" style="height:${h}%" title="${String(evName).replace(/"/g, '&quot;')} — normalised error ${(v * 100).toFixed(0)}%"></i>`;
-            }).join('');
-            trajHtml = `<div class="learn-traj" title="Accuracy trajectory — last ${trajEntries.length} learning cycles (shorter bars = better)">${bars}</div>`;
-        }
         const sortedDeltas = latestLearn.predictions
             .filter(p => Number.isFinite(p.delta.ss) || Number.isFinite(p.delta.fp))
             .map(p => {
@@ -14394,6 +14352,60 @@ function renderPredictionsHtml(cSec) {
             return { ...p, totalErr, capped };
         })
             .sort((a, b) => a.totalErr - b.totalErr);
+        // GLOW-UP 333: the grade was the mixed-unit average of the three, so it was
+        // effectively (SS + FP)/3 — TD could be arbitrarily wrong and move it by a
+        // rounding error. Normalised per stat first, then averaged, and computed the
+        // same way for past cycles so the trajectory stays internally comparable.
+        const overallNormOf = (entry) => {
+            const rows = entry.predictions || [];
+            const mean = (pick) => {
+                const v = rows.map(pick).filter(Number.isFinite);
+                return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+            };
+            const sc = {
+                SS: Math.max(mean(p => Math.abs(p.actual.ss)), SCALE_FLOOR.SS),
+                TD: Math.max(mean(p => Math.abs(p.actual.td)), SCALE_FLOOR.TD),
+                FP: Math.max(mean(p => Math.abs(p.actual.fp)), SCALE_FLOOR.FP),
+            };
+            const e = entry.summary;
+            return (e.avgAbsDeltaSS / sc.SS + e.avgAbsDeltaTD / sc.TD + e.avgAbsDeltaFP / sc.FP) / 3;
+        };
+        // GLOW-UP 341: the hero and the table were two different normalisations wearing
+        // the same label. overallNormOf averages the three PER-STAT means (uncapped);
+        // the table averages PER-FIGHTER capped ratios. On the settled card that reads
+        // 77% in the hero above a column whose own mean is 63.4% — the same
+        // self-contradiction as the Best/Worst badges in 336, one layer down.
+        //
+        // The headline is now literally the mean of the column beneath it, so the panel
+        // can be checked by eye. overallNormOf survives for the TRAJECTORY only, where
+        // per-stat summaries are all that past cycles stored — that chart compares
+        // cycles to each other, so it only needs to be internally consistent, and it is.
+        const overallNorm = sortedDeltas.length
+            ? sortedDeltas.reduce((a, x) => a + x.totalErr, 0) / sortedDeltas.length
+            : overallNormOf(latestLearn);
+        // Bands are provisional and stated on the ring: they were chosen so the raw
+        // grade on the first normalised card lands where the old formula put it, not
+        // fitted to anything. Revisit once several cycles have been scored this way.
+        const overallGrade = overallNorm < 0.30 ? 'A' : overallNorm < 0.45 ? 'B' : overallNorm < 0.65 ? 'C' : 'D';
+        const overallColor = overallNorm < 0.30 ? 'var(--green)' : overallNorm < 0.45 ? 'var(--amber)' : 'var(--red)';
+        const prevOverall = prevLearn ? overallNormOf(prevLearn) : null;
+        const overallAvg = overallNorm;
+        // Mini trajectory chart: overall avg |Δ| across the last learning cycles
+        // (bar height ∝ error, so a shrinking skyline = an improving model).
+        const trajEntries = log.slice(-8);
+        let trajHtml = '';
+        if (trajEntries.length > 1) {
+            const trajVals = trajEntries.map((e) => overallNormOf(e));
+            const trajMax = Math.max(...trajVals, 1);
+            const bars = trajEntries.map((e, i) => {
+                const v = trajVals[i];
+                const h = Math.max(14, Math.round((v / trajMax) * 100));
+                const g = v < 0.30 ? 'g-a' : v < 0.45 ? 'g-b' : v < 0.65 ? 'g-c' : 'g-d';
+                const evName = e.event ?? 'earlier cycle';
+                return `<i class="${g}${i === trajEntries.length - 1 ? ' cur' : ''}" style="height:${h}%" title="${String(evName).replace(/"/g, '&quot;')} — normalised error ${(v * 100).toFixed(0)}%"></i>`;
+            }).join('');
+            trajHtml = `<div class="learn-traj" title="Accuracy trajectory — last ${trajEntries.length} learning cycles (shorter bars = better)">${bars}</div>`;
+        }
         // GLOW-UP 336: summary.bestPrediction / worstPrediction are written by the
         // learning cycle using the OLD mixed-unit score (|dSS| + |dTD| + |dFP|). Once
         // the table below was renormalised the two disagreed on screen — the hero
