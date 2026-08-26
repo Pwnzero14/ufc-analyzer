@@ -1734,7 +1734,20 @@ async function handleLinesCapturedInner(platform, data) {
                 // Card fetch failure shouldn't block capture — fall through to merge.
             }
         }
-        const mergedFighters = mergeOrReplaceFighters(existing, data.fighters, platform);
+        let mergedFighters = mergeOrReplaceFighters(existing, data.fighters, platform);
+        // Removals, but ONLY when the caller can honestly claim this payload is the whole
+        // board. PrizePicks reaches us through the MAIN-world executeScript path, which
+        // fetches the full projections API from the page origin — the same single authoritative
+        // snapshot fetchPrizePicksFromBackground assumed. That background fetch is 403d by
+        // DataDome from the service worker, so the reconcile added there on 2026-08-21 has been
+        // DEAD IN PRODUCTION: every PP line ever taken down survived forever (yesterday's DWCS
+        // card was still on the board a day later, and was being re-archived every pass).
+        // Opt-in rather than by-platform: the PP DOM crawl also sends platform=prizepicks and
+        // may be partial, and reconciling a partial payload would clear real lines.
+        if (data.fullBoard === true) {
+            reconcileRemovals(mergedFighters, data.fighters, platform);
+            mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
+        }
         console.log(`[UFC] Merged ${platform}: existing ${existing.length}, incoming ${data.fighters.length}, merged ${mergedFighters.length}`);
         mergedFighters.forEach(f => {
             if (f.line_ss && f.line_td) {
@@ -2294,7 +2307,13 @@ async function fetchUnderdogFromBackground() {
         reconcileRemovals(mergedFighters, freshThisPass, 'underdog');
         mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
     }
-    if (mergedFighters.length) {
+    // A pass that parsed NOTHING must not rewrite the store. It used to: mergedFighters
+    // still held the previous contents, so a total fetch failure re-stamped capturedAt and
+    // re-ran archivePlatformPropLines — which is how PrizePicks displayed "4m old" while
+    // holding the previous day's DWCS card, and how those dead rows kept being re-archived
+    // into prop_archive_v1 on every pass. Keeping the old capturedAt reports the staleness
+    // honestly; the stored lines are untouched either way.
+    if (mergedFighters.length && freshThisPass.length) {
         store.underdog = { fighters: mergedFighters, capturedAt: Date.now() };
         await StorageService.setLines('underdog', mergedFighters);
         await archivePlatformPropLines('underdog', mergedFighters);
@@ -2580,7 +2599,13 @@ async function fetchPrizePicksFromBackground() {
         reconcileRemovals(mergedFighters, freshThisPass, 'prizepicks');
         mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
     }
-    if (mergedFighters.length) {
+    // A pass that parsed NOTHING must not rewrite the store. It used to: mergedFighters
+    // still held the previous contents, so a total fetch failure re-stamped capturedAt and
+    // re-ran archivePlatformPropLines — which is how PrizePicks displayed "4m old" while
+    // holding the previous day's DWCS card, and how those dead rows kept being re-archived
+    // into prop_archive_v1 on every pass. Keeping the old capturedAt reports the staleness
+    // honestly; the stored lines are untouched either way.
+    if (mergedFighters.length && freshThisPass.length) {
         store.prizepicks = { fighters: mergedFighters, capturedAt: Date.now() };
         await StorageService.setLines('prizepicks', mergedFighters);
         await archivePlatformPropLines('prizepicks', mergedFighters);
@@ -4072,7 +4097,10 @@ async function autoScrapeAllPlatforms() {
                                 const fighters = parsePrizePicksApiFighters(out.payload);
                                 console.log(`[UFC Auto-Scrape] prizepicks MAIN-world API: ${out.payload.data?.length || 0} UFC projections -> ${fighters.length} fighters`);
                                 if (fighters.length > 0) {
-                                    await handleLinesCaptured('prizepicks', { fighters });
+                                    // fullBoard: this payload IS the entire PrizePicks board for MMA/UFC —
+                                    // one API response, already league-filtered above — so absence from it is
+                                    // a genuine take-down and may be reconciled away.
+                                    await handleLinesCaptured('prizepicks', { fighters, fullBoard: true });
                                     count = store.prizepicks?.fighters?.length || fighters.length;
                                 }
                             }
