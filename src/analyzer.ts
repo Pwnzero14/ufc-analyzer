@@ -24907,11 +24907,37 @@ async function processData(data: AnalyzerDataPayload): Promise<void> {
   showToast(`Loaded ${allFighters.filter(f => f.db?.loaded).length} fighters with stats!`);
 }
 
+const TOAST_VISIBLE_MS = 3000;
+/** A burst of background reloads must not replay the same message. Clicking ARCHIVE
+ *  sends GRADE_ARCHIVE, whose settle then emits several LINES_UPDATED / ODDS_UPDATED
+ *  in a row; each one runs processData(), which ends in a toast. The user saw
+ *  "Loaded 26 fighters with stats!" two or three times per click. */
+const TOAST_REPEAT_WINDOW_MS = 10000;
+let _toastHideTimer: number | null = null;
+let _lastToastMsg = '';
+let _lastToastAt = 0;
+
 function showToast(msg: string): void {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  const now = Date.now();
+  const isRepeat = msg === _lastToastMsg && now - _lastToastAt < TOAST_REPEAT_WINDOW_MS;
+  _lastToastMsg = msg;
+  _lastToastAt = now;
+  // Said this already and it has since faded — stay quiet rather than flash it again.
+  // Still on screen: fall through, which only extends the timer below (adding a class
+  // that is already present restarts nothing).
+  if (isRepeat && !t.classList.contains('show')) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  // Every call used to queue its own hide WITHOUT cancelling the pending one, so an
+  // overlapping pair hid at the first timer and the next call re-showed it. That was
+  // the flicker, distinct from the repeat above.
+  if (_toastHideTimer !== null) clearTimeout(_toastHideTimer);
+  _toastHideTimer = window.setTimeout(() => {
+    _toastHideTimer = null;
+    t.classList.remove('show');
+  }, TOAST_VISIBLE_MS);
 }
 
 function setButtonBusyState(
