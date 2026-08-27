@@ -24516,8 +24516,15 @@ const TOAST_VISIBLE_MS = 3000;
 /** A burst of background reloads must not replay the same message. Clicking ARCHIVE
  *  sends GRADE_ARCHIVE, whose settle then emits several LINES_UPDATED / ODDS_UPDATED
  *  in a row; each one runs processData(), which ends in a toast. The user saw
- *  "Loaded 26 fighters with stats!" two or three times per click. */
-const TOAST_REPEAT_WINDOW_MS = 10000;
+ *  "Loaded 26 fighters with stats!" two or three times per click.
+ *
+ *  Sized to the reload coalescer, not picked by feel: requestDataReload cannot fire
+ *  faster than DATA_RELOAD_MIN_GAP_MS, so twice that spans a burst and nothing longer.
+ *  The window SLIDES (every call restamps it), so a continuous burst stays collapsed
+ *  however long it runs. A generous fixed window is wrong in the other direction — at
+ *  10s the page-load toast swallowed a deliberate ARCHIVE click seconds later and the
+ *  user got no feedback at all, which is worse than the repeat being fixed. */
+const TOAST_REPEAT_WINDOW_MS = DATA_RELOAD_MIN_GAP_MS * 2;
 let _toastHideTimer = null;
 let _lastToastMsg = '';
 let _lastToastAt = 0;
