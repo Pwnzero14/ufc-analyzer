@@ -1179,6 +1179,18 @@ function applyBetrManualOverrides(
   base: RawLineFighter[],
   manual: RawLineFighter[]
 ): RawLineFighter[] {
+  // Betr is AUTO-FETCHED as of MODEL v34. The manual store is the OUTAGE FALLBACK,
+  // not an overlay: when the fetched board has rows, hand-typed lines are by definition
+  // older and must not override it. Applying them as an overlay is how 26 fetched
+  // fighters rendered as 38 — 27-hour-old rows overwriting fresh ones AND re-adding
+  // fighters Betr had since taken down, which is the removals-never-propagate bug
+  // arriving through the back door.
+  //
+  // Fallback stays whole: if the fetch brought nothing (Betr down, as in August 2026),
+  // base is empty and every manual row is used, so the console-snippet + screenshot
+  // reader path still works exactly as before.
+  if (base.length) return base.map(f => ({ ...f }));
+
   const result = base.map(f => ({ ...f }));
   for (const m of manual) {
     const mName = String(m.name || '').trim().toLowerCase();
