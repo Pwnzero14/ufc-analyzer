@@ -117,7 +117,7 @@ interface EffectiveLean extends LeanResult {
 }
 interface UFCStatsData { name: string; fetchedAt: number; careerStats: CareerStats; fightHistory: UFCFightHistory[]; detailUrl: string }
 interface NameCandidate { char: string; first: string; last: string }
-interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_ss_body?: number|null; line_ud_ss_leg?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_ss_body?: number|null; line_pp_ss_leg?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_pp_kd?: number|null; kd_under_available?: boolean|null; line_dk_ss?: number|null; line_dk_ss_r1?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; ss_r1_over_odds?: number|null; ss_r1_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ss_under_available?: boolean|null; td_under_available?: boolean|null; fp_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null; lean_kd?: LeanResult|null }
+interface AnalyzerFighter { name: string; line_p6?: number|null; line_p6_ss?: number|null; line_p6_td?: number|null; line_p6_ft?: number|null; line_p6_ctrl?: number|null; line_ud?: number|null; line_ud_ss?: number|null; line_ud_ss_r1?: number|null; line_ud_ss_body?: number|null; line_ud_ss_leg?: number|null; line_ud_td?: number|null; line_ud_ft?: number|null; line_ud_ctrl?: number|null; line_betr?: number|null; line_betr_ss?: number|null; line_betr_td?: number|null; line_betr_ft?: number|null; line_betr_ctrl?: number|null; line_pp?: number|null; line_pp_ss?: number|null; line_pp_ss_r1?: number|null; line_pp_ss_body?: number|null; line_pp_ss_leg?: number|null; line_pp_td?: number|null; line_pp_ft?: number|null; line_pp_ctrl?: number|null; line_pp_kd?: number|null; kd_under_available?: boolean|null; line_dk_ss?: number|null; line_dk_ss_r1?: number|null; line_dk_td?: number|null; line_dk_ft?: number|null; line_dk_ctrl?: number|null; ss_over_odds?: number|null; ss_under_odds?: number|null; ss_r1_over_odds?: number|null; ss_r1_under_odds?: number|null; td_over_odds?: number|null; td_under_odds?: number|null; ft_over_odds?: number|null; ft_under_odds?: number|null; ctrl_over_odds?: number|null; ctrl_under_odds?: number|null; ctrl_under_available?: boolean|null; ss_under_available?: boolean|null; td_under_available?: boolean|null; fp_under_available?: boolean|null; ud_ss_over_avail?: boolean|null; ud_ss_under_avail?: boolean|null; ud_td_over_avail?: boolean|null; ud_td_under_avail?: boolean|null; ud_ft_over_avail?: boolean|null; ud_ft_under_avail?: boolean|null; betr_fp_over_avail?: boolean|null; betr_fp_under_avail?: boolean|null; betr_ss_over_avail?: boolean|null; betr_ss_under_avail?: boolean|null; betr_td_over_avail?: boolean|null; betr_td_under_avail?: boolean|null; betr_ft_over_avail?: boolean|null; betr_ft_under_avail?: boolean|null; moneyline?: number|null; opponent?: string|null; db: FighterDB; lean: LeanResult; lean_ss?: LeanResult|null; lean_ss_r1?: LeanResult|null; lean_td?: LeanResult|null; lean_ft?: LeanResult|null; lean_ctrl?: LeanResult|null; lean_kd?: LeanResult|null }
 
 function createEmptyLean(verdict = ''): LeanResult {
   return { lean: 'none', conf: 0, reasons: [], verdict };
@@ -8677,7 +8677,11 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   //  • Pick6 — SS UNDER only for FAVORITES (underdogs are More/OVER-only).
   //  • Underdog — SS UNDER only for UNDERDOGS (favorites are Higher/OVER-only).
   const ssUnderBookOffered = (f: AnalyzerFighter, book: SourcePlatformKey): boolean => {
-    if (book === 'draftkings_sportsbook' || book === 'prizepicks' || book === 'betr') return true;
+    // Betr reports the offered sides per prop (allowedOptions). Trust the flag when we
+    // have one; fall back to permissive only for lines captured before the flags existed
+    // (manual entry, or pre-auto-fetch storage).
+    if (book === 'betr') return (f.betr_ss_under_avail ?? null) !== false;
+    if (book === 'draftkings_sportsbook' || book === 'prizepicks') return true;
     const dog = isMoneylineUnderdog(f);
     if (book === 'underdog') return dog;
     return !dog; // pick6 → favorites only
@@ -8690,11 +8694,17 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   //  • Underdog — records the actual offered side at ingest; a false flag means UD had the
   //    TD line but not the under side.
   //  • DraftKings — real sportsbook, posts both sides (line presence checked separately).
-  //  • PrizePicks / Betr — pick-em books that carry both sides on the TD props they offer.
+  //  • Betr — posts takedowns MORE-only in practice; the fetched allowedOptions confirm
+  //    it per prop, so an UNDER needs a positively-confirmed Less side.
+  //  • PrizePicks — pick-em book that carries both sides on the TD props it offers.
   const tdUnderBookOffered = (f: AnalyzerFighter, book: SourcePlatformKey): boolean => {
     if (book === 'pick6') return (f.td_under_available ?? null) === true;
     if (book === 'underdog') return (f.ud_td_under_avail ?? null) !== false;
-    return true; // draftkings_sportsbook / prizepicks / betr
+    // Betr: takedowns came back MORE-only on every prop across the whole 2026-08-29
+    // board. The old blanket `return true` here treated Betr like PrizePicks and would
+    // have surfaced unplaceable TD unders the moment Betr takedown lines were fetched.
+    if (book === 'betr') return (f.betr_td_under_avail ?? null) === true;
+    return true; // draftkings_sportsbook / prizepicks
   };
 
   const bestSideLineForPick = (
@@ -23637,6 +23647,14 @@ interface RawLineFighter {
   ud_ss_under_avail?: boolean | null;
   ud_td_over_avail?: boolean | null;
   ud_td_under_avail?: boolean | null;
+  betr_fp_over_avail?: boolean | null;
+  betr_fp_under_avail?: boolean | null;
+  betr_ss_over_avail?: boolean | null;
+  betr_ss_under_avail?: boolean | null;
+  betr_td_over_avail?: boolean | null;
+  betr_td_under_avail?: boolean | null;
+  betr_ft_over_avail?: boolean | null;
+  betr_ft_under_avail?: boolean | null;
   ud_ft_over_avail?: boolean | null;
   ud_ft_under_avail?: boolean | null;
 }
@@ -23649,6 +23667,14 @@ interface MergedLineEntry {
   line_p6_ft: number | null;
   line_p6_ctrl: number | null;
   line_ud: number | null;
+  betr_fp_over_avail?: boolean | null;
+  betr_fp_under_avail?: boolean | null;
+  betr_ss_over_avail?: boolean | null;
+  betr_ss_under_avail?: boolean | null;
+  betr_td_over_avail?: boolean | null;
+  betr_td_under_avail?: boolean | null;
+  betr_ft_over_avail?: boolean | null;
+  betr_ft_under_avail?: boolean | null;
   line_ud_ss: number | null;
   line_ud_ss_r1: number | null;
   line_ud_ss_body: number | null;
@@ -23976,6 +24002,17 @@ async function mergeAndEnrich(p6Fighters: RawLineFighter[], udFighters: RawLineF
     entry.line_betr_td   = plausibleTd(f.line_td);
     entry.line_betr_ft   = f.line_ft ?? null;
     entry.line_betr_ctrl = f.line_ctrl ?? null;
+    // Side availability straight from Betr's allowedOptions. Betr posts takedowns
+    // MORE-only (verified across the whole board), so without these the model would
+    // offer TD unders that have no button.
+    if (f.betr_fp_over_avail != null) entry.betr_fp_over_avail = f.betr_fp_over_avail;
+    if (f.betr_fp_under_avail != null) entry.betr_fp_under_avail = f.betr_fp_under_avail;
+    if (f.betr_ss_over_avail != null) entry.betr_ss_over_avail = f.betr_ss_over_avail;
+    if (f.betr_ss_under_avail != null) entry.betr_ss_under_avail = f.betr_ss_under_avail;
+    if (f.betr_td_over_avail != null) entry.betr_td_over_avail = f.betr_td_over_avail;
+    if (f.betr_td_under_avail != null) entry.betr_td_under_avail = f.betr_td_under_avail;
+    if (f.betr_ft_over_avail != null) entry.betr_ft_over_avail = f.betr_ft_over_avail;
+    if (f.betr_ft_under_avail != null) entry.betr_ft_under_avail = f.betr_ft_under_avail;
     if (f.opponent) {
       const normalizedOpp = normalizeName(f.opponent);
       // Resolve abbreviated Betr opponent (e.g. "B. Ribeiro") to the canonical map key

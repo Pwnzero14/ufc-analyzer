@@ -8326,7 +8326,12 @@ function renderBestPicks(container, renderSeq = 0) {
         //  • Pick6 — SS UNDER only for FAVORITES (underdogs are More/OVER-only).
         //  • Underdog — SS UNDER only for UNDERDOGS (favorites are Higher/OVER-only).
         const ssUnderBookOffered = (f, book) => {
-            if (book === 'draftkings_sportsbook' || book === 'prizepicks' || book === 'betr')
+            // Betr reports the offered sides per prop (allowedOptions). Trust the flag when we
+            // have one; fall back to permissive only for lines captured before the flags existed
+            // (manual entry, or pre-auto-fetch storage).
+            if (book === 'betr')
+                return (f.betr_ss_under_avail ?? null) !== false;
+            if (book === 'draftkings_sportsbook' || book === 'prizepicks')
                 return true;
             const dog = isMoneylineUnderdog(f);
             if (book === 'underdog')
@@ -8340,13 +8345,20 @@ function renderBestPicks(container, renderSeq = 0) {
         //  • Underdog — records the actual offered side at ingest; a false flag means UD had the
         //    TD line but not the under side.
         //  • DraftKings — real sportsbook, posts both sides (line presence checked separately).
-        //  • PrizePicks / Betr — pick-em books that carry both sides on the TD props they offer.
+        //  • Betr — posts takedowns MORE-only in practice; the fetched allowedOptions confirm
+        //    it per prop, so an UNDER needs a positively-confirmed Less side.
+        //  • PrizePicks — pick-em book that carries both sides on the TD props it offers.
         const tdUnderBookOffered = (f, book) => {
             if (book === 'pick6')
                 return (f.td_under_available ?? null) === true;
             if (book === 'underdog')
                 return (f.ud_td_under_avail ?? null) !== false;
-            return true; // draftkings_sportsbook / prizepicks / betr
+            // Betr: takedowns came back MORE-only on every prop across the whole 2026-08-29
+            // board. The old blanket `return true` here treated Betr like PrizePicks and would
+            // have surfaced unplaceable TD unders the moment Betr takedown lines were fetched.
+            if (book === 'betr')
+                return (f.betr_td_under_avail ?? null) === true;
+            return true; // draftkings_sportsbook / prizepicks
         };
         const bestSideLineForPick = (f, source, dir) => {
             if (!source || source === 'fp' || dir !== 'over' && dir !== 'under') {
@@ -23490,6 +23502,25 @@ async function mergeAndEnrich(p6Fighters, udFighters, betrFighters, ppFighters =
         entry.line_betr_td = plausibleTd(f.line_td);
         entry.line_betr_ft = f.line_ft ?? null;
         entry.line_betr_ctrl = f.line_ctrl ?? null;
+        // Side availability straight from Betr's allowedOptions. Betr posts takedowns
+        // MORE-only (verified across the whole board), so without these the model would
+        // offer TD unders that have no button.
+        if (f.betr_fp_over_avail != null)
+            entry.betr_fp_over_avail = f.betr_fp_over_avail;
+        if (f.betr_fp_under_avail != null)
+            entry.betr_fp_under_avail = f.betr_fp_under_avail;
+        if (f.betr_ss_over_avail != null)
+            entry.betr_ss_over_avail = f.betr_ss_over_avail;
+        if (f.betr_ss_under_avail != null)
+            entry.betr_ss_under_avail = f.betr_ss_under_avail;
+        if (f.betr_td_over_avail != null)
+            entry.betr_td_over_avail = f.betr_td_over_avail;
+        if (f.betr_td_under_avail != null)
+            entry.betr_td_under_avail = f.betr_td_under_avail;
+        if (f.betr_ft_over_avail != null)
+            entry.betr_ft_over_avail = f.betr_ft_over_avail;
+        if (f.betr_ft_under_avail != null)
+            entry.betr_ft_under_avail = f.betr_ft_under_avail;
         if (f.opponent) {
             const normalizedOpp = normalizeName(f.opponent);
             // Resolve abbreviated Betr opponent (e.g. "B. Ribeiro") to the canonical map key
