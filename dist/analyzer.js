@@ -9039,7 +9039,11 @@ function renderBestPicks(container, renderSeq = 0) {
                 }
             }
         }
-        void persistBestPicksSnapshot(overs, unders);
+        // Hand over the SAME direction-resolved lean the board just rendered. The snapshot
+        // used to re-derive it with getEffectiveLean(), which is direction-agnostic, so a
+        // fighter listed in the overs column was logged with whatever their single strongest
+        // lean happened to be — frequently the UNDER, and frequently a different STAT.
+        void persistBestPicksSnapshot(overs.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'over') })), unders.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'under') })));
         // Flag fighters whose opponent is still in the SAME section after demotion
         const overNames = new Set(overs.map(f => f.name.toLowerCase()));
         const underNames = new Set(unders.map(f => f.name.toLowerCase()));
@@ -10519,8 +10523,11 @@ async function persistBestPicksSnapshot(overs, unders) {
             };
             return deriveConfidenceMemoryTagsLive(context);
         };
-        const normalizePick = (f, lean) => {
-            const el = getEffectiveLean(f);
+        const normalizePick = (entry, lean) => {
+            const f = entry.fighter;
+            // Fall back only if the column somehow had no lean in its own direction — that
+            // would be a builder bug, and logging the effective lean is better than nothing.
+            const el = entry.lean || getEffectiveLean(f);
             const source = el._source || 'fp';
             return {
                 fighter: f.name,
@@ -10537,8 +10544,8 @@ async function persistBestPicksSnapshot(overs, unders) {
             };
         };
         const picks = [
-            ...overs.map((f) => normalizePick(f, 'over')),
-            ...unders.map((f) => normalizePick(f, 'under')),
+            ...overs.map((e) => normalizePick(e, 'over')),
+            ...unders.map((e) => normalizePick(e, 'under')),
         ];
         if (!picks.length)
             return;
