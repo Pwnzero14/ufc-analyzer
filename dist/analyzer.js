@@ -9111,7 +9111,23 @@ function renderBestPicks(container, renderSeq = 0) {
         // used to re-derive it with getEffectiveLean(), which is direction-agnostic, so a
         // fighter listed in the overs column was logged with whatever their single strongest
         // lean happened to be — frequently the UNDER, and frequently a different STAT.
-        void persistBestPicksSnapshot(overs.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'over') })), unders.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'under') })));
+        // Resolve the line and book the BOARD shows, not just the lean. persistBestPicks
+        // Snapshot used to re-derive these from getSourceActiveLine/formatSourcePlatformLabel,
+        // which are direction-agnostic and know nothing about which candidate won — so after
+        // v33's best-line selection the log said "85.5 @Pick6" for a pick the board rendered as
+        // BTR 81.5. Six of sixteen picks disagreed with their own verdict text. The learning
+        // engine grades against `line`, so it was scoring numbers that were never offered.
+        const snapshotEntry = (f, dir) => {
+            const lean = getBestPickLeanForDir(f, dir);
+            const source = lean?._source || 'fp';
+            // FP carries its book on the candidate (one candidate per book); the stat sources
+            // resolve theirs through the same best-side helper the row renders with.
+            const best = bestSideLineForPick(f, source, lean?.lean);
+            const book = lean?._platform ?? best.book ?? null;
+            const line = book ? lineForLeanSource(f, source, book) : (best.line ?? getSourceActiveLine(f, source));
+            return { fighter: f, lean, line: line ?? getSourceActiveLine(f, source), book };
+        };
+        void persistBestPicksSnapshot(overs.map((f) => snapshotEntry(f, 'over')), unders.map((f) => snapshotEntry(f, 'under')));
         // Flag fighters whose opponent is still in the SAME section after demotion
         const overNames = new Set(overs.map(f => f.name.toLowerCase()));
         const underNames = new Set(unders.map(f => f.name.toLowerCase()));
@@ -10547,6 +10563,7 @@ function memoryTagsForFighter(f, source, el) {
         moneyline: f.moneyline ?? null,
     });
 }
+const BOOK_LABELS = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
 async function persistBestPicksSnapshot(overs, unders) {
     try {
         const resolveOpponentDb = resolveOpponentDbFor;
@@ -10601,8 +10618,10 @@ async function persistBestPicksSnapshot(overs, unders) {
                 fighter: f.name,
                 opponent: f.opponent || null,
                 lean,
-                line: getSourceActiveLine(f, source),
-                platform: formatSourcePlatformLabel(f, source),
+                line: entry.line !== undefined ? entry.line : getSourceActiveLine(f, source),
+                platform: entry.book
+                    ? (BOOK_LABELS[entry.book] || entry.book)
+                    : formatSourcePlatformLabel(f, source),
                 source,
                 confidence: el.conf || 0,
                 confidenceGrade: el.confidenceGrade || getConfidenceGrade(el.conf || 0),

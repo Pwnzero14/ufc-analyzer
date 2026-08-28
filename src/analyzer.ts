@@ -9415,9 +9415,25 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // used to re-derive it with getEffectiveLean(), which is direction-agnostic, so a
   // fighter listed in the overs column was logged with whatever their single strongest
   // lean happened to be — frequently the UNDER, and frequently a different STAT.
+  // Resolve the line and book the BOARD shows, not just the lean. persistBestPicks
+  // Snapshot used to re-derive these from getSourceActiveLine/formatSourcePlatformLabel,
+  // which are direction-agnostic and know nothing about which candidate won — so after
+  // v33's best-line selection the log said "85.5 @Pick6" for a pick the board rendered as
+  // BTR 81.5. Six of sixteen picks disagreed with their own verdict text. The learning
+  // engine grades against `line`, so it was scoring numbers that were never offered.
+  const snapshotEntry = (f: AnalyzerFighter, dir: 'over' | 'under') => {
+    const lean = getBestPickLeanForDir(f, dir);
+    const source = lean?._source || 'fp';
+    // FP carries its book on the candidate (one candidate per book); the stat sources
+    // resolve theirs through the same best-side helper the row renders with.
+    const best = bestSideLineForPick(f, source, lean?.lean);
+    const book = lean?._platform ?? best.book ?? null;
+    const line = book ? lineForLeanSource(f, source, book) : (best.line ?? getSourceActiveLine(f, source));
+    return { fighter: f, lean, line: line ?? getSourceActiveLine(f, source), book };
+  };
   void persistBestPicksSnapshot(
-    overs.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'over') })),
-    unders.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'under') })),
+    overs.map((f) => snapshotEntry(f, 'over')),
+    unders.map((f) => snapshotEntry(f, 'under')),
   );
 
   // Flag fighters whose opponent is still in the SAME section after demotion
@@ -10804,7 +10820,16 @@ function memoryTagsForFighter(f: AnalyzerFighter, source: LeanSource, el: LeanRe
  *  best_picks_snapshots_v1 is what the learning engine grades against results, so a
  *  second derivation that drifts silently poisons every accuracy number. Same lesson
  *  as the report-card export (ccf538c): one resolve, shared. */
-type BestPicksSnapshotEntry = { fighter: AnalyzerFighter; lean: EffectiveLean | null };
+type BestPicksSnapshotEntry = {
+  fighter: AnalyzerFighter;
+  lean: EffectiveLean | null;
+  /** The line and book the ROW DISPLAYS — resolved at the call site by the same helpers
+   *  the renderer uses. Never re-derive these here; that is the drift this replaced. */
+  line?: number | null;
+  book?: SourcePlatformKey | null;
+};
+
+const BOOK_LABELS: Record<string, string> = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'PrizePicks', betr: 'Betr', draftkings_sportsbook: 'DK Sportsbook' };
 
 async function persistBestPicksSnapshot(overs: BestPicksSnapshotEntry[], unders: BestPicksSnapshotEntry[]): Promise<void> {
   try {
@@ -10861,8 +10886,10 @@ async function persistBestPicksSnapshot(overs: BestPicksSnapshotEntry[], unders:
         fighter: f.name,
         opponent: f.opponent || null,
         lean,
-        line: getSourceActiveLine(f, source),
-        platform: formatSourcePlatformLabel(f, source),
+        line: entry.line !== undefined ? entry.line : getSourceActiveLine(f, source),
+        platform: entry.book
+          ? (BOOK_LABELS[entry.book] || entry.book)
+          : formatSourcePlatformLabel(f, source),
         source,
         confidence: el.conf || 0,
         confidenceGrade: el.confidenceGrade || getConfidenceGrade(el.conf || 0),
