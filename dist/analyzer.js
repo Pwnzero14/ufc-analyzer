@@ -24258,8 +24258,16 @@ async function loadData() {
             const manualBetr = result[STORAGE_BETR_MANUAL_KEY];
             if (manualBetr?.fighters?.length) {
                 const base = result['lines_betr']?.fighters || [];
+                const baseCapturedAt = result['lines_betr']?.capturedAt;
                 const merged = applyBetrManualOverrides(base, manualBetr.fighters);
-                result['lines_betr'] = { fighters: merged, capturedAt: manualBetr.capturedAt ?? Date.now() };
+                // Stamp the payload with whichever store actually supplied the rows. This used to
+                // take the manual timestamp unconditionally, so a live auto-fetched board still
+                // reported the age of a hand-typed entry — the board read "Betr 26 · 27h" minutes
+                // after a successful fetch, which reads as a dead book rather than a fresh one.
+                result['lines_betr'] = {
+                    fighters: merged,
+                    capturedAt: (base.length ? baseCapturedAt : manualBetr.capturedAt) ?? Date.now(),
+                };
                 // Stamp betr_event_date with the current card's date whenever manual Betr lines exist.
                 // Betr lines are entered via console snippet (which doesn't set it), so the date stays
                 // undefined — and the × DISMISS / RESET LINES buttons then treat ANY time as "event
