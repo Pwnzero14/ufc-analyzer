@@ -9349,7 +9349,14 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     }
   }
 
-  void persistBestPicksSnapshot(overs, unders);
+  // Hand over the SAME direction-resolved lean the board just rendered. The snapshot
+  // used to re-derive it with getEffectiveLean(), which is direction-agnostic, so a
+  // fighter listed in the overs column was logged with whatever their single strongest
+  // lean happened to be — frequently the UNDER, and frequently a different STAT.
+  void persistBestPicksSnapshot(
+    overs.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'over') })),
+    unders.map((f) => ({ fighter: f, lean: getBestPickLeanForDir(f, 'under') })),
+  );
 
   // Flag fighters whose opponent is still in the SAME section after demotion
   const overNames = new Set(overs.map(f => f.name.toLowerCase()));
@@ -10730,7 +10737,14 @@ function memoryTagsForFighter(f: AnalyzerFighter, source: LeanSource, el: LeanRe
   });
 }
 
-async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: AnalyzerFighter[]): Promise<void> {
+/** One entry per rendered pick: the fighter plus the lean the BOARD chose for that
+ *  column. Passing the lean in (rather than recomputing it here) is the whole point —
+ *  best_picks_snapshots_v1 is what the learning engine grades against results, so a
+ *  second derivation that drifts silently poisons every accuracy number. Same lesson
+ *  as the report-card export (ccf538c): one resolve, shared. */
+type BestPicksSnapshotEntry = { fighter: AnalyzerFighter; lean: EffectiveLean | null };
+
+async function persistBestPicksSnapshot(overs: BestPicksSnapshotEntry[], unders: BestPicksSnapshotEntry[]): Promise<void> {
   try {
     const resolveOpponentDb = resolveOpponentDbFor;
 
@@ -10775,8 +10789,11 @@ async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: Analyz
       return deriveConfidenceMemoryTagsLive(context);
     };
 
-    const normalizePick = (f: AnalyzerFighter, lean: 'over' | 'under') => {
-      const el = getEffectiveLean(f);
+    const normalizePick = (entry: BestPicksSnapshotEntry, lean: 'over' | 'under') => {
+      const f = entry.fighter;
+      // Fall back only if the column somehow had no lean in its own direction — that
+      // would be a builder bug, and logging the effective lean is better than nothing.
+      const el = entry.lean || getEffectiveLean(f);
       const source = el._source || 'fp';
       return {
         fighter: f.name,
@@ -10794,8 +10811,8 @@ async function persistBestPicksSnapshot(overs: AnalyzerFighter[], unders: Analyz
     };
 
     const picks = [
-      ...overs.map((f) => normalizePick(f, 'over')),
-      ...unders.map((f) => normalizePick(f, 'under')),
+      ...overs.map((e) => normalizePick(e, 'over')),
+      ...unders.map((e) => normalizePick(e, 'under')),
     ];
 
     if (!picks.length) return;
