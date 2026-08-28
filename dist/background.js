@@ -120,9 +120,27 @@ async function initializeBetrLines() {
     const seedEventMs = new Date(`${BETR_EVENT_DATE}T23:59:59`).getTime();
     if (Number.isFinite(seedEventMs) && Date.now() > seedEventMs) {
         try {
-            await new Promise((res) => chrome.storage.local.remove(['lines_betr', 'betr_seed_hash', 'betr_event_date'], () => res()));
-            store.betr = { fighters: [], capturedAt: Date.now() };
-            console.log(`[UFC] Betr seed skipped — event date ${BETR_EVENT_DATE} is past. Cleared stale lines_betr (manual overrides preserved).`);
+            // lines_betr is NO LONGER the legacy seed — it is the auto-fetched Betr board
+            // (fetchBetrFromBackground), so clearing it here would delete a live book on every
+            // service-worker start. Only the seed bookkeeping keys go.
+            await new Promise((res) => chrome.storage.local.remove(['betr_seed_hash', 'betr_event_date'], () => res()));
+            const persisted = await new Promise((res) => chrome.storage.local.get(['lines_betr', 'lines_betr_manual_v1'], res));
+            const auto = persisted?.lines_betr?.fighters || [];
+            const manual = persisted?.lines_betr_manual_v1?.fighters || [];
+            // Auto wins when it has rows; the manual store is the OUTAGE FALLBACK, which is
+            // the whole reason it still exists (console snippet + screenshot reader) after
+            // Betr became a fetched book.
+            if (auto.length) {
+                store.betr = { fighters: auto, capturedAt: persisted.lines_betr.capturedAt || Date.now() };
+                console.log(`[UFC] Betr: restored ${auto.length} auto-fetched rows.`);
+            }
+            else if (manual.length) {
+                store.betr = { fighters: manual, capturedAt: persisted.lines_betr_manual_v1.capturedAt || Date.now() };
+                console.log(`[UFC] Betr: no auto rows — fell back to ${manual.length} manual rows.`);
+            }
+            else {
+                store.betr = { fighters: [], capturedAt: Date.now() };
+            }
         }
         catch (error) {
             console.error('[UFC] Failed to clear stale Betr lines:', error);
@@ -1628,6 +1646,25 @@ function mergeFighters(existing = [], incoming = []) {
                 merged.ud_ft_over_avail = fighter.ud_ft_over_avail;
             if (fighter.ud_ft_under_avail != null)
                 merged.ud_ft_under_avail = fighter.ud_ft_under_avail;
+            // Betr side availability, from the API's own allowedOptions — NOT inferred from
+            // icons. mergeFighters is an ALLOWLIST: a field missing from here is silently
+            // dropped on every merge after the first insert.
+            if (fighter.betr_fp_over_avail != null)
+                merged.betr_fp_over_avail = fighter.betr_fp_over_avail;
+            if (fighter.betr_fp_under_avail != null)
+                merged.betr_fp_under_avail = fighter.betr_fp_under_avail;
+            if (fighter.betr_ss_over_avail != null)
+                merged.betr_ss_over_avail = fighter.betr_ss_over_avail;
+            if (fighter.betr_ss_under_avail != null)
+                merged.betr_ss_under_avail = fighter.betr_ss_under_avail;
+            if (fighter.betr_td_over_avail != null)
+                merged.betr_td_over_avail = fighter.betr_td_over_avail;
+            if (fighter.betr_td_under_avail != null)
+                merged.betr_td_under_avail = fighter.betr_td_under_avail;
+            if (fighter.betr_ft_over_avail != null)
+                merged.betr_ft_over_avail = fighter.betr_ft_over_avail;
+            if (fighter.betr_ft_under_avail != null)
+                merged.betr_ft_under_avail = fighter.betr_ft_under_avail;
             const cleanOpponent = sanitizeOpponentName(fighter.opponent, fighter.name);
             if (cleanOpponent != null)
                 merged.opponent = cleanOpponent;
@@ -2559,6 +2596,170 @@ function reconcileRemovals(merged, incoming, platform) {
         console.warn(`[UFC] ${platform}: cleared ${cleared} line(s) the board no longer offers`);
     }
     return cleared;
+}
+/**
+ * Betr Picks — GraphQL, no auth needed for the public board.
+ *
+ * Contract learned from the live schema + the user's own DFS notifier, which has
+ * been polling this endpoint in production:
+ *  • UFC events arrive as TeamVersusEvent → teams → players. (IndividualVersusEvent
+ *    exists in the schema but UFC does not use it — querying that shape returns an
+ *    empty list with no error.)
+ *  • ASK ONLY FOR FIELDS WE READ. Betr declares much of its schema non-null, so one
+ *    null record bubbles up and nulls the WHOLE response — on 2026-08-27 a team with
+ *    a null id killed their board for three hours. Every field below is consumed.
+ *  • Origin/Referer must be set; the endpoint is picky about unattributed callers.
+ *  • `errors` alongside `data` is a PARTIAL board and is worth keeping. Only a null
+ *    `data` is a failed poll.
+ *  • Betr 401s under heavy polling — this runs once per auto-fetch, never in a loop.
+ */
+const BETR_GRAPHQL_ENDPOINT = 'https://api.fantasy.betr.app/graphql';
+const BETR_LEAGUE_QUERY = `query LeagueUpcomingEvents($league: League!) {
+  getUpcomingEventsV2(league: $league) {
+    id name date status
+    ... on TeamVersusEvent {
+      teams {
+        players {
+          id firstName lastName
+          projections {
+            marketStatus type label key value nonRegularValue
+            allowedOptions { outcome }
+          }
+        }
+      }
+    }
+  }
+}`;
+/** Projection types whose REAL line is nonRegularValue rather than value. Mirrors the
+ *  app's own getPickInfo: nonRegularProjectionTypes.includes(type) ? nonRegularValue :
+ *  value. Boosted/anchor/nuke/free-pick props are priced on the non-regular field, so
+ *  reading `value` there posts a line the book is not offering. */
+const BETR_NON_REGULAR_TYPES = new Set(['BOOSTED', 'ANCHOR', 'NUKE', 'FREE_PICK', 'SPECIAL_INCREASED', 'SPECIAL_DECREASED']);
+function parseBetrGraphQLFighters(data) {
+    const out = {};
+    const events = Array.isArray(data?.getUpcomingEventsV2) ? data.getUpcomingEventsV2 : [];
+    for (const ev of events) {
+        if (ev?.status === 'FINISHED')
+            continue;
+        for (const team of ev?.teams || []) {
+            for (const p of team?.players || []) {
+                const name = `${p?.firstName || ''} ${p?.lastName || ''}`.trim();
+                if (!name)
+                    continue;
+                if (!out[name]) {
+                    out[name] = {
+                        name, opponent: null,
+                        line_fp: null, line_ss: null, line_td: null, line_ft: null,
+                        betr_fp_over_avail: null, betr_fp_under_avail: null,
+                        betr_ss_over_avail: null, betr_ss_under_avail: null,
+                        betr_td_over_avail: null, betr_td_under_avail: null,
+                        betr_ft_over_avail: null, betr_ft_under_avail: null,
+                    };
+                }
+                const rec = out[name];
+                for (const pr of p?.projections || []) {
+                    if (pr?.marketStatus && pr.marketStatus !== 'OPENED')
+                        continue;
+                    const outcomes = (pr?.allowedOptions || []).map((o) => String(o?.outcome || '').toUpperCase());
+                    const over = outcomes.includes('MORE');
+                    const under = outcomes.includes('LESS');
+                    const raw = BETR_NON_REGULAR_TYPES.has(String(pr?.type || '').toUpperCase())
+                        ? pr?.nonRegularValue
+                        : pr?.value;
+                    const v = Number(raw);
+                    if (!Number.isFinite(v) || v <= 0)
+                        continue;
+                    switch (String(pr?.key || '').toUpperCase()) {
+                        case 'FANTASY_POINTS':
+                            rec.line_fp = v;
+                            rec.betr_fp_over_avail = over;
+                            rec.betr_fp_under_avail = under;
+                            break;
+                        case 'SIG_STRIKES':
+                            rec.line_ss = v;
+                            rec.betr_ss_over_avail = over;
+                            rec.betr_ss_under_avail = under;
+                            break;
+                        case 'TAKEDOWNS':
+                            rec.line_td = v;
+                            rec.betr_td_over_avail = over;
+                            rec.betr_td_under_avail = under;
+                            break;
+                        case 'FIGHT_TIME':
+                            rec.line_ft = v;
+                            rec.betr_ft_over_avail = over;
+                            rec.betr_ft_under_avail = under;
+                            break;
+                        default: break; // DECISION_WIN / FINISHES / KNOCKOUTS etc. are not analyzer stats
+                    }
+                }
+            }
+        }
+        // Opponent from the other side of the same event — Betr has no opponent field.
+        const names = [];
+        for (const team of ev?.teams || [])
+            for (const p of team?.players || []) {
+                const n = `${p?.firstName || ''} ${p?.lastName || ''}`.trim();
+                if (n)
+                    names.push(n);
+            }
+        if (names.length === 2) {
+            if (out[names[0]])
+                out[names[0]].opponent = names[1];
+            if (out[names[1]])
+                out[names[1]].opponent = names[0];
+        }
+    }
+    return Object.values(out).filter((f) => f.line_fp != null || f.line_ss != null || f.line_td != null || f.line_ft != null);
+}
+async function fetchBetrFromBackground() {
+    let mergedFighters = store.betr?.fighters || [];
+    let fresh = [];
+    let partial = false;
+    try {
+        const res = await fetch(BETR_GRAPHQL_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                Origin: 'https://picks.betr.app',
+                Referer: 'https://picks.betr.app/',
+            },
+            body: JSON.stringify({ query: BETR_LEAGUE_QUERY, variables: { league: 'UFC' } }),
+            signal: AbortSignal.timeout(15000),
+        });
+        const body = await res.json();
+        if (!body?.data) {
+            console.warn('[UFC Auto-Scrape] betr: no data —', body?.errors?.[0]?.message || res.status);
+            return getUnderdogStatCoverage(mergedFighters);
+        }
+        if (body.errors?.length) {
+            partial = true;
+            console.warn(`[UFC Auto-Scrape] betr: PARTIAL board — ${String(body.errors[0]?.message).slice(0, 140)}`);
+        }
+        fresh = parseBetrGraphQLFighters(body.data);
+        console.log(`[UFC Auto-Scrape] betr GraphQL -> ${fresh.length} fighters`);
+    }
+    catch (e) {
+        console.warn('[UFC Auto-Scrape] betr fetch failed:', e);
+        return getUnderdogStatCoverage(mergedFighters);
+    }
+    if (!fresh.length)
+        return getUnderdogStatCoverage(mergedFighters);
+    mergedFighters = mergeOrReplaceFighters(mergedFighters, fresh, 'betr');
+    // Betr's board is one query for the whole league, so absence is a genuine take-down —
+    // same treatment as UD/PP. NOT on a partial board: a bubbled null there means the
+    // response is missing records that still exist, and reconciling would delete them.
+    if (!partial) {
+        reconcileRemovals(mergedFighters, fresh, 'betr');
+        mergedFighters = mergedFighters.filter(hasAnyReconcilableLine);
+    }
+    if (mergedFighters.length) {
+        store.betr = { fighters: mergedFighters, capturedAt: Date.now() };
+        await StorageService.setLines('betr', mergedFighters);
+        await archivePlatformPropLines('betr', mergedFighters);
+        notifyAnalyzerTabs({ type: 'LINES_UPDATED', platform: 'betr', count: mergedFighters.length });
+    }
+    return getUnderdogStatCoverage(mergedFighters);
 }
 async function fetchPrizePicksFromBackground() {
     const endpoints = [
@@ -3555,7 +3756,13 @@ async function autoScrapeAllPlatforms() {
     const attempts = {};
     let expectedUnderdogFighters = 20;
     try {
-        // Betr lines are entered manually (not auto-scraped) — do not clear them here.
+        // Betr is now auto-fetched like the other books. It needs no browser tab (pure
+        // GraphQL), so it runs outside orderedPlatforms rather than through the tab
+        // machinery. The manual store survives as the outage fallback.
+        const betrFetch = fetchBetrFromBackground().catch((e) => {
+            console.warn('[UFC Auto-Scrape] betr threw:', e);
+            return null;
+        });
         try {
             const card = await fetchUpcomingUFCCard();
             if (card?.fighters?.length) {
@@ -3565,6 +3772,7 @@ async function autoScrapeAllPlatforms() {
         catch {
             // Keep default expectation if card lookup fails.
         }
+        await betrFetch;
         const orderedPlatforms = ['underdog', 'pick6', 'prizepicks', 'draftkings_sportsbook'];
         // Run all platforms in parallel
         await Promise.all(orderedPlatforms.map(async (platform) => {
