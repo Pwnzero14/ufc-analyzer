@@ -475,7 +475,17 @@ async function persistPlacedParlay(legs: PlacedParlayLeg[]): Promise<'placed' | 
       raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, PlacedParlay[]>) } : {};
     const evKey = bestPicksEventKey();
     const list = Array.isArray(all[evKey]) ? [...all[evKey]] : [];
-    const sigOf = (ls: PlacedParlayLeg[]): string => ls.map(l => `${l.fighter.toLowerCase()}|${l.stat}|${String(l.dir).toLowerCase()}`).sort().join(',');
+    // The signature carries BOOK and LINE, not just the side. Without them two
+    // genuinely different slips collapsed into one: the same sides taken on Betr
+    // (Tsuruya 99.5 + Asakura 96.5) and on Pick6 (95.5 + 90.5) produced an identical
+    // signature, so the second was rejected as ALREADY PLACED and the wager went
+    // untracked. Leg COUNT was the only thing separating them, which is why that same
+    // pair plus a third leg saved fine. The placed-LEG store has always keyed on the
+    // book for exactly this reason (`Su Mudaerji|over|ss|underdog`).
+    // A true double-submit is still caught: same sides, same book, same lines.
+    const sigOf = (ls: PlacedParlayLeg[]): string => ls
+      .map(l => `${l.fighter.toLowerCase()}|${l.stat}|${String(l.dir).toLowerCase()}|${l.book ?? ''}|${l.line ?? ''}`)
+      .sort().join(',');
     const sig = sigOf(legs);
     if (list.some(p => sigOf(p.legs || []) === sig)) return 'dup';
     list.unshift({ id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, placedAt: Date.now(), legs });
