@@ -8561,48 +8561,6 @@ function renderBestPicks(container, renderSeq = 0) {
                     continue;
                 candidates.push({ ...lean, _source: 'fp', _label: '', _platform: book });
             }
-            // MODEL v33 — SAME-SCALE FP DOMINANCE.
-            // pick6 / underdog / betr all score fantasy points with FANTASY_SCORING, so a
-            // fighter's projection is IDENTICAL across them and their lines sit on one axis.
-            // A candidate on a worse line than a same-direction sibling is therefore dominated:
-            // same read, worse entry. It used to be able to win anyway, because sortCandidates
-            // ranks on confidence alone — Rei Tsuruya surfaced as OVER Betr 99.5 while Underdog
-            // offered 88.99 on the same scale, and the row rendered "PROJ SAYS UNDER 18.7"
-            // because the shared projection (92.6) sat 6.9 BELOW the displayed line, where on
-            // the UD line it sat 3.6 ABOVE. Keep only the best-priced sibling per direction.
-            // PrizePicks is deliberately NOT in this set: PRIZEPICKS_SCORING is a different
-            // formula (sig strikes only, no control time, no quick-finish bonus), so its line is
-            // not comparable and keeps its own candidate.
-            {
-                const SHARED_FP_SCALE = ['pick6', 'underdog', 'betr'];
-                const onSharedScale = (c) => c._source === 'fp' && !!c._platform && SHARED_FP_SCALE.includes(c._platform);
-                for (const dir of ['over', 'under']) {
-                    const sibs = candidates.filter(c => onSharedScale(c) && c.lean === dir);
-                    if (sibs.length < 2)
-                        continue;
-                    let keep = sibs[0];
-                    let keepLine = lineForLeanSource(f, 'fp', keep._platform);
-                    for (const c of sibs.slice(1)) {
-                        const v = lineForLeanSource(f, 'fp', c._platform);
-                        if (v == null || keepLine == null)
-                            continue;
-                        if (dir === 'over' ? v < keepLine : v > keepLine) {
-                            keep = c;
-                            keepLine = v;
-                        }
-                    }
-                    for (const c of sibs) {
-                        if (c === keep)
-                            continue;
-                        const i = candidates.indexOf(c);
-                        if (i >= 0)
-                            candidates.splice(i, 1);
-                    }
-                    if (sibs.length > 1) {
-                        debugLog(`FP dominance: ${f.name} ${dir} — kept ${keep._platform} ${keepLine}, dropped ${sibs.length - 1} worse-priced sibling(s)`);
-                    }
-                }
-            }
             // SS/TD/FT: scoring is identical across books (same underlying stat).
             // Stick with the existing single-lean approach; line variance is small.
             if (f.lean_ss?.lean && f.lean_ss.lean !== 'none' && f.lean_ss.lean !== 'push' && lineForLeanSource(f, 'ss') != null) {
@@ -8631,7 +8589,51 @@ function renderBestPicks(container, renderSeq = 0) {
             if (f.lean_ctrl?.lean === 'over' && lineForLeanSource(f, 'ctrl') != null) {
                 candidates.push({ ...f.lean_ctrl, _source: 'ctrl', _label: ' (CTRL line)' });
             }
-            return candidates.filter(c => isCandidateUsable(f, c));
+            // Usability FIRST. Dominance below compares entry prices, and comparing an
+            // unplaceable line against a placeable one would drop the only pick that could
+            // actually be taken — a dog's FP UNDER is placeable on Underdog alone, so if Pick6
+            // held the higher under line the pruner would keep Pick6, drop Underdog, and then
+            // this filter would delete the survivor, losing the pick entirely.
+            const usable = candidates.filter(c => isCandidateUsable(f, c));
+            // MODEL v33 — SAME-SCALE FP DOMINANCE.
+            // pick6 / underdog / betr all score fantasy points with FANTASY_SCORING, so a
+            // fighter's projection is IDENTICAL across them and their lines sit on one axis.
+            // A candidate on a worse line than a same-direction sibling is therefore dominated:
+            // same read, worse entry. It used to be able to win anyway, because sortCandidates
+            // ranks on confidence alone — Rei Tsuruya surfaced as OVER Betr 99.5 while Underdog
+            // offered 88.99 on the same scale, and the row rendered "PROJ SAYS UNDER 18.7"
+            // because the shared projection (92.6) sat 6.9 BELOW the displayed line, where on
+            // the UD line it sat 3.6 ABOVE. Keep only the best-priced sibling per direction.
+            // PrizePicks is deliberately NOT in this set: PRIZEPICKS_SCORING is a different
+            // formula (sig strikes only, no control time, no quick-finish bonus), so its line is
+            // not comparable and keeps its own candidate.
+            const SHARED_FP_SCALE = ['pick6', 'underdog', 'betr'];
+            const onSharedScale = (c) => c._source === 'fp' && !!c._platform && SHARED_FP_SCALE.includes(c._platform);
+            for (const dir of ['over', 'under']) {
+                const sibs = usable.filter(c => onSharedScale(c) && c.lean === dir);
+                if (sibs.length < 2)
+                    continue;
+                let keep = sibs[0];
+                let keepLine = lineForLeanSource(f, 'fp', keep._platform);
+                for (const c of sibs.slice(1)) {
+                    const v = lineForLeanSource(f, 'fp', c._platform);
+                    if (v == null || keepLine == null)
+                        continue;
+                    if (dir === 'over' ? v < keepLine : v > keepLine) {
+                        keep = c;
+                        keepLine = v;
+                    }
+                }
+                for (const c of sibs) {
+                    if (c === keep)
+                        continue;
+                    const k = usable.indexOf(c);
+                    if (k >= 0)
+                        usable.splice(k, 1);
+                }
+                debugLog(`FP dominance: ${f.name} ${dir} — kept ${keep._platform} ${keepLine}, dropped ${sibs.length - 1} worse-priced placeable sibling(s)`);
+            }
+            return usable;
         };
         const sortCandidates = (candidates) => {
             candidates.sort((a, b) => {
