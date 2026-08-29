@@ -4999,27 +4999,52 @@ function calcSSLean(name, db, line_ss, oppDB, dkLine, availableLines = [], money
     else {
         reasons.push({ icon: 'neu', text: `${ssLabel} near line — toss-up` });
     }
-    const hits = history.filter(h => (h.sigStr || 0) > line_ss).length;
+    // ── Hit rate vs this line (MODEL v39: duration-normalised) ────────────────
+    // Each past fight is scaled to THIS fight's expected minutes before asking whether it
+    // cleared the line. Raw h.sigStr comes from fights of different lengths, so a fighter
+    // with 5R main events in his history was credited with clearing a 3R line on volume he
+    // only reached because those fights ran 25 minutes. This term is worth ±2 — the largest
+    // after diff — and it was the last factor still comparing un-normalised career output
+    // against a duration-specific line, while the projection beside it has been
+    // duration-adjusted since v6 and market-anchored since v37.
+    // Scale is bounded 0.5–1.5 so a 60-second KO is not extrapolated to a full fight: the
+    // target is the systematic 3R/5R distortion, not short-fight noise. Falls back to the
+    // raw comparison per-fight when duration is missing, so a db without timeSecs behaves
+    // exactly as before. (calcTDLean has the same un-normalised pattern — left alone.)
+    const schedRoundsSS = upcomingCardPairs.length ? getScheduledRoundsContext(name).rounds : null;
+    const expMinsSS = marketExpectedFightMinutes(name, schedRoundsSS);
+    let ssNormalisedFights = 0;
+    const clearedSSLine = (h) => {
+        const ss = h.sigStr || 0;
+        const mins = Number(h.timeSecs) / 60;
+        if (expMinsSS == null || !Number.isFinite(mins) || mins <= 0)
+            return ss > line_ss;
+        ssNormalisedFights++;
+        return ss * Math.max(0.5, Math.min(1.5, expMinsSS / mins)) > line_ss;
+    };
+    const hits = history.filter(clearedSSLine).length;
     const rate = hits / history.length;
     const rateAdj = shrunkHitRate(hits, history.length);
+    const hrNote = ssNormalisedFights && expMinsSS != null
+        ? ` (${ssNormalisedFights}/${history.length} scaled to ~${expMinsSS.toFixed(0)}m)` : '';
     if (rateAdj >= 0.72) {
         score += 2;
-        reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights (${Math.round(rate * 100)}%) went over SS line` });
+        reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights (${Math.round(rate * 100)}%) went over SS line${hrNote}` });
     }
     else if (rateAdj >= 0.58) {
         score += 1;
-        reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights over SS line` });
+        reasons.push({ icon: 'pos', text: `Hit rate: ${hits}/${history.length} fights over SS line${hrNote}` });
     }
     else if (rateAdj <= 0.28) {
         score -= 2;
-        reasons.push({ icon: 'neg', text: `Hit rate: only ${hits}/${history.length} fights (${Math.round(rate * 100)}%) cleared SS line` });
+        reasons.push({ icon: 'neg', text: `Hit rate: only ${hits}/${history.length} fights (${Math.round(rate * 100)}%) cleared SS line${hrNote}` });
     }
     else if (rateAdj <= 0.42) {
         score -= 1;
-        reasons.push({ icon: 'neg', text: `Hit rate: ${hits}/${history.length} fights over SS line — under tendency` });
+        reasons.push({ icon: 'neg', text: `Hit rate: ${hits}/${history.length} fights over SS line — under tendency${hrNote}` });
     }
     else {
-        reasons.push({ icon: 'neu', text: `Hit rate: ${hits}/${history.length} fights over SS line — near 50/50` });
+        reasons.push({ icon: 'neu', text: `Hit rate: ${hits}/${history.length} fights over SS line — near 50/50${hrNote}` });
     }
     if (history.length >= 3) {
         const recentAvg = history.slice(0, 3).reduce((s, h) => s + (h.sigStr || 0), 0) / 3;
