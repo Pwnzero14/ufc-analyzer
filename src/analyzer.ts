@@ -15951,7 +15951,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
     .sort((a, b) => b.rate - a.rate || b.total - a.total)
     .slice(0, 8);
-  const tdHits = tdRows.filter(r => Number(r.result) > Number(r.line)).length;
+  // Per-fight, like the total beside it. Left as a row count this reported 195 hits
+  // against a 281-fight denominator — two different populations in one fraction.
+  const tdHits = _tdAgg.hits;
 
   // ── FightTime hit rate ────────────────────────────────────────────────
   const ftRows = resolvedRows.filter(r => String(r.propType) === 'FightTime');
