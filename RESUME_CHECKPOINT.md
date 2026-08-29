@@ -1,13 +1,13 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-29 17:48:08 -04:00
+Last Saved: 2026-08-29 19:09:36 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: d5e79b5
+HEAD: 53d7560
 
 ## Last Notes
-SESSION HANDOFF (2026-08-29, ~17:50). Tree clean. MODEL_VERSION 39.
-Pushed: feature/sleek-theme-v1 d5e79b5, master 72c2dbf (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-29, ~19:15). Tree clean. MODEL_VERSION 39.
+Pushed: feature/sleek-theme-v1 53d7560, master d8d0e82 (cherry-picked; full parity verified).
 
 BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
 finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
@@ -21,6 +21,7 @@ vs. Parnasse"; props have NOT dropped.
 3. MODEL v37 (13f827b) SS market anchor - the projection was +6 high and the market wasn't.
 4. MODEL v38 (9eba89b) SS +/-0.5 tier collapsed to a push.
 5. MODEL v39 (d5e79b5) SS hit-rate term duration-normalised.
+6. GLOW-UP 344-353 (765cf38) the two ledgers become navigable; 348 reverted (53d7560).
 
 === MODEL v37 (13f827b) - SS MARKET ANCHOR ===
 THE MEASUREMENT (149 settled SS picks from the snapshot store, 2026-08-29):
@@ -156,6 +157,84 @@ chrome.storage.local.get('ai_lean_snapshots_v1', (r) => {
 GATE 3 (badge moves off 0/N) is AFTER PARIS SETTLES - calibration and grading only count picks from PAST
   events with archive rows. A stuck 0/N all through fight week is EXPECTED, not a failure.
 
+=== GLOW-UP 344-353 (765cf38) + FIX (53d7560) - THE TWO LEDGERS ===
+USER-VERIFIED BY SCREENSHOT after an extension reload. Placed ledger = 9 events / 149 legs, parlay
+ledger = 42 slips, previously one uninterrupted column.
+ 344 EVENTS COLLAPSE. Head is a <button>, body wrapped in .plg-ev-inner. State lives in
+     _ledgerCollapsedEvents, a session-scoped Set keyed `${ledger}|${evKey}` - same shape and
+     lifetime as _archiveCollapsedSections (house pattern; NOT persisted, do not "fix" that).
+     Newest event open, rest collapsed, via applyLedgerCollapseDefaults on FIRST render only.
+ 345 Collapsed head keeps the shape: one tick per leg (per SLIP on the parlay side) in display
+     order, capped 32 with a +N tail. ledgerOutcomeStrip().
+ 346 COLLAPSE ALL / EXPAND ALL - one button whose label states which it does next.
+ 347 THE GRID HAD ONE MORE CHILD THAN TRACKS. .plg-leg emits ELEVEN children; the base rule
+     declared 11 but the <=1500px and <=1180px breakpoints declared 10 and 9. Everything from
+     `N legs` rightward sat one track LEFT of its heading and .plc-gap wrapped to an implicit row.
+     It survived for months because head and rows shifted TOGETHER - aligned with each other, under
+     the wrong labels. A/B in the preview: old 2 grid rows / 32px per leg, fixed 1 row / 24px, zero
+     header-to-cell offset at 1600 / 1400 / 1100.
+ 348 REVERTED - see the sticky lesson below.
+ 349 Parlay legs got columns (.plp-leg is a 6-track grid). They rendered as an inline run, so on a
+     7-leg slip no two lines started at the same x.
+ 350 Parlay events collapse on the same mechanism, keyed separately.
+ 351 RESULT FILTER, pure CSS off .lgr[data-filter] so 149 rows never enter a JS loop. Verified
+     exact: 144 = 51 hit + 50 miss + 43 pending legs; 42 = 6 + 23 + 13 slips. :has() hides events
+     the filter empties, and the filter OVERRIDES collapse - with !important, because a hand-
+     toggled event carries an INLINE max-height that no selector can outrank.
+ 352 Leg/slip count chip on the head.
+ 353 aria-expanded, :focus-visible, reduced-motion; the stagger no longer replays on expand.
+ PLUS empty-filter state ("Nothing matches this filter..."), since a filter matching nothing
+     rendered a toolbar over blank space and read as a broken panel.
+
+*** THE STICKY LESSON (348) - GENERALISE THIS ***
+`position: sticky; top: 88px` on .plg-ev-head produced THREE symptoms from ONE cause: the head
+overlapped the first parlay slip's legs; it painted BELOW content that follows it in the DOM; and
+on the placed ledger it completely covered the FIGHTER/SIDE/LINE column header, so the first event
+rendered with no headings at all.
+CAUSE: .section-body carries `overflow: hidden` for the accordion, which makes it the nearest
+SCROLLPORT. A sticky child positions against its SCROLLPORT, not the viewport - so top:88px pushed
+every head 88px DOWN from the section's top edge, onto its own rows. Measured: headOffsetTop 58
+against a flow position of 0, with the body correctly at 25. After revert: headOffsetTop 0 on both
+ledgers, no overlap, colhead back at exactly the head's bottom edge (11190 = 11190).
+Any future sticky inside an archive panel must solve the SCROLLPORT first - an offset alone cannot
+work, there is no scrolling ancestor to stick to. The old note "sticky offsets 54/88px" applies to
+the PAGE chrome, NOT to anything inside .section-body.
+
+*** TWO ANIMATION TECHNIQUES THAT FAILED - DO NOT RETRY (also recorded in the CSS) ***
+ - grid-template-rows 1fr -> 0fr with the rows as DIRECT children: 0fr sizes only the FIRST
+   implicit row, so 43 of 44 children kept auto rows and the event never shrank (bodyH 1095 both
+   collapsed and open).
+ - the same after wrapping in a single .plg-ev-inner: collapse worked (rows resolved to 0px) but
+   EXPAND did not - fr will not resolve back against an auto-height container mid-transition, so a
+   re-opened event sat at 0px with its class and aria correctly flipped.
+ SHIPPED: JS-measured max-height, exactly what the section accordion already uses - exact at any
+ content height and it survives both directions.
+
+*** PREVIEW HARNESS - REAL LIMITS FOUND THIS SESSION ***
+preview_start "analyzer-preview" serves analyzer.html with dev/chrome-shim.js seeded from the
+newest ~/Downloads/ufc-storage-backup-*.json, so the ledgers render REAL data. dev/preview-view.txt
+holds "viewName" or "viewName|scrollY" and the shim clicks that tab (restore it to "parlaylab" when
+done). BUT the pane goes OCCLUDED constantly, and when it does:
+ - it stops COMPOSITING. Screenshots come back solid black even though the DOM is positioned
+   correctly (measured evTop 0 while the capture was blank), and CSS TRANSITIONS freeze mid-flight
+   so an element reads as its start value forever. A collapse test looked like a FAILURE until the
+   transition was neutralised with an injected `transition:none` style - then all five bodies
+   correctly read 0.
+ - it THROTTLES TIMERS, so a long `await new Promise(setTimeout)` inside one javascript_tool call
+   blows the 45s budget. Split into several SHORT calls instead of one long one.
+ - wheel scrolling via the computer tool went the wrong way / erratically, and window.scrollTo was
+   ignored; scrollIntoView({block:'start'}) worked.
+CONCLUSION: measure with javascript_tool (track counts, offsets, rects, computed styles) - that is
+reliable. Do NOT rely on screenshots from this harness, and SAY SO rather than implying a visual
+check happened.
+
+*** THE LESSON THE NUMBERS MISSED ***
+Every 348 symptom passed numeric verification: track counts, alignment deltas, row heights and
+x-offsets were all correct. Measurement proves GEOMETRY, not OCCLUSION - an element painted on top
+of another measures perfectly. The user's screenshots caught all three. This is
+feedback_test_dense_grid_rewrites_visually from a new angle: for any change touching stacking,
+position or z-index, a human eyeball is not optional.
+
 === MODEL v36 (1a24b53) - VERIFIED, CLOSED ===
 - ACCURACY: FP 402/657 61% -> 138/221 62% (2.97x). SS 250/442 57% -> 85/163 52% (2.71x).
   TD 10/12 -> 4/6. FT 31/47 66% -> 23/34 68%.
@@ -243,6 +322,13 @@ displayedConfidence. Must be RE-READ once gate 3 gives real coverage.
   count. Line data is irreplaceable - four events were lost permanently once.
 - Write patch scripts to FILES in the scratchpad and run with node; heredocs and `node -e` have mangled
   comments three times. Small targeted edits are safer via the Edit tool directly on the source.
+- PYTHON HEREDOCS ALSO REWRITE LINE ENDINGS. io.open(...,'w') on Windows turned src/analyzer.ts
+  CRLF, and guard-invariants.js then reported a FALSE storageSet violation: it slices the function
+  body with fn.indexOf of a LF-only delimiter, which never matches CRLF, so it tested an empty
+  string. Repair with sed stripping trailing \r. Pass newline='' to BOTH io.open calls, and a
+  heredoc containing quotes will also break bash outright - write the script to a FILE.
+- A UI change touching position / z-index / stacking CANNOT be signed off by measurement alone.
+  See the 348 lesson: ask for a screenshot from the real extension.
 - Console snippets go to the user as a fenced javascript block to PASTE, not as a `cat` command.
 - Do NOT call `npm run checkpoint:save -- -Notes "$notes"` with multiline notes; it collapses to the
   first line. Call `& .\resume.ps1 -Mode save -Notes $notes` directly.
