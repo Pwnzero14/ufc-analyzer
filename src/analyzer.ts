@@ -16355,16 +16355,29 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // Compute overall calibration score (Brier-style: lower = better calibrated)
   // Mean squared error of predicted probability vs actual hit rate across buckets
+  // WEIGHTED BY BUCKET POPULATION. This counted BUCKETS, so a 9-pick bucket carried the
+  // same weight as a 250-pick one — and on the 2026-08-29 archive a single n=9 bucket
+  // supplied 71% of the total error, making the headline score a readout of the thinnest
+  // cell on the panel rather than of the model.
   let calibBrierSum = 0;
   let calibBrierN = 0;
+  // Signed, same weighting: magnitude alone cannot tell over- from under-confidence, and
+  // the direction is the actionable half. The archive shows the 60-79% range running
+  // 5-11 points BELOW its stated confidence across n=611 — 56% of all graded picks, all
+  // leaning the same way. That is systematic, and an unsigned "88/100 Excellent" hid it.
+  let calibBiasSum = 0;
   for (const b of calibBuckets) {
     if (b.total < 2) continue;
     const predicted = b.midpoint / 100;
     const actual = b.hits / b.total;
-    calibBrierSum += (predicted - actual) ** 2;
-    calibBrierN++;
+    calibBrierSum += b.total * (predicted - actual) ** 2;
+    calibBiasSum += b.total * (actual - predicted);
+    calibBrierN += b.total;
   }
   const calibScore = calibBrierN > 0 ? Math.round((1 - Math.sqrt(calibBrierSum / calibBrierN)) * 100) : null;
+  /** Positive = the model is UNDER-confident (it beats its own number); negative = it is
+   *  OVER-confident. Points of hit rate, not a probability. */
+  const calibBiasPts = calibBrierN > 0 ? Math.round((calibBiasSum / calibBrierN) * 1000) / 10 : null;
 
   // Build calibration curve HTML
   const calibActiveBuckets = calibBuckets.filter(b => b.total > 0);
@@ -16425,7 +16438,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     const scoreHtml = calibScore != null
       ? `<div class="cal-head">
           <span class="cal-score cal-score-${scoreCls}">${calibScore}<i>/100</i></span>
-          <span class="cal-verdict">${calibScore >= 85 ? 'Excellent — confidence closely matches reality' : calibScore >= 70 ? 'Good — minor gaps between predicted and actual' : 'Needs work — confidence scores are off from reality'}</span>
+          <span class="cal-verdict">${calibScore >= 85 ? 'Excellent — confidence closely matches reality' : calibScore >= 70 ? 'Good — minor gaps between predicted and actual' : 'Needs work — confidence scores are off from reality'}${calibBiasPts != null && Math.abs(calibBiasPts) >= 2 ? ` · <b style="color:${calibBiasPts < 0 ? 'var(--red)' : 'var(--green)'}">${calibBiasPts > 0 ? '+' : ''}${calibBiasPts} pts ${calibBiasPts < 0 ? 'over' : 'under'}-confident</b>` : ''}</span>
           <span class="cal-samples" title="AI lean snapshot picks matched to settled archive results">📎 ${calibTotalSamples} graded picks</span>
         </div>`
       : '';
@@ -17850,7 +17863,23 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════════════
   // Recompute bias from the same archive data we already loaded (no extra fetch)
   const biasMap = new Map<string, { platform: string; propType: string; hits: number; total: number; edgeSum: number }>();
+  // ONE observation per book per market. Counting rows is right in principle here — unlike
+  // the hit-rate leaderboards, each BOOK posting its own number genuinely is a separate
+  // observation of that book pricing that fight. What is not separate is the SAME book,
+  // same fighter, same fight appearing twice because the card is filed under two event
+  // names (a live case carried 4 event names across 2 dates). That is one market counted
+  // twice, and it silently overweights whichever fights happened to be captured under a
+  // shadow name. First row wins, matching the archive index invariant documented above.
+  const _biasSeen = new Set<string>();
   for (const r of allRows.filter(r => !!r.platform && Number.isFinite(Number(r.line)) && Number.isFinite(Number(r.result)) && Date.parse(r.date) >= londonTs)) {
+    const dedupeKey = [
+      String(r.platform).toLowerCase(),
+      String(r.propType),
+      (normalizeName(r.fighter) || String(r.fighter)).toLowerCase(),
+      String(r.date || '').slice(0, 10),
+    ].join('|');
+    if (_biasSeen.has(dedupeKey)) continue;
+    _biasSeen.add(dedupeKey);
     const key = `${String(r.platform).toLowerCase()}|${r.propType}`;
     const b = biasMap.get(key) || { platform: String(r.platform).toLowerCase(), propType: String(r.propType), hits: 0, total: 0, edgeSum: 0 };
     const normResult = normalizeArchiveResult(String(r.propType), Number(r.result));
