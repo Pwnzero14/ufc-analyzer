@@ -874,6 +874,11 @@ async function _fetchAndSettleFromUFCStats(opts) {
          *  · every line-based analytic requires a finite `line` (computeMarketFpShift, the
          *    FP-bias measurements, CLV), so a line-less row cannot pollute them.
          */
+        // Rows CREATED this run. The write below re-reads a fresh archive and re-applies
+        // resolvedKeys onto it — a race guard that only ever UPDATES existing rows. Newly
+        // pushed rows live solely in the stale in-memory copy and would be silently dropped
+        // (observed: ~150 result-only rows created, "Wrote 39882 records", total unchanged).
+        const createdRows = [];
         function ensureResultRow(name, opponent, event, propType, result, date) {
             if (!Number.isFinite(result))
                 return 0;
@@ -892,15 +897,17 @@ async function _fetchAndSettleFromUFCStats(opts) {
                     continue;
                 return 0;
             }
-            archive.push({
+            const row = {
                 fighter: name,
                 opponent,
                 event,
                 date,
                 propType: propType,
                 result,
-            });
+            };
+            archive.push(row);
             resolvedKeys.set(_resKey(name, nEvent, nProp), result);
+            createdRows.push(row);
             return 1;
         }
         function applyResult(names, event, propType, result) {
@@ -1311,6 +1318,24 @@ async function _fetchAndSettleFromUFCStats(opts) {
                         }
                     }
                     kept.push(row);
+                }
+                // Carry across the result-only rows created this run. The loop above can only
+                // update rows that exist in the fresh read, so without this the whole point of
+                // ensureResultRow is lost at the storage boundary. Re-checked against the fresh
+                // copy rather than trusted blindly: another writer may have added them already.
+                if (createdRows.length) {
+                    const seen = new Set(kept.map((r) => `${_normName(String(r.fighter || ''))}|${_normEvent(String(r.event || ''))}|${_normProp(String(r.propType || ''))}`));
+                    let added = 0;
+                    for (const nr of createdRows) {
+                        const k = `${_normName(String(nr.fighter || ''))}|${_normEvent(String(nr.event || ''))}|${_normProp(String(nr.propType || ''))}`;
+                        if (seen.has(k))
+                            continue;
+                        seen.add(k);
+                        kept.push(nr);
+                        added++;
+                    }
+                    if (added)
+                        console.log(`[UFC Settle] added ${added} result-only row(s) at write time`);
                 }
                 keptLen = kept.length;
                 return kept;
