@@ -1,36 +1,46 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-29 15:14:02 -04:00
+Last Saved: 2026-08-29 15:51:43 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 346651e
+HEAD: f2c603b
 
 ## Last Notes
-SESSION HANDOFF (2026-08-29, ~15:15). All committed and pushed to master + feature/sleek-theme-v1 (master is cherry-picked, different SHAs); dist committed with every src change; tree clean. MODEL_VERSION 34.
+SESSION HANDOFF (2026-08-29, ~15:50). All committed and pushed to master + feature/sleek-theme-v1 (master is cherry-picked, different SHAs); dist committed with every src change; tree clean. MODEL_VERSION 35.
 
-IN PROGRESS RIGHT NOW: AUDITING THE ARCHIVE SECTION
-The user found the hit-rate counting bug themselves and wants the rest of the Archive audited for the same class of error. Remaining to audit: PLATFORM BIAS, CALIBRATION CURVE, PROP ARCHIVE GRADING. Things already spotted, NOT yet investigated:
-- PROP ARCHIVE GRADING has an "UNKNOWN" platform bucket: UNKNOWN FP 14% n=21 avg edge +49.4, and in worst-combos "UNKNOWN B 0% 0/9", "UNKNOWN C 27% 3/11". A +49.4 average edge is not plausible - find out what those rows are.
-- CALIBRATION says 88/100 "Excellent" but the mid buckets are consistently OVERCONFIDENT: 60-64% -9, 65-69% -5, 70-74% -10, 75-79% -11. Those four buckets hold n=611 of 1082 picks - the bulk of the sample. Check whether the 88 score is weighting thin high-confidence buckets (80-84% n=66 at 0, 90%+ n=9 at +8) over the mass.
-- Count mismatch: CALIBRATION says "1082 picks resolved across 34 events", PROP ARCHIVE GRADING says "1182 graded AI picks". Reconcile.
-- PLATFORM BIAS is row-based (UD 706/1698, Pick6 622/1687, Betr 20/74). Arguably CORRECT since each book's line is genuinely its own observation - but it still carries the duplicate-event-name double count. Decide deliberately rather than by default.
-- Thin samples shown without shrinkage: DK TD 100% (n=4), Pick6 TD 100% (n=2).
+THE ARCHIVE AUDIT IS COMPLETE AND USER-VERIFIED BY SCREENSHOT.
+Every item from the previous checkpoint's audit list is closed. Verified on screen: Platform Bias "3770 markets priced"; Platform x Stat led by Pick6 FP (n=632) with DK TD 100% (n=4) demoted to 4th; Best Combos ABOVE 60% = UD A 82% 36/44, Pick6 A 82% 32/39, Pick6 B 66% 221/334; Worst Combos BELOW 60% = Pick6 D, Pick6 C, UD D, UD C, UD B; Calibration 93/100 with "-4.2 pts over-confident".
 
-TODAY'S CARD SETTLED (Nurmagomedov vs. Song) AND THE OPEN MODEL QUESTION IS CLOSED
-v30's -11 FP fair-line shift STANDS - no change. Measured on the population the model actually learns from (propType 'Fantasy' only, FANTASY_SCORING_BOOKS only, settled on/after the 2026-08-16 scorer fix): n=93, empirical -9.16 (SE 4.44), prior -11 (K=80), SHIFT IN USE -10.01, data weight 54%. That is 0.4 sigma from the prior - no evidence to move it, and it self-corrects as samples accrue.
-*** TRAP: a naive mean(result-line) over the WHOLE archive gives -14.60 (n=877, -11.75 sigma, 0 positive of 27 event clusters) and looks like damning proof the -11 under-corrects by 5 points. It is an artifact - ~90% of those rows predate the scorer fix. computeMarketFpShift filters propType + book set + SCORER_FIX_TS; any hand-rolled bias query MUST apply all three. ***
-Also confirmed: PrizePicks needs NO shift (bias -1.36, SE 3.36, statistically zero) while pick6 -16.47 / underdog -14.20 / betr -17.20. The model already excludes PP correctly.
+SHIPPED THIS SESSION (archive audit)
+- f8796a2 fix: a null line was graded as a line of ZERO in ten places. Number(null) is 0, so a missing line silently became a real comparison. Introduced finiteLineOrNaN and applied it at every activeLine read, INCLUDING the recalibration engine.
+- b931b1f fix(calibration): the Brier score counted BUCKETS, so an n=9 bucket weighed the same as an n=250 one and supplied 71% of total error - the headline was a readout of the thinnest cell. Now population-weighted, and paired with a SIGNED calibBiasPts, because magnitude alone cannot tell over- from under-confidence.
+- fe3e3d8 fix(bias): the platform-bias aggregation existed in THREE copies and I had patched the one the panel does not render. Shared dedupeBiasRows keyed platform|propType|fighter|DATE (date, not event name - the name is the thing that varies). One of the three feeds _platformBiasCache -> leanBestBook, so this moved the MODEL, not just the panel: UD SS +0.7 -> -0.1, Pick6 SS +0.3 -> -0.6, DK SS +0.1 -> +1.5.
+- edd6bd8 fix(grading): THE IMPORTANT ONE. c776f26 had sorted the leaderboards on shrunkHitRate and the rendered order did not move by a single row - Laplace (+1/+1) scores 4/4 at .833 against 392/632 at .620, far too light to discipline a small n and irrelevant at a large one. Replaced with wilsonBound (Wilson score interval). Best lists rank on the LOWER bound, worst lists on the UPPER - ranking both on the same bound hands one list to whichever cell is thinnest.
+- 6af711e + f2c603b fix(grading): 75% rows were printed under "Worst Combos". Two causes: the sample floor was 3 (one Betr card qualified), and the lists took a FIXED five rows each - with ten combos total that is every row, so each list had to reach past its own name. Floor raised to 10; lists now split on the model's overall rate (60%) and are as long as they deserve, which also makes them disjoint by construction.
+- 8c6ff97 fix(bias): the panel header still counted raw rows (5366) above five totals summing to 3770.
 
-SHIPPED THIS SESSION
-- 5494278 + 624499a + 8921d0b fix(settle): a placed leg whose book PULLED THE LINE before archiving could never grade. THREE stacked layers, each invisible from the one above, each reporting success: (1) applyResult only UPDATES rows, so a computed SS_R1=16 was discarded; (2) settle is driven off the unresolved set and hard-returns when it is empty, so the new code was unreachable on a settled card - forceEventName now survives that and pulls event names from the archive; (3) the writer re-reads a FRESH archive and re-applies resolvedKeys (a deliberate race guard) which only UPDATES existing rows, so created rows died at the storage boundary - they are now appended inside the same locked write. Verified: 39,882 -> 40,031 records, "added 149 result-only row(s) at write time", Xiong Jingnan UNDER 25.5 R1 SS flipped to HIT, ledger 9/41 -> 9/42.
-  REPAIR A PAST CARD: chrome.runtime.sendMessage({type:'GRADE_ARCHIVE', forceEventName:'<substring>', allEvents:true}, r=>console.log(r))
-- 73bad81 + 346651e fix(hit-rate): leaderboards counted archive ROWS and called them "events". Bilal Hasan's UFC DEBUT showed "9 events · 9/9". Inflation SS 4.67x / TD 2.31x / FP 1.80x. Worse, sorting on that count ranked fighters by HOW MANY BOOKS COVERED THEM. Now one entry per fighter per FIGHT, keyed fighter+DATE (immune to duplicate event names), outcome decided against the books' MEDIAN line. 346651e caught my own miss: TD read 195/281 - old row-based numerator over new per-fight denominator.
-- 8a02d5b + 897b230 MODEL v33: FP picks surface the BEST-PRICED book across pick6/underdog/betr (shared FANTASY_SCORING). PRIZEPICKS EXCLUDED (different formula) - do not fold it in. TRAP: filter usability BEFORE comparing prices or a dog's FP UNDER (Underdog-only) gets dropped for a better-priced unplaceable line.
-- 75d5971 + 658e340 + 21e0f2a MODEL v34: BETR IS NOW AUTO-FETCHED (was hand-typed). https://api.fantasy.betr.app/graphql, no auth. UFC events are TeamVersusEvent -> teams -> players (NOT IndividualVersusEvent - wrong shape returns empty with NO error). ASK ONLY FOR FIELDS YOU READ - non-null nulls bubble and kill the whole response. Origin+Referer required. allowedOptions gives side availability per prop: SS/FP/FT are MORE+LESS, TAKEDOWNS are MORE-ONLY on every prop (which refuted tdUnderBookOffered's blanket true for betr). Boosted props price on nonRegularValue, not value. Manual store is the OUTAGE FALLBACK only - it was overlaying stale rows on the live board (26 fetched rendered as 38). CREDIT: the user's DFS notifier at C:\Users\abdir\OneDrive\Desktop\projectX\src\adapters\betr.js supplied the shape, headers and the ask-only-what-you-read rule. READ IT FIRST if Betr breaks.
-- 60a9794 + f023700 snapshot fixes: best_picks_snapshots_v1 logged picks the board never showed - first the LEAN, then the LINE and BOOK. Snapshots written before f023700 cannot be trusted for source/direction/line/book.
-- 6e9d9d6 + 8107600 ARCHIVE toast repeat; 5cdde96 parlay dedupe now keys on book+line.
+*** THE LESSON THAT COST A ROUND TRIP: c776f26 was reported as verified because grep found the code in dist/. Presence in the build proves the code RUNS, not that it CHANGED anything - it shipped two no-ops. Verify against the NUMBERS on screen. Cheapest form: replay the on-screen values through old and new formula in node; that reproduced the unchanged ordering exactly and would have caught it pre-commit. Saved to memory as feedback_verify_by_numbers_not_dist_presence. ***
+
+ALSO CLOSED: the previous checkpoint's "UNKNOWN platform, avg edge +49.4" mystery was the null-line-as-zero bug (f8796a2). The 1061-vs-1161 count gap is BY DESIGN - calibration requires conf >= 50. The !isFinite(conf) guard in the grading loop fixed NOTHING (every snapshot pick carries a confidence, 1161 both ways); it stays as a guard and its comment now says so.
+
+THE ONE OPEN MODEL QUESTION (not a bug)
+The model runs -4.2 pts OVER-CONFIDENT, concentrated in the 60-79% band across n=611 (56% of all graded picks, every bucket leaning the same way). The grading panel now says the same thing from a second angle: every C and D cell on both books sits below the 60% line, while only A grades and Pick6 B clear it. That is the recalibration engine not reaching the middle of its own distribution. Wants more settled cards before the per-bucket numbers hold still. No MODEL_VERSION change made for it.
+
+IN PROGRESS RIGHT NOW: AUDITING THE AI ACCURACY SECTION
+User asked for the same treatment the Archive just got. Panels in scope: AI PICK ACCURACY BY STAT TYPE (FP 402/657 61%, SS 250/442 57%, TD 10/12 83%, FT 31/47 66%), BOARD CLV MODEL LINE -> CLOSE (FP +0.11 n=622, SS +0.80 n=437, TD +0.08 n=12, FT +1.30 n=46), MY PLACED LEDGER (144 legs, YOU 76/144 53%, BOARD 38/80 48%), and the PER-EVENT list. Things to check first, NOT yet investigated:
+- Two different events both report CLV numerator of EXACTLY 100 ("CLV 100/322", "CLV 100/396"). A pinned numerator across different denominators looks like a cap or a slice, not a measurement.
+- A "DWCS 10.1" event renders in the per-event list with OVERS 0/0. DWCS contamination is a known archive issue; decide whether these belong in an AI-accuracy readout at all.
+- Denominators disagree across panels for the same stat: accuracy FP n=657, board CLV FP n=622, calibration FP n=609, grading FP cells sum to 660. Some of that is by design (conf >= 50 for calibration) but not obviously all of it. Reconcile before assuming.
+- Apply the audit's own lesson: does any of this count archive ROWS where it should count picks or fights?
 
 NEXT CARD: UFC Fight Night: Hooker vs. Parnasse, 28 fighters, predictions generated on MODEL v34. Salahdine Parnasse shows NO HISTORY on a 5R main event. MICHAEL PAGE is on this card vs Nursulton Ruziboev and the model has Ruziboev at 13.5 SS - that is the user's recorded MVP-opponents-go-SS-UNDER edge agreeing, not an outlier to fade. Audit when TD + R1 SS + CTRL + FP are ALL posted (typically Friday).
+
+ARCHIVE PANEL STATS CONVENTIONS (new, saved to memory as project_archive_panel_stats_conventions)
+- Ranking cells with wildly different n: wilsonBound(hits, n, lower), display the RAW record. Do NOT reach for shrunkHitRate - that is Laplace +1/+1, correct for the lean ladders, useless for an n spanning 2 to 632.
+- Best/worst lists split on the population rate, never on a fixed row count. Sample floor 10 for platform x grade combos.
+- Bias dedupe keys on DATE, not event name. Per BOOK per market is correct for bias (each book pricing it is a real observation) but NOT for hit-rate leaderboards, which go one entry per fighter per fight and decide against the MEDIAN line.
+- Calibration Brier is population-weighted and paired with a signed bias figure.
+- Aggregations in analyzer.ts are frequently DUPLICATED. Grep for every occurrence before patching one.
 
 HOUSE RULES
 - Rebuild + commit dist with EVERY src change; cherry-pick to master and push BOTH branches. `git cherry-pick -q` is NOT a valid flag.
@@ -38,7 +48,9 @@ HOUSE RULES
 - Read-only diagnosis BEFORE any storage-mutating snippet, then backup, then write, with a before/after count.
 - VERIFY AGAINST THE BOARD, not a derived store or hand-rolled name matching. Ad-hoc dumps without NAME_ALIASES invent phantom gaps - four false findings this week.
 - When changing a measurement, change EVERY path that reads it in the same commit (346651e was exactly this miss).
-- When a fix "should already work", check WHICH CODE PATH IS LIVE before assuming the logic is wrong.
+- Write patch scripts to files in the scratchpad and run them with node. Heredoc backticks and escapes have mangled comments inside `node -e` twice.
+- Do NOT call `npm run checkpoint:save -- -Notes "$notes"` with multiline notes; it collapses to the first line. Call `& .\resume.ps1 -Mode save -Notes $notes` directly.
+
 
 ## Resume Checklist
 1. Run npm run build.
