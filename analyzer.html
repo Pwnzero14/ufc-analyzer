@@ -32244,6 +32244,219 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   font-style: normal; font-size: 8px; font-weight: 700;
   color: var(--amber, #e0a33e); margin-right: 4px; letter-spacing: .02em;
 }
+
+/* ═══ GLOW-UP 344-353 · the two ledgers become navigable ══════════════════════
+   The placed ledger renders 9 events / 149 legs and the parlay ledger 42 slips,
+   all in one uninterrupted column. Everything below is about getting to one
+   event's results without scrolling through the other eight. */
+
+/* ── 344 · the event head is a control ────────────────────────────────────────
+   It was a <div>; it is now a <button>, so these reset the UA button styling back
+   to the bar it already looked like rather than restyling from scratch. */
+.plg-ev-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; margin: 0; padding: 6px 6px 4px;
+  font: inherit; text-align: left; color: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold, #e0a33e) 9%, transparent), transparent 60%);
+  border: 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: background .14s ease;
+}
+.plg-ev-head:hover {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold, #e0a33e) 16%, transparent), transparent 66%);
+}
+/* 353 · keyboard reach. :focus-visible only, so a mouse click does not ring. */
+.plg-ev-head:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--gold, #e0a33e) 70%, transparent);
+  outline-offset: -2px;
+}
+.plg-ev-caret {
+  font-size: 9px; line-height: 1; color: var(--text3);
+  transition: transform .18s cubic-bezier(.2,.7,.3,1);
+  flex: 0 0 auto;
+}
+.plg-event.ev-collapsed .plg-ev-caret { transform: rotate(-90deg); }
+
+/* The body animates on a grid row rather than max-height: these events differ in
+   height by 40x (2 legs vs 43), and one max-height large enough for the biggest
+   makes the smallest snap open with no visible travel. */
+/* Two techniques were tried here before this one, both verified failing in the
+   preview, both recorded so neither gets retried:
+     · grid-template-rows 1fr→0fr with the rows as direct children — 0fr sizes only
+       the FIRST implicit row, so 43 of the 44 children kept their auto rows and the
+       event never shrank (bodyH 1095 collapsed and open alike).
+     · the same after wrapping the rows in one .plg-ev-inner — collapse then worked
+       (rows resolved to 0px) but EXPAND did not: fr cannot resolve back against an
+       auto-height container mid-transition, so a re-opened event sat at 0px with
+       its class and aria correctly flipped.
+   max-height driven from JS-measured scrollHeight is what the section accordion
+   above already uses, it is exact at any content height, and it survives both
+   directions. The inline style JS writes wins over the rule below; the rule is
+   only what an event rendered collapsed starts at, before it is ever toggled. */
+.plg-ev-body { overflow: hidden; transition: max-height .24s cubic-bezier(.2,.7,.3,1); }
+.plg-event.ev-collapsed .plg-ev-body { max-height: 0; }
+.plg-ev-inner { min-height: 0; }
+.plg-event.ev-collapsed .plg-ev-head { border-bottom-color: transparent; border-radius: 4px; }
+
+/* 352 · leg/slip count rides the header, so a collapsed card still states size. */
+.plg-ev-legs {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 800; letter-spacing: .04em;
+  color: var(--text3);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px; padding: 1px 5px;
+  flex: 0 0 auto;
+}
+.plg-ev-record.pend { color: var(--text3); opacity: .85; }
+
+/* ── 345 · the outcome strip ──────────────────────────────────────────────────
+   One mark per leg (per slip on the parlay ledger) in display order. Colours are
+   the direction lane the rest of the app uses — green landed, red did not, grey
+   unsettled — so it needs no legend. */
+.lstrip {
+  display: inline-flex; align-items: center; gap: 2px;
+  flex: 0 0 auto; margin-left: 2px; cursor: help;
+}
+.lstrip-t {
+  width: 3px; height: 10px; border-radius: 1px;
+  background: var(--text3); opacity: .32;
+}
+.lstrip-t.hit  { background: var(--green, #26d07c); opacity: .92; }
+.lstrip-t.miss { background: var(--red, #ff5b78);   opacity: .92; }
+.lstrip-more {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-style: normal; color: var(--text3); margin-left: 2px;
+}
+/* The name is the flexible cell; everything after it keeps its size. */
+.plg-ev-head .plg-ev-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 346/351 · the toolbar ────────────────────────────────────────────────── */
+.lgr-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 2px 8px; flex-wrap: wrap;
+}
+.lgr-seg-wrap {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px; overflow: hidden;
+}
+.lgr-seg, .lgr-allbtn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 800; letter-spacing: .08em;
+  color: var(--text3); background: transparent;
+  border: 0; padding: 3px 9px; cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.lgr-seg + .lgr-seg { border-left: 1px solid rgba(255,255,255,0.08); }
+.lgr-seg:hover { background: rgba(255,255,255,0.05); color: var(--text2); }
+.lgr-seg.on {
+  background: color-mix(in srgb, var(--gold, #e0a33e) 18%, transparent);
+  color: var(--gold, #e0a33e);
+}
+.lgr-allbtn {
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px; margin-left: auto;
+}
+.lgr-allbtn:hover { background: rgba(255,255,255,0.05); color: var(--text2); }
+.lgr-seg:focus-visible, .lgr-allbtn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--gold, #e0a33e) 70%, transparent);
+  outline-offset: -2px;
+}
+
+/* ── 351 · the filter itself, entirely in CSS ─────────────────────────────────
+   Scoped to .lgr[data-filter], so 149 rows never enter a JS loop. The column
+   header is exempt — a filtered table still needs its headings. */
+.lgr[data-filter="hit"]     .plg-leg:not(.plg-colhead):not([data-outcome="hit"]),
+.lgr[data-filter="miss"]    .plg-leg:not(.plg-colhead):not([data-outcome="miss"]),
+.lgr[data-filter="pending"] .plg-leg:not(.plg-colhead):not([data-outcome="pending"]),
+.lgr[data-filter="hit"]     .plp-parlay:not([data-outcome="hit"]),
+.lgr[data-filter="miss"]    .plp-parlay:not([data-outcome="miss"]),
+.lgr[data-filter="pending"] .plp-parlay:not([data-outcome="pending"]) { display: none; }
+
+/* A filter that leaves a card empty hides the card — otherwise "MISSES" renders
+   nine event headers, six of them over nothing. */
+.lgr[data-filter="hit"]     .plg-event:not(:has(.plg-leg[data-outcome="hit"])):not(:has(.plp-parlay[data-outcome="hit"])),
+.lgr[data-filter="miss"]    .plg-event:not(:has(.plg-leg[data-outcome="miss"])):not(:has(.plp-parlay[data-outcome="miss"])),
+.lgr[data-filter="pending"] .plg-event:not(:has(.plg-leg[data-outcome="pending"])):not(:has(.plp-parlay[data-outcome="pending"])) { display: none; }
+
+/* Filtering overrides collapse. Hunting for your misses and being shown a
+   collapsed card that contains one is the filter failing at its only job. */
+/* !important is load-bearing here, not decoration: once an event has been toggled
+   by hand it carries an INLINE max-height, and an inline style outranks any
+   selector. Without it, filtering to MISSES would still hide the misses inside an
+   event the user had collapsed earlier in the session. */
+.lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-body { max-height: none !important; }
+.lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-caret { opacity: .35; }
+
+/* ── 348 · the event name stays with its rows ─────────────────────────────────
+   A 43-leg event is taller than the viewport, so scrolling into the middle of one
+   loses which card you are reading. 88px clears the app header and the sub-nav —
+   the two bars already in the sticky stack at 54 and 88. */
+.plg-ev-head { position: sticky; top: 88px; z-index: 3; }
+.plg-event { position: relative; }
+/* The bar is translucent by design, so it needs its own ground once it overlaps
+   rows rather than sitting on the panel. */
+.plg-ev-head::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--panel, #14151a);
+  border-radius: inherit;
+}
+
+/* ── 347 · the grid had one more child than it had tracks ─────────────────────
+   .plg-leg emits ELEVEN children (…, actual, status, gap). The base rule declares
+   eleven tracks, but both narrow breakpoints declared ten and nine — so below
+   1500px every cell from `N legs` rightward landed one track left of its heading
+   and `.plc-gap` wrapped to an implicit second row. Header and rows shifted
+   together, which is exactly why it survived: the columns stayed aligned WITH EACH
+   OTHER while sitting under the wrong labels. Confirmed in the preview at 1280px
+   before this was written — 11 children, 10 computed tracks, children on 5
+   distinct row tops. Both breakpoints now carry all eleven. */
+@media (max-width: 1500px) {
+  .plg-leg {
+    grid-template-columns:
+      minmax(120px,260px) 44px 52px 44px minmax(0,200px) 88px 44px 108px 74px 64px minmax(0,1fr);
+  }
+}
+@media (max-width: 1180px) {
+  .plg-leg {
+    grid-template-columns:
+      minmax(110px,1.6fr) 42px 50px 42px 0px 80px 40px 104px 70px 62px minmax(0,0.001fr);
+    gap: 6px;
+  }
+  /* The opponent track collapses to 0 rather than leaving the row, so the eleven
+     children still map one-to-one onto eleven tracks. */
+  .plg-leg .bps-vs { display: none; }
+}
+
+/* ── 349 · parlay legs get columns ────────────────────────────────────────────
+   Each leg rendered as an inline run — mark, name, side, line, stat — so on a
+   7-leg slip no two lines started at the same x and the side you took could not be
+   read down the slip. Same tracks for every leg of every slip. */
+.plp-legs { display: flex; flex-direction: column; gap: 1px; }
+.plp-leg {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 46px 52px 44px 28px;
+  align-items: center;
+  gap: 6px;
+}
+.plp-leg > .plp-mini { text-align: center; }
+.plp-leg > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plp-leg .bps-line { text-align: right; }
+@media (max-width: 1180px) {
+  .plp-leg { grid-template-columns: 14px minmax(0,1fr) 42px 48px 40px 26px; gap: 4px; }
+}
+
+/* ── 353 · motion ─────────────────────────────────────────────────────────────
+   The staggered row reveal is keyed on --plg-i and re-runs whenever rows are
+   revealed, so expanding a 43-leg event replayed a 600ms cascade every time. Rows
+   inside an event that is being opened skip it — the accordion is already the
+   motion that explains what happened. */
+.plg-ev-body .plg-leg, .plg-ev-body .plp-parlay { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .plg-ev-body, .plg-ev-caret, .plg-ev-head, .lgr-seg, .lgr-allbtn { transition: none; }
+}
 </style>
 </head>
 <body>

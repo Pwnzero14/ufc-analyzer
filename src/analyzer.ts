@@ -13294,6 +13294,81 @@ let _archiveAutoSettleFired = false;
 let _archiveBiasSortKey: 'hitRate' | 'avgEdge' | 'total' = 'avgEdge';
 const _archiveCollapsedSections = new Set<string>();
 
+// ── GLOW-UP 344 · per-EVENT collapse inside the two ledgers ──────────────────
+// The placed ledger renders 9 events and 149 legs in one column; the parlay
+// ledger 42 slips. Section-level collapse (_archiveCollapsedSections) is
+// all-or-nothing, so reading one event's results meant scrolling past every
+// other event's. Keyed `${ledgerId}|${evKey}` because both ledgers show the same
+// event names and must collapse independently.
+//
+// Session-scoped Set, deliberately NOT persisted — same shape and lifetime as
+// _archiveCollapsedSections above, which is the house pattern for view state.
+const _ledgerCollapsedEvents = new Set<string>();
+// Set once per ledger per session: the default (everything but the newest event
+// collapsed) is applied on FIRST render only, so a re-render never re-collapses
+// what the user has since opened.
+const _ledgerDefaultsApplied = new Set<string>();
+const ledgerEvKey = (ledgerId: string, evKey: string): string => `${ledgerId}|${evKey}`;
+
+/**
+ * Marks every event but the first as collapsed the first time a ledger renders.
+ * `order` must already be in display order — the caller sorts, this only reads.
+ */
+function applyLedgerCollapseDefaults(ledgerId: string, order: string[]): void {
+  if (_ledgerDefaultsApplied.has(ledgerId) || order.length < 2) return;
+  _ledgerDefaultsApplied.add(ledgerId);
+  for (const evKey of order.slice(1)) _ledgerCollapsedEvents.add(ledgerEvKey(ledgerId, evKey));
+}
+
+/**
+ * GLOW-UP 345 — the strip that makes collapsing safe.
+ *
+ * A collapsed event that shows only "YOU 25/43" has hidden the shape of the
+ * result: four misses in a row on one fight reads identically to four spread
+ * across the card. One tick per leg in display order, so the run survives the
+ * collapse. Capped because a 43-leg event is already the widest header here and
+ * the tail adds no shape once you are counting rather than seeing.
+ */
+/**
+ * GLOW-UP 346/351 — the toolbar, and the container the filter is scoped to.
+ *
+ * Both controls have to live INSIDE the ledger body rather than in the section
+ * header: the header is itself a click target for the section accordion, so a
+ * control there fights the collapse it sits on.
+ *
+ * The filter is a data-attribute on this wrapper and everything below it is CSS.
+ * That keeps 149 rows out of a JS filter loop on every keystroke of a toggle, and
+ * it means a re-render cannot leave rows hidden — the attribute is re-emitted
+ * with the markup rather than being applied to nodes afterwards.
+ */
+function ledgerShell(ledgerId: 'placed' | 'parlay', body: string): string {
+  const opts = ledgerId === 'placed'
+    ? [['all', 'ALL'], ['hit', 'HITS'], ['miss', 'MISSES'], ['pending', 'PENDING']]
+    : [['all', 'ALL'], ['hit', 'CASHED'], ['miss', 'BUST'], ['pending', 'PENDING']];
+  const unit = ledgerId === 'placed' ? 'legs' : 'slips';
+  const seg = opts.map(([v, lbl]) =>
+    `<button type="button" class="lgr-seg${v === 'all' ? ' on' : ''}" data-lgr-filter="${v}" aria-pressed="${v === 'all'}" title="${v === 'all' ? `Show every ${unit.slice(0, -1)}` : `Show only ${unit} that ${v === 'pending' ? 'have not settled' : v === 'hit' ? (ledgerId === 'placed' ? 'hit' : 'cashed') : (ledgerId === 'placed' ? 'missed' : 'busted')}`}. Filtering opens every event — a collapsed card cannot hide a match.">${lbl}</button>`).join('');
+  return `<div class="lgr" data-lgr="${ledgerId}" data-filter="all">
+    <div class="lgr-toolbar">
+      <span class="lgr-seg-wrap" role="group" aria-label="Filter ${unit} by result">${seg}</span>
+      <button type="button" class="lgr-allbtn" data-lgr-all title="Collapse or expand every event on this ledger at once. Collapse state is per-session and is not saved.">⊟ COLLAPSE ALL</button>
+    </div>
+    ${body}
+  </div>`;
+}
+
+function ledgerOutcomeStrip(outcomes: Array<'hit' | 'miss' | 'pending'>): string {
+  if (!outcomes.length) return '';
+  const CAP = 32;
+  const shown = outcomes.slice(0, CAP);
+  const rest = outcomes.length - shown.length;
+  const hits = outcomes.filter(o => o === 'hit').length;
+  const miss = outcomes.filter(o => o === 'miss').length;
+  const pend = outcomes.length - hits - miss;
+  const ticks = shown.map(o => `<i class="lstrip-t ${o}"></i>`).join('');
+  return `<span class="lstrip" title="One mark per leg in the order shown: ${hits} hit, ${miss} missed${pend ? `, ${pend} still pending` : ''}. Reading left to right shows whether the misses clustered on one fight or spread across the card.">${ticks}${rest > 0 ? `<i class="lstrip-more">+${rest}</i>` : ''}</span>`;
+}
+
 // ── DATA VIEW SUB-NAV ─────────────────────────────────────────────────────
 // Archive stacks 14 accordions and Calibration 5, both reached through a
 // two-item dropdown — so finding one meant scrolling blind past the rest.
@@ -15483,6 +15558,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     if (!events.length) {
       return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0, updates: [] };
     }
+    // GLOW-UP 344: newest event open, the rest collapsed — first render only.
+    applyLedgerCollapseDefaults('placed', events.map(e => e.evKey));
     let boardSettledTotal = 0, boardHitsTotal = 0;
     const html = events.map(e => {
       const evSettled = e.legs.filter(l => l.outcome !== 'pending').length;
@@ -15590,7 +15667,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         // The trailing three cells stay in the markup even when empty. That is the
         // point: a pending row and a settled row occupy the same columns, so the
         // ledger reads as one table rather than two shapes.
-        return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" style="--plg-i:${Math.min(rowI, 28)}">
+        return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" data-outcome="${l.outcome}" style="--plg-i:${Math.min(rowI, 28)}">
           <span class="plc-name">${r.pretty}</span>
           <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b>
           <span class="bps-line">${r.line ?? '—'}</span>
@@ -15613,9 +15690,27 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         <span class="plc-tag"></span><span class="plc-clv">ENTRY → CLOSE</span>
         <span class="plc-actual">ACTUAL</span><span class="plc-status">RESULT</span><span class="plc-gap"></span>
       </div>`;
-      return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span>${evSummary}</div>${colHead}${rows}</div>`;
+      // ── GLOW-UP 344/345 · the event is a collapsible unit ────────────────────
+      // The head is a <button> so it is reachable by keyboard and announces its own
+      // state; the rows move into .plg-ev-body so max-height can animate the same
+      // way the section accordion above already does.
+      const collapsed = _ledgerCollapsedEvents.has(ledgerEvKey('placed', e.evKey));
+      const strip = ledgerOutcomeStrip(sortedLegs.map(l => l.outcome === 'hit' ? 'hit' : l.outcome === 'miss' ? 'miss' : 'pending'));
+      const pendN = e.legs.length - evSettled;
+      const pendChip = pendN
+        ? `<span class="plg-ev-record pend" title="${pendN} of ${e.legs.length} legs have no settled archive result yet">○ ${pendN}</span>`
+        : '';
+      return `<div class="plg-event${collapsed ? ' ev-collapsed' : ''}" data-ledger="placed" data-evkey="${e.evKey.replace(/"/g, '&quot;')}">
+        <button type="button" class="plg-ev-head" aria-expanded="${collapsed ? 'false' : 'true'}">
+          <span class="plg-ev-caret" aria-hidden="true">▾</span>
+          <span class="plg-ev-name">${e.evKey}</span>
+          <span class="plg-ev-legs" title="${e.legs.length} placed legs on this card">${e.legs.length}</span>
+          ${strip}${evSummary}${pendChip}
+        </button>
+        <div class="plg-ev-body"><div class="plg-ev-inner">${colHead}${rows}</div></div>
+      </div>`;
     }).join('');
-    return { html: selection.html + html, settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
+    return { html: selection.html + ledgerShell('placed', html), settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
   })();
 
   // GLOW-UP 174: write freshly settled outcomes back onto the placed records
@@ -15669,6 +15764,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed parlays yet — build a slip in Parlay Lab and hit ● PLACE PARLAY</div>', count: 0, cashed: 0, settled: 0 };
     }
     evs.sort((a, b) => Math.max(0, ...b.list.map(p => p.placedAt || 0)) - Math.max(0, ...a.list.map(p => p.placedAt || 0)));
+    // GLOW-UP 350: same collapse contract as the placed ledger, keyed separately
+    // so opening an event in one ledger does not open it in the other.
+    applyLedgerCollapseDefaults('parlay', evs.map(e => e.evKey));
     let count = 0, cashed = 0, settledSlips = 0;
     const html = evs.map(e => {
       const evDk = eventDedupeKey(e.evKey);
@@ -15700,6 +15798,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         return -1;
       });
       const containsIdx = slipSets.map((_, i) => insideOf.reduce<number[]>((a, v, j) => (v === i ? [...a, j] : a), []));
+      // GLOW-UP 345: one mark per SLIP here (the placed ledger marks per leg), so a
+      // collapsed parlay event still shows how many cashed and where they fell.
+      const slipOutcomes: Array<'hit' | 'miss' | 'pending'> = [];
       const cards = e.list.map((p, pi) => {
         count++;
         const cardI = Math.min(pi, 20);
@@ -15713,6 +15814,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const anyPending = legs.some(x => x.outcome === 'pending');
         const anyMiss = legs.some(x => x.outcome === 'miss');
         if (!anyPending) { settledSlips++; if (!anyMiss) cashed++; }
+        slipOutcomes.push(anyPending ? 'pending' : anyMiss ? 'miss' : 'hit');
         const statusChip = anyPending
           ? `<span class="plg-status pending" title="${legs.length - settledN} leg(s) not settled yet">○ ${settledN}/${legs.length} SETTLED</span>`
           : anyMiss
@@ -15751,11 +15853,25 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           : holds.length
           ? `<span class="plp-contain holds" title="${holds.length} smaller slip${holds.length === 1 ? '' : 's'} (${holds.map(j => `${e.list[j]?.legs.length}-leg`).join(', ')}) sit entirely inside this one — they cannot cash unless this one's shared legs do, so they add exposure to the same position rather than diversifying it.">⊃ HOLDS ${holds.length}</span>`
           : '';
-        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG</span>${p.legs[0]?.bookLabel ? `<span class="plp-book ${(() => { const k = String(p.legs[0]?.book || '').toLowerCase(); return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp' : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : ''; })()}">${p.legs[0].bookLabel}</span>` : ''}${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
+        return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" data-outcome="${anyPending ? 'pending' : anyMiss ? 'miss' : 'hit'}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG</span>${p.legs[0]?.bookLabel ? `<span class="plp-book ${(() => { const k = String(p.legs[0]?.book || '').toLowerCase(); return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp' : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : ''; })()}">${p.legs[0].bookLabel}</span>` : ''}${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
       }).join('');
-      return `<div class="plg-event"><div class="plg-ev-head"><span class="plg-ev-name">${e.evKey}</span><span class="plg-ev-record">${e.list.length} parlay${e.list.length === 1 ? '' : 's'}</span></div>${cards}</div>`;
+      const evCashed = slipOutcomes.filter(o => o === 'hit').length;
+      const evSettledSlips = slipOutcomes.filter(o => o !== 'pending').length;
+      const collapsed = _ledgerCollapsedEvents.has(ledgerEvKey('parlay', e.evKey));
+      const recChip = evSettledSlips
+        ? `<span class="plg-ev-record ${evCashed * 3 >= evSettledSlips ? 'good' : 'bad'}" title="${evCashed} of ${evSettledSlips} settled slips cashed on this card">CASHED ${evCashed}/${evSettledSlips}</span>`
+        : `<span class="plg-ev-record">all pending</span>`;
+      return `<div class="plg-event${collapsed ? ' ev-collapsed' : ''}" data-ledger="parlay" data-evkey="${e.evKey.replace(/"/g, '&quot;')}">
+        <button type="button" class="plg-ev-head" aria-expanded="${collapsed ? 'false' : 'true'}">
+          <span class="plg-ev-caret" aria-hidden="true">▾</span>
+          <span class="plg-ev-name">${e.evKey}</span>
+          <span class="plg-ev-legs" title="${e.list.length} slips placed on this card">${e.list.length}</span>
+          ${ledgerOutcomeStrip(slipOutcomes)}${recChip}
+        </button>
+        <div class="plg-ev-body"><div class="plg-ev-inner">${cards}</div></div>
+      </div>`;
     }).join('');
-    return { html, count, cashed, settled: settledSlips };
+    return { html: ledgerShell('parlay', html), count, cashed, settled: settledSlips };
   })();
   const parlayLedgerSummary = parlayLedgerData.count
     ? `<span style="font-size:10px;color:var(--text-muted)">${parlayLedgerData.count} parlay${parlayLedgerData.count === 1 ? '' : 's'} · ${parlayLedgerData.settled ? `${parlayLedgerData.cashed}/${parlayLedgerData.settled} cashed` : 'none settled yet'}</span>`
@@ -17331,6 +17447,79 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         void body.offsetHeight;
         section.classList.add('collapsed');
         body.style.maxHeight = '0';
+      }
+    });
+  });
+
+  // ── GLOW-UP 344/346/351 · ledger event collapse, collapse-all, result filter ──
+  // Delegated from the ledger wrapper rather than bound per row: the placed ledger
+  // re-renders its rows on every settle pass, so per-node listeners would be
+  // re-bound 149 times and leak the previous set. One listener per ledger survives
+  // any re-render of its children.
+  container.querySelectorAll<HTMLElement>('.lgr[data-lgr]').forEach(lgr => {
+    const ledgerId = lgr.dataset.lgr!;
+    const syncAllBtn = () => {
+      const anyOpen = Array.from(lgr.querySelectorAll<HTMLElement>('.plg-event'))
+        .some(ev => !ev.classList.contains('ev-collapsed'));
+      const btn = lgr.querySelector<HTMLElement>('.lgr-allbtn');
+      if (btn) btn.textContent = anyOpen ? '⊟ COLLAPSE ALL' : '⊞ EXPAND ALL';
+    };
+    syncAllBtn();
+
+    // Same max-height dance as the section accordion above, for the same reason: an
+    // event body is 0 to 1100px depending on how many legs it holds, so the height
+    // has to be measured rather than capped. On expand the inline value is cleared
+    // once the transition lands, otherwise a later re-render with more legs would be
+    // clipped to the height this event had when it was opened.
+    const setEvent = (ev: HTMLElement, collapsed: boolean) => {
+      const key = ledgerEvKey(ledgerId, ev.dataset.evkey || '');
+      const body = ev.querySelector<HTMLElement>('.plg-ev-body');
+      ev.querySelector('.plg-ev-head')?.setAttribute('aria-expanded', String(!collapsed));
+      if (collapsed) _ledgerCollapsedEvents.add(key); else _ledgerCollapsedEvents.delete(key);
+      if (!body) { ev.classList.toggle('ev-collapsed', collapsed); return; }
+      if (collapsed) {
+        body.style.maxHeight = body.scrollHeight + 'px';
+        void body.offsetHeight;            // commit the start value before the class
+        ev.classList.add('ev-collapsed');
+        body.style.maxHeight = '0';
+      } else {
+        ev.classList.remove('ev-collapsed');
+        body.style.maxHeight = body.scrollHeight + 'px';
+        body.addEventListener('transitionend', function done() {
+          body.style.maxHeight = '';
+          body.removeEventListener('transitionend', done);
+        }, { once: true });
+      }
+    };
+
+    lgr.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+
+      const head = t.closest<HTMLElement>('.plg-ev-head');
+      if (head) {
+        const ev = head.closest<HTMLElement>('.plg-event');
+        if (ev) { setEvent(ev, !ev.classList.contains('ev-collapsed')); syncAllBtn(); }
+        return;
+      }
+
+      if (t.closest('.lgr-allbtn')) {
+        const evs = Array.from(lgr.querySelectorAll<HTMLElement>('.plg-event'));
+        // Collapse when anything is open, expand when nothing is. One button, and its
+        // label already states which of the two the next click performs.
+        const collapse = evs.some(ev => !ev.classList.contains('ev-collapsed'));
+        evs.forEach(ev => setEvent(ev, collapse));
+        syncAllBtn();
+        return;
+      }
+
+      const seg = t.closest<HTMLElement>('.lgr-seg');
+      if (seg) {
+        lgr.dataset.filter = seg.dataset.lgrFilter || 'all';
+        lgr.querySelectorAll<HTMLElement>('.lgr-seg').forEach(b => {
+          const on = b === seg;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-pressed', String(on));
+        });
       }
     });
   });
