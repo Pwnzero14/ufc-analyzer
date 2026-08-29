@@ -2710,6 +2710,9 @@ function deriveConfidenceMemoryTagsFromSnapshotPick(pick) {
         return Array.from(new Set(pick.memoryTags.map((tag) => String(tag)).filter(Boolean)));
     }
     const tags = new Set();
+    // RAW, deliberately — NOT snapshotDisplayConf. These tags are a learning input to the
+    // confidence-memory engine; tagging with the recalibrated grade would feed the engine
+    // its own output. See snapshotDisplayConf's doc comment.
     const confidence = Number(pick.confidence);
     if (Number.isFinite(confidence))
         tags.add(`grade:${getConfidenceGrade(confidence).toLowerCase()}`);
@@ -10758,6 +10761,10 @@ async function persistBestPicksSnapshot(overs, unders) {
                 source,
                 confidence: el.conf || 0,
                 confidenceGrade: el.confidenceGrade || getConfidenceGrade(el.conf || 0),
+                // Written but not yet read here — the placed ledger still reports raw confidence.
+                // Snapshots are write-once history and cannot be backfilled, so this starts being
+                // recorded now; the ledger can switch to it whenever that panel gets audited.
+                displayedConfidence: displayedConfFor(f, el),
                 verdict: el.verdict || '',
                 memoryTags: buildMemoryTagsForFighter(f, source, el),
                 modelVersion: MODEL_VERSION,
@@ -10801,9 +10808,16 @@ async function persistAiLeanSnapshot(fighters) {
         const eventDate = (document.getElementById('eventDate')?.textContent || '').trim();
         if (!eventName)
             return;
+        // The caller fires this and initRecalibrationMap as two un-awaited voids, so on a cold
+        // load the map is still null here and every displayedConfidence would quietly fall back
+        // to the un-recalibrated number — recalibrated on a warm re-render, not on a fresh load.
+        // Awaiting makes the stored value deterministic; it early-returns once populated.
+        await initRecalibrationMap();
+        const recalReady = isRecalibrationReady();
         const picks = fighters
             .map((f) => {
             const el = getEffectiveLean(f);
+            const displayedConf = displayedConfFor(f, el);
             const source = el._source || 'fp';
             const activeLine = getSourceActiveLine(f, source);
             const activePlatform = getSourceActivePlatformKey(f, source);
@@ -10855,8 +10869,18 @@ async function persistAiLeanSnapshot(fighters) {
                 opponent: f.opponent || null,
                 lean: el.lean,
                 source,
+                // RAW confidence — before the CLV boost, before recalibration. This is the domain
+                // the recalibration map and the confidence-memory engine are keyed on, so it must
+                // stay raw: feeding either of them their own output compounds the correction every
+                // cycle. Readout panels want displayedConfidence below instead.
                 confidence: el.conf || 0,
                 confidenceGrade: el.confidenceGrade || getConfidenceGrade(el.conf || 0),
+                // What the BOARD actually showed: raw → CLV boost → clamp → recalibration.
+                // recalibrationReady records whether the map was live when this was taken, so a
+                // readout can tell a real displayed value from a boosted-but-uncorrected one.
+                displayedConfidence: displayedConf,
+                displayedConfidenceGrade: displayedConf > 0 ? getConfidenceGrade(displayedConf) : '',
+                recalibrationReady: recalReady,
                 verdict: el.verdict || '',
                 score: el.score ?? null,
                 activePlatform,
@@ -16114,6 +16138,10 @@ async function renderArchivePanel(container) {
         calibByType[pt] = calibBuckets.map(b => ({ ...b, hits: 0, total: 0 }));
     }
     let calibTotalSamples = 0;
+    // Snapshots predating displayedConfidence fall back to raw, so the curve is a MIXED
+    // sample until the store turns over. Counted so the panel can say so out loud rather
+    // than quietly reporting a number that is mostly the old measurement.
+    let calibDisplayedSamples = 0;
     for (const snap of aiSnapsFinal) {
         const snapEventKey = eventDedupeKey(String(snap?.event || ''));
         if (!snapEventKey || !pastEventKeys.has(snapEventKey))
@@ -16124,7 +16152,9 @@ async function renderArchivePanel(container) {
         for (const pick of (snap?.picks ?? [])) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '').toLowerCase();
-            const conf = Number(pick?.confidence);
+            // Readout: calibrate what the BOARD showed. The map that produced it is built from
+            // RAW confidence in initRecalibrationMap / the scope below — do not switch those.
+            const conf = snapshotDisplayConf(pick);
             const source = String(pick?.source || 'fp');
             const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
@@ -16153,6 +16183,8 @@ async function renderArchivePanel(container) {
             if (isHit)
                 calibBuckets[bucketIdx].hits++;
             calibTotalSamples++;
+            if (snapshotUsesDisplayedConf(pick))
+                calibDisplayedSamples++;
             // Per-type calibration
             if (calibByType[propType]) {
                 calibByType[propType][bucketIdx].total++;
@@ -16378,6 +16410,8 @@ async function renderArchivePanel(container) {
     const gradingByPlatStat = new Map();
     const gradingByGrade = new Map();
     const gradingByPlatGrade = new Map();
+    // See calibDisplayedSamples — same mixed-sample caveat while the store turns over.
+    let gradingDisplayedPicks = 0;
     for (const snap of aiSnapsFinal) {
         const snapKey = eventDedupeKey(String(snap?.event || ''));
         if (!snapKey || !pastEventKeys.has(snapKey))
@@ -16386,7 +16420,8 @@ async function renderArchivePanel(container) {
         for (const pick of (snap?.picks ?? [])) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '').toLowerCase();
-            const conf = Number(pick?.confidence);
+            // Readout: grade what the BOARD showed, not the raw pre-recalibration number.
+            const conf = snapshotDisplayConf(pick);
             const source = String(pick?.source || 'fp');
             const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
@@ -16408,6 +16443,8 @@ async function renderArchivePanel(container) {
                 continue;
             const result = Number(match.result);
             const isHit = (lean === 'over' && result > activeLine) || (lean === 'under' && result < activeLine);
+            if (snapshotUsesDisplayedConf(pick))
+                gradingDisplayedPicks++;
             const edge = result - activeLine;
             // Guard only. Every snapshot pick carries a confidence today, so this drops nothing
             // — checked against the live archive: 1161 graded picks before and after. It stays
@@ -16647,9 +16684,9 @@ async function renderArchivePanel(container) {
       ${cSec('td-hitrate', 'under', 'takes', 'TD Hit Rate (Current Roster)', `${tdHits}/${tdTotal}`, topTDHtml)}
     </div>
     ${cSec('bias', '', '', 'Platform Bias', `<span style="font-size:10px;color:var(--text-muted)">${dedupeBiasRows(resolvedRows.filter(r => !!r.platform)).length} markets priced</span>`, `${platSummaryHtml}${biasChartHtml}${biasHtml}`, 'margin-top:12px')}
-    ${cSec('calibration', '', '', 'Calibration Curve', `<span style="font-size:10px;color:var(--text-muted)">${calibTotalSamples} picks resolved across ${new Set(resolvedRows.map(r => r.event)).size} event(s)</span>`, calibBody, 'margin-top:12px')}
+    ${cSec('calibration', '', '', 'Calibration Curve', `<span style="font-size:10px;color:var(--text-muted)">${calibTotalSamples} picks resolved across ${new Set(resolvedRows.map(r => r.event)).size} event(s)${calibDisplayedSamples < calibTotalSamples ? ` <span style="color:var(--amber)" title="Snapshots taken before displayedConfidence existed carry only the RAW pre-recalibration number and fall back to it. Until this reads ${calibTotalSamples}/${calibTotalSamples}, the curve is a mixed sample and the over-confidence figure is still mostly the old measurement.">· ${calibDisplayedSamples}/${calibTotalSamples} on displayed conf</span>` : ''}</span>`, calibBody, 'margin-top:12px')}
     ${cSec('backtest', '', '', 'Backtesting Dashboard', `<span style="font-size:10px;color:var(--text3)">${bt ? `${bt.totalEvents} events · ${bt.totalPreds} predictions · ${bt.wf.folds.length} folds` : 'needs fighter history'}</span>`, backtestBody, 'margin-top:12px')}
-    ${cSec('grading', '', '', 'Prop Archive Grading', `<span style="font-size:10px;color:var(--text3)">${gradingTotalPicks > 0 ? `${gradingTotalPicks} graded AI picks` : 'needs settled AI picks'}</span>`, gradingBody, 'margin-top:12px')}
+    ${cSec('grading', '', '', 'Prop Archive Grading', `<span style="font-size:10px;color:var(--text3)">${gradingTotalPicks > 0 ? `${gradingTotalPicks} graded AI picks${gradingDisplayedPicks < gradingTotalPicks ? ` <span style="color:var(--amber)" title="Snapshots taken before displayedConfidence existed carry only the RAW pre-recalibration number and fall back to it. Grades below are a mixed sample until this reads ${gradingTotalPicks}/${gradingTotalPicks}.">· ${gradingDisplayedPicks}/${gradingTotalPicks} on displayed conf</span>` : ''}` : 'needs settled AI picks'}</span>`, gradingBody, 'margin-top:12px')}
   `;
     // Shared settle handler — used by both the main button and the pending banner CTA
     const runSettle = async (btn, resetLabel) => {
@@ -17067,6 +17104,31 @@ function shrunkRecalRate(hits, total, midpoint) {
     const prior = midpoint / 100;
     return Math.round(((hits + RECAL_SHRINK_K * prior) / (total + RECAL_SHRINK_K)) * 100);
 }
+/** True once the map has enough buckets for getRecalibratedConfidence to return anything. */
+function isRecalibrationReady() {
+    return !!_recalibrationMap && _recalibrationMap.size >= 2;
+}
+/**
+ * Confidence for a READOUT — the number the board actually showed for this pick.
+ *
+ * Snapshots written before this field existed carry only raw confidence, so those fall
+ * back to it and the panel stays populated rather than emptying out. Panels that care
+ * about the mix report snapshotUsesDisplayedConf() alongside the total.
+ *
+ * NOT for the recalibration map or the memory engine — both are keyed on RAW confidence
+ * (pick.confidence) and must stay that way, or the engine trains on its own output.
+ */
+function snapshotDisplayConf(pick) {
+    const shown = Number(pick?.displayedConfidence);
+    if (Number.isFinite(shown) && shown > 0)
+        return shown;
+    return Number(pick?.confidence);
+}
+/** Whether this pick carries a true displayed confidence (vs. falling back to raw). */
+function snapshotUsesDisplayedConf(pick) {
+    const shown = Number(pick?.displayedConfidence);
+    return Number.isFinite(shown) && shown > 0;
+}
 function getRecalibratedConfidence(rawConf, source) {
     if (!_recalibrationMap || _recalibrationMap.size < 2)
         return null;
@@ -17159,6 +17221,9 @@ async function renderCalibrationPanel(container) {
         for (const pick of (snap?.picks ?? [])) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '').toLowerCase();
+            // RAW, deliberately — NOT snapshotDisplayConf. This scope populates _recalibrationMap
+            // and _recalibrationByType further down, so it must stay on the raw domain for the
+            // same reason as initRecalibrationMap. See snapshotDisplayConf's doc comment.
             const conf = Number(pick?.confidence);
             const source = String(pick?.source || 'fp');
             const activeLine = finiteLineOrNaN(pick?.activeLine);
@@ -17885,8 +17950,7 @@ const LEAN_BOOK_LABEL = { pick6: 'Pick6', underdog: 'Underdog', prizepicks: 'Pri
 // The confidence a row actually DISPLAYS (raw model conf → CLV boost →
 // recalibration), so conviction rank + header tiers match the number on screen.
 // Mirrors the pipeline in buildFighterRow.
-function getDisplayedConf(f) {
-    const lean = getEffectiveLean(f);
+function displayedConfFor(f, lean) {
     const raw = lean.conf || 0;
     if (raw <= 0)
         return 0;
@@ -17894,6 +17958,11 @@ function getDisplayedConf(f) {
     const boosted = clv ? Math.max(25, Math.min(90, raw + clv.delta)) : raw;
     const recal = getRecalibratedConfidence(boosted, lean._source);
     return recal != null ? recal : boosted;
+}
+// Takes the lean explicitly because the snapshot writers log a SPECIFIC lean (the column
+// the pick was built from), which is not always getEffectiveLean(f).
+function getDisplayedConf(f) {
+    return displayedConfFor(f, getEffectiveLean(f));
 }
 // Per-book UNDER-side availability for stat props. MUST stay in sync with
 // renderBestPicks' ssUnderBookOffered / tdUnderBookOffered — it's the same rule,
@@ -24298,6 +24367,10 @@ async function initRecalibrationMap() {
             for (const pick of (snap?.picks ?? [])) {
                 const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
                 const lean = String(pick?.lean || '').toLowerCase();
+                // RAW, deliberately — NOT snapshotDisplayConf. This loop builds _recalibrationMap,
+                // whose domain is raw confidence and whose output IS displayedConfidence. Reading
+                // the displayed value here would train the map on its own output and compound the
+                // correction every cycle. The readout panels are the ones that switched.
                 const conf = Number(pick?.confidence);
                 const source = String(pick?.source || 'fp');
                 const activeLine = finiteLineOrNaN(pick?.activeLine);
