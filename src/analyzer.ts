@@ -16913,7 +16913,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       ${cSec('ss-hitrate', 'over', 'takes', 'SS Hit Rate (Current Roster)', `${ssHits}/${ssTotal}`, topSSHtml)}
       ${cSec('td-hitrate', 'under', 'takes', 'TD Hit Rate (Current Roster)', `${tdHits}/${tdTotal}`, topTDHtml)}
     </div>
-    ${cSec('bias', '', '', 'Platform Bias', `<span style="font-size:10px;color:var(--text-muted)">${resolvedRows.filter(r => !!r.platform).length} records with platform</span>`, `${platSummaryHtml}${biasChartHtml}${biasHtml}`, 'margin-top:12px')}
+    ${cSec('bias', '', '', 'Platform Bias', `<span style="font-size:10px;color:var(--text-muted)">${dedupeBiasRows(resolvedRows.filter(r => !!r.platform)).length} markets priced</span>`, `${platSummaryHtml}${biasChartHtml}${biasHtml}`, 'margin-top:12px')}
     ${cSec('calibration', '', '', 'Calibration Curve', `<span style="font-size:10px;color:var(--text-muted)">${calibTotalSamples} picks resolved across ${new Set(resolvedRows.map(r => r.event)).size} event(s)</span>`, calibBody, 'margin-top:12px')}
     ${cSec('backtest', '', '', 'Backtesting Dashboard', `<span style="font-size:10px;color:var(--text3)">${bt ? `${bt.totalEvents} events · ${bt.totalPreds} predictions · ${bt.wf.folds.length} folds` : 'needs fighter history'}</span>`, backtestBody, 'margin-top:12px')}
     ${cSec('grading', '', '', 'Prop Archive Grading', `<span style="font-size:10px;color:var(--text3)">${gradingTotalPicks > 0 ? `${gradingTotalPicks} graded AI picks` : 'needs settled AI picks'}</span>`, gradingBody, 'margin-top:12px')}
