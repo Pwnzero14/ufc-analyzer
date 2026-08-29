@@ -460,7 +460,18 @@ export const NAME_ALIASES: Record<string, string> = {
 //   IN-SAMPLE on n=149: the constants were chosen against the same rows they are
 //   scored on, so expect worse than 59% live (Wilson lower bound ~48%). Kept as
 //   round numbers rather than 6.32 to limit the overfit. Re-measure after Paris.
-export const MODEL_VERSION = 37;
+// v38 (2026-08-29): the SS ±0.5 tier collapses to a push. It fired a lean at a
+//   flat conf 54 off a SINGLE weak factor — "slightly above line" is +0.5 on its
+//   own, and so is "striker style". Over the same 149 settled SS picks, conf<=55
+//   ran 21/50 = 42% (OVER 40%, UNDER 45%) against a 52.4% breakeven: losing on
+//   BOTH sides, and the only cut where the two directions agreed. calcSSR1Lean
+//   already collapsed this exact tier — full-fight SS now matches.
+//   Stacks with v37, which independently cut the fire count 116 → 85, so SS lean
+//   VOLUME will drop sharply. That is intended, but it means v37 and v38 will be
+//   measured together after Paris; the 42% above was taken under PRE-v37 scoring
+//   and will not carry over unchanged. TD and FT keep their ±0.5 tier — FT runs
+//   68% and was never implicated.
+export const MODEL_VERSION = 38;
 
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */
