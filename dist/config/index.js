@@ -458,7 +458,19 @@ export const NAME_ALIASES = {
 //   measured together after Paris; the 42% above was taken under PRE-v37 scoring
 //   and will not carry over unchanged. TD and FT keep their ±0.5 tier — FT runs
 //   68% and was never implicated.
-export const MODEL_VERSION = 38;
+// v39 (2026-08-29): the SS hit-rate term is duration-normalised. It asked how often
+//   a fighter's PAST fights cleared THIS fight's line using raw h.sigStr, so output
+//   from 25-minute main events was compared against a 3-round line as though the
+//   fights were the same length. Worth ±2 — the largest term after diff — and the
+//   last one still duration-blind, beside a projection that has been duration-
+//   adjusted since v6 and market-anchored since v37. Each past fight is now scaled
+//   by expMins/thatFightMins, bounded 0.5–1.5 so a 60-second KO is not extrapolated
+//   to a full fight; the target is the 3R/5R distortion, not short-fight noise.
+//   Falls back per-fight to the raw comparison when timeSecs is missing, so a db
+//   without duration data behaves exactly as it did before.
+//   calcTDLean carries the same un-normalised pattern and was deliberately NOT
+//   changed — TD is n=6 in the archive, far too thin to justify touching.
+export const MODEL_VERSION = 39;
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */
 export const SS_PROJECTION_BIAS = 6;
