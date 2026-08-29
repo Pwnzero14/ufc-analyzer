@@ -13354,6 +13354,7 @@ function ledgerShell(ledgerId: 'placed' | 'parlay', body: string): string {
       <button type="button" class="lgr-allbtn" data-lgr-all title="Collapse or expand every event on this ledger at once. Collapse state is per-session and is not saved.">⊟ COLLAPSE ALL</button>
     </div>
     ${body}
+    <div class="lgr-empty">Nothing matches this filter — every ${unit.slice(0, -1)} on this ledger has settled, or none has.</div>
   </div>`;
 }
 

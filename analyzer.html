@@ -32381,6 +32381,18 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .lgr[data-filter="miss"]    .plg-event:not(:has(.plg-leg[data-outcome="miss"])):not(:has(.plp-parlay[data-outcome="miss"])),
 .lgr[data-filter="pending"] .plg-event:not(:has(.plg-leg[data-outcome="pending"])):not(:has(.plp-parlay[data-outcome="pending"])) { display: none; }
 
+/* A filter that matches nothing rendered a toolbar over empty space, which reads
+   as a broken panel rather than an answer. Same :has() test the event-hiding rule
+   uses, inverted onto the ledger itself. */
+.lgr-empty {
+  display: none;
+  font-size: 10px; color: var(--text3);
+  padding: 10px 2px;
+}
+.lgr[data-filter="hit"]:not(:has(.plg-leg[data-outcome="hit"])):not(:has(.plp-parlay[data-outcome="hit"])) .lgr-empty,
+.lgr[data-filter="miss"]:not(:has(.plg-leg[data-outcome="miss"])):not(:has(.plp-parlay[data-outcome="miss"])) .lgr-empty,
+.lgr[data-filter="pending"]:not(:has(.plg-leg[data-outcome="pending"])):not(:has(.plp-parlay[data-outcome="pending"])) .lgr-empty { display: block; }
+
 /* Filtering overrides collapse. Hunting for your misses and being shown a
    collapsed card that contains one is the filter failing at its only job. */
 /* !important is load-bearing here, not decoration: once an event has been toggled
@@ -32390,19 +32402,20 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-body { max-height: none !important; }
 .lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-caret { opacity: .35; }
 
-/* ── 348 · the event name stays with its rows ─────────────────────────────────
-   A 43-leg event is taller than the viewport, so scrolling into the middle of one
-   loses which card you are reading. 88px clears the app header and the sub-nav —
-   the two bars already in the sticky stack at 54 and 88. */
-.plg-ev-head { position: sticky; top: 88px; z-index: 3; }
+/* ── 348 · REVERTED — sticky cannot work inside this panel ────────────────────
+   The intent was to keep the event name visible while scrolling a 43-leg card.
+   `position: sticky; top: 88px` broke it instead, and the reason is worth keeping:
+   .section-body carries `overflow: hidden` for the accordion, which makes it the
+   nearest SCROLLPORT. A sticky child positions against its scrollport, not the
+   viewport — so `top: 88px` pushed every event head 88px DOWN from the section's
+   top edge, over its own rows. Measured live: headOffsetTop 58 against a flow
+   position of 0, with the body correctly at 25.
+   One cause, three symptoms: the head overlapped the first parlay slip's legs, it
+   painted BELOW content that follows it in the DOM, and on the placed ledger it
+   covered the FIGHTER/SIDE/LINE column header entirely.
+   Any future attempt has to solve the scrollport first — an offset alone cannot,
+   because there is no scrolling ancestor to stick to. */
 .plg-event { position: relative; }
-/* The bar is translucent by design, so it needs its own ground once it overlaps
-   rows rather than sitting on the panel. */
-.plg-ev-head::before {
-  content: ''; position: absolute; inset: 0; z-index: -1;
-  background: var(--panel, #14151a);
-  border-radius: inherit;
-}
 
 /* ── 347 · the grid had one more child than it had tracks ─────────────────────
    .plg-leg emits ELEVEN children (…, actual, status, gap). The base rule declares
