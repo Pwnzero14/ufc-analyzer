@@ -2657,6 +2657,21 @@ function deriveConfidenceMemoryTagsLive(context) {
         tags.add(`alert:${archetypeProfile.matchupAlert}`);
     return Array.from(tags);
 }
+/**
+ * A stored line that is null must NOT become zero.
+ *
+ * Number(null) is 0, not NaN, so every Number.isFinite(Number(activeLine)) guard
+ * in this file silently ACCEPTED a null line and graded the pick against a line of ZERO.
+ * 21 ai-lean picks (one event, all FP, all line:null) produced an UNKNOWN platform bucket
+ * reporting a +49.4 "average edge" — which was simply the mean fantasy score, since
+ * edge = result - 0 — and a 14% hit rate, because an UNDER then needs result < 0 (never)
+ * and an OVER needs result > 0 (always).
+ *
+ * Those rows reached three surfaces: the confidence-memory tags, the grading dashboard,
+ * and — worst — the recalibration engine, where an under pick contributed a directional
+ * edge of -result as a phantom miss.
+ */
+function finiteLineOrNaN(v) { return v == null ? NaN : Number(v); }
 function deriveConfidenceMemoryTagsFromSnapshotPick(pick) {
     if (Array.isArray(pick.memoryTags) && pick.memoryTags.length) {
         return Array.from(new Set(pick.memoryTags.map((tag) => String(tag)).filter(Boolean)));
@@ -2696,7 +2711,7 @@ function deriveConfidenceMemoryTagsFromSnapshotPick(pick) {
             tags.add('market:cluster');
         else
             tags.add('market:split');
-        const activeLine = Number(pick.activeLine);
+        const activeLine = finiteLineOrNaN(pick.activeLine);
         if (Number.isFinite(activeLine)) {
             const marketAvg = entries.reduce((sum, value) => sum + value, 0) / entries.length;
             if (Math.abs(activeLine - marketAvg) >= 1.5)
@@ -2758,7 +2773,7 @@ async function loadConfidenceMemoryEngine(force = false) {
         for (const rawPick of (snap?.picks ?? [])) {
             const source = normalizeLeanSource(rawPick?.source);
             const lean = String(rawPick?.lean || '').toLowerCase();
-            const activeLine = Number(rawPick?.activeLine);
+            const activeLine = finiteLineOrNaN(rawPick?.activeLine);
             const fighter = normalizeName(String(rawPick?.fighter || ''))?.toLowerCase();
             if (!source || !fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine))
                 continue;
@@ -15295,7 +15310,7 @@ async function renderArchivePanel(container) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '');
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine))
                 continue;
@@ -15342,7 +15357,7 @@ async function renderArchivePanel(container) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '');
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under'))
                 continue;
@@ -15442,7 +15457,7 @@ async function renderArchivePanel(container) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '');
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine))
                 continue;
@@ -15490,7 +15505,7 @@ async function renderArchivePanel(container) {
             const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
             const lean = String(pick?.lean || '');
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine))
                 continue;
@@ -15985,7 +16000,7 @@ async function renderArchivePanel(container) {
             const lean = String(pick?.lean || '').toLowerCase();
             const conf = Number(pick?.confidence);
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine) || !Number.isFinite(conf) || conf < 50)
                 continue;
@@ -16234,7 +16249,7 @@ async function renderArchivePanel(container) {
             const lean = String(pick?.lean || '').toLowerCase();
             const conf = Number(pick?.confidence);
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine))
                 continue;
@@ -16968,7 +16983,7 @@ async function renderCalibrationPanel(container) {
             const lean = String(pick?.lean || '').toLowerCase();
             const conf = Number(pick?.confidence);
             const source = String(pick?.source || 'fp');
-            const activeLine = Number(pick?.activeLine);
+            const activeLine = finiteLineOrNaN(pick?.activeLine);
             const activePlatform = String(pick?.activePlatform || '').trim().toLowerCase();
             if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine) || !Number.isFinite(conf) || conf < 50)
                 continue;
@@ -24098,7 +24113,7 @@ async function initRecalibrationMap() {
                 const lean = String(pick?.lean || '').toLowerCase();
                 const conf = Number(pick?.confidence);
                 const source = String(pick?.source || 'fp');
-                const activeLine = Number(pick?.activeLine);
+                const activeLine = finiteLineOrNaN(pick?.activeLine);
                 if (!fighter || (lean !== 'over' && lean !== 'under') || !Number.isFinite(activeLine) || !Number.isFinite(conf) || conf < 50)
                     continue;
                 const propType = source === 'ss' ? 'SS' : source === 'td' ? 'TD' : source === 'ft' ? 'FightTime' : 'Fantasy';
