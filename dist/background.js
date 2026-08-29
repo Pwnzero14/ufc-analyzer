@@ -848,6 +848,55 @@ async function _fetchAndSettleFromUFCStats(opts) {
         const eventRosterSurnames = new Map(); // normEvent -> surnames present on the card
         // Bulk apply: set result on matching archive records in-memory (no per-call read-modify-write).
         // Returns number of records updated.
+        /**
+         * Record a computed result that had NO archive row to land in.
+         *
+         * applyResult only ever UPDATES rows, so a stat is only ever gradeable if a
+         * line-bearing row survived to settle time. When a book takes a line down between
+         * the user placing it and the card running, that row was never written — and the
+         * settle path silently discards a result it had already computed.
+         *
+         * Live case: Xiong Jingnan's Underdog R1 SS 25.5 (placed, then pulled by UD before
+         * any archive pass). She finished round one with 16 significant strikes, so the leg
+         * was a clear hit, but it sat PENDING forever in both the Placed and Parlay ledgers
+         * while every other R1 SS leg on the card graded normally. A silent hole in the CLV
+         * record, not just a cosmetic badge.
+         *
+         * The row carries no line and no platform, which is deliberate:
+         *  · resolveVsArchive keys on fighter+event+propType and ignores platform, so the
+         *    ledger finds it. This is the same shape as the UFCStats CTRL backfill rows.
+         *  · every line-based analytic requires a finite `line` (computeMarketFpShift, the
+         *    FP-bias measurements, CLV), so a line-less row cannot pollute them.
+         */
+        function ensureResultRow(name, opponent, event, propType, result, date) {
+            if (!Number.isFinite(result))
+                return 0;
+            const nEvent = _normEvent(event);
+            const nProp = _normProp(propType);
+            const nName = _normName(name);
+            if (!nName)
+                return 0;
+            // Guard against duplicating on every re-settle.
+            for (const row of archive) {
+                if (_normName(String(row.fighter || "")) !== nName)
+                    continue;
+                if (_normEvent(String(row.event || "")) !== nEvent)
+                    continue;
+                if (_normProp(String(row.propType || "")) !== nProp)
+                    continue;
+                return 0;
+            }
+            archive.push({
+                fighter: name,
+                opponent,
+                event,
+                date,
+                propType: propType,
+                result,
+            });
+            resolvedKeys.set(_resKey(name, nEvent, nProp), result);
+            return 1;
+        }
         function applyResult(names, event, propType, result) {
             if (!Number.isFinite(result))
                 return 0;
@@ -972,8 +1021,15 @@ async function _fetchAndSettleFromUFCStats(opts) {
             console.log(`[UFC Settle] ${fightUrls.length} fights found for ${match.name}`);
             // Build a name alias map: last name → full UFCStats name, for fuzzy matching abbreviated archive names
             const allFightResults = [];
+            // Opponent pairing: fetchFightDetails returns the two fighters of ONE bout, so the
+            // pairing is only knowable here — allFightResults is flat by the time we settle.
+            const oppByName = new Map();
             for (const fightUrl of fightUrls) {
                 const fightResults = await fetchFightDetails(fightUrl);
+                if (fightResults.length === 2) {
+                    oppByName.set(fightResults[0].name, fightResults[1].name);
+                    oppByName.set(fightResults[1].name, fightResults[0].name);
+                }
                 allFightResults.push(...fightResults);
                 await new Promise(r => setTimeout(r, 250));
             }
@@ -1048,18 +1104,23 @@ async function _fetchAndSettleFromUFCStats(opts) {
                 const nameVariants = [f.name, ...Array.from(namesToTry)];
                 // Pick6 'ctrl' lines are in minutes; UFCStats provides ctrlSecs.
                 const ctrlMins = Math.round((f.ctrlSecs / 60) * 100) / 100;
-                const n = applyResult(nameVariants, archiveEvent, 'SS', f.ss)
-                    + applyResult(nameVariants, archiveEvent, 'SS_R1', f.ssR1)
-                    + applyResult(nameVariants, archiveEvent, 'ss_body', f.ssBody)
-                    + applyResult(nameVariants, archiveEvent, 'ss_leg', f.ssLeg)
-                    + applyResult(nameVariants, archiveEvent, 'TD', f.td)
-                    + applyResult(nameVariants, archiveEvent, 'KD', f.kd)
-                    + applyResult(nameVariants, archiveEvent, 'Fantasy', fp)
-                    + applyResult(nameVariants, archiveEvent, 'Fantasy_PP', fpPP)
-                    + applyResult(nameVariants, archiveEvent, 'FightTime', f.fightTimeMins)
-                    + applyResult(nameVariants, archiveEvent, 'ctrl', ctrlMins);
-                if (n > 0) {
-                    console.log(`[UFC Settle] ${f.name}: SS=${f.ss} SS_R1=${f.ssR1} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min CTRL=${ctrlMins}min (${f.won ? 'W' : 'L'} R${f.round})`);
+                const STATS = [
+                    ['SS', f.ss], ['SS_R1', f.ssR1], ['ss_body', f.ssBody], ['ss_leg', f.ssLeg],
+                    ['TD', f.td], ['KD', f.kd], ['Fantasy', fp], ['Fantasy_PP', fpPP],
+                    ['FightTime', f.fightTimeMins], ['ctrl', ctrlMins],
+                ];
+                let n = 0;
+                let created = 0;
+                for (const [prop, value] of STATS) {
+                    const filled = applyResult(nameVariants, archiveEvent, prop, value);
+                    n += filled;
+                    // Nothing to update means no line for this stat was ever archived. Keep the
+                    // computed result anyway so a placed leg on a since-pulled line can still grade.
+                    if (filled === 0)
+                        created += ensureResultRow(f.name, oppByName.get(f.name) || "", archiveEvent, prop, value, match.date);
+                }
+                if (n > 0 || created > 0) {
+                    console.log(`[UFC Settle] ${f.name}: SS=${f.ss} SS_R1=${f.ssR1} TD=${f.td} FP=${fp.toFixed(1)} FP_PP=${fpPP.toFixed(1)} FT=${f.fightTimeMins.toFixed(2)}min CTRL=${ctrlMins}min (${f.won ? 'W' : 'L'} R${f.round})${created ? ` [+${created} result-only]` : ''}`);
                     settled++;
                 }
             }
