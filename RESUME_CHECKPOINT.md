@@ -1,13 +1,13 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-29 17:44:14 -04:00
+Last Saved: 2026-08-29 17:48:08 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 9eba89b
+HEAD: d5e79b5
 
 ## Last Notes
-SESSION HANDOFF (2026-08-29, ~17:45). Tree clean. MODEL_VERSION 38.
-Pushed: feature/sleek-theme-v1 9eba89b, master 99b650d (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-29, ~17:50). Tree clean. MODEL_VERSION 39.
+Pushed: feature/sleek-theme-v1 d5e79b5, master 72c2dbf (cherry-picked; full parity verified).
 
 BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
 finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
@@ -20,6 +20,7 @@ vs. Parnasse"; props have NOT dropped.
    verified on screen; write path still pending a loaded card.
 3. MODEL v37 (13f827b) SS market anchor - the projection was +6 high and the market wasn't.
 4. MODEL v38 (9eba89b) SS +/-0.5 tier collapsed to a push.
+5. MODEL v39 (d5e79b5) SS hit-rate term duration-normalised.
 
 === MODEL v37 (13f827b) - SS MARKET ANCHOR ===
 THE MEASUREMENT (149 settled SS picks from the snapshot store, 2026-08-29):
@@ -77,18 +78,34 @@ the ONLY cut in the whole diagnosis where the two directions agreed. calcSSR1Lea
 exact tier; full-fight SS now matches. TD and FT KEEP their +/-0.5 tier - FT runs 68% and was never
 implicated. Replayed in node: only the +/-0.5..1.5 band changes, every |score| >= 1.5 maps byte-identically.
 
-*** v37 AND v38 STACK - THEY WILL BE MEASURED TOGETHER ***
+*** v37 + v38 + v39 ALL STACK - THEY WILL BE MEASURED TOGETHER ***
 The anchor independently cut fires 116 -> 85 and v38 cuts again on top, so SS lean VOLUME will drop
 SHARPLY. That is the intent (SS was 52% vs a 52.4% breakeven, so less volume at higher quality is the
 trade) but it means the two changes CANNOT be attributed separately after Paris. The 42% was measured
 under PRE-v37 scoring: the anchor changes diff -> score -> which picks land in the band, so do NOT expect
 42% to carry over. The user asked for v38 after I recommended holding it; that was their call, recorded
-here so nobody "re-litigates" it next session.
+here so nobody "re-litigates" it next session. v39 was likewise requested after the same caveat.
+THREE SS changes now land before Paris posts and CANNOT be attributed separately after it settles. v37 and
+v38 both CUT volume; v39 moves scores in BOTH directions and may add some back. If SS comes back wrong
+after Paris, the way to isolate is to revert them one at a time (they are separate commits: 13f827b,
+9eba89b, d5e79b5) - not to re-derive from the archive, which will by then mix pre- and post-change picks.
 
-ONE SS LOOSE END REMAINING
-- FINDING #3, THE DURATION-BLIND HIT-RATE TERM. history.filter(h => h.sigStr > line_ss) compares RAW
-  career SS (mixed 3R/5R fights) against the current line and is worth +/-2 - the largest term after
-  diff - while the projection beside it IS duration-adjusted. Untouched, and the sweep did not test it.
+=== MODEL v39 (d5e79b5) - SS HIT-RATE TERM DURATION-NORMALISED ===
+history.filter(h => h.sigStr > line_ss) asked how often PAST fights cleared THIS fight's line using raw
+strike counts, so 5R main-event output was measured against a 3-round line as if the fights were the same
+length. Worth +/-2 (largest after diff) and the LAST duration-blind factor, beside a projection
+duration-adjusted since v6 and market-anchored since v37. Each past fight is now scaled by
+expMins/thatFightMins via marketExpectedFightMinutes, bounded 0.5-1.5.
+NODE REPLAY - the distortion was NOT marginal:
+  5R history (110 SS / 25m) into a 3R fight, line 60:  raw 5/5 -> +2   normalised 0/5 -> -2
+  3R history (55 SS / 13m) into a 5R main event, line 70: raw 0/5 -> -2  normalised 5/5 -> +2
+  A 4-POINT SWING on a term whose tier thresholds are 1.5 and 3.0.
+GUARDS VERIFIED in the same replay: a 1-minute finish does not extrapolate (1.5 cap holds it to 9 SS vs a
+line of 40), and BOTH fallback paths - history with no timeSecs, and a null expMins - reproduce v38
+byte-identically. calcTDLean has the same un-normalised pattern and was deliberately NOT changed (TD is
+n=6 in the archive, far too thin).
+
+*** ALL SS LOOSE ENDS FROM THE DIAGNOSIS ARE NOW CLOSED ***
 - Also noted: SS is the ONLY stat with a variance haircut (ssStdDev>14 -> conf-8, >7 -> -4, else +3).
   TD and FT have none. Not changed; it is honest damping, not the bug.
 
@@ -171,15 +188,18 @@ displayedConfidence. Must be RE-READ once gate 3 gives real coverage.
 - "DWCS 10.1" renders in the per-event list at OVERS 0/0.
 - MY PLACED LEDGER (144 legs, YOU 76/144 53%, BOARD 38/80 48%) still NOT audited. When it is, switch its
   confidence readout to displayedConfidence - persistBestPicksSnapshot already writes the field.
-- The remaining SS loose end above (duration-blind hit-rate term).
+- SS diagnosis loose ends: ALL CLOSED (v37/v38/v39). Next SS question is whether the three
+  together over-corrected - answer only after Paris settles.
 
 === NEXT CARD: UFC PARIS (Hooker vs. Parnasse) ===
-- Predictions were generated on MODEL v34 and are now FOUR versions behind. REGENERATE UNDER v38.
+- Predictions were generated on MODEL v34 and are now FIVE versions behind. REGENERATE UNDER v39.
 - Salahdine Parnasse shows NO HISTORY on a 5R main event.
 - MICHAEL PAGE vs Nursulton Ruziboev: the model has Ruziboev at 13.5 SS. That is the user's recorded
   MVP-opponents-go-SS-UNDER edge AGREEING, not an outlier to fade. The v37 anchor shifts projections
   DOWN, which makes UNDERs easier to fire - consistent with that edge, no conflict. v38 then requires
   |score| >= 1.5, so the Ruziboev UNDER must clear a real bar rather than the old conf-54 tier.
+- PARIS HAS A 5R MAIN EVENT. v39 flips the hit-rate term by up to +4 for fighters with 3R history moving
+  UP to five rounds - exactly the Hooker/Parnasse main. Eyeball those two rows first when the board loads.
 - Run the Best Picks audit when TD + R1 SS + CTRL + FP are ALL posted (typically Friday).
 - FIRST THING when props drop: run gate 2, then regenerate predictions, then audit.
 
@@ -215,7 +235,7 @@ displayedConfidence. Must be RE-READ once gate 3 gives real coverage.
   resolve by taking the newest version wholesale, it is a generated full-state file.
 - Bump MODEL_VERSION for lean scoring / tiering / correlation / EV / candidate selection / anything
   feeding displayed confidence. NOT for logging or reporting fixes. (v27-v36 were never logged in the
-  config comment block; v37 and v38 are.)
+  config comment block; v37, v38 and v39 are.)
 - When changing a measurement, change EVERY path that reads it in the same commit - and check whether
   some of those paths are TRAINING inputs rather than readouts, because those must NOT change.
 - Do not bundle two behavioural changes that would need separate attribution.
