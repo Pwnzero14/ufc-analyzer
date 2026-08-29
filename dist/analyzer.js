@@ -15542,19 +15542,86 @@ async function renderArchivePanel(container) {
         }
     }
     // ── Fantasy hit rate ───────────────────────────────────────────────────
+    /**
+     * ONE ENTRY PER FIGHTER PER FIGHT — not per posted line.
+     *
+     * These leaderboards counted archive ROWS and labelled them "events". A fighter's
+     * SS line is posted by up to five books, and a card can sit under two event-name
+     * variants, so a single performance was counted up to ten times. Bilal Hasan's UFC
+     * DEBUT rendered as "9 events · 9/9 over"; Islam Makhachev's one fight as "7 events
+     * · 7/7"; Gauge Young's two fights as "14 events". Measured inflation across the
+     * archive: SS 4.67x, TD 2.31x, FP 1.80x.
+     *
+     * The ranking was the real casualty. Sorting on that count ordered fighters by HOW
+     * MANY BOOKS HAPPENED TO COVER THEM rather than by track record — Gauge Young sat
+     * above Bilal Hasan purely on coverage, when deduped they are 2/2 and 1/1.
+     *
+     * Keyed on fighter + DATE, because a fighter has at most one bout per day and the
+     * date is immune to the duplicate event-name shadow rows that inflate a name count
+     * (Gauge Young: 4 event names across 2 dates).
+     *
+     * Within a fight the books disagree on the line, so the outcome is decided against
+     * their MEDIAN — the consensus number — rather than counting each book separately.
+     * That matters: 22 SS fights had books split, and those are exactly the ones where
+     * counting rows inflated a rate (Rei Tsuruya SS read 7/10 = 70%, truly 1/2 = 50%).
+     *
+     * Fantasy_PP is dropped when a shared-scale Fantasy row exists for the same fight —
+     * PrizePicks scores fantasy on a different formula, so the two are not one sample.
+     */
+    const perFightHitRates = (rows) => {
+        const median = (xs) => {
+            const a = [...xs].sort((x, y) => x - y);
+            const m = a.length >> 1;
+            return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+        };
+        const groups = new Map();
+        for (const r of rows) {
+            const line = Number(r.line), result = Number(r.result);
+            if (!Number.isFinite(line) || !Number.isFinite(result))
+                continue;
+            const fighter = normalizeName(r.fighter) || String(r.fighter);
+            const date = String(r.date || "").slice(0, 10);
+            if (!fighter || !date)
+                continue;
+            const k = `${fighter}|${date}|${String(r.propType)}`;
+            const g = groups.get(k);
+            if (g)
+                g.lines.push(line);
+            else
+                groups.set(k, { fighter, propType: String(r.propType), lines: [line], result });
+        }
+        // Collapse to one group per fighter+fight, preferring the shared-scale propType.
+        const perFight = new Map();
+        for (const [k, g] of groups) {
+            const fightKey = k.slice(0, k.lastIndexOf("|"));
+            const prev = perFight.get(fightKey);
+            if (!prev || (prev.propType.endsWith("_PP") && !g.propType.endsWith("_PP")))
+                perFight.set(fightKey, g);
+        }
+        const out = new Map();
+        for (const g of perFight.values()) {
+            const e = out.get(g.fighter) || { hits: 0, total: 0 };
+            e.total++;
+            if (g.result > median(g.lines))
+                e.hits++;
+            out.set(g.fighter, e);
+        }
+        return out;
+    };
+    const sumRates = (m) => {
+        let hits = 0, total = 0;
+        for (const v of m.values()) {
+            hits += v.hits;
+            total += v.total;
+        }
+        return { hits, total };
+    };
     const fantasyRows = resolvedRows.filter(r => r.propType === 'Fantasy' || r.propType === 'Fantasy_PP');
-    const fantasyHits = fantasyRows.filter(r => Number(r.result) > Number(r.line)).length;
-    const fantasyTotal = fantasyRows.length;
+    const fighterFantasy = perFightHitRates(fantasyRows);
+    const _fpAgg = sumRates(fighterFantasy);
+    const fantasyHits = _fpAgg.hits;
+    const fantasyTotal = _fpAgg.total;
     const fantasyHitRate = fantasyTotal ? Math.round((fantasyHits / fantasyTotal) * 100) : 0;
-    const fighterFantasy = new Map();
-    for (const r of fantasyRows) {
-        const key = normalizeName(r.fighter) || r.fighter;
-        const entry = fighterFantasy.get(key) || { hits: 0, total: 0 };
-        entry.total++;
-        if (Number(r.result) > Number(r.line))
-            entry.hits++;
-        fighterFantasy.set(key, entry);
-    }
     const topFantasy = Array.from(fighterFantasy.entries())
         .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
         .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
@@ -15562,32 +15629,20 @@ async function renderArchivePanel(container) {
         .slice(0, 8);
     // ── SS per-fighter hit rates ───────────────────────────────────────────
     const ssRows = resolvedRows.filter(r => String(r.propType) === 'SS');
-    const fighterSS = new Map();
-    for (const r of ssRows) {
-        const key = normalizeName(r.fighter) || r.fighter;
-        const entry = fighterSS.get(key) || { hits: 0, total: 0 };
-        entry.total++;
-        if (Number(r.result) > Number(r.line))
-            entry.hits++;
-        fighterSS.set(key, entry);
-    }
+    const fighterSS = perFightHitRates(ssRows);
+    const _ssAgg = sumRates(fighterSS);
     const topSS = Array.from(fighterSS.entries())
         .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
         .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
         .sort((a, b) => b.rate - a.rate || b.total - a.total)
         .slice(0, 8);
-    const ssHits = ssRows.filter(r => Number(r.result) > Number(r.line)).length;
+    const ssHits = _ssAgg.hits;
+    const ssTotal = _ssAgg.total;
     // ── TD per-fighter hit rates ───────────────────────────────────────────
     const tdRows = resolvedRows.filter(r => String(r.propType) === 'TD');
-    const fighterTD = new Map();
-    for (const r of tdRows) {
-        const key = normalizeName(r.fighter) || r.fighter;
-        const entry = fighterTD.get(key) || { hits: 0, total: 0 };
-        entry.total++;
-        if (Number(r.result) > Number(r.line))
-            entry.hits++;
-        fighterTD.set(key, entry);
-    }
+    const fighterTD = perFightHitRates(tdRows);
+    const _tdAgg = sumRates(fighterTD);
+    const tdTotal = _tdAgg.total;
     const topTD = Array.from(fighterTD.entries())
         .filter(([fighter, v]) => v.total >= 2 && rosterFilter(fighter))
         .map(([fighter, v]) => ({ fighter, rate: Math.round((v.hits / v.total) * 100), total: v.total }))
@@ -15685,7 +15740,7 @@ async function renderArchivePanel(container) {
           <div class="best-pick-meta"><span class="best-pick-platform">SS</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
-        : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(ssHits / Math.max(1, ssRows.length) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(ssHits / Math.max(1, ssRows.length) * 100)))}%;background:${Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${ssHits}/${ssRows.length} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
+        : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(ssHits / Math.max(1, ssTotal) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssTotal) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(ssHits / Math.max(1, ssTotal) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(ssHits / Math.max(1, ssTotal) * 100)))}%;background:${Math.round(ssHits / Math.max(1, ssTotal) * 100) >= 50 ? 'var(--green)' : Math.round(ssHits / Math.max(1, ssTotal) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${ssHits}/${ssTotal} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
     const topTDHtml = topTD.length
         ? topTD.map(x => `<div class="best-pick-row">
           <div class="best-pick-rank">${x.rate}%</div>
@@ -15693,7 +15748,7 @@ async function renderArchivePanel(container) {
           <div class="best-pick-meta"><span class="best-pick-platform">TD</span></div>
           <div class="best-pick-line">${x.total} events</div>
         </div>`).join('')
-        : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(tdHits / Math.max(1, tdRows.length) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(tdHits / Math.max(1, tdRows.length) * 100)))}%;background:${Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdRows.length) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${tdHits}/${tdRows.length} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
+        : `<div class="rate-hero"><div class="rate-hero-num" style="color:${Math.round(tdHits / Math.max(1, tdTotal) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdTotal) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}">${Math.round(tdHits / Math.max(1, tdTotal) * 100)}%</div><div class="rate-hero-bar"><span style="width:${Math.max(2, Math.min(100, Math.round(tdHits / Math.max(1, tdTotal) * 100)))}%;background:${Math.round(tdHits / Math.max(1, tdTotal) * 100) >= 50 ? 'var(--green)' : Math.round(tdHits / Math.max(1, tdTotal) * 100) >= 35 ? 'var(--gold)' : 'var(--red)'}"></span></div><div class="rate-hero-sub">${tdHits}/${tdTotal} hit on current roster · per-fighter breakdown needs 2+ events each</div></div>`;
     // ── AI pick accuracy by stat type (lean-direction correct, not raw over rate) ──
     const aiStatBadge = (label, propType) => {
         const d = aiAccuracyByType[propType];
@@ -16396,8 +16451,8 @@ async function renderArchivePanel(container) {
       ${cSec('fp-hitrate', 'over', 'takes', 'Fantasy Line Hit Rate (Current Roster)', `${fantasyHits}/${fantasyTotal} · ${fantasyHitRate}%`, topFantasyHtml)}
     </div>
     <div class="best-picks-grid" style="margin-top:12px">
-      ${cSec('ss-hitrate', 'over', 'takes', 'SS Hit Rate (Current Roster)', `${ssHits}/${ssRows.length}`, topSSHtml)}
-      ${cSec('td-hitrate', 'under', 'takes', 'TD Hit Rate (Current Roster)', `${tdHits}/${tdRows.length}`, topTDHtml)}
+      ${cSec('ss-hitrate', 'over', 'takes', 'SS Hit Rate (Current Roster)', `${ssHits}/${ssTotal}`, topSSHtml)}
+      ${cSec('td-hitrate', 'under', 'takes', 'TD Hit Rate (Current Roster)', `${tdHits}/${tdTotal}`, topTDHtml)}
     </div>
     ${cSec('bias', '', '', 'Platform Bias', `<span style="font-size:10px;color:var(--text-muted)">${resolvedRows.filter(r => !!r.platform).length} records with platform</span>`, `${platSummaryHtml}${biasChartHtml}${biasHtml}`, 'margin-top:12px')}
     ${cSec('calibration', '', '', 'Calibration Curve', `<span style="font-size:10px;color:var(--text-muted)">${calibTotalSamples} picks resolved across ${new Set(resolvedRows.map(r => r.event)).size} event(s)</span>`, calibBody, 'margin-top:12px')}
