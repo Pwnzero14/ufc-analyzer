@@ -1,6 +1,6 @@
 import { FighterDB, FightResult, FightStats, CareerStats } from './types/index.js';
 import type { LineWatchSettings, LineMovementEvent, WatchPlatform, WatchedStatType } from './types/index.js';
-import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES, MODEL_VERSION, FP_CONFIDENCE_CEILING, PICKEM_PAYOUTS } from './config/index.js';
+import { FANTASY_SCORING, PRIZEPICKS_SCORING, NAME_ALIASES, MODEL_VERSION, FP_CONFIDENCE_CEILING, PICKEM_PAYOUTS, SS_PROJECTION_BIAS, SS_MARKET_ANCHOR_WEIGHT } from './config/index.js';
 import { PropArchiveService, PropLinePredictorService } from './services/index.js';
 import { ufcstatsFetchText } from './services/ufcstats-fetch.js';
 import type { PropArchiveRecord, PropPrediction, PredictionEvent, LearningResult, WeightClass, StatPrediction } from './types/index.js';
@@ -5636,6 +5636,23 @@ function calcSSLean(
     effectiveSS = durAdjSS.adjusted;
   }
 
+  // ── Market anchor (MODEL v37) ─────────────────────────────────────────────
+  // The projection ran +6.3 strikes above the actual result across 149 settled
+  // picks while the posted line ran +0.3, so the line is the better estimator and
+  // the raw projection cleared the line on 68% of picks — the whole source of the
+  // 2:1 OVER volume and its 47% hit rate. De-bias, then average with the line.
+  // Deliberately not shrink-only: scaling preserves the gap's SIGN and so cuts
+  // volume without touching the skew. See the v37 note in config/index.ts.
+  const preAnchorSS = effectiveSS;
+  effectiveSS = line_ss + SS_MARKET_ANCHOR_WEIGHT * ((effectiveSS - SS_PROJECTION_BIAS) - line_ss);
+  if (Math.abs(effectiveSS - preAnchorSS) >= 1) {
+    reasons.push({
+      // icon is DIRECTIONAL (up/down), not good/bad — see factorPolarity.
+      icon: effectiveSS < preAnchorSS ? 'neg' : 'pos',
+      text: `Market-anchored: SS proj ${preAnchorSS.toFixed(0)}→${effectiveSS.toFixed(0)} (line ${line_ss}; model runs ~${SS_PROJECTION_BIAS} high vs actual)`,
+    });
+  }
+
   const ssLabel = projSSLean != null
     ? `Proj SS (${effectiveSS.toFixed(1)} — avg ${avgSS.toFixed(1)} + opp allows ${oppAvgSSAllowedLean})`
     : `Avg SS (${effectiveSS.toFixed(1)})`;
@@ -5742,9 +5759,11 @@ function calcSSLean(
     reasons.push({ icon: memoryAdjustment.delta > 0 ? 'pos' : 'neg', text: memoryAdjustment.note });
   }
 
-  // Show the EFFECTIVE projection (opp-adjusted AND v6 duration-adjusted), so the headline
-  // matches the "SS proj 59→70" reason and the value the score was actually built from.
-  const ssVerdict = (projSSLean != null || durAdjSS != null) ? `proj ${effectiveSS.toFixed(1)}` : `avg ${avgSS.toFixed(1)}`;
+  // Show the EFFECTIVE projection (opp-adjusted, v6 duration-adjusted AND v37
+  // market-anchored), so the headline matches the reasons and the value the score was
+  // actually built from. Unconditional since v37: the anchor always applies, so the old
+  // `avg N` branch would have printed a number the score never used.
+  const ssVerdict = `proj ${effectiveSS.toFixed(1)}`;
   const verdict = lean === 'over'
     ? `SS OVER ${line_ss} (${ssVerdict}) — ${reasons[0]?.text}`
     : lean === 'under'

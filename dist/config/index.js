@@ -428,7 +428,31 @@ export const NAME_ALIASES = {
 //   control. Both halves of the blend are now expressed against THIS fight's
 //   expected minutes: the opponent's allowed control as a SHARE of fight time,
 //   the fighter's own average through the standard helper. Each half scaled once.
-export const MODEL_VERSION = 36;
+// (v27–v36 were never logged here; see the git log and RESUME_CHECKPOINT.md.)
+// v37 (2026-08-29): SS projection is anchored to the market. Measured over the
+//   149 settled SS picks in the snapshot store, calcSSLean's projection ran
+//   +6.3 significant strikes above the actual result while the POSTED LINE ran
+//   +0.3 — the market is ~20x better centred, and its raw MAE (25.90) beat the
+//   projection's (27.29). The projection therefore sat above the line on 68% of
+//   picks, which is exactly where the 2:1 OVER volume and the 47% OVER hit rate
+//   came from; UNDER, which had to overcome that same +6 handicap before it
+//   could fire at all, ran 60%. One bias, not two edges.
+//   The fix de-biases by the measured offset and then averages with the line.
+//   NOT shrink-toward-the-line alone: scaling preserves the SIGN of the gap, so
+//   it cuts volume without touching the direction skew — a sweep had it making
+//   the over:under ratio WORSE (2.52 → 4.40 at k=0.5). The pairing below was the
+//   only candidate to beat the line-only MAE baseline (25.61 vs 25.90) and it
+//   carried the best directional hit rate (59% vs 54% today, breakeven 52.4%)
+//   at a near-balanced over:under of 0.81.
+//   IN-SAMPLE on n=149: the constants were chosen against the same rows they are
+//   scored on, so expect worse than 59% live (Wilson lower bound ~48%). Kept as
+//   round numbers rather than 6.32 to limit the overfit. Re-measure after Paris.
+export const MODEL_VERSION = 37;
+// MODEL v37 · SS market anchor. See the v37 note above for the measurement.
+/** Strikes the raw SS projection runs above reality, removed before anchoring. */
+export const SS_PROJECTION_BIAS = 6;
+/** Weight on the de-biased projection vs the posted line (0.5 = plain average). */
+export const SS_MARKET_ANCHOR_WEIGHT = 0.5;
 // Ceiling on the FP predictor's confidence score. Exported because the
 // predictions panel needs to know when a 92 is an EARNED 92 and when it is the
 // clamp — on a typical card roughly a third of the board sits exactly here, and
