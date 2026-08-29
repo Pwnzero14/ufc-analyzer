@@ -16768,30 +16768,43 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     : '';
 
   // Best & worst platform+grade combos
-  const platGradeEntries = Array.from(gradingByPlatGrade.entries())
+  const platGradeAll = Array.from(gradingByPlatGrade.entries())
     .map(([k, v]) => {
       const [plat, grade] = k.split('|');
       return { plat, grade, ...v, pct: Math.round((v.hits / v.total) * 100), avgEdge: Number((v.edgeSum / v.total).toFixed(1)) };
-    })
-    .filter(x => x.total >= 3);
+    });
 
-  // Same treatment, and the worst list takes the OPTIMISTIC bound: ranking it on the
-  // pessimistic one would just hand the top spot to whichever cell was thinnest, which
-  // is the identical bug wearing a different sign. "Betr B 75% (3/4)" above
-  // "Pick6 B 66% (221/334)" is what this removes.
-  const bestCombos = [...platGradeEntries]
+  // The bar these lists are measured against: how the model does overall. Taken from the
+  // UNFILTERED set so the sample floor below cannot move the bar it is judged by.
+  const comboBaseHits = platGradeAll.reduce((n, x) => n + x.hits, 0);
+  const comboBaseTotal = platGradeAll.reduce((n, x) => n + x.total, 0);
+  const comboBaseRate = comboBaseTotal > 0 ? comboBaseHits / comboBaseTotal : 0.5;
+
+  // SAMPLE FLOOR 10, was 3. Three or four graded picks is not a track record for a
+  // book-and-grade pairing, it is one card. At 3 the panel listed "Betr B 75% (3/4)"
+  // and "Betr C 75% (3/4)" - and after the ranking fix those two landed in the WORST
+  // list, because with ten combos and five fixed slots per side the lists had to swallow
+  // the middle. A book earns a row here once it has been measured, not before.
+  const platGradeEntries = platGradeAll.filter(x => x.total >= 10);
+
+  // NOT five and five. These are two ends of one distribution, so forcing a fixed count
+  // per side makes each list reach past its own name - "best" collecting below-average
+  // cells, "worst" collecting above-average ones. Split on the overall rate instead and
+  // let each list be as long as it deserves (max 5). This also makes them disjoint by
+  // construction, replacing the exclusion set that was doing that job.
+  //
+  // Each side still ranks on the bound that is conservative FOR THAT SIDE: the
+  // pessimistic bound for best, the optimistic one for worst. Ranking both on the same
+  // bound would hand one of the two lists to whichever cell was thinnest.
+  const bestCombos = platGradeEntries
+    .filter(x => x.hits / x.total >= comboBaseRate)
     .sort((a, b) => wilsonBound(b.hits, b.total, true) - wilsonBound(a.hits, a.total, true) || b.total - a.total)
     .slice(0, 5);
-  // Best and worst rank on OPPOSITE bounds, so they are no longer exact reverses of each
-  // other and one cell can qualify for both: a deep, mediocre cell (Pick6 C, 156/283)
-  // sits near its raw rate on either bound. With ten combos and five slots per list that
-  // overlap is not hypothetical - it put two rows in both lists. Best wins the tie, since
-  // a cell already named as strong must not also be named as weak.
-  const bestKeys = new Set(bestCombos.map(x => `${x.plat}|${x.grade}`));
   const worstCombos = platGradeEntries
-    .filter(x => !bestKeys.has(`${x.plat}|${x.grade}`))
+    .filter(x => x.hits / x.total < comboBaseRate)
     .sort((a, b) => wilsonBound(a.hits, a.total, false) - wilsonBound(b.hits, b.total, false) || b.total - a.total)
     .slice(0, 5);
+  const comboBasePct = Math.round(comboBaseRate * 100);
 
   const comboRow = (x: typeof platGradeEntries[0], rank: number) => {
     const col = x.pct >= 60 ? 'var(--green)' : x.pct >= 48 ? 'var(--amber)' : 'var(--red)';
@@ -16816,15 +16829,15 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">Platform x Stat Hit Rates</div>
       ${platStatHtml}
     </div>` : ''}
-    ${bestCombos.length > 0 ? `<div style="display:flex;gap:12px;flex-wrap:wrap">
-      <div class="combo-card combo-card-best">
-        <div class="combo-card-title" style="color:var(--green)">Best Combos</div>
+    ${bestCombos.length || worstCombos.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap">
+      ${bestCombos.length ? `<div class="combo-card combo-card-best">
+        <div class="combo-card-title" style="color:var(--green)">Best Combos <span style="color:var(--text3);font-weight:400">above ${comboBasePct}%</span></div>
         ${bestCombos.map((x, i) => comboRow(x, i + 1)).join('')}
-      </div>
-      <div class="combo-card combo-card-worst">
-        <div class="combo-card-title" style="color:var(--red)">Worst Combos</div>
+      </div>` : ''}
+      ${worstCombos.length ? `<div class="combo-card combo-card-worst">
+        <div class="combo-card-title" style="color:var(--red)">Worst Combos <span style="color:var(--text3);font-weight:400">below ${comboBasePct}%</span></div>
         ${worstCombos.map((x, i) => comboRow(x, i + 1)).join('')}
-      </div>
+      </div>` : ''}
     </div>` : ''}` : null;
 
   // Collapsible section helper — wraps header with chevron + body with slide wrapper
