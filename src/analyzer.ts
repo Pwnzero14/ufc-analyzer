@@ -5716,13 +5716,19 @@ function calcSSLean(
     }
   }
 
+  // MODEL v38 — the ±0.5 tier is gone; |score| < 1.5 is a push.
+  // That tier fired a lean at a flat conf 54 off a SINGLE weak factor ("slightly above
+  // line" alone is +0.5, as is "striker style"). Measured over the 149 settled SS picks:
+  // conf<=55 ran 21/50 = 42% — OVER 40%, UNDER 45%, losing on BOTH sides against a 52.4%
+  // breakeven, and the only cut where the two directions agreed. calcSSR1Lean already
+  // collapses this exact tier for the same reason; this brings full-fight SS into line.
+  // NOTE: 42% was measured under PRE-v37 scoring. The market anchor changes diff, hence
+  // score, hence which picks land here — re-measure after Paris rather than expecting 42%.
   let lean: 'over'|'under'|'push', conf: number;
   if      (score >= 3)   { lean = 'over';  conf = Math.min(90, 68 + score * 4); }
   else if (score >= 1.5) { lean = 'over';  conf = Math.min(74, 56 + score * 5); }
-  else if (score >= 0.5) { lean = 'over';  conf = 54; }
   else if (score <= -3)  { lean = 'under'; conf = Math.min(90, 68 + Math.abs(score) * 4); }
   else if (score <= -1.5){ lean = 'under'; conf = Math.min(74, 56 + Math.abs(score) * 5); }
-  else if (score <= -0.5){ lean = 'under'; conf = 54; }
   else                   { lean = 'push';  conf = 50; }
 
   // Variance haircut: high SS spread means the outcome is less predictable
