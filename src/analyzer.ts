@@ -2956,6 +2956,39 @@ function deriveConfidenceMemoryTagsLive(context: ConfidenceMemoryContext): strin
  */
 function finiteLineOrNaN(v: unknown): number { return v == null ? NaN : Number(v); }
 
+/**
+ * One observation per BOOK per MARKET per FIGHT.
+ *
+ * Platform bias asks how a book prices a market against outcomes, so each book posting
+ * its own number IS a separate observation — unlike the hit-rate leaderboards, counting
+ * per book is correct here. What is not separate is the same book, same fighter, same
+ * fight appearing twice because the card is filed under two event-name variants.
+ *
+ * Measured on the live archive: 5,366 bias-eligible rows collapse to 3,775 distinct
+ * markets — 1,591 duplicates, ~30%, with IDENTICAL line and result under both spellings
+ * (e.g. prizepicks FightTime jamie siraj 2026-04-18, line 12.5 result 2.72, filed as both
+ * "Gilbert Burns vs Mike Malott" and "Burns vs. Malott").
+ *
+ * Keyed on date rather than event name precisely because the name is the thing that
+ * varies. First row wins, matching the archive index invariant.
+ */
+function dedupeBiasRows<T extends { platform?: unknown; propType?: unknown; fighter?: unknown; date?: unknown }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    const key = [
+      String(r.platform).toLowerCase(),
+      String(r.propType),
+      (normalizeName(String(r.fighter ?? "")) || String(r.fighter ?? "")).toLowerCase(),
+      String(r.date ?? "").slice(0, 10),
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
 function deriveConfidenceMemoryTagsFromSnapshotPick(pick: Record<string, any>): string[] {
   if (Array.isArray(pick.memoryTags) && pick.memoryTags.length) {
     return Array.from(new Set(pick.memoryTags.map((tag) => String(tag)).filter(Boolean)));
@@ -15976,8 +16009,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const ftHits = ftRows.filter(r => normalizeArchiveResult('FightTime', Number(r.result)) > Number(r.line)).length;
 
   // ── Per-platform summary (all prop types combined) ────────────────────
+  // Deduped: this is the aggregation the Platform Bias panel actually renders.
   const platSummary = new Map<string, { hits: number; total: number; edgeSum: number }>();
-  for (const r of resolvedRows.filter(r => !!r.platform)) {
+  for (const r of dedupeBiasRows(resolvedRows.filter(r => !!r.platform))) {
     const key = String(r.platform).toLowerCase();
     const b = platSummary.get(key) || { hits: 0, total: 0, edgeSum: 0 };
     const normResult = normalizeArchiveResult(String(r.propType), Number(r.result));
@@ -15989,7 +16023,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // ── Platform bias ──────────────────────────────────────────────────────
   const biasMap = new Map<string, { platform: string; propType: string; hits: number; total: number; edgeSum: number }>();
-  for (const r of resolvedRows.filter(r => !!r.platform)) {
+  for (const r of dedupeBiasRows(resolvedRows.filter(r => !!r.platform))) {
     const key = `${String(r.platform).toLowerCase()}|${r.propType}`;
     const b = biasMap.get(key) || { platform: String(r.platform).toLowerCase(), propType: String(r.propType), hits: 0, total: 0, edgeSum: 0 };
     const normResult = normalizeArchiveResult(String(r.propType), Number(r.result));
@@ -17185,7 +17219,9 @@ async function initPlatformBiasCache(): Promise<void> {
       Number.isFinite(Date.parse(r.date)) && Date.parse(r.date) >= londonTs && !!r.platform
     );
     const map = new Map<string, { platform: string; propType: string; hits: number; total: number; edgeSum: number }>();
-    for (const r of resolved) {
+    // Same dedupe as the panel — this cache feeds leanBestBook, so a doubled sample here
+    // silently overweights whichever books covered the double-filed cards.
+    for (const r of dedupeBiasRows(resolved)) {
       const key = `${String(r.platform).toLowerCase()}|${r.propType}`;
       const b = map.get(key) || { platform: String(r.platform).toLowerCase(), propType: String(r.propType), hits: 0, total: 0, edgeSum: 0 };
       let result = Number(r.result);
@@ -17870,16 +17906,7 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
   // names (a live case carried 4 event names across 2 dates). That is one market counted
   // twice, and it silently overweights whichever fights happened to be captured under a
   // shadow name. First row wins, matching the archive index invariant documented above.
-  const _biasSeen = new Set<string>();
-  for (const r of allRows.filter(r => !!r.platform && Number.isFinite(Number(r.line)) && Number.isFinite(Number(r.result)) && Date.parse(r.date) >= londonTs)) {
-    const dedupeKey = [
-      String(r.platform).toLowerCase(),
-      String(r.propType),
-      (normalizeName(r.fighter) || String(r.fighter)).toLowerCase(),
-      String(r.date || '').slice(0, 10),
-    ].join('|');
-    if (_biasSeen.has(dedupeKey)) continue;
-    _biasSeen.add(dedupeKey);
+  for (const r of dedupeBiasRows(allRows.filter(r => !!r.platform && Number.isFinite(Number(r.line)) && Number.isFinite(Number(r.result)) && Date.parse(r.date) >= londonTs))) {
     const key = `${String(r.platform).toLowerCase()}|${r.propType}`;
     const b = biasMap.get(key) || { platform: String(r.platform).toLowerCase(), propType: String(r.propType), hits: 0, total: 0, edgeSum: 0 };
     const normResult = normalizeArchiveResult(String(r.propType), Number(r.result));
