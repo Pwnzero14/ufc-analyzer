@@ -3079,7 +3079,10 @@ async function loadConfidenceMemoryEngine(force = false): Promise<ConfidenceMemo
   let resolvedSamples = 0;
   let taggedSamples = 0;
 
-  for (const snap of aiSnapshots) {
+  // Daily snapshots collapsed to one per event - see collapseSnapshotsByEvent. The
+  // confidence memory engine is a LEARNED input, not a readout: counting a pick once
+  // per day it stayed on the board taught it that long-posted lines matter more.
+  for (const snap of collapseSnapshotsByEvent(aiSnapshots, buildEventDedupeKey, 'latest')) {
     const eventKey = buildEventDedupeKey(String(snap?.event || ''));
     if (!eventKey) continue;
     const eventRows = rowsByEvent.get(eventKey) || [];
@@ -8461,6 +8464,59 @@ const PROJ_CONFLICT_MIN_GAP = 2.5;
  * only .find/.filter over it). If that ever changes, copy HERE rather than at the call
  * sites, or the sharing becomes a very quiet bug.
  */
+/**
+ * Collapse the DAILY snapshot history to one synthetic snapshot per event.
+ *
+ * persistAiLeanSnapshot keys on eventName + eventDate, and eventDate falls back to
+ * TODAY, so a new snapshot is stored every calendar day the board is open. Measured on
+ * the live store: 80 snapshots across 14 events - McGregor vs Holloway 2 alone holds
+ * eleven, one per day from 06-30 to 07-11.
+ *
+ * Every aggregate panel iterated all 80 and counted each pick once per day it survived.
+ * A pick flagged eleven days out scored eleven times; one added on fight day scored once.
+ * That is not a sample, it is a weighting by how early the line posted - and it inflated
+ * FP by 3.06x and SS by 20.58x. It also fed initRecalibrationMap, so it moved displayed
+ * confidence, not just the readouts.
+ *
+ * Collapsed per event and then per fighter+stat, because the same pick recurs across days
+ * (often at a different line, sometimes in a different direction as the board moved).
+ *
+ * @param prefer "latest" keeps each pick as it FINALLY stood - the version you would have
+ *   acted on - and is right for accuracy, grading and calibration. "earliest" keeps the
+ *   first time the model flagged it, which is the only reading that makes CLV mean
+ *   anything: measured against the latest snapshot the entry line IS the close, and the
+ *   number collapses to zero by construction.
+ */
+function collapseSnapshotsByEvent(
+  snaps: Array<Record<string, any>>,
+  keyOf: (event: string) => string,
+  prefer: 'latest' | 'earliest',
+): Array<Record<string, any>> {
+  // capturedAt is an ISO string, so lexical order is chronological. A snapshot without
+  // one sorts to the front of neither pass rather than silently winning the pick.
+  const ordered = [...snaps].sort((a, b) => {
+    const ta = String(a?.capturedAt || '');
+    const tb = String(b?.capturedAt || '');
+    if (!ta || !tb) return ta ? -1 : tb ? 1 : 0;
+    return prefer === 'latest' ? tb.localeCompare(ta) : ta.localeCompare(tb);
+  });
+  const byEvent = new Map<string, { base: Record<string, any>; picks: Map<string, any> }>();
+  for (const snap of ordered) {
+    const key = keyOf(String(snap?.event || ''));
+    if (!key) continue;
+    let entry = byEvent.get(key);
+    if (!entry) { entry = { base: snap, picks: new Map() }; byEvent.set(key, entry); }
+    for (const pick of (snap?.picks ?? []) as Array<Record<string, any>>) {
+      const fighter = normalizeName(String(pick?.fighter || ''))?.toLowerCase();
+      if (!fighter) continue;
+      const pk = fighter + '|' + String(pick?.source || 'fp');
+      if (entry.picks.has(pk)) continue; // first in the preferred order wins
+      entry.picks.set(pk, pick);
+    }
+  }
+  return Array.from(byEvent.values()).map(e => ({ ...e.base, picks: Array.from(e.picks.values()) }));
+}
+
 function makeRowsByEvent(
   rows: PropArchiveRecord[],
   keyOf: (event: string) => string,
@@ -15685,6 +15741,11 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     ? (aiSnapshotPayload[STORAGE_AI_LEAN_SNAPSHOT_KEY] as any[])
     : [];
 
+  // See collapseSnapshotsByEvent: the raw list is one snapshot PER DAY, not per event.
+  // Every panel below wants one observation per fighter+stat, never one per day survived.
+  const aiSnapsFinal = collapseSnapshotsByEvent(aiSnapshots, eventDedupeKey, 'latest');
+  const aiSnapsFirst = collapseSnapshotsByEvent(aiSnapshots, eventDedupeKey, 'earliest');
+
   // Returns { hits, total } for AI picks in a snapshot cross-referenced against archive rows for the same event.
   function computeAiAccuracy(snap: any, eventArchiveRows: PropArchiveRecord[]): { hits: number; total: number } {
     let hits = 0;
@@ -15720,7 +15781,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // Map dedup key → best AI accuracy for that event
   const aiAccuracyMap = new Map<string, { hits: number; total: number }>();
-  for (const snap of aiSnapshots) {
+  for (const snap of aiSnapsFinal) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || aiAccuracyMap.has(key)) continue;
     const eventArchiveRows = rowsForEvent(key);
@@ -15767,7 +15828,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // Map dedup key → AI × CLV agreement for that event
   const aiClvAgreementMap = new Map<string, { aligned: number; total: number }>();
-  for (const snap of aiSnapshots) {
+  // First-seen: agreement asks whether the model called the line MOVE, which needs the
+  // line as it stood when the model first spoke, not one taken after the move happened.
+  for (const snap of aiSnapsFirst) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || aiClvAgreementMap.has(key)) continue;
     const eventArchiveRows = rowsForEvent(key);
@@ -15831,7 +15894,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
 
   // ── AI pick accuracy by stat type (lean-direction correct, over + under) ──
   const aiAccuracyByType: Record<string, { hits: number; total: number; overHits: number; overTotal: number; underHits: number; underTotal: number }> = {};
-  for (const snap of aiSnapshots) {
+  for (const snap of aiSnapsFinal) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || !pastEventKeys.has(key)) continue;
     const eventArchiveRows = rowsForEvent(key);
@@ -15879,7 +15942,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     posHit: number; posResolved: number; nonPosHit: number; nonPosResolved: number;
   };
   const entryClvByType: Record<string, EntryClvBucket> = {};
-  for (const snap of aiSnapshots) {
+  // First-seen deliberately - see collapseSnapshotsByEvent.
+  for (const snap of aiSnapsFirst) {
     const key = eventDedupeKey(String(snap?.event || ''));
     if (!key || !pastEventKeys.has(key)) continue;
     const eventArchiveRows = rowsForEvent(key);
@@ -16366,7 +16430,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   }
   let calibTotalSamples = 0;
 
-  for (const snap of aiSnapshots) {
+  for (const snap of aiSnapsFinal) {
     const snapEventKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapEventKey || !pastEventKeys.has(snapEventKey)) continue;
     const eventArchiveRows = rowsForEvent(snapEventKey);
@@ -16650,7 +16714,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
   const gradingByGrade = new Map<string, GradeRecord>();
   const gradingByPlatGrade = new Map<string, GradeRecord>();
 
-  for (const snap of aiSnapshots) {
+  for (const snap of aiSnapsFinal) {
     const snapKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapKey || !pastEventKeys.has(snapKey)) continue;
     const eventArchiveRows = rowsForEvent(snapKey);
@@ -17426,7 +17490,8 @@ async function renderCalibrationPanel(container: HTMLElement): Promise<void> {
     conf >= 90 ? 8 : conf >= 85 ? 7 : conf >= 80 ? 6 : conf >= 75 ? 5
       : conf >= 70 ? 4 : conf >= 65 ? 3 : conf >= 60 ? 2 : conf >= 55 ? 1 : 0;
 
-  for (const snap of aiSnapshots) {
+  // Daily snapshots collapsed to one per event - see collapseSnapshotsByEvent.
+  for (const snap of collapseSnapshotsByEvent(aiSnapshots, eventDedupeKey, 'latest')) {
     const snapEventKey = eventDedupeKey(String(snap?.event || ''));
     if (!snapEventKey || !pastEventKeys.has(snapEventKey)) continue;
     const eventArchiveRows = rowsForEvent(snapEventKey);
@@ -24709,7 +24774,9 @@ async function initRecalibrationMap(): Promise<void> {
     for (const pt of STAT_TYPES) typeB[pt] = makeBuckets();
     const bIdx = (c: number) => c >= 90 ? 8 : c >= 85 ? 7 : c >= 80 ? 6 : c >= 75 ? 5 : c >= 70 ? 4 : c >= 65 ? 3 : c >= 60 ? 2 : c >= 55 ? 1 : 0;
 
-    for (const snap of aiSnapshots) {
+    // Daily snapshots collapsed - see collapseSnapshotsByEvent. This one is not a
+    // readout: _recalibrationMap rewrites the confidence and EV shown on every pick.
+    for (const snap of collapseSnapshotsByEvent(aiSnapshots, eventDedupeKey, 'latest')) {
       const snapKey = eventDedupeKey(String(snap?.event || ''));
       if (!snapKey || !pastEventKeys.has(snapKey)) continue;
       const eventRows = rowsForEvent(snapKey);
