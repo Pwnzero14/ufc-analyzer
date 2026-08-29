@@ -823,7 +823,13 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
       const sample = unresolved.slice(0, 20);
       console.log('[UFC Settle] Unresolved sample:', sample.map(r => `${r.fighter}|${r.event}|${r.propType}|line=${r.line}`).join('\n  '));
     }
-    if (!unresolved.length) {
+    // A FORCED event is a repair request, so it must survive an empty unresolved set.
+    // Everything below is driven off the unresolved set, and that set requires a
+    // line-bearing row — so a fully-settled card could never be reprocessed, which made
+    // the result-only row fix unreachable for any past event. Forcing the name is the
+    // deliberate, opt-in way to re-walk one card and fill stats whose line was pulled
+    // before it was ever archived.
+    if (!unresolved.length && !opts?.forceEventName) {
       console.log('[UFC Settle] No unresolved records — archive is up to date');
       return { settled: 0, skipped: 0, errors: [] };
     }
@@ -912,6 +918,14 @@ async function _fetchAndSettleFromUFCStats(opts?: { forceEventName?: string; inc
     }
 
     let eventNames = [...new Set(unresolved.map(r => r.event))];
+    // Same reason: with nothing unresolved there are no event names to walk, so pull the
+    // forced card out of the archive itself.
+    if (opts?.forceEventName) {
+      const want = opts.forceEventName.toLowerCase();
+      for (const ev of new Set(archive.map(r => String(r.event || '')))) {
+        if (ev && ev.toLowerCase().includes(want) && !eventNames.includes(ev)) eventNames.push(ev);
+      }
+    }
     console.log(`[UFC Settle] ${unresolved.length} unresolved records across ${eventNames.length} event(s): ${eventNames.join(' | ')}`);
 
     // recentOnly: by default only settle the most-recent card. Past events are already in the
