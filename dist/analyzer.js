@@ -16446,7 +16446,14 @@ async function renderArchivePanel(container) {
     const bestCombos = [...platGradeEntries]
         .sort((a, b) => wilsonBound(b.hits, b.total, true) - wilsonBound(a.hits, a.total, true) || b.total - a.total)
         .slice(0, 5);
-    const worstCombos = [...platGradeEntries]
+    // Best and worst rank on OPPOSITE bounds, so they are no longer exact reverses of each
+    // other and one cell can qualify for both: a deep, mediocre cell (Pick6 C, 156/283)
+    // sits near its raw rate on either bound. With ten combos and five slots per list that
+    // overlap is not hypothetical - it put two rows in both lists. Best wins the tie, since
+    // a cell already named as strong must not also be named as weak.
+    const bestKeys = new Set(bestCombos.map(x => `${x.plat}|${x.grade}`));
+    const worstCombos = platGradeEntries
+        .filter(x => !bestKeys.has(`${x.plat}|${x.grade}`))
         .sort((a, b) => wilsonBound(a.hits, a.total, false) - wilsonBound(b.hits, b.total, false) || b.total - a.total)
         .slice(0, 5);
     const comboRow = (x, rank) => {
