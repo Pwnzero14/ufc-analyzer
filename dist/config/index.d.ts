@@ -157,7 +157,11 @@ export declare const PRIZEPICKS_SCORING: {
     };
 };
 export declare const NAME_ALIASES: Record<string, string>;
-export declare const MODEL_VERSION = 36;
+export declare const MODEL_VERSION = 37;
+/** Strikes the raw SS projection runs above reality, removed before anchoring. */
+export declare const SS_PROJECTION_BIAS = 6;
+/** Weight on the de-biased projection vs the posted line (0.5 = plain average). */
+export declare const SS_MARKET_ANCHOR_WEIGHT = 0.5;
 export declare const FP_CONFIDENCE_CEILING = 92;
 export declare const PICKEM_PAYOUTS: Record<string, {
     label: string;
