@@ -16317,8 +16317,13 @@ async function renderArchivePanel(container) {
             const result = Number(match.result);
             const isHit = (lean === 'over' && result > activeLine) || (lean === 'under' && result < activeLine);
             const edge = result - activeLine;
-            // Confidence grade
-            const grade = Number.isFinite(conf) ? (conf >= 80 ? 'A' : conf >= 65 ? 'B' : conf >= 55 ? 'C' : 'D') : 'D';
+            // Confidence grade. A pick with NO confidence is not a low-confidence pick — it is
+            // an unmeasured one, and filing it as D quietly padded that row's track record with
+            // picks the model never rated. Calibration already excludes them (it requires a
+            // finite conf to choose a bucket); grading now agrees.
+            if (!Number.isFinite(conf))
+                continue;
+            const grade = conf >= 80 ? 'A' : conf >= 65 ? 'B' : conf >= 55 ? 'C' : 'D';
             const plat = activePlatform || 'unknown';
             // By platform+stat
             const psKey = `${plat}|${propType}`;
@@ -16372,7 +16377,12 @@ async function renderArchivePanel(container) {
         return { plat, stat, ...v, pct: Math.round((v.hits / v.total) * 100), avgEdge: Number((v.edgeSum / v.total).toFixed(1)) };
     })
         .filter(x => x.total >= 2)
-        .sort((a, b) => b.pct - a.pct);
+        // SORTED ON A SHRUNK RATE, DISPLAYED RAW. "DK TD 100%" on n=4 and "Pick6 TD 100%" on
+        // n=2 were outranking "Pick6 FP 62%" on n=632, so the table read as a recommendation
+        // to follow whichever cell had the least evidence. shrunkHitRate is the same Laplace
+        // adjustment the lean ladders already use (+1 phantom hit, +1 phantom miss), which
+        // pulls a thin cell toward 50% without touching the record shown beside it.
+        .sort((a, b) => shrunkHitRate(b.hits, b.total) - shrunkHitRate(a.hits, a.total) || b.total - a.total);
     const platStatHtml = platStatEntries.length > 0
         ? `<div style="display:flex;gap:12px;font-size:10px;margin-bottom:6px;padding:0 6px">
         <span style="flex:1;color:var(--text3);font-family:'JetBrains Mono',monospace">Platform / Stat</span>
@@ -16402,8 +16412,14 @@ async function renderArchivePanel(container) {
         return { plat, grade, ...v, pct: Math.round((v.hits / v.total) * 100), avgEdge: Number((v.edgeSum / v.total).toFixed(1)) };
     })
         .filter(x => x.total >= 3);
-    const bestCombos = [...platGradeEntries].sort((a, b) => b.pct - a.pct).slice(0, 5);
-    const worstCombos = [...platGradeEntries].sort((a, b) => a.pct - b.pct).slice(0, 5);
+    // Shrunk for ranking, raw for display — same reason as the platform x stat table above:
+    // "Betr B 75% (3/4)" was ranking above "Pick6 B 66% (221/334)".
+    const bestCombos = [...platGradeEntries]
+        .sort((a, b) => shrunkHitRate(b.hits, b.total) - shrunkHitRate(a.hits, a.total) || b.total - a.total)
+        .slice(0, 5);
+    const worstCombos = [...platGradeEntries]
+        .sort((a, b) => shrunkHitRate(a.hits, a.total) - shrunkHitRate(b.hits, b.total) || b.total - a.total)
+        .slice(0, 5);
     const comboRow = (x, rank) => {
         const col = x.pct >= 60 ? 'var(--green)' : x.pct >= 48 ? 'var(--amber)' : 'var(--red)';
         const platLabel = PLAT_LABELS[x.plat] || x.plat.toUpperCase();
