@@ -4970,6 +4970,33 @@ function shrunkHitRate(hits: number, n: number): number {
   return (hits + 1) / (n + 2);
 }
 
+/**
+ * Wilson score interval bound — the rate we can defend at 95%, not the rate observed.
+ *
+ * For RANKING leaderboard cells whose sample sizes differ by orders of magnitude.
+ * shrunkHitRate (Laplace +1/+1) is the wrong tool here and measurably so: it scores
+ * "DK TD 4/4" at .833 against "Pick6 FP 392/632" at .620, so a four-pick cell still
+ * outranked a six-hundred-pick one. A fixed +1/+1 prior is simply too light to matter
+ * once n leaves single digits, and too light to discipline it while n is there.
+ *
+ * Wilson scales its penalty with the actual uncertainty: the same 4/4 lands at .510
+ * and 392/632 at .582, which is the ordering a reader of the panel actually wants.
+ * No arbitrary prior weight to tune.
+ *
+ * @param lower true for the pessimistic bound (rank BEST cells), false for the
+ *              optimistic one (rank WORST cells — otherwise a 3-pick cell tops the
+ *              worst list on noise alone, the same bug pointing the other way).
+ */
+function wilsonBound(hits: number, n: number, lower: boolean): number {
+  if (n <= 0) return lower ? 0 : 1;
+  const z = 1.96;
+  const p = hits / n;
+  const denom = 1 + (z * z) / n;
+  const centre = p + (z * z) / (2 * n);
+  const margin = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+  return (lower ? centre - margin : centre + margin) / denom;
+}
+
 function calcLean(
   name: string,
   db: FighterDB|null,
@@ -16656,10 +16683,10 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       const isHit = (lean === 'over' && result > activeLine) || (lean === 'under' && result < activeLine);
       const edge = result - activeLine;
 
-      // Confidence grade. A pick with NO confidence is not a low-confidence pick — it is
-      // an unmeasured one, and filing it as D quietly padded that row's track record with
-      // picks the model never rated. Calibration already excludes them (it requires a
-      // finite conf to choose a bucket); grading now agrees.
+      // Guard only. Every snapshot pick carries a confidence today, so this drops nothing
+      // — checked against the live archive: 1161 graded picks before and after. It stays
+      // because an unrated pick is not a low-confidence pick, and the old expression
+      // silently filed one as a D. Do not read the D row as evidence this ever fired.
       if (!Number.isFinite(conf)) continue;
       const grade = conf >= 80 ? 'A' : conf >= 65 ? 'B' : conf >= 55 ? 'C' : 'D';
       const plat = activePlatform || 'unknown';
@@ -16710,12 +16737,12 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
       return { plat, stat, ...v, pct: Math.round((v.hits / v.total) * 100), avgEdge: Number((v.edgeSum / v.total).toFixed(1)) };
     })
     .filter(x => x.total >= 2)
-    // SORTED ON A SHRUNK RATE, DISPLAYED RAW. "DK TD 100%" on n=4 and "Pick6 TD 100%" on
-    // n=2 were outranking "Pick6 FP 62%" on n=632, so the table read as a recommendation
-    // to follow whichever cell had the least evidence. shrunkHitRate is the same Laplace
-    // adjustment the lean ladders already use (+1 phantom hit, +1 phantom miss), which
-    // pulls a thin cell toward 50% without touching the record shown beside it.
-    .sort((a, b) => shrunkHitRate(b.hits, b.total) - shrunkHitRate(a.hits, a.total) || b.total - a.total);
+    // RANKED ON THE WILSON LOWER BOUND, DISPLAYED RAW. "DK TD 100%" on n=4 and
+    // "Pick6 TD 100%" on n=2 were outranking "Pick6 FP 62%" on n=632, so the table read
+    // as advice to follow whichever cell had the least evidence behind it. A first pass
+    // sorted on shrunkHitRate and changed the order not at all — Laplace scores 4/4 at
+    // .833, still above .620 — which is why this uses an interval bound instead.
+    .sort((a, b) => wilsonBound(b.hits, b.total, true) - wilsonBound(a.hits, a.total, true) || b.total - a.total);
 
   const platStatHtml = platStatEntries.length > 0
     ? `<div style="display:flex;gap:12px;font-size:10px;margin-bottom:6px;padding:0 6px">
@@ -16748,13 +16775,15 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
     })
     .filter(x => x.total >= 3);
 
-  // Shrunk for ranking, raw for display — same reason as the platform x stat table above:
-  // "Betr B 75% (3/4)" was ranking above "Pick6 B 66% (221/334)".
+  // Same treatment, and the worst list takes the OPTIMISTIC bound: ranking it on the
+  // pessimistic one would just hand the top spot to whichever cell was thinnest, which
+  // is the identical bug wearing a different sign. "Betr B 75% (3/4)" above
+  // "Pick6 B 66% (221/334)" is what this removes.
   const bestCombos = [...platGradeEntries]
-    .sort((a, b) => shrunkHitRate(b.hits, b.total) - shrunkHitRate(a.hits, a.total) || b.total - a.total)
+    .sort((a, b) => wilsonBound(b.hits, b.total, true) - wilsonBound(a.hits, a.total, true) || b.total - a.total)
     .slice(0, 5);
   const worstCombos = [...platGradeEntries]
-    .sort((a, b) => shrunkHitRate(a.hits, a.total) - shrunkHitRate(b.hits, b.total) || b.total - a.total)
+    .sort((a, b) => wilsonBound(a.hits, a.total, false) - wilsonBound(b.hits, b.total, false) || b.total - a.total)
     .slice(0, 5);
 
   const comboRow = (x: typeof platGradeEntries[0], rank: number) => {
