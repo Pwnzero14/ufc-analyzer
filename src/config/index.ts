@@ -483,7 +483,25 @@ export const NAME_ALIASES: Record<string, string> = {
 //   without duration data behaves exactly as it did before.
 //   calcTDLean carries the same un-normalised pattern and was deliberately NOT
 //   changed — TD is n=6 in the archive, far too thin to justify touching.
-export const MODEL_VERSION = 39;
+// v40 (2026-08-30): the prop-line predictor learns against the POSTED LINE.
+//   runLearningCycle computed its gradient from `result` — the stat the fighter went
+//   on to produce — while the thing it outputs is a LINE. Those are different targets:
+//   over 149 settled SS props the posted line sat 0.29 from the eventual result on
+//   average, with a mean absolute error of 25.90, so training on the outcome spent the
+//   whole gradient chasing ~26 points of variance no book is trying to price. The
+//   tuning notes gave it away — v13 cites MAE 7.9, only reachable against a line.
+//   Tuned on one target, learned on the other; this reconciles them.
+//   effectiveDelta is now `predicted - median opening line` wherever a line was
+//   archived, falling back to close, then the old RLM-blended result, then the raw
+//   result — so a prop with no archived line behaves exactly as before. The relative-
+//   error DENOMINATOR moves to the same scale (marketTarget), or a line-scale
+//   numerator over a result-scale denominator would mis-size every weight step.
+//   Paired with a read-only backtest (backtestVsPostedLines) that scores stored
+//   predictions against posted openers per stat AND per book.
+//   NOTE: existing per-fighter trends were EWMA'd on the OLD target and are on the
+//   wrong scale. They are deliberately not reset — alpha >= 0.10 washes them out over
+//   roughly 7-10 events — but read early post-v40 trend values with that in mind.
+export const MODEL_VERSION = 40;
 
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */

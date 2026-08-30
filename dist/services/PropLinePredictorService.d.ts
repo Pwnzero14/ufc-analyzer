@@ -1,4 +1,4 @@
-import type { FighterDB, FighterTrend, LearningResult, PredictionEvent, PredictorWeights, PropArchiveRecord, PropPrediction, StatPrediction, WeightClass } from '../types/index.js';
+import type { FighterDB, FighterTrend, LearningResult, PredictionEvent, PredictorWeights, PropArchiveRecord, PredictorLineBacktest, PropPrediction, StatPrediction, WeightClass } from '../types/index.js';
 export declare class PropLinePredictorService {
     static getWeights(): Promise<PredictorWeights>;
     static saveWeights(w: PredictorWeights): Promise<void>;
@@ -98,6 +98,35 @@ export declare class PropLinePredictorService {
         median: number;
         sampleCount: number;
     } | null, marketFtMin?: number | null, marketExpectedMin?: number | null): PropPrediction;
+    /**
+     * Median OPENING line across books for one fighter+prop, with the closing line as
+     * fallback. This is the quantity the predictor is actually trying to forecast: the
+     * number a book will POST, not the number the fighter will produce.
+     *
+     * Opening rather than closing on purpose — the predictor runs before books post, so
+     * the opener is the like-for-like target. The close is a different (later, sharper)
+     * question and only stands in when no opener was archived.
+     */
+    static marketLineFor(archiveRecords: PropArchiveRecord[], fighter: string, propTypes: string[]): {
+        line: number;
+        kind: 'open' | 'close';
+        books: number;
+    } | null;
+    /**
+     * SUGGESTION 6 — score stored predictions against the number books ACTUALLY POSTED.
+     *
+     * The learning panel has always reported error against the fighter's realised stat,
+     * which is a different and much noisier question: measured over 149 settled SS props,
+     * the posted line sat 0.29 from the eventual result on average but with a mean
+     * absolute error of 25.90. Predicting the outcome therefore carries ~26 points of
+     * irreducible noise that books are not even attempting to price. This scores the
+     * thing the predictor is for.
+     *
+     * Read-only and archive-driven: it needs no live card and no posted lines for the
+     * upcoming event — every past event with archived open lines is a labelled row.
+     * `vsResult` is reported alongside so the two targets can be compared directly.
+     */
+    static backtestVsPostedLines(predictionEvents: PredictionEvent[], archiveRecords: PropArchiveRecord[]): PredictorLineBacktest;
     static runLearningCycle(eventName: string, archiveRecords: PropArchiveRecord[]): Promise<LearningResult | null>;
 }
 //# sourceMappingURL=PropLinePredictorService.d.ts.map

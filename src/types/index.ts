@@ -443,10 +443,38 @@ export interface LearningPredictionResult {
   predicted: { ss: number; td: number; fp: number };
   actual: { ss: number; td: number; fp: number };
   delta: { ss: number; td: number; fp: number };
-  // RLM-blended delta used by calibration when the closing line moved meaningfully
-  // from open. Equals `delta` when no significant RLM was observed. UI should
-  // display `actual` and `delta` (raw); calibration code reads `effectiveDelta`.
+  // The LEARNING SIGNAL. Since MODEL v40 this is `predicted - posted line` wherever a
+  // line was archived — the predictor forecasts a LINE, so the line is the target.
+  // Falls back to the old RLM-blended result delta, then the raw result delta, when no
+  // line exists. UI still displays `actual` and `delta` (raw outcome); every calibration
+  // and weight-update path reads `effectiveDelta`.
   effectiveDelta?: { ss: number; td: number; fp: number };
+  // Median opening line across books, when archived. Used as the DENOMINATOR for the
+  // proportional weight step so relative error is measured on the same scale as the
+  // signal — mixing a line-scale numerator with a result-scale denominator would
+  // silently mis-size every update.
+  marketTarget?: { ss: number; td: number; fp: number };
+  // Which target actually drove effectiveDelta, per stat — so a later session can tell
+  // line-trained cycles from the older result-trained ones.
+  targetKind?: { ss: string; td: string; fp: string };
+}
+
+/** One cell of the posted-line backtest. */
+export interface BacktestCell {
+  n: number;
+  absSum: number;
+  sgnSum: number;
+  mae: number;
+  /** Signed mean of (predicted - target): positive = the model lines HIGHER than books. */
+  bias: number;
+}
+
+export interface PredictorLineBacktest {
+  events: number;
+  byStat: Record<string, BacktestCell>;
+  byBook: Record<string, Record<string, BacktestCell>>;
+  /** The metric the learning panel reported before v40 — predicted vs realised stat. */
+  vsResult: Record<string, BacktestCell>;
 }
 
 export interface LearningSummary {
