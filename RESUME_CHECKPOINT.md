@@ -1,13 +1,13 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-30 17:49:38 -04:00
+Last Saved: 2026-08-30 18:03:44 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: b53ab99
+HEAD: 0a960f5
 
 ## Last Notes
-SESSION HANDOFF (2026-08-30, ~18:00). Tree clean. MODEL_VERSION 42.
-Pushed: feature/sleek-theme-v1 b53ab99, master 76f04a7 (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-30, ~18:15). Tree clean. MODEL_VERSION 43.
+Pushed: feature/sleek-theme-v1 0a960f5, master 291b49e (cherry-picked; full parity verified).
 
 BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
 finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
@@ -25,6 +25,8 @@ vs. Parnasse"; props have NOT dropped.
 7. MODEL v40 (bb3d7ab) predictor learns against the POSTED LINE, not results.
 8. MODEL v41 (65c7f4f) predictions de-biased + snapped to the grid books post on.
 9. MODEL v42 (b53ab99) R1 SS is now a predicted prop.
+10. MODEL v43 (0a960f5) SS/TD get FP's market ties; debut fights stop mirroring.
+    ALL FOUR predictor suggestions are now DONE. Only CTRL remains, parked by agreement.
 
 === MODEL v37 (13f827b) - SS MARKET ANCHOR ===
 THE MEASUREMENT (149 settled SS picks from the snapshot store, 2026-08-29):
@@ -235,6 +237,50 @@ together (.pred-row and .pred-head, base AND the 1100px breakpoint). That is the
 exact shape. Verified live: 1280px -> 7 kids / 7 tracks / 1 grid row / zero header-to-cell
 offset; 1050px -> 7 kids / 6 tracks with the factors rail correctly spanning 1 / -1.
 
+--- v43 (0a960f5) SUGGESTIONS 2 + 4 - USER-VERIFIED BY SCREENSHOT ---
+#2 BOOK PRIOR + MARKET ANCHOR FOR SS / TD / R1 SS. computeBookPriorFP and
+applyMarketAnchor had been FP-ONLY since v22, so SS and TD had NOTHING tying them to how
+books price a given fighter - the likeliest reason FP tracks the market better in the v40
+backtest (FP MAE 17.8 on ~85-point lines is proportionally far better than SS 12.6 on ~43).
+ - computeBookPrior: same median-of-posted-lines, same >=5 sample gate. `books` stays
+   OPTIONAL because only FP needs a rulebook exclusion (PrizePicks scores fantasy
+   differently); SS and TD mean the same quantity everywhere and take every book.
+ - The anchor cap is a FRACTION of the fair line (0.18), not FP's absolute 15, because TD
+   lines average 1.3 and SS 43 - one absolute cap cannot serve both. 0.18 is what FP's 15
+   already is against its ~85 mean, so all four props run on ONE rule.
+ - `shift` comes from bookCalibration, so "fair" = posted line adjusted by how this model
+   is measured to sit against books. bookCalibration is HOISTED above the pair loop for
+   this; the v41 calibration pass reuses the same table.
+
+#4 THE DEBUT MIRROR - FIXED. With no history a fighter got the league prior, and because
+the OPPONENT also had none the "opponent allows" term was the league default too, so both
+sides came out byte-identical.
+MEASURED ON POSTED OPENING LINES (favourite minus underdog):
+    SS +13.4 (n=266)   FP +16.0 (n=94)   R1 SS +4.7 (n=77)   TD +0.2 (n=75)
+DELIBERATELY measured on LINES, not results: on RESULTS the same split reads +24.2 SS, but
+favourites win more and winners fight longer, so the outcome gap is ~double what books
+price and would over-separate. HALF the gap to each side keeps the pair's midpoint on the
+league prior - separates the two fighters WITHOUT moving the level of the fight. Fires
+ONLY with zero history (a record already encodes level; otherwise double-counted).
+
+*** TD IS EXCLUDED FROM THE DEBUT SPLIT, and the node replay is what caught it ***
+Its 0.2 gap is SMALLER than the 0.5 grid TD lines are posted on. A +/-0.1 nudge on a prop
+that only takes 0.5 / 1.5 / 2.5 cannot express itself, and the 0.5 floor then broke the
+midpoint symmetry the other three keep (fav 0.6 / dog 0.5, midpoint 0.6 against a 0.5
+base). A gap under the grid resolution is not a signal you can post. Generalise it.
+
+VERIFIED ON SCREEN after reload + Generate (board reads MODEL v43):
+    Aljarouj (fav)  SS 53.5  R1 SS 24.5  FP 81.5
+    Sintes   (dog)  SS 40.5  R1 SS 19.5  FP 65.5
+    gaps            13.0            5.0      16.0   <- matches the measured table
+FP midpoint lands exactly on the 73.5 base. Benouaich (debut, favourite) got +8 FP while
+Montenegro (has history) correctly did not move.
+
+*** KNOWN COSMETIC DEFECT INTRODUCED BY v42/v43 - NOT YET FIXED ***
+Debut fighters now render the NO HISTORY badge TWICE (Parnasse, Aljarouj, Sintes,
+Benouaich). predictSS and predictSSR1 each emit their own "no history" reason and the
+factor-chip extractor renders both. Harmless but visible; dedupe the chip list by label.
+
 *** WHERE THE PREDICTOR DATA LIVES (saves a re-derivation) ***
 - The cached fighter log key is `fightHistory`, NOT `history` (FighterDB uses `history`;
   the ufcstats_v49_* CACHE uses fightHistory). Getting this wrong reports 0% coverage.
@@ -247,15 +293,8 @@ offset; 1050px -> 7 kids / 6 tracks with the factors rail correctly spanning 1 /
   read the backup, take payload.storage ?? payload, then prop_archive_v1 / ufcstats_v*.
 
 *** SUGGESTIONS STILL OPEN ***
-- #2 BOOK PRIOR / MARKET ANCHOR FOR SS AND TD. computeBookPriorFP + applyMarketAnchor are
-  FP-ONLY. SS and TD have nothing tying them to how books price those fighters, which is
-  likely why FP tracks books better. Historical prior is archive-only (buildable now);
-  the live-anchor half needs posted lines for the card.
-- #4 THE NO-HISTORY MIRROR. Still visible on this card: Michael Aljarouj and Fabia Sintes
-  render IDENTICAL rows (SS 47.5, R1 SS 22.5, TD 0.5, FP 73.5, conf 53%) because when
-  NEITHER fighter has history each one's "opponent allows" is also the league default, so
-  the model emits a perfect mirror. Books never do that - they differentiate on moneyline,
-  weight class and non-UFC record. Moneyline and weight class are already available.
+- #2 and #4 are DONE (v43). All four predictor suggestions are complete.
+- The doubled NO HISTORY badge above is the only outstanding defect, and it is cosmetic.
 - CTRL AS A PREDICTED PROP - deferred BY AGREEMENT until more cards accumulate lines.
   It archives under TWO propTypes: `Control` 5,780 rows with **0** openLine (result-only
   backfill) and `ctrl` 228 rows all carrying a line. Only ~228 labelled rows today, so it
