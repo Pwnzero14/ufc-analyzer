@@ -528,7 +528,35 @@ export const NAME_ALIASES = {
 //   of full-fight SS over 451 paired fighter-events) rather than fitting a second
 //   modifier on a fifth of the data. So it learns through the SS signal; its own
 //   accuracy is tracked separately in the Predictor vs Posted Lines panel.
-export const MODEL_VERSION = 42;
+// v43 (2026-08-30): SS/TD get the market ties FP has had since v22, and two
+//   debutants in one fight stop rendering identical rows.
+//   #2 BOOK PRIOR + MARKET ANCHOR FOR SS/TD/R1 SS. computeBookPriorFP and
+//     applyMarketAnchor were FP-ONLY, so SS and TD had nothing tying them to how books
+//     price a given fighter — the likeliest reason FP tracks the market better (FP MAE
+//     17.8 on lines averaging ~85 is proportionally far better than SS 12.6 on ~43).
+//     computeBookPrior is the same median-of-posted-lines with the same >=5 sample gate;
+//     `books` stays optional because only FP needs a rulebook exclusion (PrizePicks
+//     scores fantasy differently), while SS and TD mean the same thing everywhere.
+//     The anchor cap is a FRACTION of the fair line (0.18) rather than FP's absolute 15,
+//     because TD lines average 1.3 and SS 43 — one absolute cap cannot serve both. 0.18
+//     is what FP's 15 already is against its ~85 mean, so all four props share one rule.
+//     `shift` comes from bookCalibration, so "fair" means the posted line adjusted by
+//     how this model is measured to sit against books.
+//   #4 THE DEBUT MIRROR. TD is EXCLUDED — see below. With no history a fighter gets the league prior — and because
+//     the OPPONENT also has none, the "opponent allows" term is the league default too,
+//     so both sides came out byte-identical (Aljarouj and Sintes: SS 47.5 / R1 SS 22.5 /
+//     TD 0.5 / FP 73.5 / conf 53%). Books separate them on price. Measured on POSTED
+//     OPENING LINES: favourites are priced above underdogs by SS +13.4 (n=266), FP +16.0
+//     (n=94), R1 SS +4.7 (n=77), TD +0.2 (n=75). Deliberately measured on LINES, not
+//     results — on results the same split reads +24.2 SS, but favourites win more and
+//     winners fight longer, so the outcome gap is about double what books actually
+//     price and would over-separate. HALF the gap goes to each side, so the pair's
+//     midpoint stays on the league prior: it separates the two without moving the level
+//     of the fight. TD is dropped: its 0.2 gap is SMALLER than the 0.5 grid TD lines are
+//     posted on, so it cannot express itself and the 0.5 floor breaks the midpoint
+//     symmetry the other three keep. Fires ONLY with zero history, since a record already
+//     encodes their level and would be double-counted.
+export const MODEL_VERSION = 43;
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */
 export const SS_PROJECTION_BIAS = 6;

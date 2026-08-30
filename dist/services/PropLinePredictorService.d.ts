@@ -77,6 +77,69 @@ export declare class PropLinePredictorService {
      */
     static readonly FP_GAP_CAP = 15;
     static applyMarketAnchor(fantasy: StatPrediction, postedLine: number | null, shift: number): StatPrediction;
+    /**
+     * SUGGESTION 2 — the book prior, generalised off FP.
+     *
+     * computeBookPriorFP has existed since v22 and is FP-ONLY: SS and TD had nothing
+     * tying them to how books have historically priced THIS fighter, which is the most
+     * likely reason FP tracks the market better than SS does (FP MAE 17.8 on lines
+     * averaging ~85 is proportionally far better than SS 12.6 on ~43).
+     *
+     * Same shape as the FP version: median of that fighter's posted lines inside the
+     * recency window, needing MIN_BOOK_SAMPLES before it is allowed to say anything.
+     * `books` is optional and only FP needs it — fantasy scoring differs by rulebook, so
+     * PrizePicks has to stay out of an FP median; SS and TD are the same quantity
+     * everywhere and take every book.
+     */
+    static computeBookPrior(archive: PropArchiveRecord[], fighter: string, propTypes: string[], books?: Set<string>): {
+        median: number;
+        sampleCount: number;
+    } | null;
+    /**
+     * Blend a fighter's own historical book prior into a projection. Same weight curve
+     * predictFantasy already uses for FP: 0.10 + 0.02 per sample, capped 0.20-0.35, so a
+     * thin prior nudges and a deep one pulls without ever dominating the model.
+     */
+    static applyBookPrior(sp: StatPrediction, prior: {
+        median: number;
+        sampleCount: number;
+    } | null, label: string): StatPrediction;
+    /**
+     * Market anchor for SS / R1 SS / TD. FP keeps applyMarketAnchor and its absolute
+     * FP_GAP_CAP of 15; these props span wildly different magnitudes (TD lines average
+     * 1.3, SS 43) so one absolute cap cannot serve them. The cap is a FRACTION of the
+     * fair line instead — 0.18, which is what FP's 15 already is against its ~85 average,
+     * so the three stay on one rule rather than three hand-picked numbers.
+     *
+     * `shift` is the measured per-stat offset from bookCalibration, so "fair" means the
+     * posted line adjusted by how this model is known to sit against books.
+     */
+    static readonly ANCHOR_GAP_FRACTION = 0.18;
+    static applyMarketAnchorFor(sp: StatPrediction, postedLine: number | null, shift: number, label: string, minCap: number): StatPrediction;
+    /**
+     * SUGGESTION 4 — two debutants in one fight were rendering IDENTICAL rows.
+     *
+     * With no history, a fighter's projection is the league prior; and because the
+     * opponent has no history either, the "opponent allows" term is ALSO the league
+     * default. Both sides of a debut-vs-debut fight therefore came out byte-identical —
+     * Michael Aljarouj and Fabia Sintes both at SS 47.5 / R1 SS 22.5 / TD 0.5 / FP 73.5
+     * / conf 53%. Books never do that; they separate the two on price.
+     *
+     * Moneyline is the one differentiator available with zero fight history, and it is a
+     * real one. Measured on POSTED OPENING LINES (the thing v40 predicts), favourites are
+     * priced above underdogs by:
+     *     SS +13.4 (n=266)   FP +16.0 (n=94)   R1 SS +4.7 (n=77)   TD +0.2 (n=75)
+     * Deliberately measured on lines, not results: on RESULTS the same split reads +24.2
+     * SS, but favourites win more and winners fight longer, so the outcome gap is roughly
+     * double what books actually price. Using the results number would over-separate.
+     *
+     * Applied as HALF the gap to each side so the pair's midpoint stays on the league
+     * prior — this separates two debutants without moving the level of the fight — and
+     * ONLY when the fighter has no history, since a fighter with a record already encodes
+     * their level and would be double-counted.
+     */
+    static readonly DEBUT_ML_GAP: Record<string, number>;
+    static applyDebutMoneylineSplit(pred: PropPrediction, moneyline: number | null | undefined, hasHistory: boolean): PropPrediction;
     static computeBookPriorFP(archive: PropArchiveRecord[], fighter: string): {
         median: number;
         sampleCount: number;
