@@ -460,7 +460,7 @@ export class PropLinePredictorService {
             return {
                 ...sp,
                 line: after,
-                reasons: [...sp.reasons, `No history — separated from opponent on price: ${role} at ${ml > 0 ? '+' : ''}${ml}, and books post ${role}s ${side > 0 ? 'above' : 'below'} by ~${(half * 2).toFixed(1)} on this prop (half applied) → ${before.toFixed(1)}→${after.toFixed(1)}`],
+                reasons: [...sp.reasons, `Debut split ${side > 0 ? '+' : '-'}${half.toFixed(1)}: no history, so separated from the opponent on price (${role} at ${ml > 0 ? '+' : ''}${ml}). Books post ${role}s ~${(half * 2).toFixed(1)} ${side > 0 ? 'above' : 'below'} on this prop; half applied so the pair's midpoint stays put → ${before.toFixed(1)}→${after.toFixed(1)}`],
             };
         };
         return {
