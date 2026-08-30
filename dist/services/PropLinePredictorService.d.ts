@@ -1,4 +1,4 @@
-import type { FighterDB, FighterTrend, LearningResult, PredictionEvent, PredictorWeights, PropArchiveRecord, PredictorLineBacktest, PropPrediction, StatPrediction, WeightClass } from '../types/index.js';
+import type { FighterDB, FighterTrend, LearningResult, PredictionEvent, PredictorWeights, PropArchiveRecord, PredictorLineBacktest, BookCalibration, PropPrediction, StatPrediction, WeightClass } from '../types/index.js';
 export declare class PropLinePredictorService {
     static getWeights(): Promise<PredictorWeights>;
     static saveWeights(w: PredictorWeights): Promise<void>;
@@ -127,6 +127,48 @@ export declare class PropLinePredictorService {
      * `vsResult` is reported alongside so the two targets can be compared directly.
      */
     static backtestVsPostedLines(predictionEvents: PredictionEvent[], archiveRecords: PropArchiveRecord[]): PredictorLineBacktest;
+    /**
+     * SUGGESTIONS 3 + 5 — where books actually put their numbers.
+     *
+     * Two separate facts, measured from the archive rather than assumed, because both
+     * turned out to be things I would have got wrong by eye:
+     *
+     *  GRID (5). Every book posts SS, TD and R1 SS on a .50 grid — but FANTASY is
+     *  book-specific: Betr and Pick6 use .50, Underdog uses .99 (366/366 rows) and
+     *  PrizePicks uses .55 (100%). A prediction of 63.7 is not postable anywhere; the
+     *  same number rounds to 63.5, 63.99 or 63.55 depending on who is pricing it.
+     *
+     *  OFFSET (3). Books disagree with the model by a CONSTANT per stat, which is the
+     *  correctable half of the error — MAE spread is not. Measured over 10 events:
+     *  FP ran 7.8 BELOW the books, SS 4.1 ABOVE, TD flat.
+     *
+     * Both are recomputed from the archive on every call rather than frozen as
+     * constants. That matters: MODEL v40 now trains against the line too, so the true
+     * bias shrinks event over event and this layer must shrink with it or it would
+     * over-correct. A stored constant would fight the learner.
+     *
+     * PrizePicks Fantasy is deliberately NOT special-cased. Its +19.2 offset is a
+     * different scoring basis (`Fantasy_PP`), and a per-book offset absorbs that on its
+     * own — the same reason v33 excludes PP from FP best-line comparisons.
+     */
+    static bookCalibration(predictionEvents: PredictionEvent[], archiveRecords: PropArchiveRecord[]): BookCalibration;
+    /** Snap to the nearest postable value on `frac`'s grid (63.7 -> 63.5 / 63.99 / 63.55). */
+    static snapToGrid(value: number, frac: number): number;
+    /**
+     * The line THIS book is expected to post. Applies that book's measured offset when
+     * there is enough of it, else the all-book offset, then snaps to that book's grid.
+     */
+    static expectedLineAtBook(predicted: number, statLabel: string, propType: string, book: string, cal: BookCalibration): number | null;
+    /**
+     * Calibrate a whole prediction toward what books will post: de-bias on the
+     * shared-scoring consensus, then snap to the .5 grid that SS/TD use and that every
+     * book except Underdog/PrizePicks uses for FP.
+     *
+     * The headline number stays one number — per-book variants come from
+     * expectedLineAtBook — so this uses the ALL-BOOK offset rather than any single
+     * book's, and PrizePicks' scoring-basis gap cannot drag the headline with it.
+     */
+    static calibrateToBooks(pred: PropPrediction, cal: BookCalibration): PropPrediction;
     static runLearningCycle(eventName: string, archiveRecords: PropArchiveRecord[]): Promise<LearningResult | null>;
 }
 //# sourceMappingURL=PropLinePredictorService.d.ts.map

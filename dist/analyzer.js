@@ -14159,6 +14159,29 @@ async function generatePredictions(container) {
         p2.fantasy = PropLinePredictorService.applyMarketAnchor(p2.fantasy, postedFp(pair.f2), fpShift);
         predictions.push(p1, p2);
     }
+    // ── MODEL v41 · calibrate to what books actually post ───────────────────────
+    // De-bias by the measured per-stat offset and snap to the .5 grid every book uses
+    // for SS/TD. Applied HERE, before the save, so the stored prediction IS the
+    // calibrated one — Best Picks, EV and the parlay maths all read the same number,
+    // and there is no second derivation to drift from it.
+    //
+    // Recomputed from the archive every generation rather than frozen: v40 now trains
+    // against the line as well, so the true bias shrinks event over event and this
+    // correction shrinks with it. A hard-coded constant would fight the learner.
+    try {
+        const priorPreds = await PropLinePredictorService.getPredictions();
+        const cal = PropLinePredictorService.bookCalibration(priorPreds, propArchive);
+        if (cal.events >= 3) {
+            for (let i = 0; i < predictions.length; i++) {
+                predictions[i] = PropLinePredictorService.calibrateToBooks(predictions[i], cal);
+            }
+            debugLog(`Book calibration applied over ${cal.events} events: ` +
+                `SS ${(cal.global.SS ?? 0).toFixed(1)}, TD ${(cal.global.TD ?? 0).toFixed(1)}, FP ${(cal.global.FP ?? 0).toFixed(1)}`);
+        }
+    }
+    catch (e) {
+        debugLog('Book calibration skipped: ' + String(e));
+    }
     const eventName = upcomingEventName || 'Unknown Event';
     const predEvent = {
         event: eventName,
@@ -14909,8 +14932,10 @@ function renderPredictionsHtml(archiveRows, cSec) {
     // the two are directly comparable. Archive-driven — no live card needed.
     const lineBt = (() => {
         let bt;
+        let cal;
         try {
             bt = PropLinePredictorService.backtestVsPostedLines(preds, archiveRows);
+            cal = PropLinePredictorService.bookCalibration(preds, archiveRows);
         }
         catch {
             return '';
@@ -14941,7 +14966,12 @@ function renderPredictionsHtml(archiveRows, cSec) {
                 const c = bt.byBook[b][k];
                 return `<span class="plbt-bcell">${k} ${c && c.n ? `<b>${f(c.mae)}</b> <i>${c.bias >= 0 ? '+' : ''}${f(c.bias)}</i>` : '—'}</span>`;
             }).join('');
-            return `<div class="plbt-brow"><span class="plbt-bname">${BOOK_LABELS[b] || b}</span>${cells}</div>`;
+            // MODEL v41: what this book is expected to POST, on its own grid — .5 for
+            // SS/TD everywhere, but .99 on Underdog FP and .55 on PrizePicks FP.
+            const g = cal.grids[b] || {};
+            const gridTxt = ['SS', 'TD', 'Fantasy'].map(p => g[p] != null ? `${p === 'Fantasy' ? 'FP' : p} .${String(Math.round(g[p] * 100)).padStart(2, '0')}` : null)
+                .filter(Boolean).join(' · ');
+            return `<div class="plbt-brow"><span class="plbt-bname">${BOOK_LABELS[b] || b}</span>${cells}${gridTxt ? `<span class="plbt-grid" title="The fractional part this book posts on, measured from every archived line — a prediction is snapped to this before it is comparable.">grid ${gridTxt}</span>` : ''}</div>`;
         }).join('');
         return `<div class="plbt">
       <div class="plbt-head">Scored against the median OPENING line across books · ${bt.events} event${bt.events === 1 ? '' : 's'}</div>

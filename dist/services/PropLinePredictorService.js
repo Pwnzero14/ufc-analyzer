@@ -986,6 +986,140 @@ export class PropLinePredictorService {
                 seal(byBook[b][k]);
         return { events, byStat, byBook, vsResult };
     }
+    /**
+     * SUGGESTIONS 3 + 5 — where books actually put their numbers.
+     *
+     * Two separate facts, measured from the archive rather than assumed, because both
+     * turned out to be things I would have got wrong by eye:
+     *
+     *  GRID (5). Every book posts SS, TD and R1 SS on a .50 grid — but FANTASY is
+     *  book-specific: Betr and Pick6 use .50, Underdog uses .99 (366/366 rows) and
+     *  PrizePicks uses .55 (100%). A prediction of 63.7 is not postable anywhere; the
+     *  same number rounds to 63.5, 63.99 or 63.55 depending on who is pricing it.
+     *
+     *  OFFSET (3). Books disagree with the model by a CONSTANT per stat, which is the
+     *  correctable half of the error — MAE spread is not. Measured over 10 events:
+     *  FP ran 7.8 BELOW the books, SS 4.1 ABOVE, TD flat.
+     *
+     * Both are recomputed from the archive on every call rather than frozen as
+     * constants. That matters: MODEL v40 now trains against the line too, so the true
+     * bias shrinks event over event and this layer must shrink with it or it would
+     * over-correct. A stored constant would fight the learner.
+     *
+     * PrizePicks Fantasy is deliberately NOT special-cased. Its +19.2 offset is a
+     * different scoring basis (`Fantasy_PP`), and a per-book offset absorbs that on its
+     * own — the same reason v33 excludes PP from FP best-line comparisons.
+     */
+    static bookCalibration(predictionEvents, archiveRecords) {
+        const MIN_GRID_N = 20; // below this a modal fraction is noise, not a convention
+        const MIN_OFFSET_N = 15; // below this an offset is one bad event, not a bias
+        // ── grids ────────────────────────────────────────────────────────────────
+        const fracCount = new Map();
+        for (const r of archiveRecords) {
+            const book = String(r.platform || '').toLowerCase();
+            const prop = String(r.propType || '');
+            if (!book || !prop)
+                continue;
+            for (const v of [r.openLine, r.line]) {
+                const n = Number(v);
+                if (!Number.isFinite(n) || n <= 0)
+                    continue;
+                const frac = Math.round((n - Math.floor(n)) * 100) / 100;
+                const k = `${book}|${prop}`;
+                if (!fracCount.has(k))
+                    fracCount.set(k, new Map());
+                const m = fracCount.get(k);
+                m.set(frac, (m.get(frac) || 0) + 1);
+            }
+        }
+        const grids = {};
+        for (const [k, m] of fracCount) {
+            const total = [...m.values()].reduce((s, v) => s + v, 0);
+            if (total < MIN_GRID_N)
+                continue;
+            const [frac, n] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+            // Only treat it as a convention when the book is overwhelmingly consistent.
+            // FightTime is genuinely mixed (.50/.75/.25/.99) and must NOT be snapped.
+            if (n / total < 0.8)
+                continue;
+            const [book, prop] = k.split('|');
+            grids[book] = grids[book] || {};
+            grids[book][prop] = frac;
+        }
+        // ── offsets ──────────────────────────────────────────────────────────────
+        const bt = this.backtestVsPostedLines(predictionEvents, archiveRecords);
+        const offsets = {};
+        for (const [book, byStat] of Object.entries(bt.byBook)) {
+            for (const [stat, cell] of Object.entries(byStat)) {
+                if (!cell || cell.n < MIN_OFFSET_N || !Number.isFinite(cell.bias))
+                    continue;
+                offsets[book] = offsets[book] || {};
+                offsets[book][stat] = cell.bias;
+            }
+        }
+        const global = {};
+        for (const [stat, cell] of Object.entries(bt.byStat)) {
+            if (cell && cell.n >= MIN_OFFSET_N && Number.isFinite(cell.bias))
+                global[stat] = cell.bias;
+        }
+        return { grids, offsets, global, events: bt.events };
+    }
+    /** Snap to the nearest postable value on `frac`'s grid (63.7 -> 63.5 / 63.99 / 63.55). */
+    static snapToGrid(value, frac) {
+        if (!Number.isFinite(value))
+            return value;
+        return Math.round(value - frac) + frac;
+    }
+    /**
+     * The line THIS book is expected to post. Applies that book's measured offset when
+     * there is enough of it, else the all-book offset, then snaps to that book's grid.
+     */
+    static expectedLineAtBook(predicted, statLabel, propType, book, cal) {
+        if (!Number.isFinite(predicted))
+            return null;
+        const b = book.toLowerCase();
+        const off = cal.offsets[b]?.[statLabel] ?? cal.global[statLabel] ?? 0;
+        // bias is (predicted - posted), so the posted number is predicted MINUS the bias.
+        const corrected = predicted - off;
+        const frac = cal.grids[b]?.[propType];
+        return frac == null ? round1(corrected) : this.snapToGrid(corrected, frac);
+    }
+    /**
+     * Calibrate a whole prediction toward what books will post: de-bias on the
+     * shared-scoring consensus, then snap to the .5 grid that SS/TD use and that every
+     * book except Underdog/PrizePicks uses for FP.
+     *
+     * The headline number stays one number — per-book variants come from
+     * expectedLineAtBook — so this uses the ALL-BOOK offset rather than any single
+     * book's, and PrizePicks' scoring-basis gap cannot drag the headline with it.
+     */
+    static calibrateToBooks(pred, cal) {
+        const apply = (sp, statLabel) => {
+            if (!sp || !Number.isFinite(sp.line))
+                return sp;
+            const off = cal.global[statLabel] ?? 0;
+            if (!off && !Number.isFinite(off))
+                return sp;
+            const before = sp.line;
+            const snapped = this.snapToGrid(before - off, 0.5);
+            if (snapped === before)
+                return sp;
+            return {
+                ...sp,
+                line: snapped,
+                reasons: [
+                    ...(sp.reasons || []),
+                    `Book calibration: ${before.toFixed(1)} → ${snapped.toFixed(1)} (measured ${statLabel} offset ${off >= 0 ? '+' : ''}${off.toFixed(1)} over ${cal.events} events, snapped to the .5 grid books post on)`,
+                ],
+            };
+        };
+        return {
+            ...pred,
+            ss: apply(pred.ss, 'SS'),
+            td: apply(pred.td, 'TD'),
+            fantasy: apply(pred.fantasy, 'FP'),
+        };
+    }
     static async runLearningCycle(eventName, archiveRecords) {
         const predictions = await this.getPredictions();
         // Match ALL unsettled entries for this event — duplicates can occur when

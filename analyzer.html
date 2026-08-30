@@ -32293,6 +32293,16 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 }
 .plbt-bcell b { color: var(--text); }
 .plbt-bcell i { font-style: normal; color: var(--text-muted); }
+/* v41 · the fractional part this book posts on. Measured, and not uniform: SS/TD are
+   .50 everywhere but FP is .99 on Underdog and .55 on PrizePicks. */
+.plbt-grid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; color: var(--text-muted);
+  margin-left: auto; cursor: help;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
 
 /* ═══ GLOW-UP 344-353 · the two ledgers become navigable ══════════════════════
    The placed ledger renders 9 events / 149 legs and the parlay ledger 42 slips,
