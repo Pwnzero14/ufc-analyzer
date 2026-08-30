@@ -508,7 +508,27 @@ export const NAME_ALIASES = {
 //   basis, and a per-book offset absorbs it — the same reason v33 keeps PP out of FP
 //   best-line comparisons. The headline number uses the all-book offset so that gap
 //   cannot drag it.
-export const MODEL_VERSION = 41;
+// v42 (2026-08-30): the predictor forecasts ROUND-1 significant strikes.
+//   543 archived SS_R1 rows, every single one carrying an openLine, on a clean .50
+//   grid at DK / PrizePicks / Underdog — the best-labelled prop that was not being
+//   predicted. (CTRL is deliberately NOT added yet: it archives under TWO propTypes
+//   and only the 228 `ctrl` rows carry a line at all; the 5,780 `Control` rows are
+//   result-only backfill. Revisit once a few more cards accumulate lines.)
+//   predictSSR1 does NOT reuse predictSS. Round one is a fixed five minutes, so the
+//   v12 rate x expected-minutes apparatus and its v14/v15 corrections do not apply;
+//   the only duration term is early-finish risk INSIDE the round.
+//   Constants are FITTED. Walk-forward over 3,104 samples from 478 cached fighters
+//   (baseline from PRIOR fights only) shows the same regression to the mean the
+//   full-fight rate has: raw bucket bias runs -8.25 on low priors to +8.87 on high,
+//   a 17-point tilt. Shrinking toward the measured league mean 17.15 with K=10
+//   flattens every bucket to within 1.02 and takes MAE 9.47 -> 9.01. As with v15 the
+//   MAE gain is small; killing the tilt is the point, since it sits exactly where an
+//   OVER would be bet.
+//   R1 SS shares ss_pace_modifier and ss_trend (scaled by 0.57, the median R1 share
+//   of full-fight SS over 451 paired fighter-events) rather than fitting a second
+//   modifier on a fifth of the data. So it learns through the SS signal; its own
+//   accuracy is tracked separately in the Predictor vs Posted Lines panel.
+export const MODEL_VERSION = 42;
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */
 export const SS_PROJECTION_BIAS = 6;

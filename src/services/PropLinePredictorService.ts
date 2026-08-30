@@ -125,6 +125,23 @@ const LEAGUE_SS_RATE = 3.9;     // league-typical SS landed (and absorbed) per m
 // affecting fighters with no history at all. Worth revisiting together.)
 const SS_RATE_LEAGUE_MEAN = 4.55;
 
+// ── MODEL v42 — round-1 significant strikes ──────────────────────────────
+// Measured, not chosen. 3,930 R1 observations from the cached fighter logs (494
+// cached fighters, 99% of their fights carry sigStrR1) give a league mean of 17.15
+// R1 significant strikes. Kept as its own constant for the same reason
+// SS_RATE_LEAGUE_MEAN is separate from LEAGUE_SS_RATE: R1_SS_SHRINK_K was fitted
+// against THIS number and substituting another average would re-bias every
+// projection.
+const R1_SS_LEAGUE_MEAN = 17.15;
+// Phantom fights at the league mean. Swept K over 0..12 on 3,104 walk-forward
+// samples; K=10 minimised MAE (9.47 -> 9.01) while flattening the worst bucket bias
+// from 8.87 to 1.02. See predictSSR1 for the full bucket table.
+const R1_SS_SHRINK_K = 10;
+// A full-fight trend is a full-fight quantity. Median R1 SS is 0.565 of full-fight SS
+// across 451 paired fighter-events, so the trend is scaled before it is applied to a
+// single round — applying it whole would count it nearly twice.
+const R1_SS_TREND_SHARE = 0.57;
+
 // ── MODEL v27 — FP regression to the mean ────────────────────────────────
 // Mean Betr FP across the walk-forward population (1,307 fights / 272 fighters
 // in the cached histories). Measured, and deliberately its own constant for the
@@ -680,6 +697,105 @@ export class PropLinePredictorService {
 
   // ── TD Prediction ───────────────────────────────────────────────────
 
+  /**
+   * MODEL v42 — round-1 significant strikes.
+   *
+   * R1 is structurally EASIER than full-fight SS and deliberately does not reuse
+   * predictSS's machinery: round one is a fixed five minutes, so there is no duration
+   * multiplier to get wrong — the whole v12 "rate × expected minutes" apparatus, and
+   * the v14/v15 corrections that had to be bolted onto it, simply do not apply. The
+   * only duration term is early-finish risk INSIDE round one.
+   *
+   * Constants are fitted, not chosen. Walk-forward over 3,104 samples from 478 cached
+   * fighters (baseline rebuilt from PRIOR fights only, compared to that fight's actual
+   * R1 SS) shows the same regression to the mean the full-fight rate has:
+   *     prior  0-8   n=111  mean err -8.25   <- LOW priors UNDER-predicted
+   *     prior  8-13  n=631  mean err -2.61
+   *     prior 13-18  n=986  mean err -0.55
+   *     prior 18-24  n=950  mean err +1.28
+   *     prior 24+    n=426  mean err +8.87   <- HIGH priors OVER-predicted
+   * A 17-point tilt across the range. Empirical-Bayes shrinkage toward the measured
+   * league mean flattens every bucket to within ±1.02 and takes MAE 9.47 -> 9.01. As
+   * with v15 the MAE gain is small; removing the systematic tilt is the point, because
+   * the tilt sits exactly where an OVER would be bet.
+   */
+  static predictSSR1(
+    fighterDB: FighterDB,
+    opponentDB: FighterDB | null,
+    scheduledRounds: number,
+    weights: PredictorWeights,
+    trend: FighterTrend | null,
+    weightClass?: WeightClass | null,
+    marketExpectedMin?: number | null,
+  ): StatPrediction {
+    const reasons: string[] = [];
+    const r1Of = (h: { sigStrR1?: number | null } | undefined): number | null => {
+      const v = Number(h?.sigStrR1);
+      return Number.isFinite(v) && v >= 0 ? v : null;
+    };
+
+    const own = (fighterDB.history || []).map(r1Of).filter((v): v is number => v != null);
+    const priorN = own.length;
+    const rawPrior = priorN ? own.reduce((s, v) => s + v, 0) / priorN : R1_SS_LEAGUE_MEAN;
+
+    // Empirical Bayes in "phantom fights at the league mean" — shrinks proportionally,
+    // cannot overshoot, and handles sample size natively: a debut is pulled all the way
+    // to the mean, a twelve-fight veteran barely moves.
+    let predicted = (rawPrior * priorN + R1_SS_LEAGUE_MEAN * R1_SS_SHRINK_K) / (priorN + R1_SS_SHRINK_K);
+    if (priorN) {
+      reasons.push(`R1 SS prior ${rawPrior.toFixed(1)} over ${priorN} fight${priorN === 1 ? '' : 's'} → ${predicted.toFixed(1)} (shrunk toward league ${R1_SS_LEAGUE_MEAN}, K=${R1_SS_SHRINK_K})`);
+    } else {
+      reasons.push(`No R1 history — league mean ${R1_SS_LEAGUE_MEAN}`);
+    }
+
+    // What the opponent ALLOWS in round one. Same 50/50 blend the full-fight SS lean
+    // uses, and only when there is enough of it to mean anything.
+    const oppAllowed = (opponentDB?.oppHistory || []).map(r1Of).filter((v): v is number => v != null);
+    if (oppAllowed.length >= 3) {
+      const oppAvg = oppAllowed.reduce((s, v) => s + v, 0) / oppAllowed.length;
+      const before = predicted;
+      predicted = 0.5 * predicted + 0.5 * oppAvg;
+      reasons.push(`Opponent allows ${oppAvg.toFixed(1)} R1 SS over ${oppAllowed.length} fights → ${before.toFixed(1)}→${predicted.toFixed(1)}`);
+    }
+
+    // Early-finish risk, the ONLY duration term round one has. A fight the market
+    // prices to end inside five minutes cannot bank a full round of striking; one
+    // priced for fifteen banks the whole round either way, so this is one-sided.
+    if (marketExpectedMin != null && Number.isFinite(marketExpectedMin) && marketExpectedMin > 0 && marketExpectedMin < 5) {
+      const scale = clamp(marketExpectedMin / 5, 0.45, 1);
+      const before = predicted;
+      predicted *= scale;
+      reasons.push(`Market prices ~${marketExpectedMin.toFixed(1)}m total — round one may not finish (×${scale.toFixed(2)}) → ${before.toFixed(1)}→${predicted.toFixed(1)}`);
+    }
+
+    // Per-class pace modifier is shared with full-fight SS on purpose: a division that
+    // strikes at a high rate does so in round one too, and a separate R1 modifier would
+    // be fitted on a fifth of the samples for the same underlying effect.
+    const paceMod = getMod(weights.ss_pace_modifier, weightClass);
+    if (paceMod !== 1) {
+      predicted *= paceMod;
+      reasons.push(`${weightClass ?? 'default'} pace ×${paceMod.toFixed(2)}`);
+    }
+    if (trend && Number.isFinite(trend.ss_trend) && trend.ss_trend !== 0) {
+      // Full-fight trend, scaled to a round. Median R1 is ~0.57 of full-fight SS
+      // (451 paired fighter-events), so a full-fight trend applied whole would be
+      // nearly double-counted here.
+      const step = clamp(trend.ss_trend * R1_SS_TREND_SHARE, -6, 6);
+      predicted += step;
+      reasons.push(`Fighter trend ${step >= 0 ? '+' : ''}${step.toFixed(1)} (SS trend × ${R1_SS_TREND_SHARE})`);
+    }
+
+    const line = round1(clamp(predicted, 1, 55));
+    const conf = clamp(
+      // Sample size drives it; R1 output is noisier than a full fight, so the ceiling
+      // is lower than the full-fight SS cap by design.
+      38 + Math.min(priorN, 10) * 3.2 + (oppAllowed.length >= 3 ? 6 : 0),
+      35, 82,
+    );
+    const lean = predicted > rawPrior ? 'over' : 'under';
+    return { line, lean, confidence: Math.round(conf), reasons, sampleSize: priorN };
+  }
+
   static predictTD(
     fighterDB: FighterDB,
     opponentDB: FighterDB | null,
@@ -1046,8 +1162,9 @@ export class PropLinePredictorService {
     const ss = this.predictSS(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, marketFtMin, marketExpectedMin);
     const td = this.predictTD(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass);
     const fantasy = this.predictFantasy(fighterDB, opponentDB, scheduledRounds, weights, trend, ss.line, td.line, weightClass, bookPriorFP);
+    const ss_r1 = this.predictSSR1(fighterDB, opponentDB, scheduledRounds, weights, trend, weightClass, marketExpectedMin);
 
-    return { fighter, opponent, scheduledRounds, modelVersion: MODEL_VERSION, weightClass: weightClass ?? undefined, ss, td, fantasy };
+    return { fighter, opponent, scheduledRounds, modelVersion: MODEL_VERSION, weightClass: weightClass ?? undefined, ss, td, fantasy, ss_r1 };
   }
 
   // ── Learning Cycle ──────────────────────────────────────────────────
@@ -1098,10 +1215,13 @@ export class PropLinePredictorService {
     predictionEvents: PredictionEvent[],
     archiveRecords: PropArchiveRecord[],
   ): PredictorLineBacktest {
-    const PROPS: Array<{ stat: 'ss' | 'td' | 'fp'; label: string; types: string[] }> = [
+    const PROPS: Array<{ stat: 'ss' | 'td' | 'fp' | 'ss_r1'; label: string; types: string[] }> = [
       { stat: 'ss', label: 'SS', types: ['SS'] },
       { stat: 'td', label: 'TD', types: ['TD'] },
       { stat: 'fp', label: 'FP', types: ['Fantasy', 'FP', 'Fantasy_PP'] },
+      // MODEL v42 — 543 archived rows, every one carrying an openLine, on a clean
+      // .50 grid at DK / PrizePicks / Underdog.
+      { stat: 'ss_r1', label: 'R1 SS', types: ['SS_R1'] },
     ];
     const mkCell = (): BacktestCell => ({ n: 0, absSum: 0, sgnSum: 0, mae: 0, bias: 0 });
     const seal = (c: BacktestCell): BacktestCell => {
@@ -1122,7 +1242,10 @@ export class PropLinePredictorService {
       events++;
       for (const pred of ev.predictions) {
         for (const p of PROPS) {
-          const predicted = p.stat === 'ss' ? pred.ss.line : p.stat === 'td' ? pred.td.line : pred.fantasy.line;
+          const predicted = p.stat === 'ss' ? pred.ss.line
+            : p.stat === 'td' ? pred.td.line
+            : p.stat === 'ss_r1' ? (pred.ss_r1 ? pred.ss_r1.line : NaN)
+            : pred.fantasy.line;
           if (!Number.isFinite(predicted)) continue;
           const fkey = normName(pred.fighter);
           const rows = evRows.filter(r => normName(r.fighter) === fkey && p.types.includes(String(r.propType)));
@@ -1295,6 +1418,7 @@ export class PropLinePredictorService {
       ss: apply(pred.ss, 'SS'),
       td: apply(pred.td, 'TD'),
       fantasy: apply(pred.fantasy, 'FP'),
+      ss_r1: pred.ss_r1 ? apply(pred.ss_r1, 'R1 SS') : undefined,
     };
   }
 
