@@ -1,13 +1,13 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-29 19:09:36 -04:00
+Last Saved: 2026-08-30 17:49:38 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 53d7560
+HEAD: b53ab99
 
 ## Last Notes
-SESSION HANDOFF (2026-08-29, ~19:15). Tree clean. MODEL_VERSION 39.
-Pushed: feature/sleek-theme-v1 53d7560, master d8d0e82 (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-30, ~18:00). Tree clean. MODEL_VERSION 42.
+Pushed: feature/sleek-theme-v1 b53ab99, master 76f04a7 (cherry-picked; full parity verified).
 
 BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
 finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
@@ -22,6 +22,9 @@ vs. Parnasse"; props have NOT dropped.
 4. MODEL v38 (9eba89b) SS +/-0.5 tier collapsed to a push.
 5. MODEL v39 (d5e79b5) SS hit-rate term duration-normalised.
 6. GLOW-UP 344-353 (765cf38) the two ledgers become navigable; 348 reverted (53d7560).
+7. MODEL v40 (bb3d7ab) predictor learns against the POSTED LINE, not results.
+8. MODEL v41 (65c7f4f) predictions de-biased + snapped to the grid books post on.
+9. MODEL v42 (b53ab99) R1 SS is now a predicted prop.
 
 === MODEL v37 (13f827b) - SS MARKET ANCHOR ===
 THE MEASUREMENT (149 settled SS picks from the snapshot store, 2026-08-29):
@@ -157,6 +160,107 @@ chrome.storage.local.get('ai_lean_snapshots_v1', (r) => {
 GATE 3 (badge moves off 0/N) is AFTER PARIS SETTLES - calibration and grading only count picks from PAST
   events with archive rows. A stuck 0/N all through fight week is EXPECTED, not a failure.
 
+=== PROP LINE PREDICTOR OVERHAUL (v40 / v41 / v42) - 2026-08-30 ===
+All three USER-VERIFIED BY SCREENSHOT after reload + Generate Predictions.
+Board now reads MODEL v42, shows an R1 SS column, and every FP row carries its
+"Book calibration: X -> Y" reason.
+
+--- v40 (bb3d7ab) THE PREDICTOR WAS TRAINED ON THE WRONG TARGET ---
+runLearningCycle computed its gradient from `result` - the stat the fighter went on to
+produce - while what this predictor OUTPUTS is a LINE. Measured: over 149 settled SS
+props the posted line sat 0.29 from the eventual result on average but with MAE 25.90,
+so training on outcomes spent the whole gradient chasing ~26 points of variance no book
+is trying to price. The v13 tuning comment citing MAE 7.9 gave it away - that is only
+reachable against a line. Tuned on one target, learned on the other.
+FIX: effectiveDelta = predicted - median OPENING line where archived; fallback chain
+open -> close -> old RLM-blended result -> raw result. The relative-error DENOMINATOR
+moved to the same scale (marketTarget) - left on `actual` it would divide a line-scale
+numerator by a result-scale magnitude, worst on TD where result 0 vs line 0.5 is routine.
+NEW: backtestVsPostedLines() + "Predictor vs Posted Lines" panel (its own sub-nav item
+under OTHER). Archive-driven, needs NO live card.
+
+*** THE MEASUREMENT THAT JUSTIFIES IT (10 events, 558 props) ***
+            vs POSTED LINE       vs RESULT (old metric)    n
+    SS      MAE 12.6  bias +4.1        29.7               227
+    TD      MAE  0.5  bias -0.0         1.1               121
+    FP      MAE 17.8  bias -7.8        37.2               210
+The line target is ~2.4x more learnable on EVERY stat.
+Per book (MAE / bias): Betr SS 9.9 +0.5 | Pick6 SS 11.4 +1.9 | PrizePicks SS 13.0 +4.6
+  | Underdog SS 13.0 +5.8 | DK SS 14.4 +3.5. Best-matched book on SS is Betr, worst DK.
+CAVEAT: per-fighter trends were EWMA'd on the OLD target and are on the wrong scale.
+Deliberately NOT reset - alpha >= 0.10 washes them out over ~7-10 events - but read
+early post-v40 trend values with that in mind.
+
+--- v41 (65c7f4f) CALIBRATE TO WHAT BOOKS ACTUALLY POST ---
+Suggestions 3 + 5, one layer. BOTH facts MEASURED from the 39.9k-row archive, and both
+would have been got wrong by eye:
+ GRID - every book posts SS, TD and R1 SS on .50, but FANTASY is book-specific:
+   Betr/Pick6 .50, UNDERDOG .99 (366/366 rows), PRIZEPICKS .55 (100%). 63.7 is not
+   postable anywhere; it rounds to 63.5 / 63.99 / 63.55 by book. FightTime is genuinely
+   mixed (.50/.75/.25/.99) so the 80%-consistency gate REFUSES to snap it.
+ OFFSET - the correctable half of the error. FP ran 7.8 BELOW books, SS 4.1 ABOVE.
+Both RECOMPUTED from the archive every generation, never frozen. That is load-bearing:
+v40 now trains against the line too, so true bias shrinks event over event and this layer
+shrinks with it. A stored constant would fight the learner and over-correct.
+Applied BEFORE the save, so the stored prediction IS the calibrated one - Best Picks, EV
+and parlay maths read one number instead of re-deriving it.
+PrizePicks FP +19.2 is NOT a model error: Fantasy_PP is a different scoring basis, and a
+per-book offset absorbs it. Same reason v33 keeps PP out of FP best-line. The headline
+number uses the ALL-BOOK offset so that gap cannot drag it.
+VERIFIED ON SCREEN: FP rows show "Book calibration: 63.0 -> 70.5", "85.0 -> 92.5",
+"42.5 -> 50.5" etc (all ~+7.5-8.0); Hooker SS 52 -> 48.5. Every posted value ends .5.
+
+--- v42 (b53ab99) R1 SS IS PREDICTED ---
+Best-labelled prop that was not being predicted: 543 SS_R1 archive rows, EVERY one
+carrying an openLine, .50 grid at DK / PrizePicks / Underdog.
+predictSSR1 deliberately does NOT reuse predictSS. Round one is a FIXED five minutes, so
+the v12 rate x expected-minutes apparatus and its v14/v15 corrections do not apply. The
+only duration term is early-finish risk INSIDE the round, and it is one-sided.
+CONSTANTS FITTED, not chosen. Walk-forward 3,104 samples / 478 cached fighters (baseline
+from PRIOR fights only):
+    prior  0-8   n=111  mean err -8.25   <- LOW priors UNDER-predicted
+    prior  8-13  n=631  mean err -2.61
+    prior 13-18  n=986  mean err -0.55
+    prior 18-24  n=950  mean err +1.28
+    prior 24+    n=426  mean err +8.87   <- HIGH priors OVER-predicted
+A 17-point tilt. Empirical Bayes toward the MEASURED league mean 17.15 with K=10 (swept
+0..12) flattens every bucket to within 1.02; MAE 9.47 -> 9.01. Same as v15: the MAE gain
+is small, killing the tilt is the point, because the tilt sits where an OVER gets bet.
+R1 SS SHARES ss_pace_modifier and ss_trend (trend x 0.57, the median R1 share of
+full-fight SS over 451 paired fighter-events) rather than fitting a second modifier on a
+fifth of the data. So it learns THROUGH the SS signal; its own accuracy is tracked in the
+Predictor vs Posted Lines panel, not by a separate gradient.
+GRID DISCIPLINE: the row went 6 children -> 7, so ALL FOUR track declarations moved
+together (.pred-row and .pred-head, base AND the 1100px breakpoint). That is the 347 bug's
+exact shape. Verified live: 1280px -> 7 kids / 7 tracks / 1 grid row / zero header-to-cell
+offset; 1050px -> 7 kids / 6 tracks with the factors rail correctly spanning 1 / -1.
+
+*** WHERE THE PREDICTOR DATA LIVES (saves a re-derivation) ***
+- The cached fighter log key is `fightHistory`, NOT `history` (FighterDB uses `history`;
+  the ufcstats_v49_* CACHE uses fightHistory). Getting this wrong reports 0% coverage.
+  494 cached fighters, 4,022 fighter-fight rows, 99% carry sigStrR1.
+- 4,022 is fighter-fight PAIRS, not events: one fight appears twice when both corners are
+  cached. 3,930 belong to fighters with >=2 fights; 3,104 are usable walk-forward samples
+  (the first two fights of each log have no prior).
+- Measure this stuff with NODE against the newest ~/Downloads/ufc-storage-backup-*.json.
+  No browser, no harness churn. Scripts used are in the session scratchpad pattern:
+  read the backup, take payload.storage ?? payload, then prop_archive_v1 / ufcstats_v*.
+
+*** SUGGESTIONS STILL OPEN ***
+- #2 BOOK PRIOR / MARKET ANCHOR FOR SS AND TD. computeBookPriorFP + applyMarketAnchor are
+  FP-ONLY. SS and TD have nothing tying them to how books price those fighters, which is
+  likely why FP tracks books better. Historical prior is archive-only (buildable now);
+  the live-anchor half needs posted lines for the card.
+- #4 THE NO-HISTORY MIRROR. Still visible on this card: Michael Aljarouj and Fabia Sintes
+  render IDENTICAL rows (SS 47.5, R1 SS 22.5, TD 0.5, FP 73.5, conf 53%) because when
+  NEITHER fighter has history each one's "opponent allows" is also the league default, so
+  the model emits a perfect mirror. Books never do that - they differentiate on moneyline,
+  weight class and non-UFC record. Moneyline and weight class are already available.
+- CTRL AS A PREDICTED PROP - deferred BY AGREEMENT until more cards accumulate lines.
+  It archives under TWO propTypes: `Control` 5,780 rows with **0** openLine (result-only
+  backfill) and `ctrl` 228 rows all carrying a line. Only ~228 labelled rows today, so it
+  would ship with wide error bars. Revisit after 2-3 more cards.
+
 === GLOW-UP 344-353 (765cf38) + FIX (53d7560) - THE TWO LEDGERS ===
 USER-VERIFIED BY SCREENSHOT after an extension reload. Placed ledger = 9 events / 149 legs, parlay
 ledger = 42 slips, previously one uninterrupted column.
@@ -271,7 +375,7 @@ displayedConfidence. Must be RE-READ once gate 3 gives real coverage.
   together over-corrected - answer only after Paris settles.
 
 === NEXT CARD: UFC PARIS (Hooker vs. Parnasse) ===
-- Predictions were generated on MODEL v34 and are now FIVE versions behind. REGENERATE UNDER v39.
+- Predictions were generated on MODEL v34 and were regenerated under v42 on 2026-08-30. REGENERATE UNDER v42 (done 2026-08-30 18:00; board reads v42).
 - Salahdine Parnasse shows NO HISTORY on a 5R main event.
 - MICHAEL PAGE vs Nursulton Ruziboev: the model has Ruziboev at 13.5 SS. That is the user's recorded
   MVP-opponents-go-SS-UNDER edge AGREEING, not an outlier to fade. The v37 anchor shifts projections
