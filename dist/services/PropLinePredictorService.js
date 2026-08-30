@@ -361,6 +361,115 @@ export class PropLinePredictorService {
             ],
         };
     }
+    /**
+     * SUGGESTION 2 — the book prior, generalised off FP.
+     *
+     * computeBookPriorFP has existed since v22 and is FP-ONLY: SS and TD had nothing
+     * tying them to how books have historically priced THIS fighter, which is the most
+     * likely reason FP tracks the market better than SS does (FP MAE 17.8 on lines
+     * averaging ~85 is proportionally far better than SS 12.6 on ~43).
+     *
+     * Same shape as the FP version: median of that fighter's posted lines inside the
+     * recency window, needing MIN_BOOK_SAMPLES before it is allowed to say anything.
+     * `books` is optional and only FP needs it — fantasy scoring differs by rulebook, so
+     * PrizePicks has to stay out of an FP median; SS and TD are the same quantity
+     * everywhere and take every book.
+     */
+    static computeBookPrior(archive, fighter, propTypes, books) {
+        const MIN_BOOK_SAMPLES = 5;
+        const RECENCY_DAYS = 730;
+        const cutoff = Date.now() - RECENCY_DAYS * 86400 * 1000;
+        const key = normName(fighter);
+        const lines = [];
+        for (const r of archive) {
+            if (normName(r.fighter) !== key)
+                continue;
+            if (books && (!r.platform || !books.has(r.platform)))
+                continue;
+            if (!propTypes.includes(String(r.propType)))
+                continue;
+            const lineVal = Number(r.line);
+            if (!Number.isFinite(lineVal) || lineVal <= 0)
+                continue;
+            const recordTs = Date.parse(r.date);
+            if (Number.isFinite(recordTs) && recordTs < cutoff)
+                continue;
+            lines.push(lineVal);
+        }
+        if (lines.length < MIN_BOOK_SAMPLES)
+            return null;
+        lines.sort((a, b) => a - b);
+        const median = lines.length % 2 === 0
+            ? (lines[lines.length / 2 - 1] + lines[lines.length / 2]) / 2
+            : lines[(lines.length - 1) / 2];
+        return { median, sampleCount: lines.length };
+    }
+    /**
+     * Blend a fighter's own historical book prior into a projection. Same weight curve
+     * predictFantasy already uses for FP: 0.10 + 0.02 per sample, capped 0.20-0.35, so a
+     * thin prior nudges and a deep one pulls without ever dominating the model.
+     */
+    static applyBookPrior(sp, prior, label) {
+        if (!sp || !prior || prior.sampleCount < 5 || !Number.isFinite(sp.line))
+            return sp;
+        const w = clamp(0.10 + prior.sampleCount * 0.02, 0.20, 0.35);
+        const before = sp.line;
+        const blended = round1((1 - w) * before + w * prior.median);
+        if (blended === before)
+            return sp;
+        return {
+            ...sp,
+            line: blended,
+            reasons: [...sp.reasons, `Book prior: books have posted this fighter's ${label} at a median ${prior.median.toFixed(1)} over ${prior.sampleCount} lines (w=${w.toFixed(2)}) → ${before.toFixed(1)}→${blended.toFixed(1)}`],
+        };
+    }
+    static applyMarketAnchorFor(sp, postedLine, shift, label, minCap) {
+        if (!sp || postedLine == null || !Number.isFinite(postedLine) || postedLine <= 0)
+            return sp;
+        if (!Number.isFinite(sp.line) || !Number.isFinite(shift))
+            return sp;
+        const fair = postedLine + shift;
+        const cap = Math.max(minCap, this.ANCHOR_GAP_FRACTION * fair);
+        const gap = sp.line - fair;
+        if (Math.abs(gap) <= cap)
+            return sp;
+        const anchored = round1(fair + Math.sign(gap) * cap);
+        return {
+            ...sp,
+            line: anchored,
+            anchoredFrom: sp.line,
+            reasons: [...sp.reasons, `Anchored to market: model said ${sp.line.toFixed(1)} for ${label}, ${Math.abs(gap).toFixed(1)} from the fair line ${fair.toFixed(1)} — capped at ${cap.toFixed(1)}`],
+        };
+    }
+    static applyDebutMoneylineSplit(pred, moneyline, hasHistory) {
+        const ml = Number(moneyline);
+        if (hasHistory || !Number.isFinite(ml) || ml === 0)
+            return pred;
+        const side = ml < 0 ? 1 : -1; // negative American price = favourite
+        const role = ml < 0 ? 'favourite' : 'underdog';
+        const bump = (sp, key, floor) => {
+            if (!sp || !Number.isFinite(sp.line))
+                return sp;
+            const half = (this.DEBUT_ML_GAP[key] ?? 0) / 2;
+            if (!half)
+                return sp;
+            const before = sp.line;
+            const after = round1(Math.max(floor, before + side * half));
+            if (after === before)
+                return sp;
+            return {
+                ...sp,
+                line: after,
+                reasons: [...sp.reasons, `No history — separated from opponent on price: ${role} at ${ml > 0 ? '+' : ''}${ml}, and books post ${role}s ${side > 0 ? 'above' : 'below'} by ~${(half * 2).toFixed(1)} on this prop (half applied) → ${before.toFixed(1)}→${after.toFixed(1)}`],
+            };
+        };
+        return {
+            ...pred,
+            ss: bump(pred.ss, 'ss', 1),
+            fantasy: bump(pred.fantasy, 'fp', 5),
+            ss_r1: bump(pred.ss_r1, 'ss_r1', 1),
+        };
+    }
     static computeBookPriorFP(archive, fighter) {
         const MIN_BOOK_SAMPLES = 5;
         const RECENCY_DAYS = 730;
@@ -1491,4 +1600,43 @@ export class PropLinePredictorService {
  * confirmed on a v31 board, and cannot be until one settles.
  */
 PropLinePredictorService.FP_GAP_CAP = 15;
+/**
+ * Market anchor for SS / R1 SS / TD. FP keeps applyMarketAnchor and its absolute
+ * FP_GAP_CAP of 15; these props span wildly different magnitudes (TD lines average
+ * 1.3, SS 43) so one absolute cap cannot serve them. The cap is a FRACTION of the
+ * fair line instead — 0.18, which is what FP's 15 already is against its ~85 average,
+ * so the three stay on one rule rather than three hand-picked numbers.
+ *
+ * `shift` is the measured per-stat offset from bookCalibration, so "fair" means the
+ * posted line adjusted by how this model is known to sit against books.
+ */
+PropLinePredictorService.ANCHOR_GAP_FRACTION = 0.18;
+/**
+ * SUGGESTION 4 — two debutants in one fight were rendering IDENTICAL rows.
+ *
+ * With no history, a fighter's projection is the league prior; and because the
+ * opponent has no history either, the "opponent allows" term is ALSO the league
+ * default. Both sides of a debut-vs-debut fight therefore came out byte-identical —
+ * Michael Aljarouj and Fabia Sintes both at SS 47.5 / R1 SS 22.5 / TD 0.5 / FP 73.5
+ * / conf 53%. Books never do that; they separate the two on price.
+ *
+ * Moneyline is the one differentiator available with zero fight history, and it is a
+ * real one. Measured on POSTED OPENING LINES (the thing v40 predicts), favourites are
+ * priced above underdogs by:
+ *     SS +13.4 (n=266)   FP +16.0 (n=94)   R1 SS +4.7 (n=77)   TD +0.2 (n=75)
+ * Deliberately measured on lines, not results: on RESULTS the same split reads +24.2
+ * SS, but favourites win more and winners fight longer, so the outcome gap is roughly
+ * double what books actually price. Using the results number would over-separate.
+ *
+ * Applied as HALF the gap to each side so the pair's midpoint stays on the league
+ * prior — this separates two debutants without moving the level of the fight — and
+ * ONLY when the fighter has no history, since a fighter with a record already encodes
+ * their level and would be double-counted.
+ */
+// TD is deliberately ABSENT. Its measured favourite-underdog gap is 0.2, which is
+// SMALLER than the 0.5 grid TD lines are posted on — a ±0.1 nudge on a prop that only
+// takes 0.5 / 1.5 / 2.5 cannot express itself, and the floor at 0.5 then breaks the
+// midpoint symmetry the other three keep (replayed: fav 0.6 / dog 0.5, midpoint 0.6
+// against a 0.5 base). A gap under the grid resolution is not a signal you can post.
+PropLinePredictorService.DEBUT_ML_GAP = { ss: 13.4, ss_r1: 4.7, fp: 16.0 };
 //# sourceMappingURL=PropLinePredictorService.js.map

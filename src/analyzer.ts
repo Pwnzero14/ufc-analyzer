@@ -14450,6 +14450,12 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
   // shading. Same accessor shape as marketFt below, and the same getSourceActiveLine
   // the board's book chip reads, so the number capped against is the number shown.
   const fpShift = PropLinePredictorService.computeMarketFpShift(propArchive).shift;
+  // v43: computed ONCE, before the pair loop, because the SS/TD market anchors need its
+  // measured per-stat offset to know what "fair" means — the same table the v41
+  // calibration pass below re-uses.
+  let bookCal: BookCalibration | null = null;
+  try { bookCal = PropLinePredictorService.bookCalibration(await PropLinePredictorService.getPredictions(), propArchive); }
+  catch { bookCal = null; }
   const postedFp = (name: string): number | null => {
     const entry = allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(name) || ''));
     return entry ? getSourceActiveLine(entry, 'fp') : null;
@@ -14488,10 +14494,10 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
     // the career-based estimate, so it's inert until those markets post.
     const mktMin = (name: string): number | null =>
       marketExpectedFightMinutesDirect(name, rounds) ?? marketExpectedFightMinutesFromLadder(name, rounds);
-    const p1 = PropLinePredictorService.predictFighter(
+    let p1 = PropLinePredictorService.predictFighter(
       pair.f1, pair.f2, f1DB, f2DB, rounds, weights, f1Trend, pair.weightClass, f1Book, marketFt(pair.f1), mktMin(pair.f1),
     );
-    const p2 = PropLinePredictorService.predictFighter(
+    let p2 = PropLinePredictorService.predictFighter(
       pair.f2, pair.f1, f2DB, f1DB, rounds, weights, f2Trend, pair.weightClass, f2Book, marketFt(pair.f2), mktMin(pair.f2),
     );
     // MODEL v31: pull the fantasy number toward the fair line before it is stored.
@@ -14501,6 +14507,30 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
     // would leave the manufactured edge running underneath it.
     p1.fantasy = PropLinePredictorService.applyMarketAnchor(p1.fantasy, postedFp(pair.f1), fpShift);
     p2.fantasy = PropLinePredictorService.applyMarketAnchor(p2.fantasy, postedFp(pair.f2), fpShift);
+
+    // ── MODEL v43 · SUGGESTION 2 — SS and TD get what FP has had since v22 ────────
+    // The book prior (how books have priced THIS fighter historically) and the market
+    // anchor (a cap on disagreement with the line actually posted) were FP-only. SS and
+    // TD had nothing tying them to the market at all, which is the likeliest reason FP
+    // tracks books better. Both stats take every book — unlike FP, SS and TD mean the
+    // same thing on every platform, so no rulebook exclusion is needed.
+    const anchorShift = (stat: string): number => -(bookCal?.global?.[stat] ?? 0);
+    for (const [p, name] of [[p1, pair.f1], [p2, pair.f2]] as Array<[PropPrediction, string]>) {
+      const entry = allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(name) || ''));
+      p.ss = PropLinePredictorService.applyBookPrior(p.ss, PropLinePredictorService.computeBookPrior(propArchive, name, ['SS']), 'SS');
+      p.td = PropLinePredictorService.applyBookPrior(p.td, PropLinePredictorService.computeBookPrior(propArchive, name, ['TD']), 'TD');
+      if (p.ss_r1) p.ss_r1 = PropLinePredictorService.applyBookPrior(p.ss_r1, PropLinePredictorService.computeBookPrior(propArchive, name, ['SS_R1']), 'R1 SS');
+      p.ss = PropLinePredictorService.applyMarketAnchorFor(p.ss, entry ? getSourceActiveLine(entry, 'ss') : null, anchorShift('SS'), 'SS', 6);
+      p.td = PropLinePredictorService.applyMarketAnchorFor(p.td, entry ? getSourceActiveLine(entry, 'td') : null, anchorShift('TD'), 'TD', 0.5);
+      if (p.ss_r1) p.ss_r1 = PropLinePredictorService.applyMarketAnchorFor(p.ss_r1, entry ? getSourceActiveLine(entry, 'ss_r1') : null, anchorShift('R1 SS'), 'R1 SS', 3);
+    }
+
+    // ── MODEL v43 · SUGGESTION 4 — debut-vs-debut fights were perfect mirrors ─────
+    // Applied LAST so it separates the final numbers rather than being washed out by
+    // the anchor above. Only fires when the fighter has no history at all.
+    p1 = PropLinePredictorService.applyDebutMoneylineSplit(p1, resolveMoneylineFromMap(pair.f1), !!(f1DB?.history?.length));
+    p2 = PropLinePredictorService.applyDebutMoneylineSplit(p2, resolveMoneylineFromMap(pair.f2), !!(f2DB?.history?.length));
+
     predictions.push(p1, p2);
   }
 
@@ -14514,14 +14544,12 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
   // against the line as well, so the true bias shrinks event over event and this
   // correction shrinks with it. A hard-coded constant would fight the learner.
   try {
-    const priorPreds = await PropLinePredictorService.getPredictions();
-    const cal = PropLinePredictorService.bookCalibration(priorPreds, propArchive);
-    if (cal.events >= 3) {
+    if (bookCal && bookCal.events >= 3) {
       for (let i = 0; i < predictions.length; i++) {
-        predictions[i] = PropLinePredictorService.calibrateToBooks(predictions[i], cal);
+        predictions[i] = PropLinePredictorService.calibrateToBooks(predictions[i], bookCal);
       }
-      debugLog(`Book calibration applied over ${cal.events} events: ` +
-        `SS ${(cal.global.SS ?? 0).toFixed(1)}, TD ${(cal.global.TD ?? 0).toFixed(1)}, FP ${(cal.global.FP ?? 0).toFixed(1)}`);
+      debugLog(`Book calibration applied over ${bookCal.events} events: ` +
+        `SS ${(bookCal.global.SS ?? 0).toFixed(1)}, TD ${(bookCal.global.TD ?? 0).toFixed(1)}, FP ${(bookCal.global.FP ?? 0).toFixed(1)}`);
     }
   } catch (e) {
     debugLog('Book calibration skipped: ' + String(e));
