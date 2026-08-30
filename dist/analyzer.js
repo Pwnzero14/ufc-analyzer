@@ -14180,7 +14180,7 @@ async function generatePredictions(container) {
     showToast(`✓ ${predictions.length} predictions generated for ${eventName}`);
     void renderArchivePanel(container);
 }
-function renderPredictionsHtml(cSec) {
+function renderPredictionsHtml(archiveRows, cSec) {
     const preds = _cachedPredictions ?? [];
     const log = _cachedLearningLog ?? [];
     // Find latest prediction event
@@ -14902,7 +14902,55 @@ function renderPredictionsHtml(cSec) {
         }
     }
     const learnCount = latestLearn ? `${latestLearn.event}` : '';
+    // ── MODEL v40 · scored against what books POSTED ────────────────────────────
+    // The panel above measures predicted-vs-RESULT, which is a noisier question than the
+    // one this predictor exists to answer. This scores every stored prediction against the
+    // median OPENING line archived for that fighter, and prints the old metric beside it so
+    // the two are directly comparable. Archive-driven — no live card needed.
+    const lineBt = (() => {
+        let bt;
+        try {
+            bt = PropLinePredictorService.backtestVsPostedLines(preds, archiveRows);
+        }
+        catch {
+            return '';
+        }
+        const totalN = Object.values(bt.byStat).reduce((s, c) => s + c.n, 0);
+        if (!totalN) {
+            return `<div class="inline-empty-msg" style="font-size:10px">No scored props yet — needs a past event whose opening lines were archived alongside stored predictions.</div>`;
+        }
+        const f = (v, d = 1) => Number.isFinite(v) ? v.toFixed(d) : '—';
+        const cell = (label, c, vs) => {
+            if (!c.n)
+                return '';
+            // Positive bias = the model lines HIGHER than the books do.
+            const sign = c.bias >= 0 ? '+' : '';
+            return `<div class="plbt-card">
+        <div class="plbt-stat">${label}</div>
+        <div class="plbt-mae" title="Mean absolute error against the median OPENING line across books, over ${c.n} props. This is the number to drive down.">MAE <b>${f(c.mae)}</b></div>
+        <div class="plbt-bias ${Math.abs(c.bias) < 0.5 ? '' : c.bias > 0 ? 'hi' : 'lo'}" title="Signed mean of (predicted − posted line). Positive means the model consistently lines ABOVE the books; that is a correctable offset, unlike MAE.">bias ${sign}${f(c.bias)}</div>
+        <div class="plbt-n">n=${c.n}</div>
+        ${vs.n ? `<div class="plbt-vs" title="The metric this panel reported before v40: predicted vs the fighter's realised stat, over ${vs.n} props. Expect it to be far larger — the outcome scatters around the line by design, and no book is trying to predict it.">vs result ${f(vs.mae)}</div>` : ''}
+      </div>`;
+        };
+        const cards = ['SS', 'TD', 'FP'].map(k => cell(k, bt.byStat[k], bt.vsResult[k])).join('');
+        // Per-book rows: which book's pricing the model is closest to.
+        const books = Object.keys(bt.byBook).sort();
+        const bookRows = books.map(b => {
+            const cells = ['SS', 'TD', 'FP'].map(k => {
+                const c = bt.byBook[b][k];
+                return `<span class="plbt-bcell">${k} ${c && c.n ? `<b>${f(c.mae)}</b> <i>${c.bias >= 0 ? '+' : ''}${f(c.bias)}</i>` : '—'}</span>`;
+            }).join('');
+            return `<div class="plbt-brow"><span class="plbt-bname">${BOOK_LABELS[b] || b}</span>${cells}</div>`;
+        }).join('');
+        return `<div class="plbt">
+      <div class="plbt-head">Scored against the median OPENING line across books · ${bt.events} event${bt.events === 1 ? '' : 's'}</div>
+      <div class="plbt-cards">${cards}</div>
+      ${books.length ? `<div class="plbt-books"><div class="plbt-bhead">MAE / bias per book — which book's pricing the model already matches</div>${bookRows}</div>` : ''}
+    </div>`;
+    })();
     return `${cSec('predictions', '', '', 'Prop Line Predictions', predCount, predBody, 'margin-bottom:12px')}
+    ${cSec('line-accuracy', '', '', 'Predictor vs Posted Lines', '', lineBt, 'margin-bottom:12px')}
     ${cSec('learning', '', '', 'Learning Summary', learnCount, learnBody, 'margin-bottom:12px')}`;
 }
 async function renderArchivePanel(container) {
@@ -16794,7 +16842,7 @@ async function renderArchivePanel(container) {
         }
     }
     _cachedLearningLog = await PropLinePredictorService.getLearningLog();
-    const predictionsHtml = renderPredictionsHtml(cSec);
+    const predictionsHtml = renderPredictionsHtml(allRows, cSec);
     const calibBody = calibCurveHtml
         ? calibCurveHtml
         : `<div class="archive-empty-state">

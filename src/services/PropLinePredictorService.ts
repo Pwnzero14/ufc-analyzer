@@ -19,6 +19,8 @@ import type {
   PredictionEvent,
   PredictorWeights,
   PropArchiveRecord,
+  BacktestCell,
+  PredictorLineBacktest,
   PropPrediction,
   StatPrediction,
   WeightClass,
@@ -1049,6 +1051,115 @@ export class PropLinePredictorService {
 
   // ── Learning Cycle ──────────────────────────────────────────────────
 
+  /**
+   * Median OPENING line across books for one fighter+prop, with the closing line as
+   * fallback. This is the quantity the predictor is actually trying to forecast: the
+   * number a book will POST, not the number the fighter will produce.
+   *
+   * Opening rather than closing on purpose — the predictor runs before books post, so
+   * the opener is the like-for-like target. The close is a different (later, sharper)
+   * question and only stands in when no opener was archived.
+   */
+  static marketLineFor(
+    archiveRecords: PropArchiveRecord[],
+    fighter: string,
+    propTypes: string[],
+  ): { line: number; kind: 'open' | 'close'; books: number } | null {
+    const fkey = normName(fighter);
+    const rows = archiveRecords.filter(r => normName(r.fighter) === fkey && propTypes.includes(String(r.propType)));
+    if (!rows.length) return null;
+    const med = (xs: number[]): number => {
+      const s = [...xs].sort((a, b) => a - b);
+      return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+    };
+    const opens = rows.map(r => Number(r.openLine)).filter(v => Number.isFinite(v) && v > 0);
+    if (opens.length) return { line: med(opens), kind: 'open', books: opens.length };
+    const closes = rows.map(r => Number(r.line)).filter(v => Number.isFinite(v) && v > 0);
+    if (closes.length) return { line: med(closes), kind: 'close', books: closes.length };
+    return null;
+  }
+
+  /**
+   * SUGGESTION 6 — score stored predictions against the number books ACTUALLY POSTED.
+   *
+   * The learning panel has always reported error against the fighter's realised stat,
+   * which is a different and much noisier question: measured over 149 settled SS props,
+   * the posted line sat 0.29 from the eventual result on average but with a mean
+   * absolute error of 25.90. Predicting the outcome therefore carries ~26 points of
+   * irreducible noise that books are not even attempting to price. This scores the
+   * thing the predictor is for.
+   *
+   * Read-only and archive-driven: it needs no live card and no posted lines for the
+   * upcoming event — every past event with archived open lines is a labelled row.
+   * `vsResult` is reported alongside so the two targets can be compared directly.
+   */
+  static backtestVsPostedLines(
+    predictionEvents: PredictionEvent[],
+    archiveRecords: PropArchiveRecord[],
+  ): PredictorLineBacktest {
+    const PROPS: Array<{ stat: 'ss' | 'td' | 'fp'; label: string; types: string[] }> = [
+      { stat: 'ss', label: 'SS', types: ['SS'] },
+      { stat: 'td', label: 'TD', types: ['TD'] },
+      { stat: 'fp', label: 'FP', types: ['Fantasy', 'FP', 'Fantasy_PP'] },
+    ];
+    const mkCell = (): BacktestCell => ({ n: 0, absSum: 0, sgnSum: 0, mae: 0, bias: 0 });
+    const seal = (c: BacktestCell): BacktestCell => {
+      c.mae = c.n ? c.absSum / c.n : NaN;
+      c.bias = c.n ? c.sgnSum / c.n : NaN;
+      return c;
+    };
+    const byStat: Record<string, BacktestCell> = {};
+    const vsResult: Record<string, BacktestCell> = {};
+    const byBook: Record<string, Record<string, BacktestCell>> = {};
+    for (const p of PROPS) { byStat[p.label] = mkCell(); vsResult[p.label] = mkCell(); }
+
+    let events = 0;
+    for (const ev of predictionEvents) {
+      // Only events whose props have actually been archived can be scored.
+      const evRows = archiveRecords.filter(r => normName(String(r.event || '')).includes(normName(ev.event).slice(0, 20)));
+      if (!evRows.length) continue;
+      events++;
+      for (const pred of ev.predictions) {
+        for (const p of PROPS) {
+          const predicted = p.stat === 'ss' ? pred.ss.line : p.stat === 'td' ? pred.td.line : pred.fantasy.line;
+          if (!Number.isFinite(predicted)) continue;
+          const fkey = normName(pred.fighter);
+          const rows = evRows.filter(r => normName(r.fighter) === fkey && p.types.includes(String(r.propType)));
+          if (!rows.length) continue;
+
+          const mkt = this.marketLineFor(rows, pred.fighter, p.types);
+          if (mkt) {
+            const d = predicted - mkt.line;
+            const c = byStat[p.label];
+            c.n++; c.absSum += Math.abs(d); c.sgnSum += d;
+            // Per BOOK: books disagree systematically, so one blended number cannot
+            // match all four and the per-book split is what says which it is closest to.
+            for (const r of rows) {
+              const book = String(r.platform || '').toLowerCase();
+              const bl = Number.isFinite(Number(r.openLine)) ? Number(r.openLine) : Number(r.line);
+              if (!book || !Number.isFinite(bl) || bl <= 0) continue;
+              byBook[book] = byBook[book] || {};
+              byBook[book][p.label] = byBook[book][p.label] || mkCell();
+              const bc = byBook[book][p.label];
+              const bd = predicted - bl;
+              bc.n++; bc.absSum += Math.abs(bd); bc.sgnSum += bd;
+            }
+          }
+          // Contrast: the metric the panel reports today.
+          const res = rows.map(r => Number(r.result)).find(v => Number.isFinite(v));
+          if (res != null && Number.isFinite(res)) {
+            const d = predicted - res;
+            const c = vsResult[p.label];
+            c.n++; c.absSum += Math.abs(d); c.sgnSum += d;
+          }
+        }
+      }
+    }
+    for (const k of Object.keys(byStat)) { seal(byStat[k]); seal(vsResult[k]); }
+    for (const b of Object.keys(byBook)) for (const k of Object.keys(byBook[b])) seal(byBook[b][k]);
+    return { events, byStat, byBook, vsResult };
+  }
+
   static async runLearningCycle(
     eventName: string,
     archiveRecords: PropArchiveRecord[],
@@ -1124,18 +1235,46 @@ export class PropLinePredictorService {
       const ssMarket = getMarketSignal(pred.fighter, 'SS');
       const tdMarket = getMarketSignal(pred.fighter, 'TD');
       const fpMarket = getMarketSignal(pred.fighter, 'Fantasy');
-      const effectiveActual = {
-        ss: blendActual(actual.ss, ssMarket, RLM_SS),
-        td: blendActual(actual.td, tdMarket, RLM_TD),
-        fp: blendActual(actual.fp, fpMarket, RLM_FP),
+
+      // ── MODEL v40: learn against the POSTED LINE, not the realised stat ────────
+      // This predictor forecasts a LINE. It was being trained on `result` — the number
+      // the fighter went on to produce — which is a different and far noisier target:
+      // over 149 settled SS props the posted line sat 0.29 from the eventual result on
+      // average, with a mean absolute error of 25.90. Training on the outcome spends the
+      // whole gradient chasing ~26 points of variance no book is trying to price.
+      //
+      // The tuning notes above already give this away — v13 cites MAE 7.9, which is only
+      // reachable against a LINE, never against a result that scatters by 26. The model
+      // was tuned on one target and learned on the other; this reconciles them.
+      //
+      // Fallback chain per stat: median opening line -> median closing line (both from
+      // marketLineFor) -> the old RLM-blended result -> the raw result. So a prop with no
+      // archived line behaves exactly as it did before rather than dropping out.
+      const targetFor = (
+        stat: 'ss' | 'td' | 'fp',
+        types: string[],
+        rawActual: number,
+        mkt: { closingLine: number; rlm: number } | null,
+        rlmThreshold: number,
+      ): { target: number; kind: string } => {
+        const posted = this.marketLineFor(archiveRecords, pred.fighter, types);
+        if (posted) return { target: posted.line, kind: posted.kind === 'open' ? 'line-open' : 'line-close' };
+        const blended = blendActual(rawActual, mkt, rlmThreshold);
+        return { target: blended, kind: blended === rawActual ? 'result' : 'result-rlm' };
       };
+      const tSS = targetFor('ss', ['SS'], actual.ss, ssMarket, RLM_SS);
+      const tTD = targetFor('td', ['TD'], actual.td, tdMarket, RLM_TD);
+      const tFP = targetFor('fp', ['Fantasy', 'FP', 'Fantasy_PP'], actual.fp, fpMarket, RLM_FP);
+
+      const marketTarget = { ss: tSS.target, td: tTD.target, fp: tFP.target };
+      const targetKind = { ss: tSS.kind, td: tTD.kind, fp: tFP.kind };
       const effectiveDelta = {
-        ss: effectiveActual.ss - predicted.ss,
-        td: effectiveActual.td - predicted.td,
-        fp: effectiveActual.fp - predicted.fp,
+        ss: tSS.target - predicted.ss,
+        td: tTD.target - predicted.td,
+        fp: tFP.target - predicted.fp,
       };
 
-      results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta, effectiveDelta });
+      results.push({ fighter: pred.fighter, weightClass: pred.weightClass, predicted, actual, delta, effectiveDelta, marketTarget, targetKind });
 
       // Update fighter trend with sample-count-adaptive learning rate.
       // α = clamp(1 / (n+2), 0.10, 0.50) where n is pre-update sampleCount.
@@ -1193,9 +1332,14 @@ export class PropLinePredictorService {
       pickDelta: (r: LearningPredictionResult) => number;
       minActual: number;
     }> = [
-      { mod: 'ss_pace_modifier',   label: 'ss', pickActual: r => r.actual.ss, pickDelta: r => r.effectiveDelta?.ss ?? r.delta.ss, minActual: 1   },
-      { mod: 'td_attempt_modifier',label: 'td', pickActual: r => r.actual.td, pickDelta: r => r.effectiveDelta?.td ?? r.delta.td, minActual: 0.3 },
-      { mod: 'fp_global_modifier', label: 'fp', pickActual: r => r.actual.fp, pickDelta: r => r.effectiveDelta?.fp ?? r.delta.fp, minActual: 5   },
+      // MODEL v40: the denominator follows the numerator onto the LINE scale. relErr is
+      // avgDelta/avgActual, so leaving `actual` here while effectiveDelta became a
+      // line-delta would divide a line-scale error by a result-scale magnitude and
+      // silently mis-size every weight step — most visibly on TD, where a result of 0
+      // and a line of 0.5 are routine.
+      { mod: 'ss_pace_modifier',   label: 'ss', pickActual: r => r.marketTarget?.ss ?? r.actual.ss, pickDelta: r => r.effectiveDelta?.ss ?? r.delta.ss, minActual: 1   },
+      { mod: 'td_attempt_modifier',label: 'td', pickActual: r => r.marketTarget?.td ?? r.actual.td, pickDelta: r => r.effectiveDelta?.td ?? r.delta.td, minActual: 0.3 },
+      { mod: 'fp_global_modifier', label: 'fp', pickActual: r => r.marketTarget?.fp ?? r.actual.fp, pickDelta: r => r.effectiveDelta?.fp ?? r.delta.fp, minActual: 5   },
     ];
 
     for (const cfg of statConfigs) {

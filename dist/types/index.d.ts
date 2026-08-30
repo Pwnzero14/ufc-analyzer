@@ -373,6 +373,32 @@ export interface LearningPredictionResult {
         td: number;
         fp: number;
     };
+    marketTarget?: {
+        ss: number;
+        td: number;
+        fp: number;
+    };
+    targetKind?: {
+        ss: string;
+        td: string;
+        fp: string;
+    };
+}
+/** One cell of the posted-line backtest. */
+export interface BacktestCell {
+    n: number;
+    absSum: number;
+    sgnSum: number;
+    mae: number;
+    /** Signed mean of (predicted - target): positive = the model lines HIGHER than books. */
+    bias: number;
+}
+export interface PredictorLineBacktest {
+    events: number;
+    byStat: Record<string, BacktestCell>;
+    byBook: Record<string, Record<string, BacktestCell>>;
+    /** The metric the learning panel reported before v40 — predicted vs realised stat. */
+    vsResult: Record<string, BacktestCell>;
 }
 export interface LearningSummary {
     avgAbsDeltaSS: number;
