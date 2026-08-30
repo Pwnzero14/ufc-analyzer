@@ -88,6 +88,29 @@ export declare class PropLinePredictorService {
         avgFinishMin: number;
     };
     static predictSS(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null, marketFtMin?: number | null, marketExpectedMin?: number | null): StatPrediction;
+    /**
+     * MODEL v42 — round-1 significant strikes.
+     *
+     * R1 is structurally EASIER than full-fight SS and deliberately does not reuse
+     * predictSS's machinery: round one is a fixed five minutes, so there is no duration
+     * multiplier to get wrong — the whole v12 "rate × expected minutes" apparatus, and
+     * the v14/v15 corrections that had to be bolted onto it, simply do not apply. The
+     * only duration term is early-finish risk INSIDE round one.
+     *
+     * Constants are fitted, not chosen. Walk-forward over 3,104 samples from 478 cached
+     * fighters (baseline rebuilt from PRIOR fights only, compared to that fight's actual
+     * R1 SS) shows the same regression to the mean the full-fight rate has:
+     *     prior  0-8   n=111  mean err -8.25   <- LOW priors UNDER-predicted
+     *     prior  8-13  n=631  mean err -2.61
+     *     prior 13-18  n=986  mean err -0.55
+     *     prior 18-24  n=950  mean err +1.28
+     *     prior 24+    n=426  mean err +8.87   <- HIGH priors OVER-predicted
+     * A 17-point tilt across the range. Empirical-Bayes shrinkage toward the measured
+     * league mean flattens every bucket to within ±1.02 and takes MAE 9.47 -> 9.01. As
+     * with v15 the MAE gain is small; removing the systematic tilt is the point, because
+     * the tilt sits exactly where an OVER would be bet.
+     */
+    static predictSSR1(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null, marketExpectedMin?: number | null): StatPrediction;
     static predictTD(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, weightClass?: WeightClass | null): StatPrediction;
     private static calcBetrFP;
     static predictFantasy(fighterDB: FighterDB, opponentDB: FighterDB | null, scheduledRounds: number, weights: PredictorWeights, trend: FighterTrend | null, ssLine: number, tdLine: number, weightClass?: WeightClass | null, bookPriorFP?: {

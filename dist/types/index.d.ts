@@ -300,6 +300,8 @@ export interface PropPrediction {
     ss: StatPrediction;
     td: StatPrediction;
     fantasy: StatPrediction;
+    /** MODEL v42. Optional: predictions generated before v42 have no R1 SS. */
+    ss_r1?: StatPrediction;
 }
 export interface PredictionEvent {
     event: string;

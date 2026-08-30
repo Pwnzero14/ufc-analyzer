@@ -10945,7 +10945,7 @@ html { scroll-behavior: smooth; }
 /* ── GLOW-UP 13: Archive predictions table ── */
 .pred-row {
   display: grid;
-  grid-template-columns: minmax(180px, 230px) 86px 76px 86px 96px 1fr;
+  grid-template-columns: minmax(180px, 230px) 86px 80px 76px 86px 96px 1fr;
   gap: 10px; align-items: center;
   padding: 8px 14px; border-bottom: 1px solid var(--border);
   cursor: pointer; transition: background 0.12s;
@@ -10954,7 +10954,7 @@ html { scroll-behavior: smooth; }
 .pred-row:last-child { border-bottom: none; }
 .pred-fighter { display: flex; align-items: center; gap: 8px; min-width: 0; }
 @media (max-width: 1100px) {
-  .pred-row { grid-template-columns: minmax(150px, 1fr) 82px 72px 82px 90px; }
+  .pred-row { grid-template-columns: minmax(150px, 1fr) 82px 76px 72px 82px 90px; }
   .pred-row > :last-child { grid-column: 1 / -1; }
 }
 
@@ -30350,7 +30350,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
    inference. The header carries a key now. */
 .pred-head {
   display: grid;
-  grid-template-columns: minmax(180px, 230px) 86px 76px 86px 96px 1fr;
+  grid-template-columns: minmax(180px, 230px) 86px 80px 76px 86px 96px 1fr;
   gap: 10px; align-items: center;
   padding: 5px 14px 6px;
   border-bottom: 1px solid rgba(125,145,190,0.16);
@@ -30364,7 +30364,7 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 .pred-head > div:nth-child(3),
 .pred-head > div:nth-child(4) { text-align: center; }
 @media (max-width: 1100px) {
-  .pred-head { grid-template-columns: minmax(150px, 1fr) 82px 72px 82px 90px; }
+  .pred-head { grid-template-columns: minmax(150px, 1fr) 82px 76px 72px 82px 90px; }
   .pred-head > :last-child { display: none; }
 }
 /* Legend — the chip colours were learnable only by inference before this.

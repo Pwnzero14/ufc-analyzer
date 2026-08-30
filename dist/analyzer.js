@@ -14342,6 +14342,10 @@ function renderPredictionsHtml(archiveRows, cSec) {
             const tdArrow = p.td.lean === 'over' ? '▲' : '▼';
             const fpArrow = p.fantasy.lean === 'over' ? '▲' : '▼';
             const ssColor = p.ss.lean === 'over' ? 'var(--green)' : 'var(--red)';
+            // MODEL v42 — optional: predictions generated before v42 carry no R1 SS.
+            const r1 = p.ss_r1 ?? null;
+            const r1Arrow = r1 ? (r1.lean === 'over' ? '▲' : '▼') : '';
+            const r1Color = r1 ? (r1.lean === 'over' ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)';
             const tdColor = p.td.lean === 'over' ? 'var(--green)' : 'var(--red)';
             const fpColor = p.fantasy.lean === 'over' ? 'var(--green)' : 'var(--red)';
             const confWidth = Math.round(p.fantasy.confidence);
@@ -14512,6 +14516,7 @@ function renderPredictionsHtml(archiveRows, cSec) {
             return `<div class="pred-row pr-${p.fantasy.lean}" data-jump="${p.fighter}" data-fightkey="${fightKey.replace(/"/g, '&quot;')}" title="Open fighter card">
         <div class="pred-fighter"><span class="pred-rank" title="${_predSort === 'card' ? 'Position on the card, main event first' : `Rank ${rowIdx + 1} of ${sorted.length} under the current sort`}">${rowIdx + 1}</span><span class="bp-avatar bp-avatar-sm"><span class="bp-avatar-flag">🥊</span><img class="bp-avatar-img" data-name="${p.fighter}" alt="" /></span><div style="min-width:0"><div class="pf-name">${prettyName(p.fighter)}</div><div class="pf-sub"><span class="pf-vs">vs ${prettyName(p.opponent)} · ${p.scheduledRounds}R</span>${evBadge}</div></div></div>
         ${statCell('SS', String(p.ss.line), ssColor, ssArrow, '', bookCell(p.fighter, 'ss', p.ss.line), '', splitMark('ss', p.ss.line, p.ss.lean))}
+        ${r1 ? statCell('R1 SS', String(r1.line), r1Color, r1Arrow, '', '', '', '') : `<div class="pcell pcell-empty" title="Generated before MODEL v42, which added round-1 significant strikes. Regenerate to fill this in."><span class="pcell-lab">R1 SS</span><span class="pcell-val">—</span></div>`}
         ${statCell('TD', String(p.td.line), tdColor, tdArrow, '', bookCell(p.fighter, 'td', p.td.line), '', splitMark('td', p.td.line, p.td.lean))}
         ${statCell('FP', String(p.fantasy.line), fpColor, fpArrow, ' pcell-fp' + (p.fantasy.anchoredFrom != null ? ' is-anchored' : ''), bookCell(p.fighter, 'fp', p.fantasy.line), thinCls, splitMark('fp', p.fantasy.line, p.fantasy.lean) + anchorMark(p.fantasy))}
         <div class="pconf pconf-${confTier}${confCapped ? ' is-capped' : ''}" title="${confTip.replace(/"/g, '&quot;')}"><span class="pcell-lab">CONF</span><span class="pconf-gauge">${confCells}</span><span class="pconf-n">${confWidth}<b>%</b></span></div>
@@ -14582,7 +14587,7 @@ function renderPredictionsHtml(archiveRows, cSec) {
       </span>
     </div>
     <div class="pred-head">
-      <div>Fighter</div><div>SS</div><div>TD</div><div>FP</div><div>Conf</div>
+      <div>Fighter</div><div>SS</div><div>R1 SS</div><div>TD</div><div>FP</div><div>Conf</div>
       <div class="pred-head-rail">Factors${legendKeys}</div>
     </div>
     ${rows}`;
