@@ -501,7 +501,27 @@ export const NAME_ALIASES: Record<string, string> = {
 //   NOTE: existing per-fighter trends were EWMA'd on the OLD target and are on the
 //   wrong scale. They are deliberately not reset — alpha >= 0.10 washes them out over
 //   roughly 7-10 events — but read early post-v40 trend values with that in mind.
-export const MODEL_VERSION = 40;
+// v41 (2026-08-30): predictions are calibrated to what books actually POST.
+//   Two facts, both MEASURED from the 39.9k-row archive rather than assumed, and both
+//   things eyeballing would have got wrong:
+//   GRID — every book posts SS, TD and R1 SS on .50, but FANTASY is book-specific:
+//     Betr/Pick6 .50, Underdog .99 (366/366 rows), PrizePicks .55 (100%). A prediction
+//     of 63.7 is not postable anywhere; it rounds to 63.5 / 63.99 / 63.55 by book.
+//     FightTime is genuinely mixed (.50/.75/.25/.99) so the 80%-consistency gate
+//     deliberately refuses to snap it.
+//   OFFSET — books disagree with the model by a CONSTANT per stat, which is the
+//     correctable half of the error in a way MAE spread is not. Over 10 events FP ran
+//     7.8 BELOW the books and SS 4.1 ABOVE.
+//   Both are recomputed from the archive at every generation, never frozen: v40 trains
+//   against the line too, so the true bias shrinks event over event and this layer must
+//   shrink with it. A stored constant would fight the learner.
+//   Applied BEFORE the save, so the stored prediction is the calibrated one and Best
+//   Picks / EV / parlay maths all read one number rather than re-deriving it.
+//   PrizePicks Fantasy is NOT special-cased: its +19.2 gap is the Fantasy_PP scoring
+//   basis, and a per-book offset absorbs it — the same reason v33 keeps PP out of FP
+//   best-line comparisons. The headline number uses the all-book offset so that gap
+//   cannot drag it.
+export const MODEL_VERSION = 41;
 
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */

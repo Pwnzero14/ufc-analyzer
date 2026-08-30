@@ -469,6 +469,19 @@ export interface BacktestCell {
   bias: number;
 }
 
+/**
+ * Where books actually put their numbers — measured, never assumed.
+ * `grids[book][propType]` is the modal fractional part (SS/TD are .50 everywhere;
+ * Fantasy is .50 on Betr/Pick6, .99 on Underdog, .55 on PrizePicks).
+ * `offsets[book][stat]` and `global[stat]` are signed (predicted - posted).
+ */
+export interface BookCalibration {
+  grids: Record<string, Record<string, number>>;
+  offsets: Record<string, Record<string, number>>;
+  global: Record<string, number>;
+  events: number;
+}
+
 export interface PredictorLineBacktest {
   events: number;
   byStat: Record<string, BacktestCell>;
