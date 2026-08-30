@@ -14361,7 +14361,7 @@ const FACTOR_LANES: Array<{ cls: string; label: string; test: RegExp }> = [
   { cls: 'pf-guard',    label: 'guard',      test: /^No history|^Clamped to historic|^Anchored to market/i },
   // Post-hoc multipliers on the level — calibration, the book prior, the learned
   // trend. Same family as the shrink, so they share its gold.
-  { cls: 'pf-cal',      label: 'correction', test: /^FP cal|^Book prior|^Trend/i },
+  { cls: 'pf-cal',      label: 'correction', test: /^FP cal|^Book prior|^Trend|^Debut split/i },
   // Legacy: pre-v29 boards only.
   { cls: 'pf-duration', label: 'duration',   test: /^Duration adj/ },
   // Anchored so it cannot swallow `Opp adj: x1.09 (... Finish synergy ...)`, an
@@ -14390,6 +14390,7 @@ const SHRINK_LANE = { cls: 'pred-factor-shrink', label: 'shrink' };
 // meter beside the fighter's name already states the sample size; it was the same
 // number printed twice on the same row.
 const FACTOR_SHORT: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^Debut split ([+-][\d.]+)/,                  m => `DEBUT ${m[1]}`],
   [/^No history/i,                              () => 'NO HISTORY'],
   [/^Clamped to historic range:\s*(.+)$/i,      m => `CLAMP ${m[1]!.replace('-', '–')}`],
   // MODEL v31. The chip carries what the MODEL said; the FP cell beside it already
@@ -14809,8 +14810,18 @@ function renderPredictionsHtml(
       // is what makes the clamp safe: the guard and correction chips can never be
       // the ones pushed out of view.
       const isNoise = (r: string): boolean => /:\s*0(\.0)?$/.test(r.trim());
+      // The rail pools reasons from SEVERAL stat predictions, so two predictors that
+      // reach the same conclusion each contribute a chip and the rail says it twice.
+      // Since v42 added R1 SS that showed up as a doubled NO HISTORY on every debut
+      // (Parnasse, Aljarouj, Sintes, Benouaich all carried it). Deduped on the
+      // COMPRESSED label rather than the raw string, because the raw texts differ
+      // ("No history — league mean 17.15" vs "No history, using league baseline") while
+      // the chip the user actually sees is identical. Keeps the first, which is also
+      // the highest-priority lane after the sort below.
+      const seenChip = new Set<string>();
       const ranked = [...p.ss.reasons.slice(0, 2), ...p.td.reasons.slice(0, 1), ...otherFp]
         .filter(r => !isNoise(r))
+        .filter(r => { const k = compressFactor(r); if (seenChip.has(k)) return false; seenChip.add(k); return true; })
         .map(r => ({ r, cls: factorCls(r), rank: laneOf(r) }))
         .sort((a, b) => (a.rank < 0 ? 99 : a.rank) - (b.rank < 0 ? 99 : b.rank));
       // 5 was set when a chip averaged ~110px. Compressed they average ~52px, so
