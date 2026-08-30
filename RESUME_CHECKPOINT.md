@@ -1,13 +1,13 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-30 18:03:44 -04:00
+Last Saved: 2026-08-30 18:16:05 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 0a960f5
+HEAD: f23a7cb
 
 ## Last Notes
-SESSION HANDOFF (2026-08-30, ~18:15). Tree clean. MODEL_VERSION 43.
-Pushed: feature/sleek-theme-v1 0a960f5, master 291b49e (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-30, ~18:30). Tree clean. MODEL_VERSION 43.
+Pushed: feature/sleek-theme-v1 f23a7cb, master ca30f0f (cherry-picked; full parity verified).
 
 BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
 finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
@@ -276,10 +276,28 @@ VERIFIED ON SCREEN after reload + Generate (board reads MODEL v43):
 FP midpoint lands exactly on the 73.5 base. Benouaich (debut, favourite) got +8 FP while
 Montenegro (has history) correctly did not move.
 
-*** KNOWN COSMETIC DEFECT INTRODUCED BY v42/v43 - NOT YET FIXED ***
-Debut fighters now render the NO HISTORY badge TWICE (Parnasse, Aljarouj, Sintes,
-Benouaich). predictSS and predictSSR1 each emit their own "no history" reason and the
-factor-chip extractor renders both. Harmless but visible; dedupe the chip list by label.
+*** THE DOUBLED NO HISTORY BADGE - FIXED (f23a7cb), AND IT WAS NOT COSMETIC ***
+Reported as a duplicate badge; it was v43's OWN bug and it was DESTROYING information.
+applyDebutMoneylineSplit wrote its reason starting "No history - separated from opponent
+on price...". That prefix is claimed TWICE: the guard lane matches /^No history/i, and so
+does the NO HISTORY entry in FACTOR_SHORT. So the chip carrying the whole debut
+adjustment - which side, at what price, by how much - was compressed to the literal
+string "NO HISTORY" and rendered beside the real one from predictFantasy. Two identical
+badges, and the adjustment itself invisible.
+FIX: the reason leads with what it IS ("Debut split +8.0: ..."), gets its own
+FACTOR_SHORT entry so the chip reads DEBUT +8.0 with the signed magnitude, and moves to
+the CORRECTION lane beside FP cal / Book prior / Trend - a post-hoc adjustment to the
+LEVEL, not a guard warning that the model had little to work with.
+PLUS a safety net worth keeping: the rail pools reasons from SEVERAL stat predictions, so
+any two predictors reaching the same conclusion each contributed a chip. Ranked reasons
+are now deduped on the COMPRESSED label, not the raw string - the raw texts differ ("No
+history, using league baseline" vs "No history - component estimate") while the chip the
+user sees is identical.
+VERIFIED LIVE on 26 rendered rows: zero rows carry a duplicate chip; NO HISTORY appears
+exactly once per debut row.
+GENERALISE: a reason string's PREFIX is load-bearing in two independent tables
+(FACTOR_LANES and FACTOR_SHORT). Any new reason must be checked against BOTH, or it will
+be silently swallowed by whichever pattern claims its opening words.
 
 *** WHERE THE PREDICTOR DATA LIVES (saves a re-derivation) ***
 - The cached fighter log key is `fightHistory`, NOT `history` (FighterDB uses `history`;
@@ -294,7 +312,7 @@ factor-chip extractor renders both. Harmless but visible; dedupe the chip list b
 
 *** SUGGESTIONS STILL OPEN ***
 - #2 and #4 are DONE (v43). All four predictor suggestions are complete.
-- The doubled NO HISTORY badge above is the only outstanding defect, and it is cosmetic.
+- The doubled NO HISTORY badge is FIXED (f23a7cb). No outstanding predictor defects.
 - CTRL AS A PREDICTED PROP - deferred BY AGREEMENT until more cards accumulate lines.
   It archives under TWO propTypes: `Control` 5,780 rows with **0** openLine (result-only
   backfill) and `ctrl` 228 rows all carrying a line. Only ~228 labelled rows today, so it
