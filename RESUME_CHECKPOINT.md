@@ -1,11 +1,68 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-30 18:16:05 -04:00
+Last Saved: 2026-08-30 18:28:40 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: f23a7cb
+HEAD: 7503da8
 
 ## Last Notes
+################################################################################
+##  START HERE — NEXT SESSION'S FIRST TASK                                     ##
+################################################################################
+
+GLOW-UP 354-363: a SECOND ten-level UI pass over MY PLACED LEDGER and MY PARLAY
+LEDGER. (344-353 was the first pass and is DONE + user-verified — do not redo it.)
+
+--- WHAT ALREADY EXISTS. DO NOT REBUILD ANY OF THIS ---
+ 344 Events collapse. Head is a <button>; body wrapped in .plg-ev-inner. State in
+     _ledgerCollapsedEvents, a SESSION-SCOPED Set keyed `${ledger}|${evKey}` — same
+     shape/lifetime as _archiveCollapsedSections. NOT persisted; that is deliberate,
+     do not "fix" it. Newest event open, rest collapsed, FIRST render only via
+     applyLedgerCollapseDefaults.
+ 345 ledgerOutcomeStrip() — one tick per leg (per SLIP on the parlay side) in display
+     order, capped 32 with a +N tail.
+ 346 COLLAPSE ALL / EXPAND ALL, one button that states which it does next.
+ 347 The .plg-leg grid: ELEVEN children, and all FOUR declarations carry 11 tracks.
+ 348 REVERTED — sticky. See THE STICKY LESSON below before even considering it again.
+ 349 .plp-leg is a 6-track grid (parlay legs align in columns).
+ 350 Parlay events collapse on the same mechanism, keyed separately.
+ 351 Result filter, PURE CSS off .lgr[data-filter] — 149 rows never enter a JS loop.
+     :has() hides events the filter empties; filter OVERRIDES collapse via !important
+     (a hand-toggled event carries an INLINE max-height no selector can outrank).
+ 352 Leg/slip count chip on the head.
+ 353 aria-expanded, :focus-visible, reduced-motion; stagger does not replay on expand.
+ PLUS an empty-filter message ("Nothing matches this filter...").
+
+--- HARD CONSTRAINTS FOR ANY NEW LEDGER UI ---
+ * .plg-leg emits ELEVEN children. If you add or remove one, EVERY grid declaration
+   moves together — base AND both breakpoints (<=1500px, <=1180px). Getting this wrong
+   is bug 347: cells land one track LEFT of their headings and the trailing cell wraps,
+   and it SURVIVES REVIEW because head and rows shift together — aligned with each
+   other, under the wrong labels. Same trap bit .pred-row/.pred-head in v42 (6->7
+   children, FOUR declarations).
+ * The collapse animation is JS-measured max-height (what the section accordion uses).
+   Two other techniques were tried and FAILED — see the animation note below.
+ * Chip/reason prefixes are load-bearing in TWO independent tables (FACTOR_LANES and
+   FACTOR_SHORT). That is a predictions-panel rule but the same class of bug.
+
+--- CANDIDATE SEEDS (user has not picked; ask or propose) ---
+ - MY PLACED LEDGER HAS NEVER BEEN AUDITED (144 legs, YOU 76/144 53%, BOARD 38/80 48%).
+   A UI pass is a natural moment to check the numbers are right, not just prettier.
+ - The CONFLICT CHIP is open and unimplemented, and is LINE-BLIND — see
+   [[project_placed_leg_vs_board_line_vintage]]: the board re-scores at the CURRENT
+   line, so a flip against a leg you hold is line vintage, not a reversal.
+ - Per-event P/L or units; book breakdown; stat breakdown; sort/search; surfacing the
+   fight-grouping that already exists (GLOW-UP 309) more strongly.
+ - The 2-row residue from the archive audit: platform x stat sums to 423 not 425.
+
+--- VERIFY LIKE THIS ---
+ Numbers via javascript_tool (track counts, offsets, computed styles) — reliable.
+ Screenshots from the harness are NOT — see the PREVIEW HARNESS section below.
+ AND: measurement proves GEOMETRY, not OCCLUSION. Anything touching position/z-index/
+ stacking needs a real screenshot from the extension. That is how 348 shipped broken.
+
+################################################################################
+
 SESSION HANDOFF (2026-08-30, ~18:30). Tree clean. MODEL_VERSION 43.
 Pushed: feature/sleek-theme-v1 f23a7cb, master ca30f0f (cherry-picked; full parity verified).
 
