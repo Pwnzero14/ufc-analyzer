@@ -15274,22 +15274,37 @@ async function renderArchivePanel(container) {
                     // them. The remaining FP drifts are unverified only because
                     // fightHistory stores no fp field — FP has to be recomputed from
                     // components — not because anything contradicts this.
-                    // Still MARK rather than overwrite: refreshing the stored value is a
-                    // WRITE to best_picks_placed_v1 and belongs in its own change, where
-                    // it can keep GLOW-UP 174's pruning-resilience by refreshing only
-                    // when an archive row actually exists.
+                    // ── GLOW-UP 357 · CORRECTED AT READ TIME, NEVER WRITTEN ──────────────
+                    // Since the archive is the right side, showing the frozen number means
+                    // showing a number known to be wrong on nine rows. So the DISPLAYED
+                    // actual comes from the archive whenever a row exists.
+                    // Deliberately a read-time correction and not a write-back:
+                    //  · best_picks_placed_v1 is user-entered data. Repairing it buys
+                    //    nothing this does not, and risks overwriting a good frozen value
+                    //    if the archive is ever wrong in the other direction.
+                    //  · GLOW-UP 174's pruning-resilience survives UNTOUCHED, because the
+                    //    fallback when no row exists is still the stored value.
+                    //  · The VERDICT stays frozen either way — only the number moves.
+                    //    Nothing here feeds the totals; those read l.outcome.
                     // O(1) per leg against the existing index, so it costs nothing.
                     const frozenDir = rec.dir === 'OVER' ? 'over' : 'under';
                     const now = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, frozenDir);
                     const stored = Number(rec.actual);
-                    const moved = now.outcome !== 'pending'
-                        && now.actual != null
+                    const haveFresh = now.outcome !== 'pending' && now.actual != null;
+                    const moved = haveFresh
                         && (now.outcome !== rec.outcome || !Number.isFinite(stored) || Math.abs(now.actual - stored) > 0.05);
                     return {
                         rec,
                         outcome: rec.outcome,
-                        actual: rec.actual ?? null,
-                        drift: moved ? { freshActual: now.actual, freshOutcome: now.outcome } : null,
+                        // Archive first, stored as the fallback that keeps pruned legs alive.
+                        actual: haveFresh ? now.actual : (rec.actual ?? null),
+                        drift: moved
+                            ? {
+                                storedActual: Number.isFinite(stored) ? stored : null,
+                                freshActual: now.actual,
+                                freshOutcome: now.outcome,
+                            }
+                            : null,
                     };
                 }
                 const dir = rec.dir === 'OVER' ? 'over' : 'under';
@@ -15482,8 +15497,8 @@ async function renderArchivePanel(container) {
                 const driftCls = l.drift ? (l.drift.freshOutcome !== l.outcome ? ' has-flip' : ' has-drift') : '';
                 const driftTitle = l.drift
                     ? (l.drift.freshOutcome !== l.outcome
-                        ? ` title="STORED VERDICT NO LONGER REPRODUCES. Frozen as ${String(l.outcome).toUpperCase()} at actual ${l.actual}${unit}, but the archive now reads ${Math.round(l.drift.freshActual * 10) / 10}${unit}, which grades ${l.drift.freshOutcome.toUpperCase()} against your line of ${r.line}. The frozen verdict still counts in the totals — storage wins over recompute so the ledger survives archive pruning — but this row needs a look."`
-                        : ` title="The archive has moved since this settled: stored ${l.actual}${unit}, now ${Math.round(l.drift.freshActual * 10) / 10}${unit} (${l.drift.freshActual > Number(l.actual) ? '+' : ''}${Math.round((l.drift.freshActual - Number(l.actual)) * 10) / 10}). Your ${r.dir} still grades ${String(l.outcome).toUpperCase()} either way, so the verdict is unaffected. Usually a duplicate archive row for this fighter+stat, or a backfill that rewrote the result."`)
+                        ? ` title="STORED VERDICT NO LONGER REPRODUCES. This leg was frozen as ${String(l.outcome).toUpperCase()} when it settled at ${l.drift.storedActual ?? '—'}${unit}. The number shown is the archive's current ${Math.round(l.drift.freshActual * 10) / 10}${unit}, which grades ${l.drift.freshOutcome.toUpperCase()} against your line of ${r.line}. The frozen verdict is what still counts in the totals, so this row needs a look."`
+                        : ` title="Showing the archive's current value. This settled at ${l.drift.storedActual ?? '—'}${unit} and the archive was later corrected to ${Math.round(l.drift.freshActual * 10) / 10}${unit} (${l.drift.storedActual != null && l.drift.freshActual > l.drift.storedActual ? '+' : ''}${l.drift.storedActual != null ? Math.round((l.drift.freshActual - l.drift.storedActual) * 10) / 10 : '?'}) — the settle path re-applies results as UFCStats data firms up, and it is the side that matches UFCStats. Your ${r.dir} grades ${String(l.outcome).toUpperCase()} on either number, so the verdict is unaffected."`)
                     : '';
                 const actualHtml = l.actual != null
                     ? `<span class="plg-actual${driftCls}"${driftTitle}>actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
