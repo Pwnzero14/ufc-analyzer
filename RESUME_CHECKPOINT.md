@@ -29,8 +29,18 @@ TWO THREADS. Pick by whether props have dropped.
 THE GLOW-UP LADDER IS DONE (354-360 shipped, 357 REVERTED as 361). Do not
 re-open it. Remaining ledger ideas are at the bottom; none are required.
 
+THE CLIPPING SWEEP IS ALSO DONE AND MINED OUT (362-364, 2026-08-31). Do not
+re-run it as a source of work - see the section near the bottom for what it
+produced and, more importantly, the measurement trap it walked into first.
+
 ################################################################################
 
+SESSION HANDOFF (2026-08-31, ~12:35). Tree clean, both branches pushed, FULL
+parity. feature/sleek-theme-v1 263f3a6, master 5f13525.
+  Since the 08-30 handoff below: GLOW-UP 362/363/364 (UI clipping), the Duclos
+  alias (2a7044e), and the DWCS overlap check - all detailed at the bottom.
+
+--- previous handoff, still accurate for everything else ---
 SESSION HANDOFF (2026-08-30, ~21:46). Tree clean, both branches pushed, FULL
 parity (src/ dist/ analyzer.html all empty on the diff).
   feature/sleek-theme-v1  e004212
@@ -209,3 +219,76 @@ npm run checkpoint:resume
 npm run build
 git status
 ~~~
+
+################################################################################
+##  2026-08-31 SESSION - UI CLIPPING + THE DWCS CHECK                          ##
+################################################################################
+
+BOARD STATE AT HANDOFF: Paris props are only PARTIALLY in. Underdog has FT lines
+(13 archived, "Partial - 13 lines"); Pick6, Betr, PrizePicks and DK Sportsbook
+all still WAITING. 28 fighters, 6 actionable leans, TOP EDGE Michael Page
+FT-OVER, 11 unresolved records. Gate 2 may already be satisfiable - its bar is
+>=1 pick with a lean AND a finite activeLine, not full coverage - but the Best
+Picks audit still needs TD + R1 SS + CTRL + FP.
+
+=== THE DWCS OVERLAP: CHECKED, AND THERE IS NO CONTAMINATION ===
+Underdog captured 23 names, ~10 of them OFF-CARD (Patrick Rivera, Adam Darby,
+Modestino Rodrigues, Brandon Holmes, Adam Livingston, Hunter Smith, Silvestre
+Sanchez, Liam McCracken, Charlie Cleveland, Gabriel Lourenco). Only the 13
+ON-ROSTER fighters reached the archive, matching the "13 archived" chip. ZERO
+DWCS rows carry a UFC event name. DWCS results archive under their own label
+("DWCS 8.3", results, no lines). That is the desired split - keep the data, skip
+the fight card - and it is ALREADY the behaviour. Do not "fix" it.
+lines_underdog shape is {capturedAt, fighters:[...]}; entries carry
+name/opponent/line_*/*_avail/*_odds and NO promotion or slate field, so any
+attribution rule would have to be roster-based, not source-based.
+
+METHOD TRAP: the ghost detector reported 1 ghost and the true count was 0. It
+compared a DOM-scraped roster name against an archive name WITHOUT
+alias-normalising either side, so "Matthieu Letho Duclos" (UD) looked off-card
+against "Matthieu Duclos" (roster). ALIAS-NORMALISE BOTH SIDES or a sweep
+invents contamination.
+
+That variant WAS a real latent bug for a different reason, now fixed (2a7044e):
+namesMatch is surname-token based so archiving worked, but resolveVsArchive uses
+an EXACT event|normalizedName|propType key - a leg placed on "Matthieu Duclos"
+would never have found a row filed under "Matthieu Letho Duclos". Same shape as
+the 8 legs (Orolbai, Sumudaerji) the 08-30 audit could not re-grade.
+
+=== THE CLIPPING SWEEP: WHAT IT PRODUCED, AND ITS ONE BIG MISTAKE ===
+*** MEASUREMENT TRAP - READ BEFORE ANY LAYOUT WORK ***
+Every measurement in the first half of this session was taken at 827px, with
+DevTools DOCKED beside the page. That is UNDER the 1100px breakpoint and NOT a
+width this board is ever used at (normal use is ~1707px, DevTools closed).
+It caused a defect to be flagged that does not exist in normal use, and caused
+a real one to be both oversold and then undersold. UNDOCK DEVTOOLS (its menu ->
+Dock side -> undock) before any layout sweep, or the results describe a layout
+nobody sees.
+
+362 pred-factor - REAL, the big one. v41's "Book calibration: ..." reason was
+    registered in NEITHER table that owns chip rendering: FACTOR_SHORT had no
+    rule so compressFactor fell through to `return r` and rendered the whole
+    sentence (326px over, on 28 chips), and FACTOR_LANES had no matching test
+    (^Book prior does not cover ^Book calibration) so it drew with NO lane class
+    and was absent from the legend. BOTH tables match the RAW reason. Now
+    compressed to "BCAL 71->78.5" and joined to the existing pf-cal lane.
+    THE TWO-TABLE TRAP IS REAL - a new reason string needs an entry in both.
+363 pf-vs - REAL but small. It was one nowrap+ellipsis run of
+    "vs {opponent} - {rounds}R", so overflow ate the TAIL: the round count,
+    which drives 5R/3R inference and v39's duration-normalised hit-rate term.
+    Now an inline-flex with a shrinkable .pf-vs-name and a flex:0 0 auto
+    .pf-vs-r. Still 11 rows clipping at full width - by design; the name
+    truncates and the marker survives. No child-count change (the 347 rule).
+364 bias-platform - REAL. Printed the raw storage key DRAFTKINGS_SPORTSBOOK.
+    Fixed with a TRANSFORM, deliberately not a sixth lookup table:
+    BP_SLATE_BOOK_ABBR, BOOK_ABBR, BOOK_NAME, BP_BOOK_SHORT and BP_BOOK_FULL are
+    already five copies of the same book-label map.
+fighter-name - NON-ISSUE. Its truncation lives only inside
+    @media (max-width: 1100px) with max-width 260px. No cap above that, and the
+    board is used at ~1707px. Do not "fix" it.
+pred-gen - FALSE POSITIVE. The sweep reported 196px; it does not reproduce.
+    vOverflow is 0, scrollW/clientW differ by 19px of phantom trailing advance
+    (padding 5px 14px + letter-spacing 0.44px), and the label renders in full.
+
+THE SWEEP IS SPENT. Down to phantom 19px readings and enum labels. If you want
+more UI, pick it from something annoying in daily use, not another sweep.
