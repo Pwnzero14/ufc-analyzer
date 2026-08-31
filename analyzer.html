@@ -31968,6 +31968,12 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   box-shadow: inset 2px 0 0 -0.5px color-mix(in srgb, var(--accent, #6ee7a8) 34%, transparent);
 }
 .plg-leg.in-group.group-head { box-shadow: inset 2px 0 0 -0.5px var(--accent, #6ee7a8); }
+/* ── 360 · a stacked fight reads as a block, not as adjacent rows ─────────────
+   The spine marks the group; this makes the block itself legible when you are
+   scanning a 46-row card. Deliberately faint — it must not compete with the
+   HIT/MISS column, which is what the eye is actually hunting down this list. */
+.plg-leg.in-group { background: rgba(255,255,255,0.018); }
+.plg-leg.in-group.group-head { background: rgba(255,255,255,0.030); }
 .plg-leg.in-group.group-head::before {
   content: ''; position: absolute; left: -1px; top: 50%; width: 5px; height: 5px;
   transform: translateY(-50%); border-radius: 50%;
@@ -32447,6 +32453,27 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   flex: 0 0 auto;
 }
 .plg-ev-record.pend { color: var(--text3); opacity: .85; }
+/* ── 360 · concentration chip on the event head ──────────────────────────────
+   Same shell as the leg-count chip beside it, so it reads as part of that
+   cluster rather than a new kind of thing. Neutral by default: spreading legs
+   over many fights is not virtuous and stacking one is not a mistake — it is
+   exposure, and exposure is a size decision. `.hot` lights only at 4+ legs on a
+   single fight, where a card's outcome genuinely turns on one result. Amber,
+   not red: nothing here has gone wrong. */
+.plg-ev-conc {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px; font-weight: 800; letter-spacing: .06em;
+  color: var(--text3);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px; padding: 1px 5px;
+  flex: 0 0 auto;
+}
+.plg-ev-conc.hot {
+  color: #f0b95c;
+  background: rgba(240,185,92,0.09);
+  border-color: rgba(240,185,92,0.30);
+}
 
 /* ── 345 · the outcome strip ──────────────────────────────────────────────────
    One mark per leg (per slip on the parlay ledger) in display order. Colours are

@@ -15556,6 +15556,23 @@ async function renderArchivePanel(container) {
                 const k = fightKeyOf(l.rec);
                 fightCount.set(k, (fightCount.get(k) || 0) + 1);
             }
+            // ── GLOW-UP 360 · CONCENTRATION, stated instead of implied ────────────────
+            // 309 sorted legs by fight and drew a spine down each group, which shows the
+            // grouping but never answers the question the grouping exists for: how many
+            // separate fights is this card actually riding on? Forty-three legs over
+            // fourteen fights and forty-three over four are completely different risk,
+            // and both rendered as "43". Concentration is the whole reason to read a
+            // ledger rather than a bet slip — [[feedback_same_fight_corr_is_concentration
+            // _not_conflict]] is the same idea one panel over, where stacking a fight is
+            // treated as concentration to be sized, not a conflict to be resolved.
+            // Goes on the EVENT HEAD, which is already a flex row of chips, rather than
+            // into .plg-leg — that grid is eleven tracks and a twelfth child is bug 347.
+            const fightsOnCard = fightCount.size;
+            const maxOnOneFight = Math.max(0, ...fightCount.values());
+            const stackedFights = [...fightCount.values()].filter(n => n > 1).length;
+            const concChip = fightsOnCard
+                ? `<span class="plg-ev-conc${maxOnOneFight >= 4 ? ' hot' : ''}" title="${e.legs.length} legs spread across ${fightsOnCard} fight${fightsOnCard === 1 ? '' : 's'}${stackedFights ? `, ${stackedFights} of which carry more than one position` : ', none of them stacked'}. Your deepest single fight holds ${maxOnOneFight} leg${maxOnOneFight === 1 ? '' : 's'} — that is ${Math.round((maxOnOneFight / e.legs.length) * 100)}% of this card riding on one result. Legs are already sorted by fight and share a lit spine, so a stack reads as one block.">${fightsOnCard} FIGHT${fightsOnCard === 1 ? '' : 'S'}${maxOnOneFight > 1 ? ` · MAX ${maxOnOneFight}` : ''}</span>`
+                : '';
             const sortedLegs = [...e.legs].sort((a, b) => {
                 const ka = fightKeyOf(a.rec), kb = fightKeyOf(b.rec);
                 if (ka !== kb)
@@ -15698,7 +15715,7 @@ async function renderArchivePanel(container) {
           <span class="plg-ev-caret" aria-hidden="true">▾</span>
           <span class="plg-ev-name">${e.evKey}</span>
           <span class="plg-ev-legs" title="${e.legs.length} placed legs on this card">${e.legs.length}</span>
-          ${strip}${evSummary}${pendChip}
+          ${concChip}${strip}${evSummary}${pendChip}
         </button>
         <div class="plg-ev-body"><div class="plg-ev-inner">${colHead}${rows}</div></div>
       </div>`;
