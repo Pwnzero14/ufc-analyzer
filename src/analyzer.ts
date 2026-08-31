@@ -15602,14 +15602,28 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         if (rec.outcome === 'hit' || rec.outcome === 'miss') {
           // ── GLOW-UP 356 · re-resolve a FROZEN leg, for comparison only ────────
           // The 2026-08-30 audit re-graded all 144: zero verdict disagreements,
-          // but NINE stored `actual` values had drifted from the archive — six
-          // because duplicate rows share one event|fighter|propType key and
-          // archiveIdx is first-row-wins over an allRows order that shifts as
-          // rows are re-archived, three because the row's own result was
-          // rewritten by a later backfill (three of those moved exactly +10 on
-          // FP). Verdicts survived only because no delta crossed its line; with
-          // SS deltas of 21 and 37 that is luck, not design. This is O(1) per
-          // leg against the existing index, so it costs nothing to watch.
+          // but NINE stored `actual` values no longer match the archive.
+          // MECHANISM, MEASURED (an earlier guess blaming duplicate rows was
+          // WRONG and is recorded here so nobody re-derives it): a key like
+          // event|fighter|propType legitimately holds ONE ROW PER BOOK — same
+          // `result`, different `line` — so archiveIdx's first-row-wins is
+          // harmless, every candidate returns the same number. All 32 rows
+          // behind the nine drifts agree with each other and DISAGREE with the
+          // frozen value. The archive's `result` was rewritten after the leg
+          // froze; the settle path re-applies results on every run.
+          // Deltas are not small: SS 23→2, 110→73, 7→14; FP +10, -25, -5.
+          // WHICH SIDE IS RIGHT, SETTLED: the ARCHIVE is, and the frozen value
+          // is stale. UFCStats agreed with the archive on both checkable SS
+          // cases (Douglas 7 stored / 14 archive / 14 truth; Mederos 110 / 73 /
+          // 73). So the settle path CORRECTS results rather than corrupting
+          // them. The remaining FP drifts are unverified only because
+          // fightHistory stores no fp field — FP has to be recomputed from
+          // components — not because anything contradicts this.
+          // Still MARK rather than overwrite: refreshing the stored value is a
+          // WRITE to best_picks_placed_v1 and belongs in its own change, where
+          // it can keep GLOW-UP 174's pruning-resilience by refreshing only
+          // when an archive row actually exists.
+          // O(1) per leg against the existing index, so it costs nothing.
           const frozenDir = rec.dir === 'OVER' ? 'over' as const : 'under' as const;
           const now = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, frozenDir);
           const stored = Number(rec.actual);
