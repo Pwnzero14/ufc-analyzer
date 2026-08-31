@@ -27938,6 +27938,58 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   color: var(--text2);
 }
 .plg-sel-cohort b { color: var(--text); font-weight: 800; }
+/* ── GLOW-UP 358: BY BOOK / BY STAT breakdown strips ─────────────────────────
+   Same shell as .plg-selection so the three strips read as one block. Direction
+   colour (green beats your overall rate, red trails it) rides on the BORDER and
+   the rate, while the book/stat hue stays on the label — the semantic split the
+   rest of the app already uses, so a book's identity never competes with the
+   good/bad signal. Dim = under the sample floor and making no claim. */
+.plg-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.02);
+}
+.plg-bd-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.02);
+  cursor: help;
+  white-space: nowrap;
+}
+.plg-bd-cell b { color: var(--text); font-weight: 800; margin-left: 2px; }
+.plg-bd-cell i { font-style: normal; margin-left: 4px; }
+/* .flat is the DEFAULT state, not a failure: the cell has enough legs to be
+   read but sits inside 1.5 SE of the population rate, so it makes no claim.
+   Colour is reserved for cells that have actually separated — see GLOW-UP 310,
+   which took the same decision for the ALPHA chip one strip up. */
+.plg-bd-cell.flat i { color: var(--text2); }
+.plg-bd-cell.good { border-color: rgba(38,208,124,0.38); }
+.plg-bd-cell.good i { color: #6ee7a8; }
+.plg-bd-cell.bad  { border-color: rgba(255,91,120,0.38); }
+.plg-bd-cell.bad  i { color: #ff8fa3; }
+.plg-bd-cell.thin { opacity: 0.55; }
+.plg-bd-cell.thin i { color: var(--text3); }
+.plg-bd-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  cursor: help;
+  margin-left: 2px;
+}
 .plg-alpha {
   font-family: 'JetBrains Mono', monospace;
   font-size: 8.5px;
