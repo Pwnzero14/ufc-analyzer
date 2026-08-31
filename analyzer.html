@@ -28001,6 +28001,32 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
   white-space: nowrap;
 }
 .plg-actual b { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+/* ── GLOW-UP 356: the frozen `actual` no longer matches the archive ──────────
+   ZERO-WIDTH BY CONSTRUCTION. A Δ glyph after the value was the first attempt
+   and it clipped the cell: .plg-actual is white-space:nowrap in a fixed track,
+   so extra content does not overflow the row, it eats the span's own leading
+   text — "actual 110" rendered "ual 110". .plg-leg's scrollWidth never moved,
+   because the row was never wrong. Underline and colour cost no layout at all.
+   Amber, not red: neither state means the leg lost — red is spoken for by MISS
+   and by direction elsewhere in this panel. */
+.plg-actual.has-drift,
+.plg-actual.has-flip { cursor: help; }
+.plg-actual.has-drift b {
+  border-bottom: 1px dotted rgba(240,185,92,0.75);
+  padding-bottom: 1px;
+}
+.plg-actual.has-flip b {
+  color: #ffb37a;
+  border-bottom: 1px solid rgba(255,140,60,0.9);
+  padding-bottom: 1px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .plg-actual.has-flip b { animation: plgFlipPulse 2.4s ease-in-out infinite; }
+}
+@keyframes plgFlipPulse {
+  0%, 100% { border-bottom-color: rgba(255,140,60,0.55); }
+  50%      { border-bottom-color: rgba(255,140,60,1); }
+}
 .plg-status {
   font-family: 'JetBrains Mono', monospace;
   font-size: 8px;
