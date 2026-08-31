@@ -32539,6 +32539,41 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-body { max-height: none !important; }
 .lgr:not([data-filter="all"]) .plg-event.ev-collapsed .plg-ev-caret { opacity: .35; }
 
+/* ── 359 · the fighter search ────────────────────────────────────────────────
+   Same override, same reason: a search that leaves the match inside a collapsed
+   card has failed at its only job, and an inline max-height from a hand-toggled
+   event outranks any selector without !important. The rule that does the actual
+   matching is injected into .lgr-searchcss by the handler — it cannot live here
+   because the query is arbitrary text. */
+.lgr[data-searching] .plg-event.ev-collapsed .plg-ev-body { max-height: none !important; }
+.lgr[data-searching] .plg-event.ev-collapsed .plg-ev-caret { opacity: .35; }
+.lgr-search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px;
+  background: rgba(255,255,255,0.03);
+}
+.lgr-search-wrap:focus-within { border-color: rgba(255,255,255,0.22); }
+.lgr-search-ico { font-size: 10px; color: var(--text3); }
+.lgr-search {
+  width: 104px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 0;
+}
+.lgr-search::placeholder { color: var(--text3); }
+/* Chrome draws its own clear affordance on type=search and it collides with the
+   monospace metrics at this size. */
+.lgr-search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
 /* ── 348 · REVERTED — sticky cannot work inside this panel ────────────────────
    The intent was to keep the event name visible while scrolling a 43-leg card.
    `position: sticky; top: 88px` broke it instead, and the reason is worth keeping:

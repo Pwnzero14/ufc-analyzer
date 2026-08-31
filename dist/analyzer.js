@@ -13030,14 +13030,46 @@ function ledgerShell(ledgerId, body) {
         : [['all', 'ALL'], ['hit', 'CASHED'], ['miss', 'BUST'], ['pending', 'PENDING']];
     const unit = ledgerId === 'placed' ? 'legs' : 'slips';
     const seg = opts.map(([v, lbl]) => `<button type="button" class="lgr-seg${v === 'all' ? ' on' : ''}" data-lgr-filter="${v}" aria-pressed="${v === 'all'}" title="${v === 'all' ? `Show every ${unit.slice(0, -1)}` : `Show only ${unit} that ${v === 'pending' ? 'have not settled' : v === 'hit' ? (ledgerId === 'placed' ? 'hit' : 'cashed') : (ledgerId === 'placed' ? 'missed' : 'busted')}`}. Filtering opens every event — a collapsed card cannot hide a match.">${lbl}</button>`).join('');
+    // ── GLOW-UP 359 · find a fighter without expanding five cards ───────────────
+    // 144 legs over five events, most of them collapsed: locating one fighter meant
+    // opening every card and scanning. Built the same way as 351's result filter —
+    // the matching happens in CSS, not in a JS loop over rows. The rule cannot be
+    // static (the query is arbitrary text), so the handler rewrites ONE stylesheet
+    // rule per keystroke instead; still one style recalc, still no per-row work.
+    // The empty-state line is shared with the result filter and reworded by the
+    // handler, so a search that matches nothing says so rather than rendering a
+    // toolbar over blank space — the failure 351 already fixed once.
     return `<div class="lgr" data-lgr="${ledgerId}" data-filter="all">
+    <style class="lgr-searchcss"></style>
     <div class="lgr-toolbar">
       <span class="lgr-seg-wrap" role="group" aria-label="Filter ${unit} by result">${seg}</span>
+      <label class="lgr-search-wrap" title="Filter by fighter. Matches either corner, so typing one name shows both sides of that fight. Combines with the result filter above, and opens collapsed cards so a match cannot hide.">
+        <span class="lgr-search-ico" aria-hidden="true">⌕</span>
+        <input type="search" class="lgr-search" data-lgr-search placeholder="fighter…" aria-label="Filter ${unit} by fighter name" autocomplete="off" spellcheck="false">
+      </label>
       <button type="button" class="lgr-allbtn" data-lgr-all title="Collapse or expand every event on this ledger at once. Collapse state is per-session and is not saved.">⊟ COLLAPSE ALL</button>
     </div>
     ${body}
     <div class="lgr-empty">Nothing matches this filter — every ${unit.slice(0, -1)} on this ledger has settled, or none has.</div>
   </div>`;
+}
+// GLOW-UP 359 · one reduction, used by BOTH the row attribute and the typed query.
+// They must agree exactly or a search silently matches nothing, so they share this
+// rather than each doing their own version — the "a fact derived twice drifts" rule
+// that already cost this codebase a report-card export bug.
+// Diacritics folded, punctuation dropped: the alphabet is [a-z0-9 ] and nothing else,
+// which is also what makes the value safe to drop into an attribute selector.
+// Built from escapes, never pasted as literal combining marks — a raw U+0300-U+036F
+// range in source is invisible in every editor and does not survive a tool that
+// re-encodes the file. This codebase has already lost a day to encoding damage.
+const LEDGER_COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+function ledgerSearchKey(s) {
+    return String(s || '')
+        .normalize('NFD')
+        .replace(LEDGER_COMBINING, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
 }
 function ledgerOutcomeStrip(outcomes) {
     if (!outcomes.length)
@@ -15624,7 +15656,11 @@ async function renderArchivePanel(container) {
                 // The trailing three cells stay in the markup even when empty. That is the
                 // point: a pending row and a settled row occupy the same columns, so the
                 // ledger reads as one table rather than two shapes.
-                return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" data-outcome="${l.outcome}" style="--plg-i:${Math.min(rowI, 28)}">
+                // GLOW-UP 359: BOTH corners, so searching either name returns the fight.
+                // Lowercased and stripped to the same alphabet the handler reduces the
+                // query to, so "O'Malley" and "omalley" land on each other.
+                const searchKey = ledgerSearchKey(`${r.name} ${r.opponent || ''}`);
+                return `<div class="plg-leg${nFight > 1 ? ' in-group' : ''}${isGroupHead ? ' group-head' : ''}" data-outcome="${l.outcome}" data-name="${searchKey}" style="--plg-i:${Math.min(rowI, 28)}">
           <span class="plc-name">${r.pretty}</span>
           <b class="bps-dir ${r.dir === 'OVER' ? 'ov' : 'un'}">${r.dir}</b>
           <span class="bps-line">${r.line ?? '—'}</span>
@@ -15829,7 +15865,11 @@ async function renderArchivePanel(container) {
                     : holds.length
                         ? `<span class="plp-contain holds" title="${holds.length} smaller slip${holds.length === 1 ? '' : 's'} (${holds.map(j => `${e.list[j]?.legs.length}-leg`).join(', ')}) sit entirely inside this one — they cannot cash unless this one's shared legs do, so they add exposure to the same position rather than diversifying it.">⊃ HOLDS ${holds.length}</span>`
                         : '';
-                return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" data-outcome="${anyPending ? 'pending' : anyMiss ? 'miss' : 'hit'}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG</span>${p.legs[0]?.bookLabel ? `<span class="plp-book ${(() => { const k = String(p.legs[0]?.book || '').toLowerCase(); return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp' : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : ''; })()}">${p.legs[0].bookLabel}</span>` : ''}${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
+                // GLOW-UP 359: a slip matches if ANY leg does — searching one fighter should
+                // surface every parlay you have exposure to them in, not just slips where
+                // they happen to be the first leg.
+                const slipSearchKey = ledgerSearchKey(p.legs.map(x => `${x.fighter} ${x.opponent || ''}`).join(' '));
+                return `<div class="plp-parlay${inIdx >= 0 ? ' is-inside' : ''}" data-outcome="${anyPending ? 'pending' : anyMiss ? 'miss' : 'hit'}" data-name="${slipSearchKey}" style="--plg-i:${cardI}"><div class="plp-head"><span class="plp-title">${p.legs.length}-LEG</span>${p.legs[0]?.bookLabel ? `<span class="plp-book ${(() => { const k = String(p.legs[0]?.book || '').toLowerCase(); return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp' : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : ''; })()}">${p.legs[0].bookLabel}</span>` : ''}${containTag}${statusChip}${removeBtn}</div><div class="plp-legs">${legRows}</div></div>`;
             }).join('');
             const evCashed = slipOutcomes.filter(o => o === 'hit').length;
             const evSettledSlips = slipOutcomes.filter(o => o !== 'pending').length;
@@ -17500,6 +17540,44 @@ async function renderArchivePanel(container) {
                 });
             }
         });
+        // ── GLOW-UP 359 · the search, as ONE rewritten stylesheet rule ─────────────
+        // Not a loop over rows. The query is reduced through the SAME ledgerSearchKey
+        // the row attributes were built with, then dropped into an attribute selector.
+        // That reduction is also what makes this injection-safe: the alphabet coming
+        // out is [a-z0-9 ] only, so nothing can close the selector or the style block.
+        const style = lgr.querySelector('.lgr-searchcss');
+        const searchBox = lgr.querySelector('.lgr-search');
+        if (style && searchBox) {
+            const applySearch = () => {
+                const q = ledgerSearchKey(searchBox.value);
+                if (!q) {
+                    style.textContent = '';
+                    delete lgr.dataset.searching;
+                    return;
+                }
+                lgr.dataset.searching = '1';
+                const id = lgr.dataset.lgr === 'parlay' ? 'parlay' : 'placed';
+                const S = `.lgr[data-lgr="${id}"][data-searching]`;
+                // Rows that do not match, and then whole events left with no match. The
+                // column header is exempt for the same reason it is under the result
+                // filter: a filtered table still needs its headings.
+                style.textContent = [
+                    `${S} .plg-leg:not(.plg-colhead):not([data-name*="${q}"]){display:none}`,
+                    `${S} .plp-parlay:not([data-name*="${q}"]){display:none}`,
+                    `${S} .plg-event:not(:has(.plg-leg[data-name*="${q}"])):not(:has(.plp-parlay[data-name*="${q}"])){display:none}`,
+                    `${S}:not(:has(.plg-leg[data-name*="${q}"])):not(:has(.plp-parlay[data-name*="${q}"])) .lgr-empty{display:block}`,
+                ].join('\n');
+            };
+            searchBox.addEventListener('input', applySearch);
+            // Escape clears without having to select the text first.
+            searchBox.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Escape' && searchBox.value) {
+                    ev.stopPropagation();
+                    searchBox.value = '';
+                    applySearch();
+                }
+            });
+        }
     });
     buildDataSubNav(container);
     // ── Animate archive bars (grade bars, etc.) on scroll into view ──────
