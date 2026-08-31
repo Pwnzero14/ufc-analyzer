@@ -15653,18 +15653,25 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           // them. The remaining FP drifts are unverified only because
           // fightHistory stores no fp field — FP has to be recomputed from
           // components — not because anything contradicts this.
-          // ── GLOW-UP 357 · CORRECTED AT READ TIME, NEVER WRITTEN ──────────────
-          // Since the archive is the right side, showing the frozen number means
-          // showing a number known to be wrong on nine rows. So the DISPLAYED
-          // actual comes from the archive whenever a row exists.
-          // Deliberately a read-time correction and not a write-back:
-          //  · best_picks_placed_v1 is user-entered data. Repairing it buys
-          //    nothing this does not, and risks overwriting a good frozen value
-          //    if the archive is ever wrong in the other direction.
-          //  · GLOW-UP 174's pruning-resilience survives UNTOUCHED, because the
-          //    fallback when no row exists is still the stored value.
-          //  · The VERDICT stays frozen either way — only the number moves.
-          //    Nothing here feeds the totals; those read l.outcome.
+          // ── GLOW-UP 357 REVERTED (361) · THE ARCHIVE IS NOT UNIFORMLY RIGHT ──
+          // 357 displayed the archive's value whenever a row existed, on the
+          // strength of two SS cases where UFCStats agreed with the archive
+          // (Douglas 7/14/14, Mederos 110/73/73). That did NOT generalise.
+          // Recomputing FP from UFCStats components put the archive on the WRONG
+          // side of all three Makhachev rows: components give 117.5 (Fantasy) and
+          // 66 (PrizePicks), which is what the STORED value says; the archive
+          // reads 127.5 / 76, exactly +10 in both scoring systems.
+          // A wider scan found 81 archive Fantasy rows disagreeing with computed
+          // FP, dominated by -5 on three-round decisions and appearing on LOSSES
+          // as well as wins — so it is not a win-bonus effect, and the mechanism
+          // is NOT yet known. That scan also mixed settled rows (platform + line)
+          // with backfilled ones (neither), which are written by different code
+          // paths, so it is two populations superimposed.
+          // Until that is understood, this MARKS the disagreement and picks
+          // NEITHER side. The stored value is what the ledger has always shown
+          // and is the user's own settle record; the archive's number is named in
+          // the tooltip, so nothing is hidden. Do not re-apply 357 on the SS
+          // evidence alone - that is exactly the reasoning that produced it.
           // O(1) per leg against the existing index, so it costs nothing.
           const frozenDir = rec.dir === 'OVER' ? 'over' as const : 'under' as const;
           const now = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, frozenDir);
@@ -15675,8 +15682,9 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
           return {
             rec,
             outcome: rec.outcome,
-            // Archive first, stored as the fallback that keeps pruned legs alive.
-            actual: haveFresh ? (now.actual as number) : (rec.actual ?? null),
+            // STORED wins the display again (361). The archive's value lives on
+            // in drift.freshActual and is named in the tooltip.
+            actual: rec.actual ?? null,
             drift: moved
               ? {
                   storedActual: Number.isFinite(stored) ? stored : null,
@@ -15966,8 +15974,8 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         const driftCls = l.drift ? (l.drift.freshOutcome !== l.outcome ? ' has-flip' : ' has-drift') : '';
         const driftTitle = l.drift
           ? (l.drift.freshOutcome !== l.outcome
-              ? ` title="STORED VERDICT NO LONGER REPRODUCES. This leg was frozen as ${String(l.outcome).toUpperCase()} when it settled at ${l.drift.storedActual ?? '—'}${unit}. The number shown is the archive's current ${Math.round(l.drift.freshActual * 10) / 10}${unit}, which grades ${l.drift.freshOutcome.toUpperCase()} against your line of ${r.line}. The frozen verdict is what still counts in the totals, so this row needs a look."`
-              : ` title="Showing the archive's current value. This settled at ${l.drift.storedActual ?? '—'}${unit} and the archive was later corrected to ${Math.round(l.drift.freshActual * 10) / 10}${unit} (${l.drift.storedActual != null && l.drift.freshActual > l.drift.storedActual ? '+' : ''}${l.drift.storedActual != null ? Math.round((l.drift.freshActual - l.drift.storedActual) * 10) / 10 : '?'}) — the settle path re-applies results as UFCStats data firms up, and it is the side that matches UFCStats. Your ${r.dir} grades ${String(l.outcome).toUpperCase()} on either number, so the verdict is unaffected."`)
+              ? ` title="STORED VERDICT NO LONGER REPRODUCES. Frozen as ${String(l.outcome).toUpperCase()} at the ${l.actual}${unit} shown, but the archive now reads ${Math.round(l.drift.freshActual * 10) / 10}${unit}, which grades ${l.drift.freshOutcome.toUpperCase()} against your line of ${r.line}. The frozen verdict is what counts in the totals. WHICH NUMBER IS RIGHT IS NOT SETTLED — the archive won on the SS cases checked against UFCStats and LOST on the FP ones, so this row needs a look rather than an automatic correction."`
+              : ` title="The archive disagrees with this settled value: shown ${l.actual}${unit}, archive ${Math.round(l.drift.freshActual * 10) / 10}${unit} (${l.drift.storedActual != null && l.drift.freshActual > l.drift.storedActual ? '+' : ''}${l.drift.storedActual != null ? Math.round((l.drift.freshActual - l.drift.storedActual) * 10) / 10 : '?'}). Your ${r.dir} grades ${String(l.outcome).toUpperCase()} on either number, so the verdict is unaffected. NEITHER side is automatically trusted: recomputing from UFCStats components put the archive RIGHT on the SS drifts and WRONG on the FP ones, and 81 archive Fantasy rows disagree with computed FP for reasons not yet understood."`)
           : '';
         const actualHtml = l.actual != null
           ? `<span class="plg-actual${driftCls}"${driftTitle}>actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
