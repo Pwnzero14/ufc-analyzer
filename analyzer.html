@@ -32817,6 +32817,28 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   font-feature-settings: 'tnum' 1;
 }
 
+/* ── GLOW-UP 367 · three hero tiles that are actually the same size ──────────
+   CALIBRATED HIT RATE and ACTIONABLE LEANS each contain a .mh-meter; TOP EDGE
+   has none, so it measured 86px against their 100px — and 14px is EXACTLY the
+   meter's footprint (6px height + 1px margins + the tile's own 6px flex gap).
+   Trend lines sat 7px apart, value baselines 7px apart: three tiles presented
+   as a set, one of them structurally smaller.
+
+   NOT SOLVED WITH A FAKE GAUGE. "+40%" is an unbounded edge figure with no
+   scale to fill, so giving it a meter would be inventing a measurement to make
+   a layout tidy. Not solved with a spacer either — a hand-tuned 14px shim is a
+   magic number that breaks the moment the meter's height changes.
+   The tiles are already flex columns with justify-content: space-between, so
+   they distribute correctly INTERNALLY; they were simply different heights.
+   Stretching the row makes them equal and space-between does the rest — the
+   trend lands on a shared baseline in all three, with no magic numbers. */
+.model-health-strip { align-items: stretch; }
+
+/* And a FIFTH radius, found while measuring: these tiles sit at 10px, outside
+   the 14/8 scale 366 established. They are nested cards inside the slate
+   banner, so they take the inset step. */
+.model-health-strip .mh-stat { border-radius: var(--r-inset) !important; }
+
 /* ── Wordmark: type-scale contrast is the whole hierarchy here ───────────── */
 .logo-text {
   font-family: 'Space Grotesk', sans-serif;
