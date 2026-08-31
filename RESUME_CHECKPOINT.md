@@ -1,9 +1,9 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-30 21:46:57 -04:00
+Last Saved: 2026-08-31 12:36:16 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: e004212
+HEAD: 6b8769b
 
 ## Last Notes
 ################################################################################
@@ -115,11 +115,13 @@ TWO HYPOTHESES TESTED, BOTH FAILED - do not re-run them:
   neither prediction (predicted +15 Fantasy / +20 PP for 3R decisions; observed
   -5 dominant).
 
-*** FIRST MOVE NEXT TIME - CHEAP AND NOT YET DONE ***
-The scan MIXED two populations: SETTLED rows carry `platform` AND `line`;
-BACKFILLED rows carry NEITHER. They are written by different code paths. Re-run
-the histogram SPLIT on platform presence before reasoning any further - the -5
-cluster may resolve into one population entirely.
+*** FIRST MOVE NEXT TIME ***
+The platform split HAS been run (see above - it was not the answer) and the
+reversal mechanism HAS been found. What is left is the 53-row residual and the
+question of WHY reversals are missed intermittently. The one untested lead is
+that fightHistory is parsed from the FIGHTER page while the settle path parses
+the FIGHT DETAIL page; compare the two sources for one known-missed fight.
+That needs a live UFCStats fetch, so it is not a five-minute job.
 
 THE LIVE SCORER IS NOT THE BUG. The settle log reconciles by hand: Sumudaerji
 SS=41 CTRL=0.23min W R3 over a 15.00min fight -> FP 70.6, which only works with
@@ -197,29 +199,6 @@ CONCENTRATION: 7 legs on ONE fight on the Nurmagomedov card (16% of it).
 - The CONFLICT CHIP is still unimplemented and LINE-BLIND.
 - The 2-row archive-audit residue: platform x stat sums to 423 not 425.
 
-
-## Resume Checklist
-1. Run npm run build.
-2. Check git status.
-3. Continue the highest-priority task from your notes.
-
-## Working Tree Status
-~~~text
-(clean working tree)
-~~~
-
-## Diff Summary
-~~~text
-(no unstaged diff)
-~~~
-
-## Quick Commands
-~~~powershell
-npm run checkpoint:resume
-npm run build
-git status
-~~~
-
 ################################################################################
 ##  2026-08-31 SESSION - UI CLIPPING + THE DWCS CHECK                          ##
 ################################################################################
@@ -292,3 +271,25 @@ pred-gen - FALSE POSITIVE. The sweep reported 196px; it does not reproduce.
 
 THE SWEEP IS SPENT. Down to phantom 19px readings and enum labels. If you want
 more UI, pick it from something annoying in daily use, not another sweep.
+
+## Resume Checklist
+1. Run npm run build.
+2. Check git status.
+3. Continue the highest-priority task from your notes.
+
+## Working Tree Status
+~~~text
+(clean working tree)
+~~~
+
+## Diff Summary
+~~~text
+(no unstaged diff)
+~~~
+
+## Quick Commands
+~~~powershell
+npm run checkpoint:resume
+npm run build
+git status
+~~~
