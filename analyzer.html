@@ -32731,6 +32731,17 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
      line at a 3px period blurs toward flat grey on a HiDPI panel, so the right
      value cannot be reasoned about, only looked at. */
   --hud-scanline:   rgba(120, 145, 195, 0.15);
+  /* ── GLOW-UP 366 · ONE radius scale ──────────────────────────────────────
+     Measured across a single screen: .header 12px, .filter-bar 10px, the slate
+     row 8px, and eight fighter panels at 14px. FOUR values, and TWO of them
+     were introduced by 365 — the pass meant to unify the chrome had quietly
+     added a fourth dialect to a board that already had one.
+     14px wins because the board already speaks it (8 of 9 panels), so adopting
+     it changes MY two surfaces instead of eight-plus, and keeps this out of
+     .fighter-main — a fixed grid this repo has broken before by editing it
+     ahead of a browser check. The one-hour-old chrome yields to the app. */
+  --r-panel:        14px;
+  --r-inset:        8px;
 }
 
 /* ── The scanline. One repeating-linear-gradient at 3% over the whole chrome,
@@ -32758,13 +32769,52 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 .header {
   background: linear-gradient(180deg, rgba(19,26,44,0.82), rgba(8,12,23,0.92));
   border: 1px solid var(--hud-hairline);
-  border-radius: 12px;
+  border-radius: var(--r-panel);
   box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 10px 30px -18px rgba(0,0,0,0.9);
 }
 .filter-bar {
   background: linear-gradient(180deg, rgba(19,26,44,0.55), rgba(8,12,23,0.72));
   border: 1px solid var(--hud-hairline);
-  border-radius: 10px;
+  border-radius: var(--r-panel);
+}
+
+/* ── GLOW-UP 366 · the seam line gets a baseline ─────────────────────────────
+   .fighter-header-row is the ONLY major surface measuring border 0px / radius
+   0px. It is also sticky at 88px, so it is the first thing under the chrome and
+   the label row for the densest data on the board.
+   A BASELINE RULE, NOT A PANEL: it spans full width, so a border and corners
+   would read as a floating card wedged under the bar. What a column header
+   wants is the thing that makes it a header — a hairline its columns sit on. */
+.fighter-header-row {
+  border-bottom: 1px solid var(--hud-hairline);
+}
+
+/* ── GLOW-UP 366 · tabular figures on the BIG metrics only ───────────────────
+   Measured, not assumed — rendering "111" against "000" at 40px:
+     Space Grotesk  54.3 vs 77.8   (zeros 43% wider)
+     Sora           51.4 vs 91.6   (zeros 78% wider)
+     JetBrains Mono 72.0 vs 72.0   (already tabular)
+   So every headline metric in Space Grotesk or Sora reflows as its value
+   changes. Mono readouts were already fine and need nothing.
+
+   DELIBERATELY NOT GLOBAL. tabular-nums sets every digit to the WIDEST digit's
+   advance, so "111" gets WIDER, not narrower. On a board this dense that is a
+   width increase in tight cells — the exact way to manufacture the clipping
+   this session just spent its time removing.
+
+   The dense fighter-card metrics were held back at first on the theory that
+   widening digits inside a fixed grid is how new clipping gets made. MEASURED
+   INSTEAD OF ASSUMED, by applying it live to all 41 and re-measuring:
+     clipped before 0 -> after 0 | 29 elements grew | widest growth 7px
+   Absorbed without pushing anything past its bounds, so they are included. The
+   caution was right to have and wrong to keep. */
+.mh-value,
+.stat-card-num,
+.line-value,
+[class$="-hero-val"],
+[class*="-hero-val"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
 /* ── Wordmark: type-scale contrast is the whole hierarchy here ───────────── */
