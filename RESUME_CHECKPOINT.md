@@ -78,6 +78,26 @@ components. Histogram is dominated by -5 (Fantasy, 19 rows), then -10 (8), with
 a long one-off tail. The -5 cluster sits on THREE-ROUND DECISIONS and appears on
 LOSSES as well as wins, so it is NOT a win-bonus effect. Mechanism UNKNOWN.
 
+*** ONE MECHANISM IS NOW NAILED: THE ARCHIVE INTERMITTENTLY MISSES REVERSALS ***
+28 of the 81 (35%) are EXACTLY -5 x rev; recomputing with rev forced to 0 gives
+delta 0 on every one. rev 1 -> -5, rev 2 -> -10, rev 3 -> -15.
+THE DISCRIMINATOR was scoring, not value: reversal is 5 in FANTASY and 0 in
+PRIZEPICKS, so a missing reversal hits Fantasy rows ONLY. A missing TAKEDOWN
+would hit both (5 and 5). The -5 cluster is 100% Fantasy, never Fantasy_PP.
+INTERMITTENT, NOT SYSTEMATIC: 432 rows have rev>0 and only 28 are wrong (~93%
+correct). NOT a code-path cutover either: clean before 2022-10, then misses
+scatter to 2026-07 interleaved with clean months (2026-04 8/0, 2026-05 6/0,
+2026-08 7/0), and they appear in BOTH settled and backfilled rows.
+UNTESTED NEXT STEP: fightHistory is parsed from the FIGHTER page, the settle
+path from the FIGHT DETAIL page - the two sources may disagree on reversals.
+Needs a live UFCStats fetch. Treat as a starting point only; three hypotheses
+on this thread already failed.
+RESIDUAL after reversals: 53 rows - -60.01 Fantasy (4), -39.98 (3), +10 Fantasy
+(3), -40.5 Fantasy_PP (2), long tail. The Makhachev +10 is in there, unexplained.
+
+THE PLATFORM SPLIT WAS RUN AND WAS NOT THE ANSWER: SETTLED 340 compared / 19
+disagree (6%); BACKFILLED 4185 / 62 (1%). Neither path is broadly broken.
+
 TWO HYPOTHESES TESTED, BOTH FAILED - do not re-run them:
   (a) a miscounted knockdown; (b) the round-vs-decision win bonus. Neither is
   separable by VALUE anyway: each adds exactly 10 to both scoring systems, so
