@@ -32722,6 +32722,15 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   --hud-stale:      #ff5b78;
   --hud-idle:       #5c6d92;
   --hud-ease:       cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Scanline strength, in ONE place. Safe to tune freely: the lines paint at
+     z-index 0 with every child at z-index 1, so this sits on the panel
+     background and never overlays text — raising it costs nothing in contrast.
+     Started at 0.030 x 0.55 opacity (~0.017 effective) which was texture rather
+     than pattern and read as nothing at all. 0.15 was picked ON THE DISPLAY it
+     is used on, by stepping 0.045 / 0.075 / 0.11 / 0.15 / 0.20 live — a 1px
+     line at a 3px period blurs toward flat grey on a HiDPI panel, so the right
+     value cannot be reasoned about, only looked at. */
+  --hud-scanline:   rgba(120, 145, 195, 0.15);
 }
 
 /* ── The scanline. One repeating-linear-gradient at 3% over the whole chrome,
@@ -32734,11 +32743,11 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(120, 145, 195, 0.030) 0px,
-    rgba(120, 145, 195, 0.030) 1px,
+    var(--hud-scanline) 0px,
+    var(--hud-scanline) 1px,
     transparent 1px,
     transparent 3px);
-  opacity: 0.55;
+  opacity: 0.9;
   border-radius: inherit;
   z-index: 0;
 }
