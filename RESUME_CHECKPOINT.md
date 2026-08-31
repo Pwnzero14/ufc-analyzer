@@ -1,555 +1,351 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-30 18:28:40 -04:00
+Last Saved: 2026-08-31 13:43:26 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 7503da8
+HEAD: a1dbd48
 
 ## Last Notes
 ################################################################################
-##  START HERE — NEXT SESSION'S FIRST TASK                                     ##
+##  START HERE - NEXT SESSION'S FIRST TASK                                     ##
 ################################################################################
 
-GLOW-UP 354-363: a SECOND ten-level UI pass over MY PLACED LEDGER and MY PARLAY
-LEDGER. (344-353 was the first pass and is DONE + user-verified — do not redo it.)
+TWO THREADS. Pick by whether props have dropped.
 
---- WHAT ALREADY EXISTS. DO NOT REBUILD ANY OF THIS ---
- 344 Events collapse. Head is a <button>; body wrapped in .plg-ev-inner. State in
-     _ledgerCollapsedEvents, a SESSION-SCOPED Set keyed `${ledger}|${evKey}` — same
-     shape/lifetime as _archiveCollapsedSections. NOT persisted; that is deliberate,
-     do not "fix" it. Newest event open, rest collapsed, FIRST render only via
-     applyLedgerCollapseDefaults.
- 345 ledgerOutcomeStrip() — one tick per leg (per SLIP on the parlay side) in display
-     order, capped 32 with a +N tail.
- 346 COLLAPSE ALL / EXPAND ALL, one button that states which it does next.
- 347 The .plg-leg grid: ELEVEN children, and all FOUR declarations carry 11 tracks.
- 348 REVERTED — sticky. See THE STICKY LESSON below before even considering it again.
- 349 .plp-leg is a 6-track grid (parlay legs align in columns).
- 350 Parlay events collapse on the same mechanism, keyed separately.
- 351 Result filter, PURE CSS off .lgr[data-filter] — 149 rows never enter a JS loop.
-     :has() hides events the filter empties; filter OVERRIDES collapse via !important
-     (a hand-toggled event carries an INLINE max-height no selector can outrank).
- 352 Leg/slip count chip on the head.
- 353 aria-expanded, :focus-visible, reduced-motion; stagger does not replay on expand.
- PLUS an empty-filter message ("Nothing matches this filter...").
+(A) IF PARIS PROPS HAVE DROPPED (board still read ALL FIGHTERS 0 at 21:45):
+  1. GATE 2 (displayedConfidence write path) - needs only the FIRST book lines
+     (Pick6/UD/Betr), not the full Friday set.
+  2. Regenerate predictions.
+  3. Best Picks audit once TD + R1 SS + CTRL + FP are ALL posted (Friday).
+  4. Eyeball Hooker/Parnasse for v39 (3R history moving up to a 5R main flips
+     the SS hit-rate term by up to +4).
 
---- HARD CONSTRAINTS FOR ANY NEW LEDGER UI ---
- * .plg-leg emits ELEVEN children. If you add or remove one, EVERY grid declaration
-   moves together — base AND both breakpoints (<=1500px, <=1180px). Getting this wrong
-   is bug 347: cells land one track LEFT of their headings and the trailing cell wraps,
-   and it SURVIVES REVIEW because head and rows shift together — aligned with each
-   other, under the wrong labels. Same trap bit .pred-row/.pred-head in v42 (6->7
-   children, FOUR declarations).
- * The collapse animation is JS-measured max-height (what the section accordion uses).
-   Two other techniques were tried and FAILED — see the animation note below.
- * Chip/reason prefixes are load-bearing in TWO independent tables (FACTOR_LANES and
-   FACTOR_SHORT). That is a predictions-panel rule but the same class of bug.
+(B) IF NOT: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
+    FP recomputed from UFCStats components. This is the biggest open thread in
+    the project right now and it is NOT a ledger problem - the archive feeds
+    grading, calibration, FP hit rates and CLV. See the section below; the FIRST
+    move is already identified and is cheap.
 
---- CANDIDATE SEEDS (user has not picked; ask or propose) ---
- - MY PLACED LEDGER HAS NEVER BEEN AUDITED (144 legs, YOU 76/144 53%, BOARD 38/80 48%).
-   A UI pass is a natural moment to check the numbers are right, not just prettier.
- - The CONFLICT CHIP is open and unimplemented, and is LINE-BLIND — see
-   [[project_placed_leg_vs_board_line_vintage]]: the board re-scores at the CURRENT
-   line, so a flip against a leg you hold is line vintage, not a reversal.
- - Per-event P/L or units; book breakdown; stat breakdown; sort/search; surfacing the
-   fight-grouping that already exists (GLOW-UP 309) more strongly.
- - The 2-row residue from the archive audit: platform x stat sums to 423 not 425.
+THE GLOW-UP LADDER IS DONE (354-360 shipped, 357 REVERTED as 361). Do not
+re-open it. Remaining ledger ideas are at the bottom; none are required.
 
---- VERIFY LIKE THIS ---
- Numbers via javascript_tool (track counts, offsets, computed styles) — reliable.
- Screenshots from the harness are NOT — see the PREVIEW HARNESS section below.
- AND: measurement proves GEOMETRY, not OCCLUSION. Anything touching position/z-index/
- stacking needs a real screenshot from the extension. That is how 348 shipped broken.
+THE UI WORK IS DONE FOR NOW (362-367, 2026-08-31). The clipping sweep is MINED
+OUT - do not re-run it as a source of work. The design system pass (365-367) is
+also at a natural stop. Both are written up at the bottom, along with the
+measurement traps they walked into, which are the reusable part.
 
 ################################################################################
 
-SESSION HANDOFF (2026-08-30, ~18:30). Tree clean. MODEL_VERSION 43.
-Pushed: feature/sleek-theme-v1 f23a7cb, master ca30f0f (cherry-picked; full parity verified).
+SESSION HANDOFF (2026-08-31, ~12:35). Tree clean, both branches pushed, FULL
+parity. feature/sleek-theme-v1 263f3a6, master 5f13525.
+  Since the 08-30 handoff below: GLOW-UP 362/363/364 (UI clipping), the Duclos
+  alias (2a7044e), and the DWCS overlap check - all detailed at the bottom.
 
-BOARD STATE: "Ready for Next Event", ALL FIGHTERS 0, 40031 records settled. Nurmagomedov vs Song
-finished and absorbed cleanly the morning of 2026-08-29. NO card loaded, so persistAiLeanSnapshot is
-early-returning and NO snapshots are being written. Next card is UFC Paris = "UFC Fight Night: Hooker
-vs. Parnasse"; props have NOT dropped.
+--- previous handoff, still accurate for everything else ---
+SESSION HANDOFF (2026-08-30, ~21:46). Tree clean, both branches pushed, FULL
+parity (src/ dist/ analyzer.html all empty on the diff).
+  feature/sleek-theme-v1  e004212
+  master                  61918a9
 
-=== THREE THINGS SHIPPED THIS SESSION ===
-1. MODEL v36 (1a24b53) VERIFIED ON SCREEN. Closed.
-2. 240fe65 displayedConfidence - calibration was grading a number the board never showed. Read path
-   verified on screen; write path still pending a loaded card.
-3. MODEL v37 (13f827b) SS market anchor - the projection was +6 high and the market wasn't.
-4. MODEL v38 (9eba89b) SS +/-0.5 tier collapsed to a push.
-5. MODEL v39 (d5e79b5) SS hit-rate term duration-normalised.
-6. GLOW-UP 344-353 (765cf38) the two ledgers become navigable; 348 reverted (53d7560).
-7. MODEL v40 (bb3d7ab) predictor learns against the POSTED LINE, not results.
-8. MODEL v41 (65c7f4f) predictions de-biased + snapped to the grid books post on.
-9. MODEL v42 (b53ab99) R1 SS is now a predicted prop.
-10. MODEL v43 (0a960f5) SS/TD get FP's market ties; debut fights stop mirroring.
-    ALL FOUR predictor suggestions are now DONE. Only CTRL remains, parked by agreement.
+=== MY PLACED LEDGER IS NOW AUDITED. IT IS CLEAN. ===
+The "144 legs, YOU 76/144, BOARD 38/80, still NOT audited" line that rode in
+this checkpoint for many sessions is CLOSED. All 144 legs re-graded against the
+current archive with a faithful replay of resolveVsArchive:
+  agree 136 | DISAGREE 0 | unmatched 8 | total 144, stored hits 76
+The 8 unmatched were the REPLAY's own missing NAME_ALIASES (Myktybek Orolbai ->
+...Uulu, the Sumudaerji family), not defects. YOU 76/144 is trustworthy.
 
-=== MODEL v37 (13f827b) - SS MARKET ANCHOR ===
-THE MEASUREMENT (149 settled SS picks from the snapshot store, 2026-08-29):
-  proj - actual  = +6.32   <- model overshoots real SS by six strikes
-  line - actual  = +0.29   <- market essentially unbiased
-  proj - line    = +6.03 mean, +5.00 median, projection above line on 68% of picks
-  MAE proj 27.29  vs  MAE line 25.90   <- the POSTED LINE predicts actual SS better than the model
-Those three reconcile exactly (6.32 - 0.29 = 6.03), so it is not a join artifact. 149/149 verdicts parsed.
+ALL 144 legs are FROZEN verdicts (unpersisted 0). GLOW-UP 174 uses a persisted
+rec.outcome verbatim and never re-resolves, so resolver fixes cannot reach them.
+The re-grade proves they agree anyway - latent, not live.
 
-WHY IT MATTERED: diff = effectiveSS - line_ss is the biggest single score term (+/-2.5) and it was
-comparing the line against an estimator strictly worse than the line. The +6 offset put the projection
-above the line on 68% of picks, which IS the 2:1 OVER volume and IS the 47% OVER hit rate. UNDER had to
-overcome the same +6 handicap before it could fire, so only genuinely strong cases survived - 60%.
-ONE BIAS WITH A FILTER ON ONE SIDE, not two separate edges.
+=== SHIPPED (354-360), PLUS ONE REVERT (361) ===
+354 BOARD chip tooltip: it is the closing BEST PICKS shortlist (<=8 OVER + <=8
+    UNDER, one pick per fight, dedupeNegCorrelatedSameFight ~9567), NOT "the
+    board's full suggested slate". Confirmed in storage: overs 8 / unders 8.
+355 Header says BOARD top-16 and explains why YOU (every leg placed, 29-46 per
+    event) and BOARD (16 per event) are NOT like-for-like. SELECTION below IS.
+356 Drift marker on frozen actual values that no longer match the archive.
+357 REVERTED - see the next section. Do not re-apply it.
+358 BY BOOK / BY STAT breakdown strips, with a 1.5 SE bar before any cell takes
+    a side (the GLOW-UP 310 rule). Everything currently reads FLAT.
+359 Fighter search on BOTH ledgers, matching in CSS, both corners per row.
+360 Concentration chip on the event head: "N FIGHTS - MAX M".
 
-THE SPLIT THAT STARTED IT (SS, n=149, breakeven 52.4%):
-  OVER  47/99 = 47%      UNDER 30/50 = 60%
-  by tier: OVER 40/56/46 (weak/mid/strong) - FLAT-TO-INVERTED, strong 65+ is the WORST cell
-           UNDER 45/65/77 - MONOTONIC, the model genuinely knows what it is doing on that side
-  Raw split alone was NOT significant (two-proportion z=1.44, p=0.15). The mechanism is what made it
-  actionable - do not quote the split on its own.
+=== 357 WAS WRONG AND IS REVERTED. THE ARCHIVE IS NOT UNIFORMLY RIGHT. ===
+357 displayed the archive's value on any drifted leg. It was built on TWO SS
+cases where UFCStats agreed with the archive. It did not generalise. PER STAT:
+  SS drifts -> ARCHIVE right (Douglas 7/14/14, Mederos 110/73/73).
+  FP drifts -> STORED right, ARCHIVE WRONG. UFCStats components compute 117.5
+    (Fantasy) / 66 (PP) on all three Makhachev rows, matching stored; the
+    archive reads 127.5 / 76 - exactly +10 in BOTH scoring systems.
+The ledger now MARKS the disagreement and picks NEITHER side; the archive's
+number is named in the tooltip. DO NOT re-apply 357 on SS evidence alone - that
+is precisely the reasoning that produced it.
 
-THE FIX:  effectiveSS = line_ss + 0.5 * ((effectiveSS - 6) - line_ss)
-  == midpoint(line, proj) - 3. Applied AFTER durationAdjustProjection in calcSSLean.
-  Constants exported from config/index.ts as SS_PROJECTION_BIAS=6, SS_MARKET_ANCHOR_WEIGHT=0.5.
-  Verified in node before committing: shipped formula is byte-identical to swept candidate C, and the
-  predicted mean gap drops +6.03 -> +0.015.
+=== (B) THE ARCHIVE FP INVESTIGATION - OPEN, AND THE BIGGEST THREAD ===
+81 archive Fantasy/Fantasy_PP rows disagree with FP recomputed from UFCStats
+components. Histogram is dominated by -5 (Fantasy, 19 rows), then -10 (8), with
+a long one-off tail. The -5 cluster sits on THREE-ROUND DECISIONS and appears on
+LOSSES as well as wins, so it is NOT a win-bonus effect. Mechanism UNKNOWN.
 
-THE SWEEP (candidate table, same 149 rows; line-only MAE baseline = 25.90):
-  today  (proj - 0)        MAE 27.29  bias +6.32  O:U 2.52  fires 116  dirHit 54%
-  debias6 + k=0.5  <-WON   MAE 25.61  bias +0.30  O:U 0.81  fires  85  dirHit 59%
-  Only candidate to BEAT the line-only MAE baseline, best dirHit, near-balanced O:U.
-  Trade: 31 picks of volume for +5pts accuracy. 116 x 1.6pts ~ +1.9u today vs 85 x 6.6pts ~ +5.6u.
+*** ONE MECHANISM IS NOW NAILED: THE ARCHIVE INTERMITTENTLY MISSES REVERSALS ***
+28 of the 81 (35%) are EXACTLY -5 x rev; recomputing with rev forced to 0 gives
+delta 0 on every one. rev 1 -> -5, rev 2 -> -10, rev 3 -> -15.
+THE DISCRIMINATOR was scoring, not value: reversal is 5 in FANTASY and 0 in
+PRIZEPICKS, so a missing reversal hits Fantasy rows ONLY. A missing TAKEDOWN
+would hit both (5 and 5). The -5 cluster is 100% Fantasy, never Fantasy_PP.
+INTERMITTENT, NOT SYSTEMATIC: 432 rows have rev>0 and only 28 are wrong (~93%
+correct). NOT a code-path cutover either: clean before 2022-10, then misses
+scatter to 2026-07 interleaved with clean months (2026-04 8/0, 2026-05 6/0,
+2026-08 7/0), and they appear in BOTH settled and backfilled rows.
+UNTESTED NEXT STEP: fightHistory is parsed from the FIGHTER page, the settle
+path from the FIGHT DETAIL page - the two sources may disagree on reversals.
+Needs a live UFCStats fetch. Treat as a starting point only; three hypotheses
+on this thread already failed.
+RESIDUAL after reversals: 53 rows - -60.01 Fantasy (4), -39.98 (3), +10 Fantasy
+(3), -40.5 Fantasy_PP (2), long tail. The Makhachev +10 is in there, unexplained.
 
-*** IN-SAMPLE CAVEAT - DO NOT FORGET ***
-6 and 0.5 were chosen against the same 149 rows they are scored on. Expect worse than 59% live; Wilson
-lower bound on 50/85 is ~48%, BELOW breakeven. Kept as round numbers (not 6.32) to limit the overfit.
-This is mechanism-backed and the best available, NOT proven. RE-MEASURE AFTER PARIS.
+THE PLATFORM SPLIT WAS RUN AND WAS NOT THE ANSWER: SETTLED 340 compared / 19
+disagree (6%); BACKFILLED 4185 / 62 (1%). Neither path is broadly broken.
 
-*** TWO THINGS LOOKED FOR AND NOT FOUND - DO NOT RE-TRY ***
-- GAP SIZE IS NOT ANTI-SIGNAL FOR SS. OVER by |gap| runs 50% / 36% / 55% (<5 / 5-12 / 12+) -
-  non-monotonic, small cells. FP v30/v31's "cap the gap at +/-15" does NOT transfer to SS.
-- THE OPPONENT ADJUSTMENT ADDS NOTHING. Verdict kind split: opp-adjusted 'proj' 66/128 = 52% vs raw
-  career 'avg' 11/21 = 52%. Identical. oppAvgSSAllowedLean is not earning its place.
-- ALSO WRONG ON THE WAY: "shrink toward the line" was the first instinct and is BACKWARDS. Scaling
-  preserves the gap's SIGN, so it cuts volume while leaving the skew intact - the sweep had it making
-  O:U WORSE (2.52 -> 4.40 at k=0.5, and 12.67 at k=0.25) because only large POSITIVE gaps survive the
-  +/-3 threshold. A systematic offset needs SUBTRACTION, not multiplication.
+TWO HYPOTHESES TESTED, BOTH FAILED - do not re-run them:
+  (a) a miscounted knockdown; (b) the round-vs-decision win bonus. Neither is
+  separable by VALUE anyway: each adds exactly 10 to both scoring systems, so
+  the Makhachev +10 cannot discriminate them. The aggregate histogram matches
+  neither prediction (predicted +15 Fantasy / +20 PP for 3R decisions; observed
+  -5 dominant).
 
-=== MODEL v38 (9eba89b) - SS +/-0.5 TIER COLLAPSED ===
-|score| < 1.5 is now a push for full-fight SS. That tier fired a directional lean at a flat conf 54 off a
-SINGLE weak factor ("slightly above line" is +0.5 on its own; so is "striker style"). Over the same 149
-picks, conf<=55 ran 21/50 = 42% - OVER 40%, UNDER 45%, losing on BOTH sides against a 52.4% breakeven and
-the ONLY cut in the whole diagnosis where the two directions agreed. calcSSR1Lean already collapsed this
-exact tier; full-fight SS now matches. TD and FT KEEP their +/-0.5 tier - FT runs 68% and was never
-implicated. Replayed in node: only the +/-0.5..1.5 band changes, every |score| >= 1.5 maps byte-identically.
+*** FIRST MOVE NEXT TIME ***
+The platform split HAS been run (see above - it was not the answer) and the
+reversal mechanism HAS been found. What is left is the 53-row residual and the
+question of WHY reversals are missed intermittently. The one untested lead is
+that fightHistory is parsed from the FIGHTER page while the settle path parses
+the FIGHT DETAIL page; compare the two sources for one known-missed fight.
+That needs a live UFCStats fetch, so it is not a five-minute job.
 
-*** v37 + v38 + v39 ALL STACK - THEY WILL BE MEASURED TOGETHER ***
-The anchor independently cut fires 116 -> 85 and v38 cuts again on top, so SS lean VOLUME will drop
-SHARPLY. That is the intent (SS was 52% vs a 52.4% breakeven, so less volume at higher quality is the
-trade) but it means the two changes CANNOT be attributed separately after Paris. The 42% was measured
-under PRE-v37 scoring: the anchor changes diff -> score -> which picks land in the band, so do NOT expect
-42% to carry over. The user asked for v38 after I recommended holding it; that was their call, recorded
-here so nobody "re-litigates" it next session. v39 was likewise requested after the same caveat.
-THREE SS changes now land before Paris posts and CANNOT be attributed separately after it settles. v37 and
-v38 both CUT volume; v39 moves scores in BOTH directions and may add some back. If SS comes back wrong
-after Paris, the way to isolate is to revert them one at a time (they are separate commits: 13f827b,
-9eba89b, d5e79b5) - not to re-derive from the archive, which will by then mix pre- and post-change picks.
+THE LIVE SCORER IS NOT THE BUG. The settle log reconciles by hand: Sumudaerji
+SS=41 CTRL=0.23min W R3 over a 15.00min fight -> FP 70.6, which only works with
+the DECISION bonus (16.4 + nonSig*0.2 + 0.41 + 30), and FP_PP 50.5 likewise.
+So these are HISTORICAL writes. Note "re-applied N results" in the settle log
+re-applies STORED results; it does NOT re-derive them from components.
 
-=== MODEL v39 (d5e79b5) - SS HIT-RATE TERM DURATION-NORMALISED ===
-history.filter(h => h.sigStr > line_ss) asked how often PAST fights cleared THIS fight's line using raw
-strike counts, so 5R main-event output was measured against a 3-round line as if the fights were the same
-length. Worth +/-2 (largest after diff) and the LAST duration-blind factor, beside a projection
-duration-adjusted since v6 and market-anchored since v37. Each past fight is now scaled by
-expMins/thatFightMins via marketExpectedFightMinutes, bounded 0.5-1.5.
-NODE REPLAY - the distortion was NOT marginal:
-  5R history (110 SS / 25m) into a 3R fight, line 60:  raw 5/5 -> +2   normalised 0/5 -> -2
-  3R history (55 SS / 13m) into a 5R main event, line 70: raw 0/5 -> -2  normalised 5/5 -> +2
-  A 4-POINT SWING on a term whose tier thresholds are 1.5 and 3.0.
-GUARDS VERIFIED in the same replay: a 1-minute finish does not extrapolate (1.5 cap holds it to 9 SS vs a
-line of 40), and BOTH fallback paths - history with no timeSecs, and a null expMins - reproduce v38
-byte-identically. calcTDLean has the same un-normalised pattern and was deliberately NOT changed (TD is
-n=6 in the archive, far too thin).
+WHY IT MATTERS BEYOND THE LEDGER: the archive feeds grading, calibration, the FP
+hit rates and CLV. Nine ledger rows were the symptom, not the disease.
 
-*** ALL SS LOOSE ENDS FROM THE DIAGNOSIS ARE NOW CLOSED ***
-- Also noted: SS is the ONLY stat with a variance haircut (ssStdDev>14 -> conf-8, >7 -> -4, else +3).
-  TD and FT have none. Not changed; it is honest damping, not the bug.
+=== TWO MORE HYPOTHESES THAT DIED THIS SESSION - DO NOT RE-DERIVE ===
+1. "boardStatsFor reads a field that does not exist (p.line / p.platform)."
+   WRONG. TWO snapshot stores with DIFFERENT field names:
+     best_picks_snapshots_v1 - picks carry date, line, platform. THIS is what
+       boardStatsFor and the selection/ALPHA diagnostics read (~15557).
+     ai_lean_snapshots_v1    - picks carry capturedAt, activeLine,
+       activePlatform, and NO date/line/platform at all.
+   Its Date.parse(s.date) collapse is CORRECT for its store. The house rule
+   about collapseSnapshotsByEvent does NOT apply to the ledger. CHECK WHICH
+   STORE BEFORE DIAGNOSING - this cost three wrong diagnoses in one session.
+2. "archiveIdx first-row-wins over duplicate rows causes the drift." WRONG, and
+   it was queued as priority 1. A key event|fighter|propType legitimately holds
+   ONE ROW PER BOOK - same result, different line - so first-row-wins is
+   harmless. All 32 rows behind the 9 drifts agree with each other and disagree
+   with the frozen value. Do NOT change archiveIdx on a dupRows correlation.
 
-=== 240fe65 - displayedConfidence ===
-THE BUG: persistAiLeanSnapshot stored `confidence: el.conf` - RAW, pre-CLV-boost, pre-recalibration -
-while the fighter row displays recalConf. Calibration and grading were grading a number that never
-appears on screen and would read the same -5.1 however well the engine worked.
-NOT done by replacing raw: of the FIVE readers of snapshot confidence, THREE are ENGINE INPUTS -
-initRecalibrationMap, the scope-2 map build, and deriveConfidenceMemoryTagsFromSnapshotPick. The map's
-domain is raw confidence and its OUTPUT is the displayed value, so feeding it back compounds the
-correction every cycle. All three now carry a "RAW, deliberately" comment.
-A RACE THAT WOULD HAVE POISONED THE DATA: the caller fires initRecalibrationMap and
-persistAiLeanSnapshot as two un-awaited voids, so on a cold load the map was null and displayedConfidence
-would have silently stored the UN-recalibrated value. persistAiLeanSnapshot now AWAITS it and records
-`recalibrationReady` per pick.
-Helpers: isRecalibrationReady, snapshotDisplayConf (readouts ONLY), snapshotUsesDisplayedConf,
-displayedConfFor(f, lean) - lean passed EXPLICITLY because the snapshot writers log a specific column's
-lean, not always getEffectiveLean(f). persistBestPicksSnapshot writes the field too (nothing reads it
-there yet; snapshots are write-once history and cannot be backfilled).
-NO MODEL_VERSION bump for this one - reporting change.
+=== UFCSTATS CACHE SHAPE (cost FOUR wrong joins - do not guess it again) ===
+key ufcstats_v51_<name_lower_underscored>; top level is
+{careerStats, detailUrl, fetchedAt, fightHistory, name}.
+  - the array is **fightHistory**, NOT history
+  - each entry's opponent field is **opponent**, NOT opp
+  - date is human format ("Aug. 22, 2026"), NOT ISO - slicing it against an ISO
+    date never matches. Join on evKeyOf(entry.event) instead.
+  - entries carry sigStr/sigStrR1/sigStrBody/sigStrLeg/td/kd/ctrlSecs/sub/rev/
+    totStr/timeSecs/round/method/result - and NO fp. FP must be recomputed via
+    calcFPForPlatform (src/analyzer/fantasy-scoring.ts).
+  - method is short form ('U-DEC', 'S-DEC', 'KO/TKO'), not the fight-page wording
+Caches can be STALE: Kaue Fernandes held 4 fights ending Sep 2025, so his Aug
+2026 bout was simply absent.
 
-*** THREE GATES - ONE PASSED, TWO PENDING ***
-GATE 1 (read path) PASSED 2026-08-29 17:16 by screenshot: "425 GRADED AI PICKS - 0/425 ON DISPLAYED CONF"
-  with EVERY number below unchanged. That is the CORRECT pass condition - the badge existing proves the
-  wiring loaded, 0/425 proves the fallback works and no stored snapshot carries the field yet. If the
-  numbers HAD moved that would have been the bug.
-GATE 2 (write path) PENDING A LOADED CARD. Needs only the FIRST book lines (Pick6/UD/Betr), not the full
-  Friday props - the gate is >=1 pick with a lean AND a finite activeLine. Roster alone is NOT enough:
-  predicted lines live in a different store and do not satisfy getSourceActiveLine. Verify read-only:
+=== LESSONS THIS SESSION RE-TAUGHT ===
+- DO NOT GENERALISE FROM TWO DATA POINTS. 357 shipped on two SS cases and was
+  contradicted by the FP check within the hour. If a rule is about to drive
+  DISPLAY logic, test it on every stat it will touch first.
+- MEASUREMENT PROVES GEOMETRY, NOT OCCLUSION (the 348 lesson, again). The first
+  drift marker appended a glyph after the value. .plg-actual is nowrap in a
+  fixed track, so the extra width did not overflow the ROW - the left neighbour
+  painted over the text and "actual 110" rendered "ual 110". scrollWidth never
+  moved; a screenshot caught it. Fix was a ZERO-WIDTH signal (class +
+  border-bottom + title). SIBLING OVERLAP *IS* measurable if you compare EDGES
+  (kids[i].right > kids[i+1].left) - reuse that on any dense-grid change.
+- A CELL MUST NOT TAKE A SIDE IT CANNOT SUPPORT (358, per GLOW-UP 310's 1.5 SE
+  bar).
+- COMMIT MESSAGES GO TO A FILE. git commit -m with backticks let bash
+  command-substitute them and silently ate words. Use git commit -F.
+- BASH HEREDOCS CONTAINING QUOTES BREAK THIS TOOL OUTRIGHT, even quoted ones.
+  Two attempts died at the same line. Write the file with the Write tool.
+- A python heredoc that does not CLOSE the file may not flush. Use with-blocks.
 
-chrome.storage.local.get('ai_lean_snapshots_v1', (r) => {
-  const snaps = r.ai_lean_snapshots_v1 || [];
-  const latest = [...snaps].sort((a,b)=>String(b.capturedAt||'').localeCompare(String(a.capturedAt||'')))[0];
-  if (!latest) return console.log('no snapshots');
-  const picks = latest.picks || [];
-  console.log('event:', latest.event, '| captured:', latest.capturedAt);
-  console.log('picks:', picks.length,
-    '| carrying displayedConfidence:', picks.filter(p=>Number.isFinite(Number(p.displayedConfidence))).length,
-    '| recalibrationReady:', picks[0] && picks[0].recalibrationReady);
-  console.table(picks.slice(0,12).map(p=>({fighter:p.fighter, stat:p.source, lean:p.lean,
-    raw:p.confidence, displayed:p.displayedConfidence,
-    delta: Number.isFinite(Number(p.displayedConfidence)) ? Number(p.displayedConfidence)-Number(p.confidence) : null})));
-  console.log('TOTAL snapshots:', snaps.length);
-});
+=== WHAT THE BREAKDOWN SAYS (nothing is actionable yet) ===
+BY BOOK  PICK6 27/54 50% | UNDERDOG 24/43 56% | BETR 9/22 41% | DK 9/14 64% |
+         PRIZEPICKS 7/11 64%
+BY STAT  FP 28/55 51% | SS 23/44 52% | R1 SS 15/22 68% | TD 4/11 36% |
+         CTRL 3/7 43% | KD 2/4 50% | FT 1/1 100%
+NOT ONE separates from the 53% overall at 1.5 SE. Watch R1 SS (best cell, 1.4
+SE, nearly there). Pick6 carries 54 of 144 legs at exactly 50% - largest
+exposure on the weakest non-thin book. Do NOT act on Betr 41%; it is the cell
+most likely to tempt a change and has the least support.
+CONCENTRATION: 7 legs on ONE fight on the Nurmagomedov card (16% of it).
 
-  Expect recalibrationReady TRUE and a non-zero delta on most picks. FALSE means the awaited
-  initRecalibrationMap is not populating - investigate before trusting the stored values.
-GATE 3 (badge moves off 0/N) is AFTER PARIS SETTLES - calibration and grading only count picks from PAST
-  events with archive rows. A stuck 0/N all through fight week is EXPECTED, not a failure.
+=== REMAINING LEDGER IDEAS (none started, none required) ===
+- Per-event P/L was DELIBERATELY SKIPPED at rung 4: pick-em legs are not
+  independently priced, so 1u-per-leg P/L is hits-minus-misses restated. Needs
+  stake entry, which changes how legs are RECORDED, not just displayed.
+- The CONFLICT CHIP is still unimplemented and LINE-BLIND.
+- The 2-row archive-audit residue: platform x stat sums to 423 not 425.
 
-=== PROP LINE PREDICTOR OVERHAUL (v40 / v41 / v42) - 2026-08-30 ===
-All three USER-VERIFIED BY SCREENSHOT after reload + Generate Predictions.
-Board now reads MODEL v42, shows an R1 SS column, and every FP row carries its
-"Book calibration: X -> Y" reason.
+################################################################################
+##  2026-08-31 SESSION - UI CLIPPING + THE DWCS CHECK                          ##
+################################################################################
 
---- v40 (bb3d7ab) THE PREDICTOR WAS TRAINED ON THE WRONG TARGET ---
-runLearningCycle computed its gradient from `result` - the stat the fighter went on to
-produce - while what this predictor OUTPUTS is a LINE. Measured: over 149 settled SS
-props the posted line sat 0.29 from the eventual result on average but with MAE 25.90,
-so training on outcomes spent the whole gradient chasing ~26 points of variance no book
-is trying to price. The v13 tuning comment citing MAE 7.9 gave it away - that is only
-reachable against a line. Tuned on one target, learned on the other.
-FIX: effectiveDelta = predicted - median OPENING line where archived; fallback chain
-open -> close -> old RLM-blended result -> raw result. The relative-error DENOMINATOR
-moved to the same scale (marketTarget) - left on `actual` it would divide a line-scale
-numerator by a result-scale magnitude, worst on TD where result 0 vs line 0.5 is routine.
-NEW: backtestVsPostedLines() + "Predictor vs Posted Lines" panel (its own sub-nav item
-under OTHER). Archive-driven, needs NO live card.
+BOARD STATE AT HANDOFF: Paris props are only PARTIALLY in. Underdog has FT lines
+(13 archived, "Partial - 13 lines"); Pick6, Betr, PrizePicks and DK Sportsbook
+all still WAITING. 28 fighters, 6 actionable leans, TOP EDGE Michael Page
+FT-OVER, 11 unresolved records. Gate 2 may already be satisfiable - its bar is
+>=1 pick with a lean AND a finite activeLine, not full coverage - but the Best
+Picks audit still needs TD + R1 SS + CTRL + FP.
 
-*** THE MEASUREMENT THAT JUSTIFIES IT (10 events, 558 props) ***
-            vs POSTED LINE       vs RESULT (old metric)    n
-    SS      MAE 12.6  bias +4.1        29.7               227
-    TD      MAE  0.5  bias -0.0         1.1               121
-    FP      MAE 17.8  bias -7.8        37.2               210
-The line target is ~2.4x more learnable on EVERY stat.
-Per book (MAE / bias): Betr SS 9.9 +0.5 | Pick6 SS 11.4 +1.9 | PrizePicks SS 13.0 +4.6
-  | Underdog SS 13.0 +5.8 | DK SS 14.4 +3.5. Best-matched book on SS is Betr, worst DK.
-CAVEAT: per-fighter trends were EWMA'd on the OLD target and are on the wrong scale.
-Deliberately NOT reset - alpha >= 0.10 washes them out over ~7-10 events - but read
-early post-v40 trend values with that in mind.
+=== THE DWCS OVERLAP: CHECKED, AND THERE IS NO CONTAMINATION ===
+Underdog captured 23 names, ~10 of them OFF-CARD (Patrick Rivera, Adam Darby,
+Modestino Rodrigues, Brandon Holmes, Adam Livingston, Hunter Smith, Silvestre
+Sanchez, Liam McCracken, Charlie Cleveland, Gabriel Lourenco). Only the 13
+ON-ROSTER fighters reached the archive, matching the "13 archived" chip. ZERO
+DWCS rows carry a UFC event name. DWCS results archive under their own label
+("DWCS 8.3", results, no lines). That is the desired split - keep the data, skip
+the fight card - and it is ALREADY the behaviour. Do not "fix" it.
+lines_underdog shape is {capturedAt, fighters:[...]}; entries carry
+name/opponent/line_*/*_avail/*_odds and NO promotion or slate field, so any
+attribution rule would have to be roster-based, not source-based.
 
---- v41 (65c7f4f) CALIBRATE TO WHAT BOOKS ACTUALLY POST ---
-Suggestions 3 + 5, one layer. BOTH facts MEASURED from the 39.9k-row archive, and both
-would have been got wrong by eye:
- GRID - every book posts SS, TD and R1 SS on .50, but FANTASY is book-specific:
-   Betr/Pick6 .50, UNDERDOG .99 (366/366 rows), PRIZEPICKS .55 (100%). 63.7 is not
-   postable anywhere; it rounds to 63.5 / 63.99 / 63.55 by book. FightTime is genuinely
-   mixed (.50/.75/.25/.99) so the 80%-consistency gate REFUSES to snap it.
- OFFSET - the correctable half of the error. FP ran 7.8 BELOW books, SS 4.1 ABOVE.
-Both RECOMPUTED from the archive every generation, never frozen. That is load-bearing:
-v40 now trains against the line too, so true bias shrinks event over event and this layer
-shrinks with it. A stored constant would fight the learner and over-correct.
-Applied BEFORE the save, so the stored prediction IS the calibrated one - Best Picks, EV
-and parlay maths read one number instead of re-deriving it.
-PrizePicks FP +19.2 is NOT a model error: Fantasy_PP is a different scoring basis, and a
-per-book offset absorbs it. Same reason v33 keeps PP out of FP best-line. The headline
-number uses the ALL-BOOK offset so that gap cannot drag it.
-VERIFIED ON SCREEN: FP rows show "Book calibration: 63.0 -> 70.5", "85.0 -> 92.5",
-"42.5 -> 50.5" etc (all ~+7.5-8.0); Hooker SS 52 -> 48.5. Every posted value ends .5.
+METHOD TRAP: the ghost detector reported 1 ghost and the true count was 0. It
+compared a DOM-scraped roster name against an archive name WITHOUT
+alias-normalising either side, so "Matthieu Letho Duclos" (UD) looked off-card
+against "Matthieu Duclos" (roster). ALIAS-NORMALISE BOTH SIDES or a sweep
+invents contamination.
 
---- v42 (b53ab99) R1 SS IS PREDICTED ---
-Best-labelled prop that was not being predicted: 543 SS_R1 archive rows, EVERY one
-carrying an openLine, .50 grid at DK / PrizePicks / Underdog.
-predictSSR1 deliberately does NOT reuse predictSS. Round one is a FIXED five minutes, so
-the v12 rate x expected-minutes apparatus and its v14/v15 corrections do not apply. The
-only duration term is early-finish risk INSIDE the round, and it is one-sided.
-CONSTANTS FITTED, not chosen. Walk-forward 3,104 samples / 478 cached fighters (baseline
-from PRIOR fights only):
-    prior  0-8   n=111  mean err -8.25   <- LOW priors UNDER-predicted
-    prior  8-13  n=631  mean err -2.61
-    prior 13-18  n=986  mean err -0.55
-    prior 18-24  n=950  mean err +1.28
-    prior 24+    n=426  mean err +8.87   <- HIGH priors OVER-predicted
-A 17-point tilt. Empirical Bayes toward the MEASURED league mean 17.15 with K=10 (swept
-0..12) flattens every bucket to within 1.02; MAE 9.47 -> 9.01. Same as v15: the MAE gain
-is small, killing the tilt is the point, because the tilt sits where an OVER gets bet.
-R1 SS SHARES ss_pace_modifier and ss_trend (trend x 0.57, the median R1 share of
-full-fight SS over 451 paired fighter-events) rather than fitting a second modifier on a
-fifth of the data. So it learns THROUGH the SS signal; its own accuracy is tracked in the
-Predictor vs Posted Lines panel, not by a separate gradient.
-GRID DISCIPLINE: the row went 6 children -> 7, so ALL FOUR track declarations moved
-together (.pred-row and .pred-head, base AND the 1100px breakpoint). That is the 347 bug's
-exact shape. Verified live: 1280px -> 7 kids / 7 tracks / 1 grid row / zero header-to-cell
-offset; 1050px -> 7 kids / 6 tracks with the factors rail correctly spanning 1 / -1.
+That variant WAS a real latent bug for a different reason, now fixed (2a7044e):
+namesMatch is surname-token based so archiving worked, but resolveVsArchive uses
+an EXACT event|normalizedName|propType key - a leg placed on "Matthieu Duclos"
+would never have found a row filed under "Matthieu Letho Duclos". Same shape as
+the 8 legs (Orolbai, Sumudaerji) the 08-30 audit could not re-grade.
 
---- v43 (0a960f5) SUGGESTIONS 2 + 4 - USER-VERIFIED BY SCREENSHOT ---
-#2 BOOK PRIOR + MARKET ANCHOR FOR SS / TD / R1 SS. computeBookPriorFP and
-applyMarketAnchor had been FP-ONLY since v22, so SS and TD had NOTHING tying them to how
-books price a given fighter - the likeliest reason FP tracks the market better in the v40
-backtest (FP MAE 17.8 on ~85-point lines is proportionally far better than SS 12.6 on ~43).
- - computeBookPrior: same median-of-posted-lines, same >=5 sample gate. `books` stays
-   OPTIONAL because only FP needs a rulebook exclusion (PrizePicks scores fantasy
-   differently); SS and TD mean the same quantity everywhere and take every book.
- - The anchor cap is a FRACTION of the fair line (0.18), not FP's absolute 15, because TD
-   lines average 1.3 and SS 43 - one absolute cap cannot serve both. 0.18 is what FP's 15
-   already is against its ~85 mean, so all four props run on ONE rule.
- - `shift` comes from bookCalibration, so "fair" = posted line adjusted by how this model
-   is measured to sit against books. bookCalibration is HOISTED above the pair loop for
-   this; the v41 calibration pass reuses the same table.
+=== THE CLIPPING SWEEP: WHAT IT PRODUCED, AND ITS ONE BIG MISTAKE ===
+*** MEASUREMENT TRAP - READ BEFORE ANY LAYOUT WORK ***
+Every measurement in the first half of this session was taken at 827px, with
+DevTools DOCKED beside the page. That is UNDER the 1100px breakpoint and NOT a
+width this board is ever used at (normal use is ~1707px, DevTools closed).
+It caused a defect to be flagged that does not exist in normal use, and caused
+a real one to be both oversold and then undersold. UNDOCK DEVTOOLS (its menu ->
+Dock side -> undock) before any layout sweep, or the results describe a layout
+nobody sees.
 
-#4 THE DEBUT MIRROR - FIXED. With no history a fighter got the league prior, and because
-the OPPONENT also had none the "opponent allows" term was the league default too, so both
-sides came out byte-identical.
-MEASURED ON POSTED OPENING LINES (favourite minus underdog):
-    SS +13.4 (n=266)   FP +16.0 (n=94)   R1 SS +4.7 (n=77)   TD +0.2 (n=75)
-DELIBERATELY measured on LINES, not results: on RESULTS the same split reads +24.2 SS, but
-favourites win more and winners fight longer, so the outcome gap is ~double what books
-price and would over-separate. HALF the gap to each side keeps the pair's midpoint on the
-league prior - separates the two fighters WITHOUT moving the level of the fight. Fires
-ONLY with zero history (a record already encodes level; otherwise double-counted).
+362 pred-factor - REAL, the big one. v41's "Book calibration: ..." reason was
+    registered in NEITHER table that owns chip rendering: FACTOR_SHORT had no
+    rule so compressFactor fell through to `return r` and rendered the whole
+    sentence (326px over, on 28 chips), and FACTOR_LANES had no matching test
+    (^Book prior does not cover ^Book calibration) so it drew with NO lane class
+    and was absent from the legend. BOTH tables match the RAW reason. Now
+    compressed to "BCAL 71->78.5" and joined to the existing pf-cal lane.
+    THE TWO-TABLE TRAP IS REAL - a new reason string needs an entry in both.
+363 pf-vs - REAL but small. It was one nowrap+ellipsis run of
+    "vs {opponent} - {rounds}R", so overflow ate the TAIL: the round count,
+    which drives 5R/3R inference and v39's duration-normalised hit-rate term.
+    Now an inline-flex with a shrinkable .pf-vs-name and a flex:0 0 auto
+    .pf-vs-r. Still 11 rows clipping at full width - by design; the name
+    truncates and the marker survives. No child-count change (the 347 rule).
+364 bias-platform - REAL. Printed the raw storage key DRAFTKINGS_SPORTSBOOK.
+    Fixed with a TRANSFORM, deliberately not a sixth lookup table:
+    BP_SLATE_BOOK_ABBR, BOOK_ABBR, BOOK_NAME, BP_BOOK_SHORT and BP_BOOK_FULL are
+    already five copies of the same book-label map.
+fighter-name - NON-ISSUE. Its truncation lives only inside
+    @media (max-width: 1100px) with max-width 260px. No cap above that, and the
+    board is used at ~1707px. Do not "fix" it.
+pred-gen - FALSE POSITIVE. The sweep reported 196px; it does not reproduce.
+    vOverflow is 0, scrollW/clientW differ by 19px of phantom trailing advance
+    (padding 5px 14px + letter-spacing 0.44px), and the label renders in full.
 
-*** TD IS EXCLUDED FROM THE DEBUT SPLIT, and the node replay is what caught it ***
-Its 0.2 gap is SMALLER than the 0.5 grid TD lines are posted on. A +/-0.1 nudge on a prop
-that only takes 0.5 / 1.5 / 2.5 cannot express itself, and the 0.5 floor then broke the
-midpoint symmetry the other three keep (fav 0.6 / dog 0.5, midpoint 0.6 against a 0.5
-base). A gap under the grid resolution is not a signal you can post. Generalise it.
+THE SWEEP IS SPENT. Down to phantom 19px readings and enum labels. If you want
+more UI, pick it from something annoying in daily use, not another sweep.
 
-VERIFIED ON SCREEN after reload + Generate (board reads MODEL v43):
-    Aljarouj (fav)  SS 53.5  R1 SS 24.5  FP 81.5
-    Sintes   (dog)  SS 40.5  R1 SS 19.5  FP 65.5
-    gaps            13.0            5.0      16.0   <- matches the measured table
-FP midpoint lands exactly on the 73.5 base. Benouaich (debut, favourite) got +8 FP while
-Montenegro (has history) correctly did not move.
+################################################################################
+##  2026-08-31 PM - THE DESIGN SYSTEM PASS (365-367)                           ##
+################################################################################
 
-*** THE DOUBLED NO HISTORY BADGE - FIXED (f23a7cb), AND IT WAS NOT COSMETIC ***
-Reported as a duplicate badge; it was v43's OWN bug and it was DESTROYING information.
-applyDebutMoneylineSplit wrote its reason starting "No history - separated from opponent
-on price...". That prefix is claimed TWICE: the guard lane matches /^No history/i, and so
-does the NO HISTORY entry in FACTOR_SHORT. So the chip carrying the whole debut
-adjustment - which side, at what price, by how much - was compressed to the literal
-string "NO HISTORY" and rendered beside the real one from predictFantasy. Two identical
-badges, and the adjustment itself invisible.
-FIX: the reason leads with what it IS ("Debut split +8.0: ..."), gets its own
-FACTOR_SHORT entry so the chip reads DEBUT +8.0 with the signed magnitude, and moves to
-the CORRECTION lane beside FP cal / Book prior / Trend - a post-hoc adjustment to the
-LEVEL, not a guard warning that the model had little to work with.
-PLUS a safety net worth keeping: the rail pools reasons from SEVERAL stat predictions, so
-any two predictors reaching the same conclusion each contributed a chip. Ranked reasons
-are now deduped on the COMPRESSED label, not the raw string - the raw texts differ ("No
-history, using league baseline" vs "No history - component estimate") while the chip the
-user sees is identical.
-VERIFIED LIVE on 26 rendered rows: zero rows carry a duplicate chip; NO HISTORY appears
-exactly once per debut row.
-GENERALISE: a reason string's PREFIX is load-bearing in two independent tables
-(FACTOR_LANES and FACTOR_SHORT). Any new reason must be checked against BOTH, or it will
-be silently swallowed by whichever pattern claims its opening words.
+feature/sleek-theme-v1 a1dbd48 | master ce42c13 | full parity, tree clean.
 
-*** WHERE THE PREDICTOR DATA LIVES (saves a re-derivation) ***
-- The cached fighter log key is `fightHistory`, NOT `history` (FighterDB uses `history`;
-  the ufcstats_v49_* CACHE uses fightHistory). Getting this wrong reports 0% coverage.
-  494 cached fighters, 4,022 fighter-fight rows, 99% carry sigStrR1.
-- 4,022 is fighter-fight PAIRS, not events: one fight appears twice when both corners are
-  cached. 3,930 belong to fighters with >=2 fights; 3,104 are usable walk-forward samples
-  (the first two fights of each log have no prior).
-- Measure this stuff with NODE against the newest ~/Downloads/ufc-storage-backup-*.json.
-  No browser, no harness churn. Scripts used are in the session scratchpad pattern:
-  read the backup, take payload.storage ?? payload, then prop_archive_v1 / ufcstats_v*.
+365  COMMAND HUD over the header + both filter bars. NO new palette - the tokens
+     already in the sheet were the brief (--bg near-black navy, --gold, --cyan
+     mint, --green, --red, --text3). Status pills became ONE bounded cluster;
+     AUTO-FETCH LINES became the primary CTA at 14.02:1 with a CONTAINED glow;
+     REFRESH/MORE demoted to ghosts; four-state status set with a pulse that
+     fires ONLY when live (a pulse on a dead feed is a lie); tab bar unified with
+     an underline active state rather than a fill, because a filled tab competes
+     with the CTA. Search placeholder fixed, operators preserved on the title.
+365b SCANLINE at 0.15. Safe to push ~9x because it paints at z-index 0 with all
+     children at 1 - it never overlays text, so it costs nothing in contrast.
+     PICKED BY LOOKING: a 1px line at a 3px period blurs toward flat grey on a
+     HiDPI panel, so the value is a property of the display, not the CSS. Stepped
+     0.045/0.075/0.11/0.15/0.20 live. Retune the same way, do not reason at it.
+366  ONE RADIUS SCALE. Measured four radii on one screen - .header 12, .filter-bar
+     10, slate row 8, eight fighter panels 14 - and TWO were introduced by 365.
+     The pass meant to unify the chrome had added a fourth dialect to a board
+     that already had a coherent one. So the chrome YIELDED to the board:
+     --r-panel 14px / --r-inset 8px, and .header/.filter-bar adopt 14. Changed my
+     two surfaces instead of eight-plus, and stayed out of .fighter-main.
+     Also: .fighter-header-row measured border 0 / radius 0 - the only major
+     surface with neither - and got a BASELINE RULE, not a panel (it spans full
+     width; a border and corners would read as a card wedged under the bar).
+     Also: TABULAR FIGURES, 40 -> 0. Verified by rendering "111" vs "000" at 40px:
+     Space Grotesk 54.3/77.8, Sora 51.4/91.6, JetBrains Mono 72.0/72.0.
+367  HERO TILES equal height. TOP EDGE has no .mh-meter so it measured 86px
+     against 100px - exactly the meter's footprint (6px + 1px margins + the 6px
+     flex gap). Fixed by stretching the row, NOT by a 14px shim (magic number)
+     and NOT by giving it a gauge ("+40%" is unbounded - inventing a scale to
+     tidy a layout is inventing data). Also caught a FIFTH radius: .mh-stat at
+     10px, now on the inset step.
 
-*** SUGGESTIONS STILL OPEN ***
-- #2 and #4 are DONE (v43). All four predictor suggestions are complete.
-- The doubled NO HISTORY badge is FIXED (f23a7cb). No outstanding predictor defects.
-- CTRL AS A PREDICTED PROP - deferred BY AGREEMENT until more cards accumulate lines.
-  It archives under TWO propTypes: `Control` 5,780 rows with **0** openLine (result-only
-  backfill) and `ctrl` 228 rows all carrying a line. Only ~228 labelled rows today, so it
-  would ship with wide error bars. Revisit after 2-3 more cards.
+=== THE REUSABLE PART: MEASUREMENT OVERRULED THE PLAN FOUR TIMES ===
+Every one of these was a confident read that the numbers reversed. Expect the
+same next time and measure first.
+ 1. "Extend the chrome down onto the board." BACKWARDS. The board already had a
+    language (8 of 9 panels at 14px); my pass had disrupted it. The fix was to
+    ADOPT, not impose.
+ 2. "Don't put tabular-nums in the dense fighter cards, it will cause clipping."
+    UNFOUNDED. Applied live to all 41 and re-measured: clipped 0 before, 0 after,
+    29 grew, widest growth 7px. The caution was right to have and wrong to keep.
+ 3. "75-110px of dead vertical space in the chrome." INFLATED. Exactly ONE gap
+    over 24px (54px), total chrome before the first metric 222px, and NO empty
+    containers. Dropped as not worth doing. The 54px has no identified cause -
+    neither neighbour has margins - if anyone cares enough to look.
+ 4. "The hero trend line rides up inside its tile." WRONG CAUSE, right complaint.
+    The tiles distribute correctly internally; the tile itself was smaller. The
+    wrong cause would have produced a hand-tuned shim.
 
-=== GLOW-UP 344-353 (765cf38) + FIX (53d7560) - THE TWO LEDGERS ===
-USER-VERIFIED BY SCREENSHOT after an extension reload. Placed ledger = 9 events / 149 legs, parlay
-ledger = 42 slips, previously one uninterrupted column.
- 344 EVENTS COLLAPSE. Head is a <button>, body wrapped in .plg-ev-inner. State lives in
-     _ledgerCollapsedEvents, a session-scoped Set keyed `${ledger}|${evKey}` - same shape and
-     lifetime as _archiveCollapsedSections (house pattern; NOT persisted, do not "fix" that).
-     Newest event open, rest collapsed, via applyLedgerCollapseDefaults on FIRST render only.
- 345 Collapsed head keeps the shape: one tick per leg (per SLIP on the parlay side) in display
-     order, capped 32 with a +N tail. ledgerOutcomeStrip().
- 346 COLLAPSE ALL / EXPAND ALL - one button whose label states which it does next.
- 347 THE GRID HAD ONE MORE CHILD THAN TRACKS. .plg-leg emits ELEVEN children; the base rule
-     declared 11 but the <=1500px and <=1180px breakpoints declared 10 and 9. Everything from
-     `N legs` rightward sat one track LEFT of its heading and .plc-gap wrapped to an implicit row.
-     It survived for months because head and rows shifted TOGETHER - aligned with each other, under
-     the wrong labels. A/B in the preview: old 2 grid rows / 32px per leg, fixed 1 row / 24px, zero
-     header-to-cell offset at 1600 / 1400 / 1100.
- 348 REVERTED - see the sticky lesson below.
- 349 Parlay legs got columns (.plp-leg is a 6-track grid). They rendered as an inline run, so on a
-     7-leg slip no two lines started at the same x.
- 350 Parlay events collapse on the same mechanism, keyed separately.
- 351 RESULT FILTER, pure CSS off .lgr[data-filter] so 149 rows never enter a JS loop. Verified
-     exact: 144 = 51 hit + 50 miss + 43 pending legs; 42 = 6 + 23 + 13 slips. :has() hides events
-     the filter empties, and the filter OVERRIDES collapse - with !important, because a hand-
-     toggled event carries an INLINE max-height that no selector can outrank.
- 352 Leg/slip count chip on the head.
- 353 aria-expanded, :focus-visible, reduced-motion; the stagger no longer replays on expand.
- PLUS empty-filter state ("Nothing matches this filter..."), since a filter matching nothing
-     rendered a toolbar over blank space and read as a broken panel.
+=== TWO RULES THAT EARNED THEIR KEEP TODAY ===
+ * UNDOCK DEVTOOLS BEFORE ANY LAYOUT SWEEP. Docked beside the page it puts the
+   board at 827px, UNDER the 1100px breakpoint, which is not a width this app is
+   used at (normal is ~1707px). It made me flag fighter-name as broken when it
+   is not, and both oversell and then undersell pf-vs.
+ * CHECK A NUMBER THAT SHOULD MOVE. The first tabular-nums block left prose as
+   raw text between a stray */ and the real one; the parser discarded through the
+   rule. It survived a reload looking fine. What exposed it was the check
+   reporting "still proportional: 40 (was 40)" - unchanged after a change that
+   should have moved it. Verifying only the things that DID work would have
+   shipped a dead rule. Same shape as c776f26.
 
-*** THE STICKY LESSON (348) - GENERALISE THIS ***
-`position: sticky; top: 88px` on .plg-ev-head produced THREE symptoms from ONE cause: the head
-overlapped the first parlay slip's legs; it painted BELOW content that follows it in the DOM; and
-on the placed ledger it completely covered the FIGHTER/SIDE/LINE column header, so the first event
-rendered with no headings at all.
-CAUSE: .section-body carries `overflow: hidden` for the accordion, which makes it the nearest
-SCROLLPORT. A sticky child positions against its SCROLLPORT, not the viewport - so top:88px pushed
-every head 88px DOWN from the section's top edge, onto its own rows. Measured: headOffsetTop 58
-against a flow position of 0, with the body correctly at 25. After revert: headOffsetTop 0 on both
-ledgers, no overlap, colhead back at exactly the head's bottom edge (11190 = 11190).
-Any future sticky inside an archive panel must solve the SCROLLPORT first - an offset alone cannot
-work, there is no scrolling ancestor to stick to. The old note "sticky offsets 54/88px" applies to
-the PAGE chrome, NOT to anything inside .section-body.
-
-*** TWO ANIMATION TECHNIQUES THAT FAILED - DO NOT RETRY (also recorded in the CSS) ***
- - grid-template-rows 1fr -> 0fr with the rows as DIRECT children: 0fr sizes only the FIRST
-   implicit row, so 43 of 44 children kept auto rows and the event never shrank (bodyH 1095 both
-   collapsed and open).
- - the same after wrapping in a single .plg-ev-inner: collapse worked (rows resolved to 0px) but
-   EXPAND did not - fr will not resolve back against an auto-height container mid-transition, so a
-   re-opened event sat at 0px with its class and aria correctly flipped.
- SHIPPED: JS-measured max-height, exactly what the section accordion already uses - exact at any
- content height and it survives both directions.
-
-*** PREVIEW HARNESS - REAL LIMITS FOUND THIS SESSION ***
-preview_start "analyzer-preview" serves analyzer.html with dev/chrome-shim.js seeded from the
-newest ~/Downloads/ufc-storage-backup-*.json, so the ledgers render REAL data. dev/preview-view.txt
-holds "viewName" or "viewName|scrollY" and the shim clicks that tab (restore it to "parlaylab" when
-done). BUT the pane goes OCCLUDED constantly, and when it does:
- - it stops COMPOSITING. Screenshots come back solid black even though the DOM is positioned
-   correctly (measured evTop 0 while the capture was blank), and CSS TRANSITIONS freeze mid-flight
-   so an element reads as its start value forever. A collapse test looked like a FAILURE until the
-   transition was neutralised with an injected `transition:none` style - then all five bodies
-   correctly read 0.
- - it THROTTLES TIMERS, so a long `await new Promise(setTimeout)` inside one javascript_tool call
-   blows the 45s budget. Split into several SHORT calls instead of one long one.
- - wheel scrolling via the computer tool went the wrong way / erratically, and window.scrollTo was
-   ignored; scrollIntoView({block:'start'}) worked.
-CONCLUSION: measure with javascript_tool (track counts, offsets, rects, computed styles) - that is
-reliable. Do NOT rely on screenshots from this harness, and SAY SO rather than implying a visual
-check happened.
-
-*** THE LESSON THE NUMBERS MISSED ***
-Every 348 symptom passed numeric verification: track counts, alignment deltas, row heights and
-x-offsets were all correct. Measurement proves GEOMETRY, not OCCLUSION - an element painted on top
-of another measures perfectly. The user's screenshots caught all three. This is
-feedback_test_dense_grid_rewrites_visually from a new angle: for any change touching stacking,
-position or z-index, a human eyeball is not optional.
-
-=== MODEL v36 (1a24b53) - VERIFIED, CLOSED ===
-- ACCURACY: FP 402/657 61% -> 138/221 62% (2.97x). SS 250/442 57% -> 85/163 52% (2.71x).
-  TD 10/12 -> 4/6. FT 31/47 66% -> 23/34 68%.
-- BOARD CLV: FP +0.11 n=622 -> +0.34 n=193. SS +0.80 n=437 -> +1.31 n=158. TD +0.08 n=12 -> +0.17 n=6.
-  FT +1.30 n=46 -> +1.44 n=33. n fell AND deltas grew - that signature PROVES the 'earliest' switch;
-  a shrinking archive would shrink n WITHOUT inflating deltas.
-- GRADING 1161 -> 425. CALIBRATION 1061 -> 383, still 34 events. Score 93/100 -4.2 -> 92/100 -5.1.
-- FP's 2.97x matched the 3.06x inflation measured BEFORE the reload.
-- Hand-reconciled: grade buckets sum 425; calib buckets sum 383; per-stat 203+142+6+32=383;
-  population-weighted bias sum(n*delta) = -1968 / 383 = -5.14 -> -5.1 (b931b1f holds); conf>=50 gap
-  reconciles per stat (41 of 42); combos split at the real overall rate 59.06%, disjoint, min n=12.
-- UNEXPLAINED: SS was predicted to fall ~20.58x, fell 2.71x. The 20.58x was measured over RAW pick
-  counts across all 80 snapshots while the accuracy denominator also needs a past event + archive row +
-  finite result + conf>=50. PLAUSIBLE but UNVERIFIED. Treat as unexplained.
-- DENOMINATOR DISAGREEMENT effectively CLOSED, residue 2 rows: platform x stat sums 423 not 425 (two
-  picks on a platform that is neither Pick6 nor UD, one a TD); grading 425 vs accuracy boxes 424.
-
-=== OVER-CONFIDENCE PICTURE (RE-READ AFTER GATE 3) ===
-Under v36, NOT a uniform 60-79 band problem: 70-74 (n=46) +2 and 80-84 (n=18) +1 are well calibrated;
-60-64 (n=60) -9 and 65-69 (n=76) -5 are mild; 75-79 (n=34) -18 is one thin cell carrying 31% of the
-total signed error on 9% of the sample; 85-89 (n=7) and 90+ (n=5) are noise.
-CAVEAT: all of it is still measured on RAW confidence because every stored snapshot predates
-displayedConfidence. Must be RE-READ once gate 3 gives real coverage.
-
-=== STILL OPEN ===
-- Two events STILL report a CLV numerator of EXACTLY 100: "CLV 100/322 |D| 3.18" (Hernandez vs
-  Rodrigues) and "CLV 100/396 |D| 3.29" (Machado Garry vs Makhachev). CONFIRMED UNCHANGED by v36 -
-  those chips read the ARCHIVE not the snapshots, which RULES v36 OUT. No cap exists in code (eventMap
-  clvMoved is a plain counter over allRows).
-- "DWCS 10.1" renders in the per-event list at OVERS 0/0.
-- MY PLACED LEDGER (144 legs, YOU 76/144 53%, BOARD 38/80 48%) still NOT audited. When it is, switch its
-  confidence readout to displayedConfidence - persistBestPicksSnapshot already writes the field.
-- SS diagnosis loose ends: ALL CLOSED (v37/v38/v39). Next SS question is whether the three
-  together over-corrected - answer only after Paris settles.
-
-=== NEXT CARD: UFC PARIS (Hooker vs. Parnasse) ===
-- Predictions were generated on MODEL v34 and were regenerated under v42 on 2026-08-30. REGENERATE UNDER v42 (done 2026-08-30 18:00; board reads v42).
-- Salahdine Parnasse shows NO HISTORY on a 5R main event.
-- MICHAEL PAGE vs Nursulton Ruziboev: the model has Ruziboev at 13.5 SS. That is the user's recorded
-  MVP-opponents-go-SS-UNDER edge AGREEING, not an outlier to fade. The v37 anchor shifts projections
-  DOWN, which makes UNDERs easier to fire - consistent with that edge, no conflict. v38 then requires
-  |score| >= 1.5, so the Ruziboev UNDER must clear a real bar rather than the old conf-54 tier.
-- PARIS HAS A 5R MAIN EVENT. v39 flips the hit-rate term by up to +4 for fighters with 3R history moving
-  UP to five rounds - exactly the Hooker/Parnasse main. Eyeball those two rows first when the board loads.
-- Run the Best Picks audit when TD + R1 SS + CTRL + FP are ALL posted (typically Friday).
-- FIRST THING when props drop: run gate 2, then regenerate predictions, then audit.
-
-=== ARCHIVE PANEL STATS CONVENTIONS ===
-- Ranking cells with wildly different n: wilsonBound(hits, n, lower), display the RAW record. NOT
-  shrunkHitRate (Laplace +1/+1) - right for lean ladders, useless for an n spanning 2 to 632.
-- Best/worst lists split on the population rate, never a fixed row count. Sample floor 10.
-- Bias dedupe keys on DATE, not event name. Per BOOK per market is right for bias but NOT for hit-rate
-  leaderboards, which go one entry per fighter per FIGHT against the MEDIAN line.
-- Calibration Brier is population-weighted and paired with a signed bias figure.
-- AI snapshots are DAILY. Anything reading ai_lean_snapshots_v1 must go through collapseSnapshotsByEvent.
-- Snapshots store BOTH: `confidence` is RAW (engine domain), `displayedConfidence` is what the board
-  showed (readouts). Use snapshotDisplayConf for a READOUT, plain pick.confidence for anything that
-  TRAINS. Never feed the engine its own output.
-- Aggregations in analyzer.ts are frequently DUPLICATED (bias had three copies, the snapshot loop had
-  seven, the recal map is built in TWO places). Grep for EVERY occurrence before patching one.
-
-=== HOUSE RULES ===
-- VERIFY BY THE NUMBERS ON SCREEN, never by grepping dist/. c776f26 shipped two no-ops and was reported
-  as working. Predict the numbers FIRST, then check, and replay the arithmetic by hand or in node.
-- A change can correctly produce NO movement. 240fe65 was designed to leave 425/383/-5.1 identical and
-  prove itself via a new 0/N badge. State the expected outcome BEFORE the reload.
-- Ad-hoc console dumps must ANCHOR to a number the board already published (the SS dump matched 149 vs
-  the panel's 163 and the 14 missing rows were all Pick6, with both book rates matching the board
-  exactly - that is what made the splits trustworthy). Without an anchor these invent phantom findings.
-- Do not tell the user to check something that needs a loaded card when the board reads "Ready for Next
-  Event" - check ALL FIGHTERS first.
-- A systematic OFFSET needs subtraction; SHRINKAGE only scales and preserves the sign. Check which one
-  the defect actually is before choosing a fix.
-- Rebuild + commit dist with EVERY src change; cherry-pick to master and push BOTH branches. Verify with
-  `git diff master feature/sleek-theme-v1 -- src/ dist/` (empty = parity). `git cherry-pick -q` is NOT
-  valid. Cherry-picking RESUME_CHECKPOINT.md conflicts because master skips some checkpoint commits -
-  resolve by taking the newest version wholesale, it is a generated full-state file.
-- Bump MODEL_VERSION for lean scoring / tiering / correlation / EV / candidate selection / anything
-  feeding displayed confidence. NOT for logging or reporting fixes. (v27-v36 were never logged in the
-  config comment block; v37, v38 and v39 are.)
-- When changing a measurement, change EVERY path that reads it in the same commit - and check whether
-  some of those paths are TRAINING inputs rather than readouts, because those must NOT change.
-- Do not bundle two behavioural changes that would need separate attribution.
-- Read-only diagnosis BEFORE any storage-mutating snippet, then backup, then write, with a before/after
-  count. Line data is irreplaceable - four events were lost permanently once.
-- Write patch scripts to FILES in the scratchpad and run with node; heredocs and `node -e` have mangled
-  comments three times. Small targeted edits are safer via the Edit tool directly on the source.
-- PYTHON HEREDOCS ALSO REWRITE LINE ENDINGS. io.open(...,'w') on Windows turned src/analyzer.ts
-  CRLF, and guard-invariants.js then reported a FALSE storageSet violation: it slices the function
-  body with fn.indexOf of a LF-only delimiter, which never matches CRLF, so it tested an empty
-  string. Repair with sed stripping trailing \r. Pass newline='' to BOTH io.open calls, and a
-  heredoc containing quotes will also break bash outright - write the script to a FILE.
-- A UI change touching position / z-index / stacking CANNOT be signed off by measurement alone.
-  See the 348 lesson: ask for a screenshot from the real extension.
-- Console snippets go to the user as a fenced javascript block to PASTE, not as a `cat` command.
-- Do NOT call `npm run checkpoint:save -- -Notes "$notes"` with multiline notes; it collapses to the
-  first line. Call `& .\resume.ps1 -Mode save -Notes $notes` directly.
+=== SMALL AND OPEN (neither is required) ===
+ - The 54px gap after .filter-bar-top has no identified cause.
+ - Fighter cards look empty on the right, but that is likely PARTIAL-DATA state
+   (only UD FT lines are in) and may fill in when props land. Do not treat a
+   partial board as a layout problem.
+ - .fighter-main is the remaining big surface. It is also the one this repo has
+   broken before by editing ahead of a browser check - test in the browser FIRST.
 
 
 ## Resume Checklist
