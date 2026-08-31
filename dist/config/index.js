@@ -174,6 +174,16 @@ export const NAME_ALIASES = {
     'Aori Qileng': 'Aoriqileng',
     'Aori Aoriqileng': 'Aoriqileng',
     'Harris Carlston': 'Carlston Harris',
+    // 2026-08-31 (Hooker vs. Parnasse): UD lists the full "Matthieu Letho Duclos";
+    // UFCStats and the card roster use "Matthieu Duclos". Caught BEFORE it cost
+    // anything — his UD FightTime 7.5 archived fine, because namesMatch is
+    // surname-token based and duclos/duclos matches on both sides. The exposure is
+    // resolveVsArchive, which does NOT use namesMatch: it looks up an EXACT
+    // `event|normalizedName|propType` key, so a leg placed under "Matthieu Duclos"
+    // would never find a row filed under "Matthieu Letho Duclos". That is the exact
+    // shape of the 8 legs (Orolbai, Sumudaerji) the 2026-08-30 ledger audit could
+    // not re-grade until aliases were applied.
+    'Matthieu Letho Duclos': 'Matthieu Duclos',
     // 2026-08-21: PrizePicks lists him "Sergey Spivak"; UFCStats canonical is
     // "Serghei Spivac". namesMatch is surname-token based, so Spivak/Spivac never
     // matched and the stale-opponent guard concluded PP had priced Vitor Petrino
