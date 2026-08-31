@@ -15255,13 +15255,35 @@ async function renderArchivePanel(container) {
             const evDk = eventDedupeKey(evKey);
             const legs = legEntries.map(([legKey, rec]) => {
                 if (rec.outcome === 'hit' || rec.outcome === 'miss') {
-                    return { rec, outcome: rec.outcome, actual: rec.actual ?? null };
+                    // ── GLOW-UP 356 · re-resolve a FROZEN leg, for comparison only ────────
+                    // The 2026-08-30 audit re-graded all 144: zero verdict disagreements,
+                    // but NINE stored `actual` values had drifted from the archive — six
+                    // because duplicate rows share one event|fighter|propType key and
+                    // archiveIdx is first-row-wins over an allRows order that shifts as
+                    // rows are re-archived, three because the row's own result was
+                    // rewritten by a later backfill (three of those moved exactly +10 on
+                    // FP). Verdicts survived only because no delta crossed its line; with
+                    // SS deltas of 21 and 37 that is luck, not design. This is O(1) per
+                    // leg against the existing index, so it costs nothing to watch.
+                    const frozenDir = rec.dir === 'OVER' ? 'over' : 'under';
+                    const now = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, frozenDir);
+                    const stored = Number(rec.actual);
+                    const moved = now.outcome !== 'pending'
+                        && now.actual != null
+                        && (now.outcome !== rec.outcome || !Number.isFinite(stored) || Math.abs(now.actual - stored) > 0.05);
+                    return {
+                        rec,
+                        outcome: rec.outcome,
+                        actual: rec.actual ?? null,
+                        drift: moved ? { freshActual: now.actual, freshOutcome: now.outcome } : null,
+                    };
                 }
                 const dir = rec.dir === 'OVER' ? 'over' : 'under';
                 const res = resolveVsArchive(evDk, rec.name, propTypesFor(rec.source, rec.book), rec.line, dir);
                 if (res.outcome !== 'pending')
                     updates.push({ evKey, legKey, outcome: res.outcome, actual: res.actual });
-                return { rec, outcome: res.outcome, actual: res.actual };
+                // Freshly resolved this render — it cannot be stale, so never marked.
+                return { rec, outcome: res.outcome, actual: res.actual, drift: null };
             });
             events.push({ evKey, newest: Math.max(0, ...legEntries.map(([, r]) => Number(r.placedAt) || 0)), legs });
         }
@@ -15270,10 +15292,13 @@ async function renderArchivePanel(container) {
         const settled = flat.filter(l => l.outcome !== 'pending').length;
         const hits = flat.filter(l => l.outcome === 'hit').length;
         // ── GLOW-UP 175 (level 4): selection diagnostics ──────────────────────
-        // Split each placed event's suggested slate (latest snapshot) into the
-        // picks you TOOK vs the ones you SKIPPED, grade both cohorts with the
-        // shared resolver, and measure the gap — are you picking the right
+        // Split the closing BEST PICKS board (best_picks_snapshots_v1, capped at
+        // 8 per direction — see GLOW-UP 354 below, it is NOT the full lean slate)
+        // into the picks you TOOK vs the ones you SKIPPED, grade both cohorts with
+        // the shared resolver, and measure the gap — are you picking the right
         // picks off the board? Match key: fighter + direction + stat source.
+        // Unlike the YOU-vs-BOARD chips, these two cohorts ARE like-for-like: both
+        // are drawn from that same 16-pick population, so ALPHA compares fairly.
         const selection = (() => {
             const taken = { settled: 0, hits: 0, confSum: 0, confN: 0 };
             const skipped = { settled: 0, hits: 0, confSum: 0, confN: 0 };
@@ -15353,16 +15378,25 @@ async function renderArchivePanel(container) {
             const evHits = e.legs.filter(l => l.outcome === 'hit').length;
             // GLOW-UP 173: board baseline for this event — only meaningful once
             // something settled on either side.
+            // ── GLOW-UP 354 · what this baseline IS was mis-stated for its whole life ──
+            // The chip called itself "the board's full suggested slate". It is not.
+            // boardStatsFor reads best_picks_snapshots_v1 — the BEST PICKS board —
+            // and dedupeNegCorrelatedSameFight caps that at 8 per direction keeping
+            // ONE pick per fight (~9567), so a closing snapshot is at most sixteen
+            // high-conviction picks. The placed legs beside it are drawn from every
+            // lean on the card: 29–46 per event against the board's 16.
+            // The 2026-08-30 ledger audit measured EXACTLY 16 settled board picks on
+            // all five placed events, which is what killed the old reading.
             const board = boardStatsFor(eventDedupeKey(e.evKey));
             boardSettledTotal += board.settled;
             boardHitsTotal += board.hits;
             const youRate = evSettled ? evHits / evSettled : null;
             const boardRate = board.settled ? board.hits / board.settled : null;
             const boardChip = board.settled
-                ? `<span class="plg-ev-record board" title="The board's full suggested slate for this event (latest snapshot), graded by the same resolver: ${board.hits}/${board.settled} hit">BOARD ${board.hits}/${board.settled}</span>`
+                ? `<span class="plg-ev-record board" title="The board's closing BEST PICKS for this event — at most 8 OVERs and 8 UNDERs, one pick per fight — graded by the same resolver: ${board.hits}/${board.settled} hit. This is the board's highest-conviction shortlist, NOT its full slate: your legs are drawn from every lean on the card, so the two denominators are not like-for-like.">BOARD ${board.hits}/${board.settled}</span>`
                 : '';
             const evSummary = evSettled
-                ? `<span class="plg-ev-record ${youRate != null && (boardRate == null || youRate >= boardRate) ? 'good' : 'bad'}" title="Your placed legs for this event: ${evHits}/${evSettled} hit${boardRate != null ? ` · board baseline ${Math.round(boardRate * 100)}%` : ''}">YOU ${evHits}/${evSettled}</span>${boardChip}`
+                ? `<span class="plg-ev-record ${youRate != null && (boardRate == null || youRate >= boardRate) ? 'good' : 'bad'}" title="Your placed legs for this event: ${evHits}/${evSettled} hit${boardRate != null ? ` · the board's closing top-16 for the same card hit ${Math.round(boardRate * 100)}% — a smaller, higher-conviction set, not the same population as your legs` : ''}">YOU ${evHits}/${evSettled}</span>${boardChip}`
                 : `<span class="plg-ev-record">all pending</span>${boardChip}`;
             // ── GLOW-UP 309 · your exposure is per FIGHT, and the ledger hid it ──────
             // Legs render in storage-key order, which reads alphabetically by fighter. So
@@ -15417,8 +15451,28 @@ async function renderArchivePanel(container) {
                         : evSettled > 0
                             ? `<span class="plg-status pending" title="No settled archive result for this prop yet">○ PENDING</span>`
                             : '';
+                // ── GLOW-UP 356 · the drift marker rides INSIDE .plg-actual ──────────────
+                // NOT as a twelfth child. .plg-leg emits ELEVEN, and all four grid
+                // declarations (base + <=1500px + <=1180px) carry eleven tracks; adding one
+                // shifts every cell a track left of its heading and the trailing cell wraps.
+                // That is bug 347, and it survives review because the head shifts too — the
+                // rows stay aligned with each other, under the wrong labels.
+                // A GLYPH HERE COSTS WIDTH, AND THE WIDTH IS NOT FREE. The first cut
+                // appended a Δ after the value. .plg-actual is white-space:nowrap inside a
+                // fixed track, so it did not overflow the ROW — it clipped its own leading
+                // text: "actual 110" rendered as "ual 110" on three-digit actuals, while
+                // short ones looked fine. scrollWidth on .plg-leg saw nothing, because the
+                // row geometry was never wrong. Screenshot caught it; measurement could not.
+                // So the signal is now ZERO-WIDTH: a class on the existing span, painted in
+                // CSS, with the explanation on the title. No characters added to the cell.
+                const driftCls = l.drift ? (l.drift.freshOutcome !== l.outcome ? ' has-flip' : ' has-drift') : '';
+                const driftTitle = l.drift
+                    ? (l.drift.freshOutcome !== l.outcome
+                        ? ` title="STORED VERDICT NO LONGER REPRODUCES. Frozen as ${String(l.outcome).toUpperCase()} at actual ${l.actual}${unit}, but the archive now reads ${Math.round(l.drift.freshActual * 10) / 10}${unit}, which grades ${l.drift.freshOutcome.toUpperCase()} against your line of ${r.line}. The frozen verdict still counts in the totals — storage wins over recompute so the ledger survives archive pruning — but this row needs a look."`
+                        : ` title="The archive has moved since this settled: stored ${l.actual}${unit}, now ${Math.round(l.drift.freshActual * 10) / 10}${unit} (${l.drift.freshActual > Number(l.actual) ? '+' : ''}${Math.round((l.drift.freshActual - Number(l.actual)) * 10) / 10}). Your ${r.dir} still grades ${String(l.outcome).toUpperCase()} either way, so the verdict is unaffected. Usually a duplicate archive row for this fighter+stat, or a backfill that rewrote the result."`)
+                    : '';
                 const actualHtml = l.actual != null
-                    ? `<span class="plg-actual">actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
+                    ? `<span class="plg-actual${driftCls}"${driftTitle}>actual <b>${Math.round(l.actual * 10) / 10}${unit}</b></span>`
                     : '';
                 // ── GLOW-UP 311 · YOUR entry against the close, on the row ─────────────
                 // The CLV panel above this reads ai_lean_snapshots — the BOARD's lines. On
@@ -15530,6 +15584,14 @@ async function renderArchivePanel(container) {
     }
     // GLOW-UP 173: all-time roll-up in the section header — your settled hit
     // rate vs the board's, scoped to events where you actually placed legs.
+    // ── GLOW-UP 355 · the two figures were never like-for-like ────────────────
+    // "YOU 76/144 · BOARD 38/80" reads as a head-to-head, and every reader takes
+    // it as one. It is not: YOU is EVERY leg you placed (29–46 per event), BOARD
+    // is the closing Best Picks shortlist, capped at 8 per direction with one
+    // pick per fight — sixteen per event, and the board's highest-conviction
+    // sixteen at that. Labelling it in place, because the failure mode here is
+    // someone reading the header WITHOUT hovering and concluding they beat the
+    // board by 5 points. The full explanation lives on the title.
     const placedLedgerSummary = (() => {
         if (!placedLedgerData.total)
             return `<span style="font-size:10px;color:var(--text-muted)">no placed legs yet</span>`;
@@ -15537,9 +15599,12 @@ async function renderArchivePanel(container) {
             ? `YOU ${placedLedgerData.hits}/${placedLedgerData.settled} (${Math.round((placedLedgerData.hits / placedLedgerData.settled) * 100)}%)`
             : 'none settled yet';
         const board = placedLedgerData.boardSettled
-            ? ` · BOARD ${placedLedgerData.boardHits}/${placedLedgerData.boardSettled} (${Math.round((placedLedgerData.boardHits / placedLedgerData.boardSettled) * 100)}%)`
+            ? ` · BOARD top-16 ${placedLedgerData.boardHits}/${placedLedgerData.boardSettled} (${Math.round((placedLedgerData.boardHits / placedLedgerData.boardSettled) * 100)}%)`
             : '';
-        return `<span style="font-size:10px;color:var(--text-muted)">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${you}${board}</span>`;
+        const why = placedLedgerData.boardSettled
+            ? ` YOU counts every leg you placed; BOARD counts the board's closing top-16 per event (at most 8 OVERs and 8 UNDERs, one pick per fight), so the denominators are not like-for-like and the two percentages are not a head-to-head. The SELECTION row below IS a fair comparison — TAKEN and SKIPPED are both drawn from that same shortlist.`
+            : '';
+        return `<span style="font-size:10px;color:var(--text-muted)" title="${placedLedgerData.total} placed leg${placedLedgerData.total === 1 ? '' : 's'} across every event you have bet.${why}">${placedLedgerData.total} leg${placedLedgerData.total === 1 ? '' : 's'} · ${you}${board}</span>`;
     })();
     // ── GLOW-UP 181: Parlay Ledger ─────────────────────────────────────────
     // Placed slips (parlay_placed_v1) resolved leg-by-leg through the same
