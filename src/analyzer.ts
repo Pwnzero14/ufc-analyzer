@@ -15737,6 +15737,86 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         ${alphaChip}${confNote}
       </div>` };
     })();
+    // ── GLOW-UP 358 · WHERE the record comes from, by book and by stat ────────
+    // The ledger could tell you your rate and the board's, but never which BOOK
+    // or which STAT that rate is made of — and those are the two cuts you can
+    // actually act on. Deliberately NOT the P/L level that was queued here:
+    // these are pick-em legs, not independently priced, so 1u-per-leg P/L is
+    // just hits-minus-misses restated. Real money lives in the parlay ledger.
+    //
+    // Displayed as RAW records, not shrunk or ranked. Per the archive-panel
+    // conventions, shrinkage is for lean ladders and Wilson is for RANKING cells
+    // whose n spans orders of magnitude; this is a descriptive breakdown of one
+    // population, where the honest thing is the record itself. Cells under the
+    // sample floor of 10 are dimmed rather than hidden, because "you have only
+    // placed 4 of these" is itself the useful signal.
+    const breakdown = ((): { html: string } => {
+      const SAMPLE_FLOOR = 10;
+      const tally = (keyOf: (l: LedgerLeg) => string, labelOf: (l: LedgerLeg) => string) => {
+        const m = new Map<string, { label: string; hits: number; settled: number }>();
+        for (const l of flat) {
+          if (l.outcome === 'pending') continue;
+          const k = keyOf(l);
+          if (!k) continue;
+          let e = m.get(k);
+          if (!e) { e = { label: labelOf(l), hits: 0, settled: 0 }; m.set(k, e); }
+          e.settled++;
+          if (l.outcome === 'hit') e.hits++;
+        }
+        return [...m.entries()].sort((a, b) => b[1].settled - a[1].settled);
+      };
+      const overall = settled ? hits / settled : 0;
+      // ── A CELL ONLY TAKES A SIDE ONCE IT CAN SUPPORT ONE ────────────────────
+      // First cut coloured every cell green or red against the population rate.
+      // On the live ledger that painted a verdict on noise: the widest book split
+      // (Betr 41% vs 53% overall) is 1.1 SE out, and the widest stat (R1 SS 68%)
+      // is 1.45. GLOW-UP 310 already settled this exact question one strip over —
+      // the ALPHA chip stopped taking a side below 1.5 SE after it announced
+      // "-21pts" off nine legs. Same bar here, for the same reason: green on a
+      // 1-SE wobble is an instruction to change books on nothing.
+      // The RECORDS still show — those are facts, and "no split has separated
+      // yet" is itself worth knowing.
+      let anySignificant = false;
+      const cell = (e: { label: string; hits: number; settled: number }, tone: string) => {
+        const rate = e.hits / e.settled;
+        const thin = e.settled < SAMPLE_FLOOR;
+        const se = Math.sqrt((overall * (1 - overall)) / e.settled);
+        const sigmas = se > 0 ? Math.abs(rate - overall) / se : 0;
+        const separated = !thin && sigmas >= 1.5;
+        if (separated) anySignificant = true;
+        const cls = thin ? 'thin' : !separated ? 'flat' : rate >= overall ? 'good' : 'bad';
+        const why = thin
+          ? `under the ${SAMPLE_FLOOR}-leg sample floor — an observation, not a rate`
+          : separated
+            ? `${rate >= overall ? 'above' : 'below'} your overall ${Math.round(overall * 100)}% by ${sigmas.toFixed(1)} standard errors — far enough out to mean something`
+            : `your overall rate is ${Math.round(overall * 100)}%, and this sits ${sigmas.toFixed(1)} SE from it — inside the noise, so it is not evidence this ${tone.startsWith('bk-') ? 'book' : 'stat'} is better or worse`;
+        return `<span class="plg-bd-cell ${cls} ${tone}" title="${e.label}: ${e.hits} of ${e.settled} settled legs hit (${Math.round(rate * 100)}%) — ${why}">${e.label} <b>${e.hits}/${e.settled}</b> <i>${Math.round(rate * 100)}%</i></span>`;
+      };
+      const bookTone2 = (bk: string): string => {
+        const k = bk.toLowerCase();
+        return k === 'pick6' ? 'bk-p6' : k === 'underdog' ? 'bk-ud' : k === 'prizepicks' ? 'bk-pp'
+          : k === 'betr' ? 'bk-betr' : k.startsWith('draftkings') || k === 'dk' ? 'bk-dk' : '';
+      };
+      const books = tally(l => String(l.rec.book || '').toLowerCase(),
+                          l => String(l.rec.bookLabel || l.rec.book || '').toUpperCase());
+      const stats = tally(l => String(l.rec.source || '').toLowerCase(),
+                          l => String(l.rec.statLabel || l.rec.source || '').toUpperCase());
+      if (!books.length && !stats.length) return { html: '' };
+      const bookCells = books.map(([k, e]) => cell(e, bookTone2(k))).join('');
+      const statCells = stats.map(([k, e]) => cell(e, `st-${k}`)).join('');
+      // Rendered AFTER both, because `anySignificant` is only known by then.
+      const verdict = anySignificant
+        ? ''
+        : `<span class="plg-bd-note" title="Every cell here sits within 1.5 standard errors of your overall ${Math.round(overall * 100)}%, which is the same bar the ALPHA chip uses before it takes a side. With ${settled} settled legs split this many ways, no book and no stat has separated from the others yet. The records are real; the DIFFERENCES between them are not yet distinguishable from chance.">no split has separated yet</span>`;
+      const hint = (what: string) =>
+        `Your settled legs split by ${what}. Colour only appears once a cell is at least 1.5 standard errors from your overall rate — the same bar the ALPHA chip uses. Dim is under the ${SAMPLE_FLOOR}-leg sample floor.`;
+      const row = (label: string, cells: string, tip: string, tail = '') => cells
+        ? `<div class="plg-breakdown"><span class="plg-sel-label" title="${tip}">${label}</span>${cells}${tail}</div>`
+        : '';
+      return { html:
+        row('BY BOOK', bookCells, hint('the book you placed them on'))
+        + row('BY STAT', statCells, hint('prop type'), verdict) };
+    })();
     if (!events.length) {
       return { html: '<div class="inline-empty-msg" style="font-size:10px">No placed legs yet — check picks into My Slate on AI Best Picks and mark them ● PLACED</div>', settled: 0, hits: 0, total: 0, boardSettled: 0, boardHits: 0, updates: [] };
     }
@@ -15921,7 +16001,7 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         <div class="plg-ev-body"><div class="plg-ev-inner">${colHead}${rows}</div></div>
       </div>`;
     }).join('');
-    return { html: selection.html + ledgerShell('placed', html), settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
+    return { html: selection.html + breakdown.html + ledgerShell('placed', html), settled, hits, total: flat.length, boardSettled: boardSettledTotal, boardHits: boardHitsTotal, updates };
   })();
 
   // GLOW-UP 174: write freshly settled outcomes back onto the placed records
