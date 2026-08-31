@@ -30406,7 +30406,30 @@ button.ls-cell-val.plat-draftkings_sportsbook:hover { box-shadow: 0 0 0 1px rgba
 /* The vs-line truncates; the badge is fixed. One line, always, regardless of
    how long an opponent's name happens to be. */
 .pf-sub { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.pf-vs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* ── GLOW-UP 363: the round marker must not be the part that gets cut ────────
+   .pf-vs was one nowrap+ellipsis run of "vs {opponent} · {rounds}R", so when it
+   overflowed — measured at 12-27px on eight rows — the ellipsis ate the TAIL,
+   which is the round count. That is the wrong half to lose: scheduled rounds
+   drive the 5R/3R inference and MODEL v39's duration-normalised hit-rate term,
+   while an opponent's surname stays readable a few characters short.
+   Now the name shrinks and the marker does not. No new grid children anywhere —
+   both spans live INSIDE .pf-vs, which is still one flex child of
+   .pred-fighter. Full text moves to the title. */
+.pf-vs {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  cursor: help;
+}
+.pf-vs > .pf-vs-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pf-vs > .pf-vs-r { flex: 0 0 auto; white-space: nowrap; }
 .pf-sub .pred-ev { flex: 0 0 auto; margin-left: 0; }
 
 /* ── GLOW-UP 255 · rhythm, alignment, and a legend ─────────────────────────
