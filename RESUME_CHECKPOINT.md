@@ -1,9 +1,9 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-31 12:36:16 -04:00
+Last Saved: 2026-08-31 13:43:26 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 6b8769b
+HEAD: a1dbd48
 
 ## Last Notes
 ################################################################################
@@ -29,9 +29,10 @@ TWO THREADS. Pick by whether props have dropped.
 THE GLOW-UP LADDER IS DONE (354-360 shipped, 357 REVERTED as 361). Do not
 re-open it. Remaining ledger ideas are at the bottom; none are required.
 
-THE CLIPPING SWEEP IS ALSO DONE AND MINED OUT (362-364, 2026-08-31). Do not
-re-run it as a source of work - see the section near the bottom for what it
-produced and, more importantly, the measurement trap it walked into first.
+THE UI WORK IS DONE FOR NOW (362-367, 2026-08-31). The clipping sweep is MINED
+OUT - do not re-run it as a source of work. The design system pass (365-367) is
+also at a natural stop. Both are written up at the bottom, along with the
+measurement traps they walked into, which are the reusable part.
 
 ################################################################################
 
@@ -271,6 +272,81 @@ pred-gen - FALSE POSITIVE. The sweep reported 196px; it does not reproduce.
 
 THE SWEEP IS SPENT. Down to phantom 19px readings and enum labels. If you want
 more UI, pick it from something annoying in daily use, not another sweep.
+
+################################################################################
+##  2026-08-31 PM - THE DESIGN SYSTEM PASS (365-367)                           ##
+################################################################################
+
+feature/sleek-theme-v1 a1dbd48 | master ce42c13 | full parity, tree clean.
+
+365  COMMAND HUD over the header + both filter bars. NO new palette - the tokens
+     already in the sheet were the brief (--bg near-black navy, --gold, --cyan
+     mint, --green, --red, --text3). Status pills became ONE bounded cluster;
+     AUTO-FETCH LINES became the primary CTA at 14.02:1 with a CONTAINED glow;
+     REFRESH/MORE demoted to ghosts; four-state status set with a pulse that
+     fires ONLY when live (a pulse on a dead feed is a lie); tab bar unified with
+     an underline active state rather than a fill, because a filled tab competes
+     with the CTA. Search placeholder fixed, operators preserved on the title.
+365b SCANLINE at 0.15. Safe to push ~9x because it paints at z-index 0 with all
+     children at 1 - it never overlays text, so it costs nothing in contrast.
+     PICKED BY LOOKING: a 1px line at a 3px period blurs toward flat grey on a
+     HiDPI panel, so the value is a property of the display, not the CSS. Stepped
+     0.045/0.075/0.11/0.15/0.20 live. Retune the same way, do not reason at it.
+366  ONE RADIUS SCALE. Measured four radii on one screen - .header 12, .filter-bar
+     10, slate row 8, eight fighter panels 14 - and TWO were introduced by 365.
+     The pass meant to unify the chrome had added a fourth dialect to a board
+     that already had a coherent one. So the chrome YIELDED to the board:
+     --r-panel 14px / --r-inset 8px, and .header/.filter-bar adopt 14. Changed my
+     two surfaces instead of eight-plus, and stayed out of .fighter-main.
+     Also: .fighter-header-row measured border 0 / radius 0 - the only major
+     surface with neither - and got a BASELINE RULE, not a panel (it spans full
+     width; a border and corners would read as a card wedged under the bar).
+     Also: TABULAR FIGURES, 40 -> 0. Verified by rendering "111" vs "000" at 40px:
+     Space Grotesk 54.3/77.8, Sora 51.4/91.6, JetBrains Mono 72.0/72.0.
+367  HERO TILES equal height. TOP EDGE has no .mh-meter so it measured 86px
+     against 100px - exactly the meter's footprint (6px + 1px margins + the 6px
+     flex gap). Fixed by stretching the row, NOT by a 14px shim (magic number)
+     and NOT by giving it a gauge ("+40%" is unbounded - inventing a scale to
+     tidy a layout is inventing data). Also caught a FIFTH radius: .mh-stat at
+     10px, now on the inset step.
+
+=== THE REUSABLE PART: MEASUREMENT OVERRULED THE PLAN FOUR TIMES ===
+Every one of these was a confident read that the numbers reversed. Expect the
+same next time and measure first.
+ 1. "Extend the chrome down onto the board." BACKWARDS. The board already had a
+    language (8 of 9 panels at 14px); my pass had disrupted it. The fix was to
+    ADOPT, not impose.
+ 2. "Don't put tabular-nums in the dense fighter cards, it will cause clipping."
+    UNFOUNDED. Applied live to all 41 and re-measured: clipped 0 before, 0 after,
+    29 grew, widest growth 7px. The caution was right to have and wrong to keep.
+ 3. "75-110px of dead vertical space in the chrome." INFLATED. Exactly ONE gap
+    over 24px (54px), total chrome before the first metric 222px, and NO empty
+    containers. Dropped as not worth doing. The 54px has no identified cause -
+    neither neighbour has margins - if anyone cares enough to look.
+ 4. "The hero trend line rides up inside its tile." WRONG CAUSE, right complaint.
+    The tiles distribute correctly internally; the tile itself was smaller. The
+    wrong cause would have produced a hand-tuned shim.
+
+=== TWO RULES THAT EARNED THEIR KEEP TODAY ===
+ * UNDOCK DEVTOOLS BEFORE ANY LAYOUT SWEEP. Docked beside the page it puts the
+   board at 827px, UNDER the 1100px breakpoint, which is not a width this app is
+   used at (normal is ~1707px). It made me flag fighter-name as broken when it
+   is not, and both oversell and then undersell pf-vs.
+ * CHECK A NUMBER THAT SHOULD MOVE. The first tabular-nums block left prose as
+   raw text between a stray */ and the real one; the parser discarded through the
+   rule. It survived a reload looking fine. What exposed it was the check
+   reporting "still proportional: 40 (was 40)" - unchanged after a change that
+   should have moved it. Verifying only the things that DID work would have
+   shipped a dead rule. Same shape as c776f26.
+
+=== SMALL AND OPEN (neither is required) ===
+ - The 54px gap after .filter-bar-top has no identified cause.
+ - Fighter cards look empty on the right, but that is likely PARTIAL-DATA state
+   (only UD FT lines are in) and may fill in when props land. Do not treat a
+   partial board as a layout problem.
+ - .fighter-main is the remaining big surface. It is also the one this repo has
+   broken before by editing ahead of a browser check - test in the browser FIRST.
+
 
 ## Resume Checklist
 1. Run npm run build.
