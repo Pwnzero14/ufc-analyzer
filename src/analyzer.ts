@@ -16925,8 +16925,16 @@ async function renderArchivePanel(container: HTMLElement): Promise<void> {
         <span style="flex:1;color:var(--text-muted)">Platform / Prop</span>
         ${biasHdr('Avg Edge', 'avgEdge')} &nbsp; ${biasHdr('Hit%', 'hitRate')} &nbsp; ${biasHdr('N', 'total')}
        </div>` +
+      // ── GLOW-UP 364 · the bias panel printed a raw storage key ──────────────
+      // DRAFTKINGS_SPORTSBOOK, underscore and all — the only label in this panel
+      // wide enough to clip (33px at full width; the other four are already
+      // readable words). A TRANSFORM, not a sixth lookup table: BP_SLATE_BOOK_ABBR,
+      // BOOK_ABBR, BOOK_NAME, BP_BOOK_SHORT and BP_BOOK_FULL are already five
+      // copies of the same book-label map, and adding another is exactly how five
+      // happened. Underscores become spaces and the one long vendor prefix
+      // shortens, so PICK6 / UNDERDOG / PRIZEPICKS / BETR are untouched.
       biasSorted.map(x => { const rc = x.hitRate >= 55 ? 'var(--green)' : x.hitRate >= 45 ? 'var(--gold)' : 'var(--red)'; return `<div class="bias-row">
-        <span class="bias-platform">${x.platform.toUpperCase()}</span>
+        <span class="bias-platform" title="${x.platform}">${x.platform.replace(/^draftkings_/, 'dk_').replace(/_/g, ' ').toUpperCase()}</span>
         <div class="bias-main"><div class="bias-prop">${x.propType}${biasVerdict(x.propType, x.avgEdge, x.total)}</div><div class="bias-sub">${x.total} records · avg edge ${x.avgEdge > 0 ? '+' : ''}${x.avgEdge}</div></div>
         <span class="bias-bar"><span style="width:${Math.max(2, Math.min(100, x.hitRate))}%;background:${rc}"></span></span>
         <span class="bias-rate" style="color:${rc}">${x.hitRate}%</span>
