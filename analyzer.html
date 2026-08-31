@@ -32692,6 +32692,319 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .plg-ev-body, .plg-ev-caret, .plg-ev-head, .lgr-seg, .lgr-allbtn { transition: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   GLOW-UP 365 · COMMAND HUD — header, filter rows, tab bar
+   ──────────────────────────────────────────────────────────────────────────────
+   Mission-control HUD over a trading desk. NO new palette: the tokens already
+   here are the brief — --bg #070a14 near-black navy, --gold #f8c64a, --cyan
+   #2cd4d0 mint, --green #20df8f emerald, --red #ff5b78 coral, --text3 #5c6d92
+   slate. A second palette is how a design system dies, so this only derives.
+
+   Placed LAST in the sheet deliberately. GLOW-UP 111 spent a session on a gold
+   that "looked faint" and was actually DEAD — outranked on specificity by a
+   later rule. Ordering here is load-bearing, not stylistic.
+
+   No markup restructuring: every selector targets elements that already exist,
+   so functionality, data and flow are untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --hud-surface:    #080c17;
+  --hud-panel:      rgba(19, 26, 44, 0.72);
+  --hud-hairline:   rgba(120, 145, 195, 0.16);
+  --hud-hairline-2: rgba(120, 145, 195, 0.28);
+  --hud-mint:       #2cd4d0;
+  --hud-mint-hi:    #5ff0e4;
+  --hud-amber:      #f8c64a;
+  /* Semantic status set. Deliberately four, and only four. */
+  --hud-live:       #20df8f;
+  --hud-partial:    #f8c64a;
+  --hud-stale:      #ff5b78;
+  --hud-idle:       #5c6d92;
+  --hud-ease:       cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ── The scanline. One repeating-linear-gradient at 3% over the whole chrome,
+      not per-panel — it must read as ONE surface the panels sit on. ────────── */
+.header::before,
+.filter-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(120, 145, 195, 0.030) 0px,
+    rgba(120, 145, 195, 0.030) 1px,
+    transparent 1px,
+    transparent 3px);
+  opacity: 0.55;
+  border-radius: inherit;
+  z-index: 0;
+}
+.header, .filter-bar { position: relative; }
+.header > *, .filter-bar > * { position: relative; z-index: 1; }
+
+/* ── Glass panels: hairline border, no heavy fill ────────────────────────── */
+.header {
+  background: linear-gradient(180deg, rgba(19,26,44,0.82), rgba(8,12,23,0.92));
+  border: 1px solid var(--hud-hairline);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 10px 30px -18px rgba(0,0,0,0.9);
+}
+.filter-bar {
+  background: linear-gradient(180deg, rgba(19,26,44,0.55), rgba(8,12,23,0.72));
+  border: 1px solid var(--hud-hairline);
+  border-radius: 10px;
+}
+
+/* ── Wordmark: type-scale contrast is the whole hierarchy here ───────────── */
+.logo-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ══ STATUS CLUSTER ════════════════════════════════════════════════════════
+   Was four independent pills (state, archived, age, max delta) each with its
+   own chrome, reading as four competing objects. Now ONE bounded cluster with
+   hairline dividers: one object, four facts. */
+.ext-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--hud-hairline);
+  border-radius: 999px;
+  background: rgba(8,12,23,0.55);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  /* Base colour is --text2, NOT --text3. Measured: --text3 on this surface is
+     3.77:1, under WCAG AA's 4.5. Nothing visible inherits it today — the label
+     is JS-coloured and the chunks set their own — but a failing base is a trap
+     for whoever adds a bare span here next. --text2 measures 8.17. */
+  color: var(--text2);
+}
+#openingLinesCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  margin-left: 0 !important;
+}
+#openingLinesCount .status-chunk {
+  padding: 0 8px;
+  border-left: 1px solid var(--hud-hairline);
+  /* Metrics get the tabular face so digits hold their column as they tick. */
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--text2);
+  white-space: nowrap;
+}
+#openingLinesCount .status-chunk.age-fresh { color: var(--hud-live); }
+#openingLinesCount .status-chunk.age-aging { color: var(--hud-partial); }
+#openingLinesCount .status-chunk.age-stale { color: var(--hud-stale); }
+
+/* Status dot: 6px, its own colour, and a halo that pulses only when LIVE.
+   A pulse on a dead feed is a lie, so idle/stale never animate. */
+.ext-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--hud-idle);
+  box-shadow: 0 0 0 0 rgba(0,0,0,0);
+  flex: 0 0 auto;
+  transition: background 0.25s var(--hud-ease), box-shadow 0.25s var(--hud-ease);
+}
+.ext-dot.live    { background: var(--hud-live);    box-shadow: 0 0 8px rgba(32,223,143,0.75); }
+.ext-dot.partial { background: var(--hud-partial); box-shadow: 0 0 8px rgba(248,198,74,0.65); }
+.ext-dot.stale   { background: var(--hud-stale);   box-shadow: 0 0 8px rgba(255,91,120,0.65); }
+@media (prefers-reduced-motion: no-preference) {
+  .ext-dot.live { animation: hudPulse 2.6s ease-in-out infinite; }
+}
+@keyframes hudPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(32,223,143,0.55); }
+  50%      { box-shadow: 0 0 12px rgba(32,223,143,0.95); }
+}
+
+/* ══ PRIMARY CTA ═══════════════════════════════════════════════════════════
+   AUTO-FETCH LINES is the one action this chrome exists to offer. It was a
+   ghost button beside two other ghost buttons — three equal-weight controls
+   and no primary. Mint on near-black is the highest-contrast pairing in the
+   palette, and the glow is CONTAINED (inset ring + tight outer) so it reads
+   as lit rather than bloomed. */
+.btn.auto-fetch-btn {
+  background: linear-gradient(180deg, rgba(44,212,208,0.20), rgba(44,212,208,0.10));
+  border: 1px solid rgba(44,212,208,0.55);
+  color: var(--hud-mint-hi);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(44,212,208,0.10) inset, 0 0 18px -6px rgba(44,212,208,0.65);
+  transition: box-shadow 0.2s var(--hud-ease), border-color 0.2s var(--hud-ease),
+              background 0.2s var(--hud-ease), transform 0.12s var(--hud-ease);
+}
+.btn.auto-fetch-btn:hover {
+  border-color: rgba(95,240,228,0.85);
+  background: linear-gradient(180deg, rgba(44,212,208,0.30), rgba(44,212,208,0.14));
+  box-shadow: 0 0 0 1px rgba(44,212,208,0.18) inset, 0 0 26px -6px rgba(44,212,208,0.85);
+}
+.btn.auto-fetch-btn:active { transform: translateY(1px); }
+.btn.auto-fetch-btn:focus-visible { outline: 2px solid var(--hud-mint-hi); outline-offset: 2px; }
+
+/* Demoted to quiet ghosts. They keep every affordance — border, hover, focus —
+   they simply stop competing with the primary. */
+.btn.refresh-btn, .btn.overflow-trigger {
+  background: transparent;
+  border: 1px solid var(--hud-hairline);
+  color: var(--text2);
+  border-radius: 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.08em;
+  box-shadow: none;
+  transition: border-color 0.2s var(--hud-ease), color 0.2s var(--hud-ease),
+              background 0.2s var(--hud-ease);
+}
+.btn.refresh-btn:hover, .btn.overflow-trigger:hover {
+  border-color: var(--hud-hairline-2);
+  color: var(--text);
+  background: rgba(120,145,195,0.06);
+}
+.btn.refresh-btn:focus-visible, .btn.overflow-trigger:focus-visible {
+  outline: 2px solid var(--hud-hairline-2); outline-offset: 2px;
+}
+
+/* ── Refresh shimmer: one 620ms sweep on the row while data reloads. Bound to
+      the EXISTING .spinning class the refresh icon already toggles, so it
+      needs no new state and cannot desync from the actual load. ─────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .header:has(#refreshIcon.spinning)::after {
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none; border-radius: inherit; z-index: 2;
+    background: linear-gradient(100deg, transparent 35%,
+      rgba(95,240,228,0.10) 50%, transparent 65%);
+    background-size: 220% 100%;
+    animation: hudShimmer 0.62s var(--hud-ease);
+  }
+}
+@keyframes hudShimmer {
+  from { background-position: 140% 0; }
+  to   { background-position: -40% 0; }
+}
+
+/* ══ SEARCH ════════════════════════════════════════════════════════════════ */
+.search-input.search-wide {
+  background: rgba(8,12,23,0.62);
+  border: 1px solid var(--hud-hairline);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.02em;
+  transition: border-color 0.2s var(--hud-ease), box-shadow 0.2s var(--hud-ease);
+}
+.search-input.search-wide::placeholder { color: var(--text3); }
+.search-input.search-wide:focus {
+  border-color: rgba(44,212,208,0.55);
+  box-shadow: 0 0 0 3px rgba(44,212,208,0.10);
+  outline: none;
+}
+
+/* ══ SOURCE PILLS ══════════════════════════════════════════════════════════
+   The semantic set, applied: an ACTIVE source is emerald, an inactive one is
+   slate. Both keep their book hue on the LABEL, so identity and status never
+   fight for the same channel — the rule the rest of the app already follows. */
+.source-toggle {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  border-radius: 6px;
+  border: 1px solid var(--hud-hairline);
+  background: rgba(8,12,23,0.5);
+  transition: border-color 0.18s var(--hud-ease), color 0.18s var(--hud-ease),
+              background 0.18s var(--hud-ease);
+}
+.source-toggle:hover { border-color: var(--hud-hairline-2); background: rgba(120,145,195,0.07); }
+.source-toggle.active { border-color: rgba(32,223,143,0.42); }
+.source-toggle:focus-visible { outline: 2px solid var(--hud-hairline-2); outline-offset: 2px; }
+.source-toggle-label, .sort-trend-trigger, .density-trigger {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.08em;
+  border-radius: 7px;
+  border: 1px solid var(--hud-hairline);
+  background: rgba(8,12,23,0.5);
+  transition: border-color 0.18s var(--hud-ease), color 0.18s var(--hud-ease);
+}
+.source-toggle-label:hover, .sort-trend-trigger:hover, .density-trigger:hover {
+  border-color: var(--hud-hairline-2); color: var(--text);
+}
+.sort-trend-summary {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══ TAB BAR ═══════════════════════════════════════════════════════════════
+   One treatment for every tab so they read as a set, with the active state
+   carried by an underline rather than a fill — a filled tab competes with the
+   CTA, and there can only be one primary in a chrome this dense. */
+.tab-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text2);
+  transition: color 0.18s var(--hud-ease), border-color 0.18s var(--hud-ease),
+              background 0.18s var(--hud-ease);
+}
+.tab-btn:hover { color: var(--text); background: rgba(120,145,195,0.06); }
+.tab-btn:focus-visible { outline: 2px solid var(--hud-hairline-2); outline-offset: -2px; }
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--hud-amber);
+  background: linear-gradient(180deg, rgba(248,198,74,0.10), transparent 70%);
+}
+.tab-btn .tab-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--hud-hairline);
+  background: rgba(8,12,23,0.6);
+  color: var(--text2);
+}
+/* AI BEST PICKS is the destination, so it stays lit even when inactive —
+   amber at rest, and a fuller glow once selected. */
+.tab-btn.tab-btn-primary {
+  color: var(--hud-amber);
+  border-bottom-color: rgba(248,198,74,0.30);
+}
+.tab-btn.tab-btn-primary:hover { background: rgba(248,198,74,0.08); }
+.tab-btn.tab-btn-primary.active {
+  color: #ffdd8a;
+  border-bottom-color: var(--hud-amber);
+  background: linear-gradient(180deg, rgba(248,198,74,0.20), rgba(248,198,74,0.04) 70%);
+  box-shadow: 0 0 20px -8px rgba(248,198,74,0.85);
+}
+.tab-btn.tab-btn-primary.active .tab-count {
+  border-color: rgba(248,198,74,0.45);
+  color: #ffdd8a;
+}
+
+/* ── Desktop-first, but the chrome must survive a narrow window ─────────── */
+@media (max-width: 1200px) {
+  #openingLinesCount .status-chunk { padding: 0 6px; font-size: 9px; }
+  .btn.auto-fetch-btn { letter-spacing: 0.06em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ext-dot, .btn.auto-fetch-btn, .btn.refresh-btn, .btn.overflow-trigger,
+  .tab-btn, .source-toggle, .search-input.search-wide { transition: none; }
+  .header::after { animation: none; content: none; }
+}
 </style>
 </head>
 <body>
@@ -32832,7 +33145,11 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
     </div>
   </div>
   <div class="filter-bar-center">
-    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="🔍 Search fighters... or conf:70+ lean:over td:under split:yes" autocomplete="off">
+    <!-- GLOW-UP 365: the placeholder was truncating mid-syntax ("...or conf:") and
+         reading as a broken string. It now states its purpose; the query syntax it
+         used to carry moves to the title so the operators stay discoverable rather
+         than being deleted along with the truncation. -->
+    <input type="text" id="fighterSearch" class="search-input search-wide" placeholder="Search fighters, events, or configs" title="Search by name, or filter with operators: conf:70+ · lean:over · td:under · split:yes" autocomplete="off">
   </div>
   <div class="filter-bar-actions">
     <button id="manualEntryBtn" class="manual-entry-btn">✏️ BETR LINES</button>
