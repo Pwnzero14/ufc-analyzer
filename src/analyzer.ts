@@ -14395,7 +14395,12 @@ const FACTOR_LANES: Array<{ cls: string; label: string; test: RegExp }> = [
   { cls: 'pf-guard',    label: 'guard',      test: /^No history|^Clamped to historic|^Anchored to market/i },
   // Post-hoc multipliers on the level — calibration, the book prior, the learned
   // trend. Same family as the shrink, so they share its gold.
-  { cls: 'pf-cal',      label: 'correction', test: /^FP cal|^Book prior|^Trend|^Debut split/i },
+  // GLOW-UP 362: `Book calibration` joins this lane rather than getting its own.
+  // It is a post-hoc correction on the level, exactly like FP cal and Book prior,
+  // and the legend is derived from lanes actually drawn — so reusing pf-cal adds
+  // no legend entry. It matched NOTHING before (^Book prior does not cover it),
+  // so the chip drew with no lane class at all.
+  { cls: 'pf-cal',      label: 'correction', test: /^FP cal|^Book (prior|calibration)|^Trend|^Debut split/i },
   // Legacy: pre-v29 boards only.
   { cls: 'pf-duration', label: 'duration',   test: /^Duration adj/ },
   // Anchored so it cannot swallow `Opp adj: x1.09 (... Finish synergy ...)`, an
@@ -14433,6 +14438,13 @@ const FACTOR_SHORT: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^Anchored to market: model said ([\d.]+)/,   m => `⚓ ${m[1]}`],
   [/^FP cal \([^)]*\): ×([\d.]+)/,              m => `CAL ×${Number(m[1]).toFixed(2)}`],
   [/^Book prior: ([\d.]+)/,                     m => `BOOK ${m[1]}`],
+  // GLOW-UP 362: v41's book-calibration reason was added without a rule here, so
+  // compressFactor fell through to `return r` and rendered the whole sentence —
+  // measured at 326px of overflow on TWELVE cards, every other clipped element on
+  // the page being 33px or less. Before→after only; the sentence stays on the
+  // title, and the FP cell beside it already shows where the number landed.
+  [/^Book calibration: ([\d.]+) → ([\d.]+)/,
+    m => `BCAL ${m[1]!.replace(/\.0$/, '')}→${m[2]!.replace(/\.0$/, '')}`],
   [/^Trend(?: adj)?:\s*([+-][\d.]+)/,           m => `TREND ${m[1]}`],
   [/^Duration adj:.*\(×([\d.]+)\)/,             m => `DUR ×${m[1]}`],
   [/^High P\(finish\) (\d+)%/,                  m => `FIN ${m[1]}%`],
