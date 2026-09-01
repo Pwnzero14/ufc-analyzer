@@ -44,13 +44,16 @@ What is left off that list:
       pred.ss.line WAS the raw output and the loop was sound. The learning log
       confirms it: 18 runs, all pre-v43, learner damping correctly (-0.122).
       NO LEARNING RUN HAS EVER BEEN AFFECTED. First exposure is the Paris settle.
-   e. FP: the "broken since v22 / v27 saturation is the symptom" idea is DEAD on
-      timing. The FP book prior runs INSIDE predictFantasy and does not break the
-      loop; the first post-hoc layer is v31's anchor (2026-08-21), a DAY AFTER the
-      v27 renormalisation it was supposed to explain. FP's real break window is
-      08-21 onward and is probably tiny (the anchor is a >15 clamp on a posted
-      line; calibration only from 08-30). Measure with
-      snippets/2026-09-01_fp_loop_readonly.js - written, dry-run, NOT yet run.
+   e. FP IS CLOSED FOR NOW. The "broken since v22 / v27 saturation" idea was dead
+      on timing, and the measurement then found only TWO runs of exposure with no
+      detectable effect - and targetKind='none' on all 18 runs means every stored
+      cycle is RESULT-trained, so the metric could not have detected one anyway.
+      fp_global_modifier is 0.997, nowhere near its 0.75 floor. Treat FP as
+      untouched. Full numbers in the 09-01 section.
+   e2. THE ONE THING THAT ACTUALLY RESOLVES BOTH STATS: run 19, after Paris. It
+      will be the first cycle that is BOTH line-trained (v40) and post-v41. Re-run
+      snippets/2026-09-01_learning_log_readonly.js and _fp_loop_readonly.js then.
+      Until that exists, every loop claim is about code, not measured behaviour.
    f. STANDING RULE EARNED THE HARD WAY: check the SHIP DATE before building a
       story about long-running corruption. Twice tonight that check killed the
       story outright, both times after the reasoning was already written down.
@@ -779,16 +782,35 @@ same timing as the sign bug, same first exposure: the Paris settle.
   account stands: a genuinely over-predicting baseline the learner correctly
   damped, which became a double-correction once Step 2b fixed the bias at source.
 
-  WHAT IS ACTUALLY OPEN: the break window is 2026-08-21 onward. The anchor is a
-  CLAMP (fires only when the model is >15 off a POSTED FP line), calibration moves
-  every row from 08-30. So exposure is "some rows since 08-21, all rows since
-  08-30" and is probably tiny. MEASURE IT:
-    snippets/2026-09-01_fp_loop_readonly.js
-  It splits every logged run into loop-SOUND vs BROKEN eras, walks the
-  fp_global_modifier trajectory backwards from the live value, and pools
-  effectiveDelta.fp either side of the boundary. It also refuses to over-read a
-  shift: v27, v30, v31 and v40 all landed in the same window, so a difference has
-  several candidate causes besides the broken loop.
+  *** MEASURED 2026-09-01 03:32. TWO RUNS OF EXPOSURE, NO DETECTABLE EFFECT. ***
+    runs loop SOUND (pre 08-21) : 16
+    runs in the BROKEN window   : 2  - Hernandez vs. Rodrigues, Nurmagomedov vs.
+                                      Song. Both post-v31 anchor; NEITHER post-v41.
+    mean effectiveDelta.fp      : SOUND -0.747 (n=306) | BROKEN +0.105 (n=51)
+    fp_global_modifier          : default 0.997, net -0.111 over the log,
+                                  9 up / 8 down. NOT saturated (floor is 0.75).
+
+  THE SIGN FLIP IS AN ARTIFACT - DO NOT REPORT IT AS ONE. The broken window is
+  literally two runs whose means CANCEL: +8.274 (n=26) and -8.391 (n=25), giving
+  +0.105. Sound-era per-run means span -25.1 to +7.6 with a run-level SD of 10.19,
+  so the SE of a two-run mean is 7.21. The observed era difference is 0.85 -
+  0.12 SE. Nothing. n=51 looks like a sample; it is two events.
+
+  *** AND THE METRIC CANNOT TEST THE CLAIM ANYWAY ***
+  targetKind reads 'none' on ALL 18 runs. Its own comment (types/index.ts:459)
+  says it exists "so a later session can tell line-trained cycles from the older
+  result-trained ones" - it was added by v40 on 2026-08-30, and the last run was
+  08-29. So EVERY stored run is RESULT-trained: effectiveDelta.fp here measures
+  `RLM-blended result - predicted`, not `posted line - predicted`. The broken-loop
+  story is about the LINE target. This dataset cannot speak to it in either era.
+  The probe's targetKind column was added for exactly this and earned its place.
+
+  CONCLUSION: FP's loop break is REAL IN CODE, has TWO runs of exposure, shows no
+  detectable effect, and the only available metric could not have detected one.
+  Treat FP as untouched. Re-measure after Paris - run 19 will be the first
+  line-trained AND post-v41 cycle, for FP and SS alike.
+
+  THE TOOL: snippets/2026-09-01_fp_loop_readonly.js
 
   *** THE PATTERN TO STOP REPEATING ***
   Twice now I have proposed "an invisible correction has been quietly corrupting
