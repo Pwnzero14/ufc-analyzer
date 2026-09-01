@@ -38,9 +38,16 @@ What is left off that list:
       calcSSLean and never read PropPrediction, so no pick is currently wrong.
       Fix it, regenerate, and re-run the decomposition to confirm the shipped
       lines straddle the book instead of sitting under it.
-   d. The learning loop IS structurally broken (runLearningCycle reads the
-      calibrated line but tunes a term upstream of the calibration). That is a
-      code fact, not a statistic, and it survives the retraction.
+   d. The learning loop IS structurally broken for SS (runLearningCycle reads the
+      stored post-correction line but tunes a term upstream of it) - BUT IT IS
+      TWO DAYS OLD. Every SS correction layer landed 2026-08-30; before that
+      pred.ss.line WAS the raw output and the loop was sound. The learning log
+      confirms it: 18 runs, all pre-v43, learner damping correctly (-0.122).
+      NO LEARNING RUN HAS EVER BEEN AFFECTED. First exposure is the Paris settle.
+   e. FP's loop, by contrast, has been broken since v22 (anchor + book prior were
+      FP-only until v43). The v27 fp_global_modifier saturation at the clamp
+      floor is what that would look like. HYPOTHESIS - worth a look, not
+      established. This is the one place damage may already exist.
 
 (B) OTHERWISE: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
     FP recomputed from UFCStats components. This is the biggest open thread in
@@ -713,7 +720,53 @@ board displays and what runLearningCycle reads. Redone on final-book:
   OPPOSITE side. This is the best argument yet for fixing the sign, and it
   arrived from a question about a different fighter.
 
-=== A RATCHET, CONSISTENT WITH EVERY NUMBER BUT NOT PROVEN ===
+=== *** THE RATCHET IS DEAD. ALL THREE CHECKS, AND ONE REVERSED MY SIGN. *** ===
+LEARNING LOG READ 2026-09-01 03:12, 18 runs stored.
+  1. TIMING     : 0 runs on/after v43 shipped. Decisive on its own.
+  2. TRAJECTORY : UP 8 / DOWN 10, net -0.122. NOT monotone, and it moved DOWN.
+  3. SIGNAL     : effectiveDelta.ss n=354, mean -2.555, pos 165 / neg 187.
+                  The ratchet needed this POSITIVE. It is NEGATIVE.
+
+  MY READING OF 1.056 WAS BACKWARDS. I argued "default sits above 1.0, so it is
+  being pushed up". The trajectory shows it STARTED at 1.181 and has been coming
+  DOWN ever since; 1.056 is a waypoint on a descent, not evidence of a climb.
+
+  AND THE NUMBERS RECONCILE WITH bookCalibration, which is the reassuring part:
+  mean effectiveDelta.ss -2.555 means predicted - posted ~ +2.55, and
+  bookCal.global.SS reads +3.3. Same sign, same rough magnitude, two independent
+  paths. Historically the stored SS line ran ABOVE the posted line and the
+  learner was correctly damping it - slowly (-0.122 over 18 events), but in the
+  right direction.
+
+=== *** THE BROKEN LOOP IS TWO DAYS OLD, NOT LONGSTANDING - THIS IS THE FIX *** ===
+For SS, EVERY correction layer between the estimator and the stored line arrived
+on 2026-08-30:
+    v41 calibrateToBooks          2026-08-30
+    v43 applyBookPrior (SS)       2026-08-30  } "were FP-ONLY" - the v43 comment
+    v43 applyMarketAnchorFor (SS) 2026-08-30  }  says so outright
+BEFORE THAT, pred.ss.line WAS the raw estimator's output. The loop was SOUND for
+all 18 logged runs, which is exactly why the learner tracked the error correctly.
+So the broken-loop finding is real but it has NEVER YET AFFECTED A LEARNING RUN -
+same timing as the sign bug, same first exposure: the Paris settle.
+
+  FORWARD-LOOKING, AND THIS ONE IS A PREDICTION NOT A FINDING:
+  current final-book median is -1.0, so the FIRST v43 settle will feed the learner
+  effectiveDelta ~ +1.0 - positive, where 18 runs of history were negative. That
+  is when the modifier starts being pushed UP against a raw estimator that is
+  already hot. TEST IT AFTER PARIS: re-run this probe and check whether run 19
+  flips the sign of mean effectiveDelta.ss. Do not assert it before then.
+
+  *** WHERE THE DAMAGE MAY ALREADY BE: FP, NOT SS ***
+  FP has had applyMarketAnchor and computeBookPriorFP SINCE v22. So FP's loop has
+  been broken for far longer than SS's two days. The v27 note above records
+  fp_global_modifier saturating at its clamp floor after 18 learning cycles
+  ("every class landed under 1.0 ... womenFlyweight 0.771 against a 0.75 clamp
+  floor"). A learner fighting a correction it cannot see is EXACTLY what that
+  looks like. HYPOTHESIS ONLY - the v27 note attributes it to an over-predicting
+  baseline and says Step 2b fixed it at source. Worth a look; not established.
+
+=== SUPERSEDED: A RATCHET, CONSISTENT WITH EVERY NUMBER BUT NOT PROVEN ===
+(Kept for the reasoning trail. The probe above killed it on all three checks.)
 median final-book = -1.0, so effectiveDelta = posted - predicted is systematically
 about +1.0. The learner reads that as "predicting too low" and nudges
 ss_pace_modifier UP. Observed default: 1.056 - ABOVE 1.0, when nothing else on
