@@ -1,26 +1,40 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-08-31 13:43:26 -04:00
+Last Saved: 2026-09-01 02:20:28 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: a1dbd48
+HEAD: 60804b4
 
 ## Last Notes
 ################################################################################
 ##  START HERE - NEXT SESSION'S FIRST TASK                                     ##
 ################################################################################
 
-TWO THREADS. Pick by whether props have dropped.
+GATE 2 IS CLOSED AND THE BOARD IS REGENERATED (v43, 28 fighters, 2026-09-01).
+Items 1, 2 and 4 of the old list are DONE - see the 09-01 section at the bottom.
+What is left off that list:
 
-(A) IF PARIS PROPS HAVE DROPPED (board still read ALL FIGHTERS 0 at 21:45):
-  1. GATE 2 (displayedConfidence write path) - needs only the FIRST book lines
-     (Pick6/UD/Betr), not the full Friday set.
-  2. Regenerate predictions.
-  3. Best Picks audit once TD + R1 SS + CTRL + FP are ALL posted (Friday).
-  4. Eyeball Hooker/Parnasse for v39 (3R history moving up to a 5R main flips
-     the SS hit-rate term by up to +4).
+  3. Best Picks audit - STILL BLOCKED until TD + R1 SS + CTRL + FP are ALL
+     posted (Friday). Only SS lines are in (Pick6 + Underdog). Do not audit early.
 
-(B) IF NOT: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
+  NEW, IN ORDER:
+   a. THE 50/50 OPPONENT BLEND in predictSS is the dispersion source. Books price
+      the fighter's own rate (0.89-1.08 x career expectation); the model spans
+      0.59-1.64 because oppRate is weighted equally with the fighter's own. n=7,
+      one card - RE-RUN THE DECOMPOSITION ON 2-3 MORE CARDS before changing the
+      weight. Full table in the 09-01 section.
+   b. TWO BOOK LINES LOOK FAKE - Hooker P6 27.5 (0.45x his career-rate
+      expectation, in a 5R fight) and Peek P6 24.5 (0.55x). Everyone else is
+      0.89-1.08. Verify before trusting anything measured against them.
+   c. The anchorShift sign IS negated (fair = posted - 3.3 on all 10 anchored
+      rows). DO NOT FIX IT ALONE - and note the reason for that caution has
+      CHANGED: the "+12 raw bias it was cancelling" was my own selection-bias
+      artifact and is RETRACTED. The real reason to wait is (a) and (b).
+   d. The learning loop IS structurally broken (runLearningCycle reads the
+      calibrated line but tunes a term upstream of the calibration). That is a
+      code fact, not a statistic, and it survives the retraction.
+
+(B) OTHERWISE: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
     FP recomputed from UFCStats components. This is the biggest open thread in
     the project right now and it is NOT a ledger problem - the archive feeds
     grading, calibration, FP hit rates and CLV. See the section below; the FIRST
@@ -347,6 +361,294 @@ same next time and measure first.
  - .fighter-main is the remaining big surface. It is also the one this repo has
    broken before by editing ahead of a browser check - test in the browser FIRST.
 
+
+################################################################################
+##  2026-09-01 - GATE 2 CLOSED, v43 BOARD REGENERATED, AND THE ANCHOR SIGN     ##
+################################################################################
+
+BOARD STATE: UFC Fight Night: Hooker vs. Parnasse, 28 fighters, MODEL v43,
+regenerated 2026-09-01 ~01:55. 40807 archive records, 41 unresolved.
+LINES IN: Pick6 and Underdog SS only. Betr, PrizePicks and DK Sportsbook all
+still WAITING. No TD / FP / CTRL / R1 SS book lines anywhere on the board.
+
+=== GATE 2: CLOSED ===
+  event: UFC Fight Night: Hooker vs. Parnasse
+  picks: 9 | carrying displayedConfidence: 9 | recalibrationReady: true
+All nine picks carry the field and the raw->displayed deltas are non-zero, so
+initRecalibrationMap is populating and the stored number IS the displayed one.
+This is the first card where the graded number and the shown number are the same
+thing (240fe65). Gate 3 grades it after Paris settles.
+
+=== (4) THE v39 5R CHECK: CANNOT BE RUN YET, AND HALF OF IT NEVER CAN ===
+This was the "eyeball Hooker/Parnasse for v39" item. The answer is that v39 is
+DORMANT on this board, for two independent reasons - neither of which is a bug.
+
+  v39 IS GATED BEHIND DK, NOT BEHIND THE 5R INFERENCE. calcSSLean's hit-rate
+  term calls marketExpectedFightMinutes(name, schedRounds) (analyzer.ts ~5680).
+  That function needs resolveRoundStartFromMap / resolveDistanceDecisionProb /
+  finishHistogramConditional, and ALL THREE read dk*ByName maps - DK Sportsbook
+  is the only source. DK has posted nothing. So expMinsSS is null, clearedSSLine
+  falls back to the raw `ss > line_ss` comparison per fight, ssNormalisedFights
+  stays 0 and the hrNote is empty. The normaliser is not running.
+  durationAdjustProjection is gated on the same call, so the "Duration-adjusted"
+  reason is absent for the same reason. Neither is a 5R problem.
+
+  PARNASSE CAN NEVER EXERCISE v39. calcSSLean bails at `history.length < 3`
+  before it ever reaches the hit-rate term, and Parnasse has NO UFCStats history
+  (UFC debut - the board shows the no-history badge and the NO HISTORY chip).
+  He gets no SS lean at all. Only the HOOKER side of this main event can ever
+  test v39, and only once DK posts.
+
+  WHAT IS CONFIRMED GOOD: the 5R inference itself. Hooker and Parnasse are the
+  ONLY two rows marked 5R; all 26 others read 3R. That is exactly the headliner
+  rule and it matches the event title, so getScheduledRoundsContext reached both
+  the predictor and the lean path correctly.
+
+  RE-RUN THE v39 CHECK ON FRIDAY, ON HOOKER ONLY, once DK is in. Look for the
+  "(N/24 scaled to ~Xm)" note on his hit-rate reason - its presence is the proof
+  the term fired; its absence means DK still is not resolving for his name.
+
+=== *** THE v43 ANCHOR SHIFT IS NEGATED - CONFIRMED BY THE AUDIT, NOT FIXED *** ===
+RUN 2026-09-01 02:26. 79 stat rows, 10 anchored (all SS - TD and R1 SS measure
+S=0 so their anchor is inert, and no FP line is posted to anchor against).
+MEASURED S: SS 3.3 | TD -0.0 | R1 SS 0 | FP -7.7.
+
+  ON ALL 10 ANCHORED ROWS, fair = posted - 3.3, EXACTLY.
+    Hooker fair 24.2 / book 27.5 | Ziam 35.2 / 38.5 | Sola 21.2 / 24.5
+    Charriere 33.2 / 36.5 | Peek 21.2 / 24.5 | Campbell 21.2 / 24.5
+    Cornolle 27.2 / 30.5 | Sygula 31.2 / 34.5 | Lima 32.2 / 35.5
+    Parnasse 30.2 / 33.5
+  `fair` is quoted verbatim in the stored reason and the book line comes from the
+  RAW line store, which nothing in the anchor path writes. fair = posted + shift,
+  so shift = -3.3 = -S. Confirmed, not inferred. calibrateToBooks then subtracts
+  S a second time.
+
+DO NOT FIX THE SIGN ON ITS OWN. See the next section - the negation is currently
+compensating for something bigger, and correcting it alone makes the board worse.
+
+  analyzer.ts ~14564:  const anchorShift = (stat) => -(bookCal?.global?.[stat] ?? 0);
+
+  bookCal.global[stat] is (predicted - posted) - stated outright in
+  expectedLineAtBook: "bias is (predicted - posted), so the posted number is
+  predicted MINUS the bias". It is POSITIVE for SS (comment says 4.1; the
+  PREDICTOR VS POSTED LINES panel currently reads SS bias +3.0, n=229).
+
+  applyMarketAnchorFor computes `fair = postedLine + shift`, and it runs INSIDE
+  the pair loop - so sp.line is still on the MODEL scale, uncalibrated.
+  calibrateToBooks runs AFTER the loop and subtracts the same offset again.
+
+  Let S = bookCal.global.SS > 0 and P = the posted line. Then:
+    intended   shift = +S -> band after calibration = [P - cap, P + cap]
+    as written shift = -S -> band after calibration = [P - 2S - cap, P - 2S + cap]
+  With S ~ 3 and cap = max(6, 0.18*fair), an ANCHORED SS line can land anywhere
+  from ~12 under the book to, at best, level with it. It is structurally
+  incapable of finishing above the posted line. The offset is applied twice in
+  the same direction.
+
+  THE BOARD IS CONSISTENT WITH THIS. Of the 16 rows carrying a book SS line,
+  15 sit at or below it and only ONE is above: Parnasse at +6.0 - and Parnasse's
+  number is set by applyDebutMoneylineSplit, which v43 deliberately runs AFTER
+  the anchor. The big unders are the anchored rows (Charriere -13.0,
+  Ruziboev -10.0, Bukauskas -10.0, Sy -8.0, Pinto -6.0); the ten -1.0 rows are
+  just calibrateToBooks removing a +3 bias from a board whose real gap is ~+2.5
+  and snapping to the .5 grid. Those -1.0s are FINE. The tail is the question.
+
+  THIS IS ONE DAY OLD. anchorShift arrived with v43 SUGGESTION 2 (2026-08-30);
+  this is the first board generated under it with book lines present, so nothing
+  settled has ever been priced this way. FP is NOT affected - it uses
+  computeMarketFpShift, a different quantity, applied consistently as
+  `fair = book + fpShift` in both the anchor and the display.
+
+  BEFORE CHANGING IT: this is a numbers claim reconstructed from the code plus
+  a screenshot of the board, not from instrumented output. Confirm S and confirm
+  which rows actually carry an `anchoredFrom` field before touching the sign -
+  the house rule is verify by numbers, and "13 of 16 negative" is a correlation.
+  THE CONFIRMATION IS ALREADY WRITTEN AND IS READ-ONLY:
+    snippets/2026-09-01_anchor_sign_readonly_audit.js
+  Paste it in the ANALYZER page console. It only calls chrome.storage.local.get.
+  It recovers the posted line from the stored REASON STRINGS rather than from the
+  line stores - the anchor reason carries `fair` and `cap`, the calibration reason
+  carries the measured offset S, so P = fair + S - and then cross-checks that
+  against the raw stores as an independent column. Verdict logic was dry-run in
+  node against fabricated boards and correctly separates "consistent with the
+  sign error" from "one anchored row finished ABOVE the book, drop the claim".
+  IF NOTHING IS ANCHORED, the script says so and the claim stays UNPROVEN - the
+  band argument only bites when applyMarketAnchorFor actually fires.
+
+=== *** RETRACTED: "THE RAW SS PREDICTOR RUNS ~+12 ABOVE POSTED LINES" *** ===
+THAT NUMBER WAS SELECTION BIAS AND IT IS WRONG. It was the median of
+(anchoredFrom - book) over the ANCHORED rows only - and the anchor fires PRECISELY
+on the rows where the model disagrees most. Conditioning on "the anchor fired" and
+then measuring disagreement measures the selection, not the model. Textbook, and I
+walked straight into it.
+
+WHAT THE CLEAN DECOMPOSITION SAYS (2026-09-01 02:48, 28/28 chain intact,
+zero formula mismatches, 9 rows carrying a usable single-book line):
+  median raw-book   +7.5   (the estimator's own error)
+  median final-book -1.0   (what the learner sees)
+
+  DO NOT QUOTE +7.5 AS A BIAS. It is unstable: drop the two rows whose BOOK is
+  suspect (Hooker +24.5 at ratio 0.45, Peek +8.0 at 0.55) and the median falls to
+  -3.0. What is stable is the SPREAD, and it is enormous:
+      raw-book   -12, -11, -5, -3, +7.5, +8, +21, +24.5, +25.5   IQR 26
+      final-book -15, -10, -8, -6, -1, -1, -1, 0, +3             IQR  7
+  THE ANCHOR IS A CLAMP, NOT A CALIBRATION. It compresses the IQR from 26 to 7 -
+  location AND spread - and the clamped result is what runLearningCycle reads.
+  A single multiplicative ss_pace_modifier cannot fix a variance problem, so
+  "retune the pace term" was never the answer.
+
+  ss_pace_modifier IS NOT SATURATED either, which was the other thing I expected:
+  default 1.056, bantam 1.032, feather 0.972, heavy 0.888, FLY 1.275 - all well
+  inside [0.70, 1.40] and mostly ABOVE 1.0. The learner is not straining downward.
+  That is consistent with the broken loop below - it is not straining at all.
+
+  S IS STILL THE PIPELINE'S RESIDUAL, NOT THE MODEL'S. bookCalibration measures
+  (predicted - posted) on STORED predictions, i.e. after anchoring and calibration.
+  That part of the earlier note stands and is worth keeping.
+
+=== *** WHERE THE DISPERSION COMES FROM: THE 50/50 OPPONENT BLEND *** ===
+predictSS is  ((fighterRate + oppRate) / 2) * expectedMin * ssMod * style.
+oppRate is the OPPONENT'S ABSORBED rate (SAPM), weighted EQUALLY with the
+fighter's own output rate. Score each row against the fighter's OWN career-rate
+expectation (career SS/min x this fight's expectedMin - an independent reference
+from UFCStats, not from any book):
+
+   fighter      own   opp   opp/own   raw    careerExp   raw/careerExp
+   Cornolle    2.73  5.50    2.01    56.0      34.2          1.64
+   Ziam        2.68  4.53    1.69    46.0      36.2          1.27
+   Pinto       2.85  3.92    1.38    18.5      20.0          0.93
+   Sy          3.40  3.86    1.14    33.5      36.5          0.92
+   Hooker      4.80  3.90    0.81    52.0      61.2          0.85
+   Charriere   4.02  2.91    0.72    26.5      36.2          0.73
+   Peek        4.40  2.63    0.60    32.5      44.4          0.73
+   Bukauskas   3.13  1.87    0.60    16.5      27.9          0.59
+
+  MONOTONIC IN opp/own. That is partly ARITHMETIC, not discovery - by construction
+  raw - careerExp ~ expectedMin x (opp - own)/2 - so do NOT present it as a
+  correlation finding. The DESIGN question is what matters: is a 50/50 weight
+  right? The books say no.
+
+  BOOKS PRICE THE FIGHTER'S OWN RATE AND LARGELY IGNORE OPPONENT ABSORPTION.
+  book / careerExp on the seven rows whose book is not suspect:
+      Ziam 1.06 | Charriere 1.06 | Pinto 1.08 | Sy 1.06 | Bukauskas 0.98 |
+      Cornolle 0.89   (Hooker 0.45 and Peek 0.55 excluded as suspect)
+  Books sit in a 0.89-1.08 band. The MODEL spans 0.59-1.64 against the same
+  reference - roughly FIVE TIMES the dispersion. The opponent-absorption term is
+  injecting variance the market does not price.
+
+  CAVEATS, AND THEY ARE REAL:
+   - n = 7-9. Thin. One card.
+   - careerExp ignores opponent quality by construction, so it is a reference that
+     structurally favours whoever else ignores it. It is independent of the book
+     (UFCStats history) but it is NOT a neutral arbiter of who is right.
+   - The two suspect book lines are still unverified.
+  NEXT: re-run this on the next 2-3 cards before touching the blend weight. If it
+  holds, the change is a WEIGHT on oppRate, not a pace-modifier retune - and it
+  should be measured against careerExp AND the book, not either alone.
+
+=== THE 9 CHAIN BREAKS WERE MY BUG - RESOLVED. round1 IS NOT ONE DECIMAL. ===
+*** PropLinePredictorService:59  round1(v) = Math.round(v * 2) / 2  — NEAREST 0.5 ***
+The name is a lie and it is the single most misleading identifier in this file.
+EVERY stage output goes through it. Reconstructing with true 1dp puts the rebuilt
+value up to 0.25 off, which reported a CHAIN BREAK on any row whose arithmetic did
+not already land on the .5 grid - 9 of 28. Proven on the dumped strings:
+    Hooker    fair 24.2 + cap 6.0 = 30.2 -> round1 30.0 = logged cal.before 30.0
+    Charriere fair 33.2 - cap 6.0 = 27.2 -> round1 27.0 = logged cal.before 27.0
+    Bukauskas .74x16.5 + .26x34.5 = 21.18 -> round1 21.0 = logged 21.0
+NO unmodelled transform exists. The five known stages account for the whole move.
+The same bug caused the lone formula MISMATCH (Bukauskas): a point estimate was
+compared against a grid-snapped stored value. The check is now an INTERVAL derived
+from each input's printed precision, snapped to the grid.
+FIXED in the snippet, and there is now a REGRESSION FIXTURE built from the verbatim
+dumped strings (scratchpad dryrun4) - all three rows read chain ok / formula ok,
+and table 3 reproduces the live ratios exactly (0.45 / 1.06 / 0.98).
+RE-RUN THE DECOMPOSITION. Trusted rows go 19 -> 28 and rows carrying a usable book
+line go 4 -> ~13, so BOTH medians will move. The -4.0 / -7.0 pair above was
+computed on the four survivors of a bug and should not be quoted.
+
+=== TABLE 3 EARNED ITS PLACE: TWO BOOK LINES DO NOT LOOK REAL ===
+  Dan Hooker   P6 27.5  vs career 48.8 avg / 4.82 per min  -> ratio 0.45
+  Trevor Peek  P6 24.5  vs career 53.2 avg / 4.39 per min  -> ratio 0.55
+Everyone else lands 0.89-1.08, i.e. the books are sane across the board. HOOKER IS
+THE ROW THE WHOLE "+12" STORY WAS BUILT ON, and his line is the most suspicious on
+the card - 0.45x his own career-rate expectation in a FIVE-ROUND fight, where it
+should if anything be higher. This repo has a documented junk-low-SS-line trap
+(plausibleSs guard, cross-book outlier guard v18). Check whether 27.5 is a real
+Pick6 full-fight SS line before ANY conclusion that rests on Hooker.
+
+  *** WHY THE LEARNER NEVER CORRECTS IT - THE LOOP IS BROKEN IN THE MIDDLE ***
+  GENERATION: predictSS -> applyBookPrior -> applyMarketAnchorFor ->
+    applyDebutMoneylineSplit -> calibrateToBooks -> savePredictions.
+  LEARNING:   runLearningCycle -> getPredictions() -> `predicted = pred.ss.line`
+    -> effectiveDelta = postedLine - predicted -> updates ss_pace_modifier
+    -> which feeds predictSS, i.e. STEP ONE.
+  The gradient is measured AFTER three market-correction layers and applied to a
+  term BEFORE all of them. On this board effectiveDelta is about +1.0 (book 27.5,
+  stored 26.5): relErr 3.6%, step +0.36%. The learner concludes it has CONVERGED,
+  and on its own measurement it has. The estimator's error is corrected away
+  before it is ever observed, so it is structurally unlearnable.
+  Two more things would bite even if it could see it:
+   - ss_pace_modifier is clamped [0.70, 1.40] with MAX_STEP_PER_EVENT 0.08. Taking
+     12 off ~52 needs x0.77 - inside the clamp but near the floor. The v13 note at
+     PropLinePredictorService ~230 records this EXACT saturation happening once
+     already (lightHeavyweight pinned at 0.70) before being renormalised to 1.0.
+   - `rate x expectedMin x mod` estimates E[STRIKES LANDED]. v40 changed the
+     learning TARGET to the posted line and left the FORMULA estimating output.
+     A multiplicative pace term can rescale an output estimator; it cannot turn it
+     into a line estimator, and asking it to absorb a market convention destroys
+     what the pace term means.
+
+  DECOMPOSITION TOOL (read-only):
+    snippets/2026-09-01_ss_decomposition_readonly.js
+  Reconstructs every SS row as raw -> prior -> anchor -> debut -> calibration ->
+  final purely from the stored reason strings, and SELF-CHECKS it: each stage's
+  `after` must equal the next stage's `before`, so an unmodelled transform shows up
+  as a CHAIN BREAK instead of being averaged in. Then recomputes the raw formula
+  from its own logged inputs (rate / opp rate / expected minutes / ssMod / style /
+  trend) to confirm the attribution, and finally checks each POSTED LINE against
+  the fighter's UFCStats career rate. Medians are taken over unbroken rows only.
+
+  DO NOT SKIP TABLE 3. The +12 is only predictor error if the lines are real.
+  Hooker at Pick6 27.5 in a 5R main is about 0.55x his own career-rate expectation,
+  and this repo has a documented junk-low-SS-line trap. If the line is wrong, the
+  gap measured against it means nothing.
+
+  WHAT FLIPPING THE SIGN ALONE WOULD DO: every anchored SS line moves +2S = +6.6.
+  Hooker 26.5 -> 33.5 (+6.0 OVER the book). Charriere 23.5 -> 29.5. The board goes
+  from systematically under the book to systematically over it. The negation is
+  currently cancelling roughly half of the raw +12. FIX THE PREDICTOR FIRST, OR
+  FIX BOTH TOGETHER AND RE-MEASURE - never the sign by itself.
+
+=== THE FIRST VERDICT RULE WAS WRONG, AND HOW ===
+The snippet's original headline test (the delta band) returned "NOT consistent -
+drop the claim" on a board that does carry the defect. Two faults, both mine:
+  1. applyDebutMoneylineSplit runs AFTER the anchor and moves sp.line while leaving
+     anchoredFrom stale. Parnasse was anchored to 36.2, debut-split +6.7 to 42.9,
+     calibrated -3.3 to 39.5 - 6.0 ABOVE his book line, which the band said was
+     impossible. Reconstructs to the displayed 39.5 exactly. Now excluded and
+     reported, never counted.
+  2. The band's "posted" input was itself fair + S, so it could not disagree with
+     the sign it was testing. CIRCULAR. Replaced with shift = fair - (RAW book
+     line), which reads one number from the reason string and one from a store the
+     anchor never writes.
+The lesson is the 357 lesson from the other direction: a test built on the
+mechanism it is testing will confirm or deny whatever you built into it. The
+snippet is amended and both scenarios (negated / corrected) were dry-run in node.
+
+=== SMALLER, WORTH ONE CHECK ===
+Ruziboev's SS resolved to NO raw book line (exact name match, all five stores) at
+02:26, while the board painted a "P6 22.5" chip for him at 01:56 and he sits in
+DRIFTERS. That is the shape of the known line-removals-never-propagate bug -
+mergeFighters can add or change a line but never remove one, so a pulled line
+keeps rendering. It could also just be a re-fetch between the two timestamps.
+One check, not a conclusion.
+
+=== WHAT THE BOARD SAYS THAT IS NOT ABOUT THE ANCHOR ===
+The five big model-vs-book unders are all FINISHERS or short-fight profiles.
+estimateExpectedMinutes is pFinish*avgFinishMin + (1-pFinish)*fullLength, so a
+high finish rate pulls expected minutes down hard and SS scales with it; books
+do not discount that steeply. That is a real disagreement worth grading after
+Paris, and it is SEPARABLE from the anchor question - do not fold them together.
 
 ## Resume Checklist
 1. Run npm run build.
