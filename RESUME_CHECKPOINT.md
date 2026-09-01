@@ -18,18 +18,20 @@ What is left off that list:
      posted (Friday). Only SS lines are in (Pick6 + Underdog). Do not audit early.
 
   NEW, IN ORDER:
-   a. THE 50/50 OPPONENT BLEND in predictSS is the dispersion source. Books price
-      the fighter's own rate (0.89-1.08 x career expectation); the model spans
-      0.59-1.64 because oppRate is weighted equally with the fighter's own. n=7,
-      one card - RE-RUN THE DECOMPOSITION ON 2-3 MORE CARDS before changing the
-      weight. Full table in the 09-01 section.
-   b. TWO BOOK LINES LOOK FAKE - Hooker P6 27.5 (0.45x his career-rate
-      expectation, in a 5R fight) and Peek P6 24.5 (0.55x). Everyone else is
-      0.89-1.08. Verify before trusting anything measured against them.
+   a. RUN snippets/2026-09-01_ss_line_hitrate_readonly.js. It is written and
+      dry-run but has NEVER been run on real data. It is the first reference in
+      this whole thread that is not constructed - it asks how often the fighter's
+      own logged fights cleared the posted line, raw and v39-normalised. Every
+      other adjudication attempt tonight (careerExp ratio, "books are tighter")
+      collapsed on inspection. Start here.
+   b. THE BOOK LINES ARE ALL REAL - verified against the live Pick6 board, 12/12
+      exact. No junk. The "two look fake" note is RETRACTED, and so is the
+      50/50-opponent-blend finding that depended on excluding them.
    c. The anchorShift sign IS negated (fair = posted - 3.3 on all 10 anchored
-      rows). DO NOT FIX IT ALONE - and note the reason for that caution has
-      CHANGED: the "+12 raw bias it was cancelling" was my own selection-bias
-      artifact and is RETRACTED. The real reason to wait is (a) and (b).
+      rows). STILL DO NOT FIX IT ALONE - but note that BOTH earlier reasons for
+      that caution are now retracted (the "+12 raw bias", the suspect lines).
+      The remaining reason is plain: nothing has established whose number is
+      right, so a change that moves every SS line +6.6 is unjustified until (a).
    d. The learning loop IS structurally broken (runLearningCycle reads the
       calibrated line but tunes a term upstream of the calibration). That is a
       code fact, not a statistic, and it survives the retraction.
@@ -528,23 +530,32 @@ from UFCStats, not from any book):
   correlation finding. The DESIGN question is what matters: is a 50/50 weight
   right? The books say no.
 
-  BOOKS PRICE THE FIGHTER'S OWN RATE AND LARGELY IGNORE OPPONENT ABSORPTION.
-  book / careerExp on the seven rows whose book is not suspect:
-      Ziam 1.06 | Charriere 1.06 | Pinto 1.08 | Sy 1.06 | Bukauskas 0.98 |
-      Cornolle 0.89   (Hooker 0.45 and Peek 0.55 excluded as suspect)
-  Books sit in a 0.89-1.08 band. The MODEL spans 0.59-1.64 against the same
-  reference - roughly FIVE TIMES the dispersion. The opponent-absorption term is
-  injecting variance the market does not price.
+  *** THE "BOOKS ARE 5x TIGHTER" CLAIM IS RETRACTED. IT WAS THE EXCLUSION. ***
+  I originally read book/careerExp as a 0.89-1.08 band against a model spanning
+  0.59-1.64 and called it five times the dispersion. That band existed ONLY
+  because Hooker (0.45) and Peek (0.55) were dropped as "suspect books" - and
+  both lines are now confirmed real. Put them back and the comparison dies:
+      book   n=8  range 0.45-1.08  IQR 0.255  sd 0.251
+      model  n=8  range 0.59-1.64  IQR 0.285  sd 0.341
+  Nearly the same spread. The model's sd is ~36% higher, which is a whisper in
+  the same direction at n=8 and nothing more. THE 50/50 BLEND HYPOTHESIS IS NOT
+  SUPPORTED BY THIS DATA. Do not act on it, and do not re-derive it from the
+  monotonic table above - that table is arithmetic, as noted.
 
-  CAVEATS, AND THEY ARE REAL:
-   - n = 7-9. Thin. One card.
-   - careerExp ignores opponent quality by construction, so it is a reference that
-     structurally favours whoever else ignores it. It is independent of the book
-     (UFCStats history) but it is NOT a neutral arbiter of who is right.
-   - The two suspect book lines are still unverified.
-  NEXT: re-run this on the next 2-3 cards before touching the blend weight. If it
-  holds, the change is a WEIGHT on oppRate, not a pace-modifier retune - and it
-  should be measured against careerExp AND the book, not either alone.
+  THE DEEPER LESSON: careerExp is too noisy to adjudicate. It misses the BOOK by
+  up to 0.55, so it cannot be used to convict the model of anything. Excluding
+  the rows where a reference disagrees most, then reporting how tight the
+  remainder is, MANUFACTURES the result. That is what happened here.
+
+  WHAT SURVIVES, REFERENCE-FREE: model minus book, per fighter, needs no
+  careerExp at all -
+      Cornolle +25.5  Hooker +24.5  Parnasse +21  Peek +8  Ziam +7.5
+      Pinto -3  Sy -5  Bukauskas -11  Charriere -12
+  A -12 to +25.5 disagreement with the market is real and large. WHOSE error it
+  is remains open, and settling it needs a better reference than careerExp.
+  THE HIT-RATE TOOL BELOW IS THAT REFERENCE - it asks an empirical question
+  (did this fighter's own past fights clear this number) instead of comparing
+  against a constructed expectation.
 
 === THE 9 CHAIN BREAKS WERE MY BUG - RESOLVED. round1 IS NOT ONE DECIMAL. ===
 *** PropLinePredictorService:59  round1(v) = Math.round(v * 2) / 2  — NEAREST 0.5 ***
@@ -566,15 +577,42 @@ RE-RUN THE DECOMPOSITION. Trusted rows go 19 -> 28 and rows carrying a usable bo
 line go 4 -> ~13, so BOTH medians will move. The -4.0 / -7.0 pair above was
 computed on the four survivors of a bug and should not be quoted.
 
-=== TABLE 3 EARNED ITS PLACE: TWO BOOK LINES DO NOT LOOK REAL ===
-  Dan Hooker   P6 27.5  vs career 48.8 avg / 4.82 per min  -> ratio 0.45
-  Trevor Peek  P6 24.5  vs career 53.2 avg / 4.39 per min  -> ratio 0.55
-Everyone else lands 0.89-1.08, i.e. the books are sane across the board. HOOKER IS
-THE ROW THE WHOLE "+12" STORY WAS BUILT ON, and his line is the most suspicious on
-the card - 0.45x his own career-rate expectation in a FIVE-ROUND fight, where it
-should if anything be higher. This repo has a documented junk-low-SS-line trap
-(plausibleSs guard, cross-book outlier guard v18). Check whether 27.5 is a real
-Pick6 full-fight SS line before ANY conclusion that rests on Hooker.
+=== RETRACTED: "TWO BOOK LINES DO NOT LOOK REAL". THE SCRAPE IS PERFECT. ===
+USER CHECKED THE LIVE PICK6 BOARD 2026-09-01 02:55. Hooker 27.5 IS a real Pick6
+Significant Strikes line. So is every other one - all TWELVE stored P6 SS lines
+match the board exactly:
+  Charriere 38.5  Ziam 38.5  Sygula 37.5  Parnasse 36.5  Lima 35.5  Page 31.5
+  Cornolle 30.5   Hooker 27.5  Campbell 24.5  Peek 24.5  Sola 24.5  Ruziboev 22.5
+No junk lines anywhere. The scraper is not the problem and never was.
+
+WHAT WAS WRONG WAS MY TEST. It scored the posted line against the fighter's CAREER
+MEAN SS scaled to expected minutes. A mean is the wrong reference for a line: it is
+dragged up by high-volume outliers, while a line is priced near an outcome the book
+expects beaten about half the time. Hooker read 0.45x and got flagged. DO NOT
+REUSE THAT RATIO TEST - it is removed in favour of the hit-rate tool below.
+
+FROM THE BOARD, AN OBSERVATION WORTH KEEPING: Hooker, Peek, Charriere, Sygula,
+Sola and Ruziboev are all MORE-ONLY on Pick6 (no Less button). Charriere sits at
+1.06 on the old ratio and Hooker at 0.45, so MORE-ONLY DOES NOT EXPLAIN A LOW
+LINE and must not be treated as a tell. It is recorded because a one-sided market
+is priced differently from a two-sided one, and ss_under_available already carries
+the flag through to storage.
+
+  THE RIGHT TEST, AND IT IS WRITTEN:
+    snippets/2026-09-01_ss_line_hitrate_readonly.js
+  Asks what fraction of the fighter's OWN logged fights actually cleared the
+  posted line - raw, and MODEL v39 duration-normalised to this fight's expected
+  minutes, with mean beside median so an outlier-driven mean cannot hide. Also
+  prints the More-only flag per book. Skips any fighter whose books disagree
+  rather than averaging them. Dry-run verified: normalisation demonstrably moves
+  a row (short-KO scaling took a 5/6 to 6/6), split-book rows are skipped.
+  CAVEAT BUILT INTO THE OUTPUT: a high hit rate is the fighter's own past, not an
+  opponent-adjusted forecast. It bounds the question. It does not settle it.
+
+=== ALSO RETRACTED: THE RUZIBOEV "PULLED LINE" ===
+Flagged at 02:26 as a possible line-removals-never-propagate case (no raw book
+line, but a P6 chip on the board). The 02:48 run shows P6 22.5 present for him
+and it matches the live board. A re-fetch landed between the two runs. NOT a bug.
 
   *** WHY THE LEARNER NEVER CORRECTS IT - THE LOOP IS BROKEN IN THE MIDDLE ***
   GENERATION: predictSS -> applyBookPrior -> applyMarketAnchorFor ->
