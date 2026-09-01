@@ -18,12 +18,11 @@ What is left off that list:
      posted (Friday). Only SS lines are in (Pick6 + Underdog). Do not audit early.
 
   NEW, IN ORDER:
-   a. RUN snippets/2026-09-01_ss_line_hitrate_readonly.js. It is written and
-      dry-run but has NEVER been run on real data. It is the first reference in
-      this whole thread that is not constructed - it asks how often the fighter's
-      own logged fights cleared the posted line, raw and v39-normalised. Every
-      other adjudication attempt tonight (careerExp ratio, "books are tighter")
-      collapsed on inspection. Start here.
+   a. THE ESTIMATOR HAS A MAGNITUDE PROBLEM, NOT A SIDE PROBLEM. Against the
+      v39-normalised hit rate its direction agrees 6/8, but it overstates the
+      distance badly (Hooker +24.5 vs a 67% history; Cornolle +25.5 vs a coin
+      flip). That reframes the whole thread: do NOT go looking for a sign or bias
+      fix in predictSS - the side is already right. Full run in the 09-01 section.
    b. THE BOOK LINES ARE ALL REAL - verified against the live Pick6 board, 12/12
       exact. No junk. The "two look fake" note is RETRACTED, and so is the
       50/50-opponent-blend finding that depended on excluding them.
@@ -410,6 +409,17 @@ DORMANT on this board, for two independent reasons - neither of which is a bug.
   "(N/24 scaled to ~Xm)" note on his hit-rate reason - its presence is the proof
   the term fired; its absence means DK still is not resolving for his name.
 
+  *** PARTIALLY ANSWERED ALREADY, 03:01, WITHOUT DK ***
+  The hit-rate tool reproduces the v39 arithmetic using the PREDICTOR's
+  career-based expMin instead of DK's market minutes, and the effect the original
+  item predicted is real and large: Hooker RAW 12/24 = 50% -> v39 16/24 = 67%,
+  the biggest upward move on the card, on the exact fighter named. It also cuts
+  the other way harder than expected - Bukauskas 54% -> 23%, Pinto 50% -> 25% -
+  because those fights are priced SHORT, so duration is a two-sided correction
+  and not a 5R-main special case. Friday's DK run only needs to confirm that
+  production v39 fires and lands near these figures; the mechanism is no longer
+  in question.
+
 === *** THE v43 ANCHOR SHIFT IS NEGATED - CONFIRMED BY THE AUDIT, NOT FIXED *** ===
 RUN 2026-09-01 02:26. 79 stat rows, 10 anchored (all SS - TD and R1 SS measure
 S=0 so their anchor is inert, and no FP line is posted to anchor against).
@@ -598,7 +608,59 @@ LINE and must not be treated as a tell. It is recorded because a one-sided marke
 is priced differently from a two-sided one, and ss_under_available already carries
 the flag through to storage.
 
-  THE RIGHT TEST, AND IT IS WRITTEN:
+  *** RUN 2026-09-01 03:01 - THE HOOKER LINE IS PERFECT, AND MEAN/MEDIAN IS WHY ***
+    Hooker  line 27.5 | mean 48.8 | MEDIAN 26.5 | RAW 12/24 = 50%
+  The book posted a textbook 50/50 line and my ratio test called it fake because
+  it read the MEAN of a violently skewed distribution (25-min wars at 95+ against
+  quick finishes). MEAN 48.8 vs MEDIAN 26.5 on the same fighter. Whenever a
+  fighter's mean and median separate like that, ANY mean-based reference is junk.
+
+  FULL RUN (9 rows with one agreed book line):
+    fighter      R  line  n   expMin  mean  median  RAW      v39      sides
+    Peek         3  24.5   6   10.1   53.2   52.5   6/6 100% 6/6 100% P6 More-only
+    Hooker       5  27.5  24   12.7   48.8   26.5  12/24 50% 16/24 67% P6 More-only
+    Cornolle     3  30.5   6   12.5   30.8   31.5   3/6  50% 3/6  50%  P6 both
+    Ziam         3  38.5  11   13.5   35.4   35.0   5/11 45% 5/11 45%  P6 both
+    Charriere    3  38.5   6    9.0   34.2   34.0   3/6  50% 2/6  33%  P6 More-only
+    Pinto        3  21.5   4    7.0   22.5   21.5   2/4  50% 1/4  25%  P6 both
+    Bukauskas    3  27.5  13    8.9   31.6   36.0   7/13 54% 3/13 23%  UD
+    Sy           3  38.5   5   10.7   29.2   17.0   1/5  20% 1/5  20%  UD
+    Parnasse     -  36.5   0      -      -      -   no history (UFC debut)
+
+  *** THIS IS THE v39 ANSWER, ARRIVED AT SIDEWAYS ***
+  Checkpoint item 4 predicted that 3R history moving up to a 5R main would flip
+  the SS hit-rate term, and named Hooker. MEASURED: RAW 50% -> v39 67% on Hooker,
+  the largest upward move on the board, on exactly the fighter predicted.
+  The term also works the OTHER way and harder: Bukauskas 54% -> 23% and Pinto
+  50% -> 25%, because their fights are priced SHORT (expMin 8.9 and 7.0) so their
+  history scales DOWN. Duration is not a Hooker-only correction.
+  CAVEAT THAT MATTERS: production v39 in calcSSLean is gated behind DK round
+  markets and is still DORMANT. This tool used the PREDICTOR's career-based
+  expMin instead, so the numbers above are what v39 WOULD say, not what the board
+  is currently doing. Re-check on Friday once DK posts.
+
+  *** THE MODEL'S DIRECTION IS MOSTLY RIGHT; ITS MAGNITUDE IS NOT ***
+  model-book direction vs the v39-normalised hit rate, 6/8 agree:
+    Hooker +24.5 OVER / 67% OVER    agree      Charriere -12 UNDER / 33%  agree
+    Peek    +8.0 OVER / 100% OVER   agree      Pinto      -3 UNDER / 25%  agree
+    Ziam    +7.5 OVER /  45% UNDER  DISAGREE   Bukauskas -11 UNDER / 23%  agree
+    Cornolle +25.5 OVER / 50% COIN  (no side)  Sy         -5 UNDER / 20%  agree
+  So the estimator picks the SIDE well and overstates the DISTANCE badly:
+  Hooker +24.5 against a 67% history, Cornolle +25.5 against a coin flip. That
+  is a magnitude problem, and it is why the anchor's clamp makes the board look
+  sane. It also means "fix the raw model" is the wrong framing - the side is
+  already there.
+
+  NO SINGLE REFERENCE EXPLAINS THE BOOKS. book/median runs 0.47 (Peek), 0.76
+  (Bukauskas), 0.97, 1.00, 1.04 (Hooker), 1.10, 1.13, 2.26 (Sy). Books price
+  opponent, style and matchup, not just the fighter's own log. Stop looking for
+  one ratio that convicts them.
+
+  STANDOUT, NOT A RECOMMENDATION: Peek 6/6 with a median of 52.5 against a 24.5
+  More-only line is the largest apparent gap on the card. n=6, not
+  opponent-adjusted (he faces Campbell), and the printed caveat applies in full.
+
+  THE TOOL:
     snippets/2026-09-01_ss_line_hitrate_readonly.js
   Asks what fraction of the fighter's OWN logged fights actually cleared the
   posted line - raw, and MODEL v39 duration-normalised to this fight's expected
