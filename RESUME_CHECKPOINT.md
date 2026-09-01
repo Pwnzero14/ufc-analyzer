@@ -44,10 +44,16 @@ What is left off that list:
       pred.ss.line WAS the raw output and the loop was sound. The learning log
       confirms it: 18 runs, all pre-v43, learner damping correctly (-0.122).
       NO LEARNING RUN HAS EVER BEEN AFFECTED. First exposure is the Paris settle.
-   e. FP's loop, by contrast, has been broken since v22 (anchor + book prior were
-      FP-only until v43). The v27 fp_global_modifier saturation at the clamp
-      floor is what that would look like. HYPOTHESIS - worth a look, not
-      established. This is the one place damage may already exist.
+   e. FP: the "broken since v22 / v27 saturation is the symptom" idea is DEAD on
+      timing. The FP book prior runs INSIDE predictFantasy and does not break the
+      loop; the first post-hoc layer is v31's anchor (2026-08-21), a DAY AFTER the
+      v27 renormalisation it was supposed to explain. FP's real break window is
+      08-21 onward and is probably tiny (the anchor is a >15 clamp on a posted
+      line; calibration only from 08-30). Measure with
+      snippets/2026-09-01_fp_loop_readonly.js - written, dry-run, NOT yet run.
+   f. STANDING RULE EARNED THE HARD WAY: check the SHIP DATE before building a
+      story about long-running corruption. Twice tonight that check killed the
+      story outright, both times after the reasoning was already written down.
 
 (B) OTHERWISE: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
     FP recomputed from UFCStats components. This is the biggest open thread in
@@ -756,14 +762,39 @@ same timing as the sign bug, same first exposure: the Paris settle.
   already hot. TEST IT AFTER PARIS: re-run this probe and check whether run 19
   flips the sign of mean effectiveDelta.ss. Do not assert it before then.
 
-  *** WHERE THE DAMAGE MAY ALREADY BE: FP, NOT SS ***
-  FP has had applyMarketAnchor and computeBookPriorFP SINCE v22. So FP's loop has
-  been broken for far longer than SS's two days. The v27 note above records
-  fp_global_modifier saturating at its clamp floor after 18 learning cycles
-  ("every class landed under 1.0 ... womenFlyweight 0.771 against a 0.75 clamp
-  floor"). A learner fighting a correction it cannot see is EXACTLY what that
-  looks like. HYPOTHESIS ONLY - the v27 note attributes it to an over-predicting
-  baseline and says Step 2b fixed it at source. Worth a look; not established.
+  *** THE FP HYPOTHESIS IS ALSO DEAD ON TIMING. TWO FOR TWO. ***
+  I claimed FP's loop had been broken "since v22" and that the v27
+  fp_global_modifier saturation was what that looks like. BOTH HALVES WRONG.
+
+  A CORRECTION INSIDE THE ESTIMATOR DOES NOT BREAK THE LOOP. computeBookPriorFP
+  is passed INTO predictFighter and runs inside predictFantasy, so the learner
+  sees the number it produced. Only POST-HOC layers - ones sitting between the
+  estimator and the stored line - break it. FP has exactly two:
+      2026-04-27  FP book prior        INSIDE predictFantasy   loop SOUND
+      2026-08-20  v27 renormalisation  fp_global_modifier -> 1.0
+      2026-08-21  v31 applyMarketAnchor  POST-HOC   <- the break starts HERE
+      2026-08-30  v41 calibrateToBooks   POST-HOC
+  THE v27 SATURATION PREDATES THE FIRST POST-HOC LAYER BY ONE DAY. No such layer
+  existed during those 18 cycles, so a broken loop cannot explain it. v27's own
+  account stands: a genuinely over-predicting baseline the learner correctly
+  damped, which became a double-correction once Step 2b fixed the bias at source.
+
+  WHAT IS ACTUALLY OPEN: the break window is 2026-08-21 onward. The anchor is a
+  CLAMP (fires only when the model is >15 off a POSTED FP line), calibration moves
+  every row from 08-30. So exposure is "some rows since 08-21, all rows since
+  08-30" and is probably tiny. MEASURE IT:
+    snippets/2026-09-01_fp_loop_readonly.js
+  It splits every logged run into loop-SOUND vs BROKEN eras, walks the
+  fp_global_modifier trajectory backwards from the live value, and pools
+  effectiveDelta.fp either side of the boundary. It also refuses to over-read a
+  shift: v27, v30, v31 and v40 all landed in the same window, so a difference has
+  several candidate causes besides the broken loop.
+
+  *** THE PATTERN TO STOP REPEATING ***
+  Twice now I have proposed "an invisible correction has been quietly corrupting
+  the learner for a long time", and twice the ship dates have killed it outright -
+  the SS ratchet and this. BOTH breaks are days old and neither has touched a
+  single learning run. CHECK THE SHIP DATE BEFORE BUILDING THE STORY, not after.
 
 === SUPERSEDED: A RATCHET, CONSISTENT WITH EVERY NUMBER BUT NOT PROVEN ===
 (Kept for the reasoning trail. The probe above killed it on all three checks.)
