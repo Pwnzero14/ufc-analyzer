@@ -35,12 +35,27 @@ What is left off that list:
       [P - 2S - cap, P - 2S + cap]. MODEL_VERSION bumped 43 -> 44 deliberately:
       exactly one board was ever generated under v43 and it never settled, and the
       bump is what keeps v43-anchored rows distinguishable in the archive.
-      *** STILL TO VERIFY - THE FIX IS NOT CONFIRMED UNTIL THIS RUNS ***
-      Reload the extension, GENERATE PREDICTIONS, then re-run
-      snippets/2026-09-01_ss_decomposition_readonly.js and check that the SHIPPED
-      lines STRADDLE the book instead of sitting under it. On the v43 board 8 of 9
-      sat at or below; a fixed board should scatter both ways. Code in dist proves
-      it runs, NOT that it changed anything - that is the c776f26 lesson.
+      *** VERIFIED ON A REGENERATED BOARD, 2026-09-01 03:39:55, MODEL v44. ***
+      Decomposition re-run: chain intact 28/28.
+        median raw-book   7.5 -> 7.5   UNCHANGED, and that is the control: the
+                                       raw estimator was not touched, so exactly
+                                       one thing moved.
+        median final-book  -1 -> +2
+        distribution      8 of 9 at/below the book  ->  5 ABOVE / 4 BELOW
+      Per fighter (final vs book):
+        Hooker    26.5 -> 33.5   -1  -> +6      Charriere 23.5 -> 30.5  -15 -> -8
+        Cornolle  29.5 -> 36.5   -1  -> +6      Modestas  17.5 -> 21.5  -10 -> -6
+        Peek      23.5 -> 29.5   -1  -> +5      Sy        30.5 -> 30.5   -8 -> -8
+        Ziam      38.5 -> 40.5    0  -> +2      Pinto     15.5 -> 15.5   -6 -> -6
+        Parnasse  39.5 -> 49.5   +3  -> +13
+      Anchored rows moved +7 (2S = 6.6, plus .5-grid snapping), exactly as
+      predicted. The band is symmetric again.
+
+      WATCH PARNASSE. +13 over the book is the largest gap on the card and it is
+      the DEBUT SPLIT stacking on top of the anchor: raw 57.5 -> anchor 46.5 ->
+      debut +6.5 -> 53 -> calibration 49.5. He has NO history, so that number is
+      priors all the way down. Not a defect; just the row with the least evidence
+      behind it and now the biggest disagreement.
    d. The learning loop IS structurally broken for SS (runLearningCycle reads the
       stored post-correction line but tunes a term upstream of it) - BUT IT IS
       TWO DAYS OLD. Every SS correction layer landed 2026-08-30; before that
