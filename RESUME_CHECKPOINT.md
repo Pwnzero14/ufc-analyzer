@@ -1,9 +1,9 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-09-01 02:20:28 -04:00
+Last Saved: 2026-09-01 03:37:00 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 60804b4
+HEAD: 09ab93c
 
 ## Last Notes
 ################################################################################
@@ -30,14 +30,17 @@ What is left off that list:
    b. THE BOOK LINES ARE ALL REAL - verified against the live Pick6 board, 12/12
       exact. No junk. The "two look fake" note is RETRACTED, and so is the
       50/50-opponent-blend finding that depended on excluding them.
-   c. FIX THE anchorShift SIGN. The case is now made in OUTPUT, not code-reading:
-      8 of 9 shipped lines sit at or below the book, and on the two rows with the
-      strongest historical OVER case (Hooker 67%, Peek 100%) the board's number
-      says UNDER. Every earlier reason for waiting is retracted or answered.
-      SCOPE FIRST: this is the PREDICTOR path only - Best Picks leans come from
-      calcSSLean and never read PropPrediction, so no pick is currently wrong.
-      Fix it, regenerate, and re-run the decomposition to confirm the shipped
-      lines straddle the book instead of sitting under it.
+   c. anchorShift SIGN IS FIXED - MODEL v44 (09ab93c), src + dist, both branches.
+      shift is now +S, so the finished band is [P - cap, P + cap] instead of
+      [P - 2S - cap, P - 2S + cap]. MODEL_VERSION bumped 43 -> 44 deliberately:
+      exactly one board was ever generated under v43 and it never settled, and the
+      bump is what keeps v43-anchored rows distinguishable in the archive.
+      *** STILL TO VERIFY - THE FIX IS NOT CONFIRMED UNTIL THIS RUNS ***
+      Reload the extension, GENERATE PREDICTIONS, then re-run
+      snippets/2026-09-01_ss_decomposition_readonly.js and check that the SHIPPED
+      lines STRADDLE the book instead of sitting under it. On the v43 board 8 of 9
+      sat at or below; a fixed board should scatter both ways. Code in dist proves
+      it runs, NOT that it changed anything - that is the c776f26 lesson.
    d. The learning loop IS structurally broken for SS (runLearningCycle reads the
       stored post-correction line but tunes a term upstream of it) - BUT IT IS
       TWO DAYS OLD. Every SS correction layer landed 2026-08-30; before that
@@ -74,6 +77,14 @@ measurement traps they walked into, which are the reusable part.
 
 ################################################################################
 
+SESSION HANDOFF (2026-09-01, ~03:37). Tree clean, both branches pushed, FULL
+parity. feature/sleek-theme-v1 09ab93c, master 6c86c68.
+  This session: Gate 2 closed, v43 board audited end to end, MODEL v44 shipped
+  (the negated anchorShift), a 2-leg Underdog slip recorded at its entry lines,
+  and FOUR of my own hypotheses retracted after measurement. The retractions are
+  written up as retractions - read them before re-deriving any of them.
+
+--- previous handoff ---
 SESSION HANDOFF (2026-08-31, ~12:35). Tree clean, both branches pushed, FULL
 parity. feature/sleek-theme-v1 263f3a6, master 5f13525.
   Since the 08-30 handoff below: GLOW-UP 362/363/364 (UI clipping), the Duclos
