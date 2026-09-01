@@ -10,71 +10,68 @@ HEAD: 09ab93c
 ##  START HERE - NEXT SESSION'S FIRST TASK                                     ##
 ################################################################################
 
-GATE 2 IS CLOSED AND THE BOARD IS REGENERATED (v43, 28 fighters, 2026-09-01).
-Items 1, 2 and 4 of the old list are DONE - see the 09-01 section at the bottom.
-What is left off that list:
+RESUMING FRIDAY 2026-09-04/05. UFC Paris (Hooker vs. Parnasse) is Saturday.
+Everything from the 09-01 session is SHIPPED, PUSHED and VERIFIED - nothing is
+half-done. There is exactly ONE blocked task waiting and it unblocks Friday.
 
-  3. Best Picks audit - STILL BLOCKED until TD + R1 SS + CTRL + FP are ALL
-     posted (Friday). Only SS lines are in (Pick6 + Underdog). Do not audit early.
+*** FIRST MOVE: THE BEST PICKS AUDIT. ***
+  It was blocked all of 09-01 because only SS lines were posted. Full props
+  (TD / R1 SS / CTRL / FP) land FRIDAY - see [[feedback_audit_timing_full_props_friday]].
+  BEFORE AUDITING:
+    1. AUTO-FETCH LINES, then confirm the board actually has TD + R1 SS + CTRL +
+       FP, not just SS. If any are missing it is still too early - do not audit.
+    2. GENERATE PREDICTIONS. The stored board is from 09-01 03:39 and the lines
+       will have moved all week. MODEL v44 is current; the panel chip must say v44.
+    3. THEN invoke the ufc-lean-audit skill. That is what it is for.
 
-  NEW, IN ORDER:
-   a. THE RAW ESTIMATOR HAS A MAGNITUDE PROBLEM, NOT A SIDE PROBLEM. Its
-      direction agrees with the v39-normalised hit rate on 6/8 rows, but it
-      overstates the distance badly (Hooker +24.5 against a 67% history;
-      Cornolle +25.5 against a coin flip). So do NOT hunt for a bias fix inside
-      predictSS - the side is already right, and a single multiplicative term
-      cannot fix a magnitude spread anyway.
-      NOTE: that 6/8 is measured on RAW-book. On the SHIPPED number it is 4 agree
-      / 2 disagree / 3 no-side, and the two disagreements are what item (c) is
-      about. Both tables are in the 09-01 section; do not mix them up.
-   b. THE BOOK LINES ARE ALL REAL - verified against the live Pick6 board, 12/12
-      exact. No junk. The "two look fake" note is RETRACTED, and so is the
-      50/50-opponent-blend finding that depended on excluding them.
-   c. anchorShift SIGN IS FIXED - MODEL v44 (09ab93c), src + dist, both branches.
-      shift is now +S, so the finished band is [P - cap, P + cap] instead of
-      [P - 2S - cap, P - 2S + cap]. MODEL_VERSION bumped 43 -> 44 deliberately:
-      exactly one board was ever generated under v43 and it never settled, and the
-      bump is what keeps v43-anchored rows distinguishable in the archive.
-      *** VERIFIED ON A REGENERATED BOARD, 2026-09-01 03:39:55, MODEL v44. ***
-      Decomposition re-run: chain intact 28/28.
-        median raw-book   7.5 -> 7.5   UNCHANGED, and that is the control: the
-                                       raw estimator was not touched, so exactly
-                                       one thing moved.
-        median final-book  -1 -> +2
-        distribution      8 of 9 at/below the book  ->  5 ABOVE / 4 BELOW
-      Per fighter (final vs book):
-        Hooker    26.5 -> 33.5   -1  -> +6      Charriere 23.5 -> 30.5  -15 -> -8
-        Cornolle  29.5 -> 36.5   -1  -> +6      Modestas  17.5 -> 21.5  -10 -> -6
-        Peek      23.5 -> 29.5   -1  -> +5      Sy        30.5 -> 30.5   -8 -> -8
-        Ziam      38.5 -> 40.5    0  -> +2      Pinto     15.5 -> 15.5   -6 -> -6
-        Parnasse  39.5 -> 49.5   +3  -> +13
-      Anchored rows moved +7 (2S = 6.6, plus .5-grid snapping), exactly as
-      predicted. The band is symmetric again.
+*** SECOND: THE v39 CHECK, WHICH HAS BEEN WAITING SINCE 08-29. ***
+  calcSSLean's duration-normalised hit rate needs DK ROUND MARKETS and DK had
+  posted nothing all week, so v39 has never actually fired in production. Once DK
+  is in, look at Hooker's SS lean reason for the note "(N/24 scaled to ~Xm)".
+  Present = the term fired. Absent = DK still is not resolving for his name.
+  The EFFECT is already measured out-of-band (RAW 50% -> v39 67% on Hooker, and
+  the reverse on short-priced fights: Bukauskas 54% -> 23%). Friday only has to
+  confirm production matches. HOOKER ONLY - Parnasse is a debut and calcSSLean
+  bails at history.length < 3, so he can never exercise it.
 
-      WATCH PARNASSE. +13 over the book is the largest gap on the card and it is
-      the DEBUT SPLIT stacking on top of the anchor: raw 57.5 -> anchor 46.5 ->
-      debut +6.5 -> 53 -> calibration 49.5. He has NO history, so that number is
-      priors all the way down. Not a defect; just the row with the least evidence
-      behind it and now the biggest disagreement.
-   d. The learning loop IS structurally broken for SS (runLearningCycle reads the
-      stored post-correction line but tunes a term upstream of it) - BUT IT IS
-      TWO DAYS OLD. Every SS correction layer landed 2026-08-30; before that
-      pred.ss.line WAS the raw output and the loop was sound. The learning log
-      confirms it: 18 runs, all pre-v43, learner damping correctly (-0.122).
-      NO LEARNING RUN HAS EVER BEEN AFFECTED. First exposure is the Paris settle.
-   e. FP IS CLOSED FOR NOW. The "broken since v22 / v27 saturation" idea was dead
-      on timing, and the measurement then found only TWO runs of exposure with no
-      detectable effect - and targetKind='none' on all 18 runs means every stored
-      cycle is RESULT-trained, so the metric could not have detected one anyway.
-      fp_global_modifier is 0.997, nowhere near its 0.75 floor. Treat FP as
-      untouched. Full numbers in the 09-01 section.
-   e2. THE ONE THING THAT ACTUALLY RESOLVES BOTH STATS: run 19, after Paris. It
-      will be the first cycle that is BOTH line-trained (v40) and post-v41. Re-run
-      snippets/2026-09-01_learning_log_readonly.js and _fp_loop_readonly.js then.
-      Until that exists, every loop claim is about code, not measured behaviour.
-   f. STANDING RULE EARNED THE HARD WAY: check the SHIP DATE before building a
-      story about long-running corruption. Twice tonight that check killed the
-      story outright, both times after the reasoning was already written down.
+*** THIRD, AND ONLY AFTER THE CARD SETTLES: RUN 19. ***
+  The next learning cycle will be the FIRST that is both line-trained (v40) and
+  post-v41/v44. Every loop claim in this file is about CODE, not measured
+  behaviour, until it exists. Re-run BOTH probes after settling:
+    snippets/2026-09-01_learning_log_readonly.js   (SS)
+    snippets/2026-09-01_fp_loop_readonly.js        (FP)
+  What to look for: does mean effectiveDelta.ss flip POSITIVE (18 runs of history
+  were negative), and does targetKind finally read line-open/line-close instead
+  of 'none'? Also run the Learning Cycle in the right order -
+  [[project_learning_cycle_workflow]]: load the NEXT slate's lines BEFORE
+  absorbing the finished card.
+
+BOARD STATE AT HANDOFF (2026-09-01 03:41): 28 fighters, MODEL v44, 40807 archive
+records / 41 unresolved. Pick6 + Underdog SS only; Betr, PrizePicks and DK all
+still WAITING. Lines were ~1.9h old and SLATE CHECK had drifted 68% -> 53%, which
+is just staleness - re-fetch on Friday, do not read it as a defect.
+
+MY PLACED: the 09-01 Underdog "Champions" 2-legger is recorded at its ENTRY lines
+(Ruziboev UNDER 22.5, Page UNDER 31.5, placed 08-31 15:15) alongside the 4-leg
+Pick6 slip. Both fighters are the same fight, both UNDER - that is POSITIVE
+correlation and effectively one wager. Stake/payout are NOT stored; PlacedParlay
+has no such field.
+
+--- WHAT IS CLOSED. DO NOT RE-DERIVE ANY OF THIS. ---
+ * anchorShift sign: FIXED and VERIFIED in MODEL v44. Details below.
+ * The book lines are ALL REAL - 12/12 against the live Pick6 board.
+ * FOUR of my own hypotheses were retracted after measurement on 09-01: the "+12
+   raw bias" (selection bias - measured only anchored rows), "books are 5x
+   tighter" (built on excluding two rows that turned out to be real lines), the
+   SS ratchet (dead on timing AND the trajectory ran the opposite way), and FP's
+   long-running corruption (dead on timing again). All four are written up as
+   RETRACTIONS in the 09-01 section. Read them before re-proposing any of them.
+ * STANDING RULE: check the SHIP DATE before building a story about long-running
+   corruption. That check killed two stories on 09-01, both times only after the
+   reasoning had already been written down.
+ * The raw SS estimator has a MAGNITUDE problem, not a side problem (direction
+   agrees with normalised history on 6/8). Do NOT hunt for a bias fix inside
+   predictSS, and do not expect a single multiplicative term to fix a spread.
 
 (B) OTHERWISE: THE ARCHIVE FP INVESTIGATION. 81 archive Fantasy rows disagree with
     FP recomputed from UFCStats components. This is the biggest open thread in
@@ -971,7 +968,16 @@ Paris, and it is SEPARABLE from the anchor question - do not fold them together.
 
 ## Quick Commands
 ~~~powershell
-npm run checkpoint:resume
+npm run checkpoint:resume   # READ-ONLY, safe
 npm run build
 git status
 ~~~
+
+*** DO NOT RUN `npm run checkpoint:save` WITHOUT -Notes. ***
+resume.ps1 save mode REGENERATES THIS WHOLE FILE from a template and writes
+`## Last Notes` = `(none)` when -Notes is empty (resume.ps1:138-158). That would
+delete every line above this - the entire accumulated project record. The Last
+Notes section is maintained BY HAND and always has been.
+If you ever do want the script's header refresh, pass the full notes body:
+  npm run checkpoint:save -- -Notes "..."
+Otherwise edit this file directly, which is what every session has done.
