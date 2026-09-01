@@ -18,19 +18,26 @@ What is left off that list:
      posted (Friday). Only SS lines are in (Pick6 + Underdog). Do not audit early.
 
   NEW, IN ORDER:
-   a. THE ESTIMATOR HAS A MAGNITUDE PROBLEM, NOT A SIDE PROBLEM. Against the
-      v39-normalised hit rate its direction agrees 6/8, but it overstates the
-      distance badly (Hooker +24.5 vs a 67% history; Cornolle +25.5 vs a coin
-      flip). That reframes the whole thread: do NOT go looking for a sign or bias
-      fix in predictSS - the side is already right. Full run in the 09-01 section.
+   a. THE RAW ESTIMATOR HAS A MAGNITUDE PROBLEM, NOT A SIDE PROBLEM. Its
+      direction agrees with the v39-normalised hit rate on 6/8 rows, but it
+      overstates the distance badly (Hooker +24.5 against a 67% history;
+      Cornolle +25.5 against a coin flip). So do NOT hunt for a bias fix inside
+      predictSS - the side is already right, and a single multiplicative term
+      cannot fix a magnitude spread anyway.
+      NOTE: that 6/8 is measured on RAW-book. On the SHIPPED number it is 4 agree
+      / 2 disagree / 3 no-side, and the two disagreements are what item (c) is
+      about. Both tables are in the 09-01 section; do not mix them up.
    b. THE BOOK LINES ARE ALL REAL - verified against the live Pick6 board, 12/12
       exact. No junk. The "two look fake" note is RETRACTED, and so is the
       50/50-opponent-blend finding that depended on excluding them.
-   c. The anchorShift sign IS negated (fair = posted - 3.3 on all 10 anchored
-      rows). STILL DO NOT FIX IT ALONE - but note that BOTH earlier reasons for
-      that caution are now retracted (the "+12 raw bias", the suspect lines).
-      The remaining reason is plain: nothing has established whose number is
-      right, so a change that moves every SS line +6.6 is unjustified until (a).
+   c. FIX THE anchorShift SIGN. The case is now made in OUTPUT, not code-reading:
+      8 of 9 shipped lines sit at or below the book, and on the two rows with the
+      strongest historical OVER case (Hooker 67%, Peek 100%) the board's number
+      says UNDER. Every earlier reason for waiting is retracted or answered.
+      SCOPE FIRST: this is the PREDICTOR path only - Best Picks leans come from
+      calcSSLean and never read PropPrediction, so no pick is currently wrong.
+      Fix it, regenerate, and re-run the decomposition to confirm the shipped
+      lines straddle the book instead of sitting under it.
    d. The learning loop IS structurally broken (runLearningCycle reads the
       calibrated line but tunes a term upstream of the calibration). That is a
       code fact, not a statistic, and it survives the retraction.
@@ -645,6 +652,9 @@ the flag through to storage.
     Peek    +8.0 OVER / 100% OVER   agree      Pinto      -3 UNDER / 25%  agree
     Ziam    +7.5 OVER /  45% UNDER  DISAGREE   Bukauskas -11 UNDER / 23%  agree
     Cornolle +25.5 OVER / 50% COIN  (no side)  Sy         -5 UNDER / 20%  agree
+  SUPERSEDED - this used RAW-book. Redone on the SHIPPED number further down;
+  see THE AGREEMENT TEST, REDONE. Kept only because the raw-vs-final contrast
+  is the point. Original reading follows:
   So the estimator picks the SIDE well and overstates the DISTANCE badly:
   Hooker +24.5 against a 67% history, Cornolle +25.5 against a coin flip. That
   is a magnitude problem, and it is why the anchor's clamp makes the board look
@@ -659,6 +669,68 @@ the flag through to storage.
   STANDOUT, NOT A RECOMMENDATION: Peek 6/6 with a median of 52.5 against a 24.5
   More-only line is the largest apparent gap on the card. n=6, not
   opponent-adjusted (he faces Campbell), and the printed caveat applies in full.
+
+=== *** THE ZIAM DISAGREEMENT WAS MY TEST READING THE WRONG NUMBER *** ===
+ZIAM IS NOT A DISAGREEMENT. His SHIPPED line is 38.5 and the book is 38.5 -
+final-book = 0.0, the board takes NO position on him. The "DISAGREE" came from
+comparing the RAW estimator (46.0) against his history, and raw is not what
+ships: 46 -> prior 44 -> anchor 41.5 -> calibration 38.5, landing on the book.
+
+  Where the raw +7.5 comes from is plain: Ziam's own rate is 2.68 SS/min but
+  Sola absorbs 4.53, so the 50/50 blend multiplies his own rate by 1.35. His
+  own-rate-only projection is 34.4, his median is 35.0, the book is 38.5 - so the
+  BOOK also adjusts up for Sola, by about +10%, where the model adjusts +35%.
+
+  THAT STILL DOES NOT GENERALISE - I checked before believing it. Solving each
+  book line for the opponent weight it implies, book = (own*(1-w) + opp*w)*K
+  where K = expMin * ssMod * style:
+      Hooker 2.80 | Sy 1.70 | Pinto 1.00 | Peek 1.00 | Ziam 0.17
+      Cornolle -0.18 | Bukauskas -0.76 | Charriere -0.89
+  Range -0.89 to +2.80 against the model's fixed 0.50. NO CONSISTENT WEIGHT. The
+  books are not doing this calculation at all. Ziam is one row where the blend
+  happens to push hard, not evidence of a pattern. The blend hypothesis stays
+  dead - this is the THIRD time it has been offered and refused.
+
+=== *** THE AGREEMENT TEST, REDONE ON THE SHIPPED NUMBER *** ===
+The 6/8 figure recorded above used RAW-book. Wrong number - `final` is what the
+board displays and what runLearningCycle reads. Redone on final-book:
+
+  fighter     raw-book  final-book  side    v39    verdict
+  Hooker        +24.5      -1.0    UNDER    67%    DISAGREE
+  Peek           +8.0      -1.0    UNDER   100%    DISAGREE
+  Ziam           +7.5       0.0    none     45%    (no side taken)
+  Cornolle      +25.5      -1.0    UNDER    50%    (coin flip)
+  Charriere     -12.0     -15.0    UNDER    33%    agree
+  Pinto          -3.0      -6.0    UNDER    25%    agree
+  Sy             -5.0      -8.0    UNDER    20%    agree
+  Bukauskas     -11.0     -10.0    UNDER    23%    agree
+  ON THE SHIPPED NUMBER: 4 agree, 2 disagree, 3 no-side.
+
+  *** 8 OF 9 SHIPPED LINES SIT AT OR BELOW THE BOOK. *** That is the negated
+  anchor sign, now visible in OUTPUT rather than inferred from code. It
+  manufactures UNDER-side numbers across the board, and on the two rows with the
+  strongest historical OVER case - Hooker 67%, Peek 100% - it produces the
+  OPPOSITE side. This is the best argument yet for fixing the sign, and it
+  arrived from a question about a different fighter.
+
+=== A RATCHET, CONSISTENT WITH EVERY NUMBER BUT NOT PROVEN ===
+median final-book = -1.0, so effectiveDelta = posted - predicted is systematically
+about +1.0. The learner reads that as "predicting too low" and nudges
+ss_pace_modifier UP. Observed default: 1.056 - ABOVE 1.0, when nothing else on
+this board suggests the estimator runs cold.
+  So: negated sign biases the stored line low -> learner pushes the pace modifier
+  up -> the raw estimator runs hotter -> the anchor clamps harder. A loop that
+  quietly ratchets. CONSISTENT with everything measured; NOT proven, because the
+  causal chain needs the learning-log history (prop_predictor_learning_log_v1)
+  and that has not been read. Do not state it as fact without that.
+
+=== SCOPE CORRECTION - THE SIGN BUG DOES NOT REACH THE PICKS ===
+All of the above is the PREDICTOR path: the displayed line, the delta-BOOK chips,
+the PREDICTOR VS POSTED LINES panel, and runLearningCycle's target. BEST PICKS
+leans come from calcSSLean, a SEPARATE engine that never reads PropPrediction
+(see [[project_fp_moneyline_guard]]). So the sign bug is NOT currently producing
+bad picks - it is corrupting the predictor's output and its own training signal.
+That lowers the urgency and it should be stated whenever the sign comes up.
 
   THE TOOL:
     snippets/2026-09-01_ss_line_hitrate_readonly.js
