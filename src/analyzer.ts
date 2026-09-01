@@ -14561,7 +14561,19 @@ async function generatePredictions(container: HTMLElement): Promise<void> {
     // TD had nothing tying them to the market at all, which is the likeliest reason FP
     // tracks books better. Both stats take every book — unlike FP, SS and TD mean the
     // same thing on every platform, so no rulebook exclusion is needed.
-    const anchorShift = (stat: string): number => -(bookCal?.global?.[stat] ?? 0);
+    // MODEL v44 — the sign here was NEGATED and it skewed every anchored line DOWN.
+    // bookCal.global[stat] is (predicted - posted), positive for SS. applyMarketAnchorFor
+    // computes `fair = postedLine + shift` against sp.line, which is still on the MODEL
+    // scale — calibrateToBooks subtracts the same offset AFTERWARDS. So to land the
+    // finished line symmetrically around the posted one:
+    //     final = fair ± cap − S  and we want final ∈ [P − cap, P + cap]
+    //     ⟹ fair = P + S  ⟹  shift = +S
+    // With shift = −S the reachable band was [P − 2S − cap, P − 2S + cap]: the offset
+    // was applied twice in the same direction and an anchored line could never finish
+    // ABOVE the book. Measured on the 2026-09-01 board, 8 of 9 shipped lines sat at or
+    // below the posted line, and the two rows with the strongest historical OVER case
+    // (Hooker 67%, Peek 100%) were pushed to the UNDER side.
+    const anchorShift = (stat: string): number => (bookCal?.global?.[stat] ?? 0);
     for (const [p, name] of [[p1, pair.f1], [p2, pair.f2]] as Array<[PropPrediction, string]>) {
       const entry = allFighters.find(x => namesMatch(normalizeName(x.name) || '', normalizeName(name) || ''));
       p.ss = PropLinePredictorService.applyBookPrior(p.ss, PropLinePredictorService.computeBookPrior(propArchive, name, ['SS']), 'SS');

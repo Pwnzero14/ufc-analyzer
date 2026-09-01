@@ -579,7 +579,28 @@ export const NAME_ALIASES: Record<string, string> = {
 //     posted on, so it cannot express itself and the 0.5 floor breaks the midpoint
 //     symmetry the other three keep. Fires ONLY with zero history, since a record already
 //     encodes their level and would be double-counted.
-export const MODEL_VERSION = 43;
+// v44 (2026-09-01): the v43 market-anchor shift was NEGATED for SS/TD/R1 SS.
+//   bookCal.global[stat] is (predicted - posted) and applyMarketAnchorFor computes
+//   `fair = postedLine + shift` against a line still on the MODEL scale, which
+//   calibrateToBooks then de-biases by the same offset. Passing -S made the fair
+//   reference P - S instead of P + S, so the offset was applied TWICE in the same
+//   direction and the reachable band became [P - 2S - cap, P - 2S + cap]: an anchored
+//   line could never finish above the posted one. Corrected to +S, which puts the
+//   finished band symmetrically at [P - cap, P + cap].
+//   MEASURED ON THE BOARD, not read off the code: `fair` is quoted verbatim in every
+//   anchor reason and sat exactly S below the posted line on all 10 anchored rows
+//   (Hooker fair 24.2 / book 27.5, Charriere 33.2 / 36.5, with S = 3.3). 8 of 9
+//   SHIPPED lines sat at or below the book, and the two rows with the strongest
+//   duration-normalised OVER history — Hooker 67%, Peek 100% — were pushed UNDER.
+//   SCOPE: predictor path only. Best Picks leans come from calcSSLean, which never
+//   reads PropPrediction, so no pick was affected. What was affected is the displayed
+//   line, the Δ BOOK chips, PREDICTOR VS POSTED LINES, and runLearningCycle's target.
+//   THE BUMP MATTERS AS MUCH AS THE FIX: only one board was ever generated under v43
+//   (Hooker vs. Parnasse, 2026-09-01) and it never settled, so nothing learned from a
+//   wrong-signed line. Bumping to 44 keeps v43-anchored rows distinguishable in the
+//   archive — every diagnosis this session depended on knowing which model version
+//   produced a stored line.
+export const MODEL_VERSION = 44;
 
 // MODEL v37 · SS market anchor. See the v37 note above for the measurement.
 /** Strikes the raw SS projection runs above reality, removed before anchoring. */
