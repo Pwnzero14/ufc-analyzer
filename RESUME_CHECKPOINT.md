@@ -160,12 +160,72 @@ INTERMITTENT, NOT SYSTEMATIC: 432 rows have rev>0 and only 28 are wrong (~93%
 correct). NOT a code-path cutover either: clean before 2022-10, then misses
 scatter to 2026-07 interleaved with clean months (2026-04 8/0, 2026-05 6/0,
 2026-08 7/0), and they appear in BOTH settled and backfilled rows.
-UNTESTED NEXT STEP: fightHistory is parsed from the FIGHTER page, the settle
-path from the FIGHT DETAIL page - the two sources may disagree on reversals.
-Needs a live UFCStats fetch. Treat as a starting point only; three hypotheses
-on this thread already failed.
-RESIDUAL after reversals: 53 rows - -60.01 Fantasy (4), -39.98 (3), +10 Fantasy
-(3), -40.5 Fantasy_PP (2), long tail. The Makhachev +10 is in there, unexplained.
+*** 2026-09-02: THAT "UNTESTED NEXT STEP" IS DEAD AT THE PREMISE. ***
+It said fightHistory comes from the FIGHTER page and the settle path from the
+FIGHT DETAIL page, and wanted a live fetch to compare them. There is nothing to
+compare. parseFightHistoryLinks (analyzer/parsers.ts:42) pushes ONLY
+{result, opponent, event, method, round, date, fightUrl} - no rev, no kd, no
+sigStr, no statistics at all. The fighter page never supplies a reversal, so
+fightHistory.rev can only come from parseFightDetailStats. Both candidate
+sources read the SAME page at the SAME column 8 (parsers.ts:160 and
+background.ts:727 carry identical column maps). DO NOT SPEND A FETCH ON THIS.
+
+THE REAL QUESTION: archivePerformanceForRosterFighter (analyzer.ts ~26325)
+computes the STORED FP from ufcData.fightHistory - the same object the audit
+recomputes from. So this was never two sources disagreeing; it is ONE source
+disagreeing with ITSELF across time. ufcstats_v51_* expires every ~24-32h and
+re-parses every fight detail, so the question is what makes a field unstable
+across refetches.
+
+=== MEASURED 2026-09-02 (probe v2, 50 disagreeing Fantasy rows) ===
+  27 explained EXACTLY by 5 x cache rev (rev 1 -> -5, rev 2 -> -10, rev 3 -> -15).
+     Stored was computed with rev=0; the cache now carries rev>0.
+  *** SS AND TD AGREE ON ALL 27. The entry was NOT rewritten. ***
+     Of the 27: 17 have CTRL agreeing too (rev moved ALONE),
+                10 have CTRL differing (rev AND ctrl moved).
+     sigStr and td NEVER drift on any of them.
+
+  THE COLUMN PATTERN IS THE LEAD. In parseFightDetailStats the map is
+     kd=1  sigStr=2  totStr=4  td=5  sub=7  REV=8  CTRL=9
+  The only two fields that ever drift are the LAST TWO columns. Everything at a
+  lower index is stable. That is a much narrower target than "the parse is wrong".
+  CAVEAT, AND IT MATTERS: a simple "the row came back truncated" story does NOT
+  fit cleanly, because ctrl SURVIVES on 17 of the 27. Col 8 can move without col
+  9 moving. Do not assume truncation; that is the next thing to test, not a
+  conclusion.
+
+  AND IT EXPLAINS THE Fantasy-ONLY DISCRIMINATOR COMPLETELY. PRIZEPICKS_SCORING
+  has reversal: 0 AND controlTimePerSec: 0 (config/index.ts:147). Losing cols 8-9
+  is INVISIBLE to Fantasy_PP by construction. The checkpoint's "-5 cluster is
+  100% Fantasy, never Fantasy_PP" was never about reversals specifically - it is
+  about the trailing columns, and reversal is just the one that shows up most.
+
+=== THE RESIDUAL IS NOW LARGELY EXPLAINED TOO ===
+Of the other 23 rows: ~15 are sub-0.1 rounding noise (one-second ctrl differences
+at 0.03/sec) and should be filtered out of any future run. The remaining ~8 are
+OUTCOME-field drift - method / round / timeSecs / kd - and every delta maps
+exactly onto a scoring constant:
+    -60  = 90 (R1 win) - 30 (decision)     stored had the decision bonus
+    +15  = 45 (R3 win) - 30 (decision)
+    -25  = quickWinBonus (R1 finish <=60s)
+    +10  = knockdown
+*** THE MAKHACHEV +10 IS A KNOCKDOWN. *** The checkpoint listed it as
+unexplained and noted that a knockdown and the win bonus "each add exactly 10 to
+both scoring systems, so the Makhachev +10 cannot discriminate them". True by
+value - but the WHOLE-ROW recompute pins it: with kd forced to match the cache
+the row reconciles, and the win-bonus tiers produce 60/15/25, not 10. That
+hypothesis was retired too early.
+
+=== WHAT IS STILL OPEN ===
+Why do cols 8-9 drift while 1-5 do not, and why can col 8 move without col 9?
+That is the remaining question and it is now narrow enough to be answerable.
+TOOL: snippets/2026-09-02_archive_fp_rev_probe.js (read-only, v2).
+  v1 of that probe INVENTED the pick6 scoring constants (sigStrike 0.5 vs the
+  real 0.4, ctrl 0.0083 vs 0.03, a flat 30 win bonus, quickWinBonus omitted) and
+  reported 2270 false disagreements. v2 mirrors calcFPForPlatform exactly and was
+  FUZZ-VERIFIED against the real implementation imported from dist/ - 4000 cases,
+  zero mismatches - and now refuses to interpret anything if the agree rate falls
+  below 90%. NEVER hand-transcribe a scoring table again; import it or fuzz it.
 
 THE PLATFORM SPLIT WAS RUN AND WAS NOT THE ANSWER: SETTLED 340 compared / 19
 disagree (6%); BACKFILLED 4185 / 62 (1%). Neither path is broadly broken.
