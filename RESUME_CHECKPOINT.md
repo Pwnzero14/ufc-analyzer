@@ -10,6 +10,45 @@ HEAD: 09ab93c
 ##  START HERE - NEXT SESSION'S FIRST TASK                                     ##
 ################################################################################
 
+################################################################################
+##  FIRST TASK NEXT SESSION (user's instruction, 2026-09-02):                  ##
+##  WHY DIDN'T CHARRIERE HEAL?                                                 ##
+################################################################################
+Morgan Charriere is on the CURRENT Paris roster and STILL carries a stale
+archive Fantasy row (UFC FN: Edwards vs. Brady, rev 1, stored 5 too low).
+He should have been rewritten on any board load since, because:
+  archivePerformanceForRosterFighter runs on EVERY fetch for a roster fighter
+  (including a cache HIT - it is called off fetchFromUFCStats regardless), and
+  PropArchiveService.updateResult overwrites unconditionally: row.result = ...
+So the heal either is not firing for him, or it fires and finds no row to write.
+*** THIS IS A QUESTION ABOUT THE HEAL PATH, NOT THE PARSE. The parse is settled:
+the live page reads Rev correctly, the cache is right, the archive is stale. ***
+
+CONCRETE FIRST MOVES - check in this order, they get cheaper to rule out:
+ 1. Is he actually in rosterNameSet()? archivePerformanceForRosterFighter
+    early-returns on `if (!roster.has(fighterNorm.toLowerCase())) return;`
+    Roster spelling vs normalizeName(name) is exactly the kind of thing that has
+    bitten this repo before ([[project_mononym_validator_ate_aliased_names]]).
+ 2. Does his ufcstats cache fightHistory actually contain that event? The loop
+    only writes rows for events present in the cache.
+ 3. Does updateResult FIND a candidate? It filters on fighter + propType FIRST
+    (any event) and returns false when `!candidates.length` - silently. Then it
+    narrows by normalizeEvent. A normalizeEvent mismatch between the archive row
+    and cache `fight.event` would make it a silent no-op.
+ 4. Only then consider ordering/timing.
+
+DO NOT re-open the parse hypotheses. Four are dead and written up below:
+fighter-page-vs-detail, trailing-range loss, opponent-cell fallback, and the
+settle-vs-backfill writer. All four were killed by data, not argument.
+
+TIMING NOTE, NOT AN OVERRIDE: if this session IS Friday and the full props have
+landed, the BEST PICKS AUDIT is boxed to a card that fights Saturday and the
+Charriere question is not. The user asked for Charriere first; do that, but do
+not let it eat the audit window. The archive row has been stale for months and
+will keep.
+
+################################################################################
+
 RESUMING FRIDAY 2026-09-04/05. UFC Paris (Hooker vs. Parnasse) is Saturday.
 Everything from the 09-01 session is SHIPPED, PUSHED and VERIFIED - nothing is
 half-done. There is exactly ONE blocked task waiting and it unblocks Friday.
