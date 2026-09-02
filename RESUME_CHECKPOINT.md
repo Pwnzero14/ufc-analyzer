@@ -216,6 +216,59 @@ value - but the WHOLE-ROW recompute pins it: with kd forced to match the cache
 the row reconciles, and the win-bonus tiers produce 60/15/25, not 10. That
 hypothesis was retired too early.
 
+=== *** VERIFIED AGAINST THE SOURCE: THE CACHE IS RIGHT, THE ARCHIVE IS STALE *** ===
+This had been ASSUMED for several sessions, never checked. Now checked. Fetched
+the live Davis vs Ziam fight page (UFC FN: Adesanya vs. Imavov) with a standalone
+PoW-solving fetcher:
+    col 8 (Rev.)   Fares Ziam = 2    Mike Davis = 3
+which is exactly what the CACHE holds. The archive row was computed with rev=0.
+So the archive is the stale side. Direction settled.
+  ALSO: that page parses cleanly TODAY - 10 <td>s, every column carrying exactly
+  two <p>s including col 8. There is no structural anomaly in the Rev cell.
+  TOOL: scripts/ufcstats-fetch-cli.mjs (node, solves the PoW, read-only GETs).
+
+=== FOUR HYPOTHESES DEAD. ALL FOUR KILLED BY DATA, NOT ARGUMENT. ===
+ 1. FIGHTER PAGE vs DETAIL PAGE - dead at the premise. parseFightHistoryLinks
+    supplies no rev at all.
+ 2. TRAILING-RANGE LOSS (cols 8+9 together) - dead. Col 7 (`sub`) is STABLE:
+    14 affected rows carry sub > 0, Fantasy_PP reconciles exactly on 25/27, and
+    ZERO are off by 4 x sub. One cell, not a range.
+ 3. OPPONENT-CELL FALLBACK (`|| tds[col][0]`) - dead. The 22/27 "match" was BASE
+    RATE; most fights carry rev 0 on both sides, where "read the opponent" and
+    "read nothing" are identical. On the ONLY 5 rows where it was testable -
+    opponent rev non-zero - the stored value is 0, not the opponent's 2/2/1/2/2.
+    And in all 5, the OPPONENT's own row is CORRECT.
+ 4. WRITER (settle's filter-shift vs backfill) - dead. Affected rows are 89%
+    backfill against a 90% backfill BASE RATE. The writer tracks the base rate
+    exactly, so it is not the discriminator.
+  METHOD NOTE WORTH KEEPING: 2 and 3 were only readable because the probe named
+  its own weak spot in advance ("a high match rate here is mostly base rate; it
+  is evidence only where the opponent rev is non-zero"). The raw 22/27 would have
+  read as confirmation. Build the base-rate comparison BEFORE running.
+
+=== SO THE MECHANISM IS: A HISTORICAL rev=0 WINDOW THAT NEVER HEALED ===
+The stored value was ABSENT and defaulted to 0 - not misread, not the opponent's.
+The cache has since been refetched correctly. What is left is a residue of rows
+written during a window when the cached rev was 0.
+
+*** WHY IT PERSISTS, AND WHY FORCE BACKFILL WILL NOT FIX IT ***
+  PropArchiveService.updateResult OVERWRITES unconditionally (`row.result = ...`)
+  but only touches EXISTING rows - it returns false when there is no candidate.
+  It is driven by archivePerformanceForRosterFighter, which early-returns unless
+  the fighter is on the CURRENT ROSTER. So rows heal only while their fighter is
+  on an upcoming card; everyone else keeps the stale number indefinitely.
+  FORCE BACKFILL DOES NOT HELP: it runs backfillUnresolvedFromKnownOutcomes,
+  which fills rows whose result is NULL. These 27 already hold a (wrong) result,
+  so they are invisible to it.
+
+=== THE ONE THING LEFT, AND IT IS NARROW ===
+Morgan Charriere is on the CURRENT Paris roster and is still affected. If the
+heal worked he should have been rewritten on any board load since. So either the
+heal is not firing for him, or normalizeEvent is failing to match his row. That
+is the next question - and it is now about the HEAL path, not the parse.
+  Suggested first move: instrument or dump, for one affected roster fighter,
+  whether updateResult finds a candidate row for that event at all.
+
 === WHAT IS STILL OPEN ===
 Why do cols 8-9 drift while 1-5 do not, and why can col 8 move without col 9?
 That is the remaining question and it is now narrow enough to be answerable.
