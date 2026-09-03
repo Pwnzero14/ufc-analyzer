@@ -462,9 +462,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
+// Identity key for "is this the same fighter": card membership, the roster gate,
+// pairing, mergeFighters' map key, and dedup all run through it.
+//
+// Diacritics are STRIPPED, matching analyzer.ts normalizeName and background's
+// own _baseNorm. Books disagree on accents for ONE fighter — on the 2026-09
+// Paris card Betr posted "Morgan Charrière" while pick6/underdog/prizepicks
+// posted "Morgan Charriere" — and without the strip mergeFighters keys those as
+// TWO entries, so the Betr line never lands on his row and shows up as a ghost
+// fighter instead. Every call site wants same-fighter semantics, so the strip is
+// uniformly correct here rather than a trade-off, and nothing persists this key,
+// so there is no migration: the merged store is rebuilt from the line stores on
+// each fetch. See [[project_diacritic_name_split]].
+//
+// NOT normalized here, deliberately: periods, hyphens and apostrophes. analyzer's
+// normalizeName also drops those ("St-Pierre" -> "St Pierre", "O'Malley" ->
+// "OMalley"), so the two still diverge on punctuation. No live defect has been
+// traced to that divergence, and widening this key is a behaviour change across
+// all 19 call sites — leave it until something actually breaks on it.
 function normalizeFighterName(name: any): string | null {
   if (typeof name !== 'string') return null;
-  return name.trim().toLowerCase();
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
 
 function sanitizeOpponentName(raw: unknown, selfName?: string): string | null {
