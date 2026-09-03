@@ -653,6 +653,63 @@ body {
 .bp-edge.pos { color: var(--green); border-color: color-mix(in srgb, var(--green) 32%, transparent); }
 .bp-edge.neg { color: var(--red);   border-color: color-mix(in srgb, var(--red) 32%, transparent); }
 
+/* ── GLOW-UP 305 · vintage / price / staleness ───────────────────────────────
+   Lanes assigned against the CANONICAL COLOUR MAPPING above, not by feel:
+     .bp-vintage → axis 1 DIRECTION/OUTCOME. It genuinely reports favourable vs
+                   unfavourable (for the side you lean), so green/red is correct
+                   and it matches .bp-edge, the chip beside it that is signed the
+                   same way. Reusing .bp-edge's geometry so the two read as one
+                   family rather than competing.
+     .bp-price   → the REAL variant carries no axis at all — it is a fact about
+                   provenance, not a judgement — so per the contract's own rule it
+                   stays NEUTRAL. The ASSUMED variant is axis 2 ATTENTION (amber):
+                   "caution that still permits action" describes an EV built on a
+                   placeholder price exactly.
+     .bp-age     → axis 2 ATTENTION. Aging is amber; stale adds a dashed underline
+                   rather than a second colour, so severity escalates WITHIN the
+                   lane instead of stealing another one.
+     .bp-recal   → carries none of the three axes (it is a system note about who
+                   wrote the number). Contract says stay neutral, so it does —
+                   deliberately NOT --purple, which is Underdog's book identity.
+   No new colour lane is introduced by this pass. */
+.bp-vintage {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+  cursor: help; white-space: nowrap;
+}
+.bp-vintage b { font-size: 10px; font-weight: 800; }
+.bp-vintage.pos { color: var(--green); border-color: color-mix(in srgb, var(--green) 32%, transparent); }
+.bp-vintage.neg { color: var(--red);   border-color: color-mix(in srgb, var(--red) 32%, transparent); }
+
+.bp-price {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+  background: var(--bg3); border: 1px solid var(--border);
+  cursor: help; white-space: nowrap;
+}
+.bp-price.real     { color: var(--text2); }
+.bp-price.assumed  { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 30%, transparent); }
+.bp-price .bp-vig  { font-style: normal; opacity: 0.62; font-size: 8px; margin-left: 2px; }
+
+.bp-age {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 5px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--amber); cursor: help; white-space: nowrap;
+}
+.bp-age.aging { opacity: 0.78; }
+.bp-age.stale { border-color: color-mix(in srgb, var(--amber) 34%, transparent); text-decoration: underline dashed currentColor 1px; text-underline-offset: 2px; }
+
+.bp-recal {
+  font-style: normal; font-size: 8px; font-weight: 700;
+  color: var(--text3); opacity: 0.75; margin-left: 3px; cursor: help;
+}
+.bp-recal:hover { opacity: 1; }
+
 /* L3 — sub-breakeven picks stay ranked but stop competing for the eye */
 .best-pick-row.bp-weak { opacity: 0.6; }
 .best-pick-row.bp-weak:hover { opacity: 0.92; }
