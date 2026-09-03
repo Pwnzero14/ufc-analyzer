@@ -367,11 +367,15 @@ let bestPicksRenderSeq = 0;
 // state for the Best Picks columns. Session-scoped by design (resets on page
 // load): these change what's DRAWN, never what the model picked, so they
 // don't belong in storage alongside real pick state.
-type BestPicksSortMode = 'model' | 'ev' | 'conf' | 'edge';
+type BestPicksSortMode = 'model' | 'ev' | 'conf' | 'edge' | 'move';
 type BestPicksStatFilter = 'all' | 'fp' | 'ss' | 'ss_r1' | 'td' | 'ft' | 'kd' | 'ctrl';
 let bestPicksSortMode: BestPicksSortMode = 'model';
 let bestPicksStatFilter: BestPicksStatFilter = 'all';
 let bestPicksEvOnly = false;
+// GLOW-UP 305 L9 — hide picks whose EV rests on the assumed -110 placeholder
+// rather than a posted price. Only possible now that bpViewMetric carries
+// assumedVig (L4); before that the flag existed but never left computeDetailedEV.
+let bestPicksRealOddsOnly = false;
 // GLOW-UP 192: after three passes of adding caveat flags (PROJ SAYS / NEEDS
 // ROUNDS / negative EV), a way to see only the picks that carry none of them.
 let bestPicksCleanOnly = false;
@@ -9713,6 +9717,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       if (!m) return true;
       if (bestPicksStatFilter !== 'all' && m.src !== bestPicksStatFilter) return false;
       if (bestPicksEvOnly && !(m.ev != null && m.ev > 0)) return false;
+      if (bestPicksRealOddsOnly && m.assumedVig) return false;
       if (bestPicksCleanOnly && !m.clean) return false;
       if (bestPicksFlaggedOnly && m.clean) return false;
       if (bestPicksSevereOnly && m.caveats < 2) return false;
@@ -9727,6 +9732,14 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       // enter. Distinct from EV (which prices the calibrated win probability) and
       // from MODEL (score + demotions): this is raw disagreement with the book.
       out = [...out].sort((a, b) => (metrics.get(b.name)?.edge ?? -Infinity) - (metrics.get(a.name)?.edge ?? -Infinity));
+    } else if (bestPicksSortMode === 'move') {
+      // GLOW-UP 305 L8 — rank by how far the line has come TO you since it
+      // opened. Distinct from every other mode here: MODEL/EV/CONF/Δ all score
+      // the pick against its CURRENT number, and none of them can see that the
+      // number used to be somewhere else. Picks with no measurable baseline sort
+      // last rather than as zero — "cannot tell" is not "did not move".
+      out = [...out].sort((a, b) =>
+        (metrics.get(b.name)?.vintage?.gain ?? -Infinity) - (metrics.get(a.name)?.vintage?.gain ?? -Infinity));
     }
     return out;
   };
@@ -9745,17 +9758,28 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   // or the opposite side on that fighter and the row says nothing — you can be staked
   // on Bogdan Grad FP OVER while the board recommends Grad SS UNDER and see no hint of
   // it. Index every placed leg by fighter so a row can report what you already hold.
-  const placedByFighter = new Map<string, Array<{ dir: string; stat: string }>>();
-  for (const key of bestPicksPlaced.keys()) {
+  // ── GLOW-UP 305 L6 · the placed-conflict chip was LINE-BLIND ──────────────
+  // Built from the map KEY alone (`name|dir|stat`), which throws away the entry
+  // line the record carries. So a leg placed OVER SS 33.5 and a board now calling
+  // UNDER SS 39.5 rendered as a flat contradiction — when in fact the line moved
+  // 6 points between them and ANY result in (33.5, 39.5) wins BOTH. That is a
+  // middle, not a reversal, and it is the exact case
+  // [[project_placed_leg_vs_board_line_vintage]] records as open: the board
+  // re-scores at the CURRENT line, so a flip against a leg you hold may be line
+  // vintage rather than the model changing its mind. Carrying `line` (from the
+  // record VALUE, not the key) is all it needed.
+  const placedByFighter = new Map<string, Array<{ dir: string; stat: string; line: number | null }>>();
+  for (const [key, rec] of bestPicksPlaced.entries()) {
     const [pName, pDir, pStat] = key.split('|');
     if (!pName) continue;
     const k = (normalizeName(pName) || pName).toLowerCase();
     if (!placedByFighter.has(k)) placedByFighter.set(k, []);
-    placedByFighter.get(k)!.push({ dir: pDir || '', stat: pStat || 'fp' });
+    const ln = Number(rec?.line);
+    placedByFighter.get(k)!.push({ dir: pDir || '', stat: pStat || 'fp', line: Number.isFinite(ln) ? ln : null });
   }
   // Returns a chip when this fighter carries a placed leg that ISN'T this pick:
   // opposite direction is a genuine conflict, a different stat is worth knowing.
-  const placedElsewhereTag = (f: AnalyzerFighter, dir: string, src: string): string => {
+  const placedElsewhereTag = (f: AnalyzerFighter, dir: string, src: string, curLine: number | null): string => {
     const held = placedByFighter.get((normalizeName(f.name) || f.name).toLowerCase());
     if (!held || !held.length) return '';
     const other = held.filter(h => !(h.dir === dir && h.stat === src));
@@ -9764,7 +9788,29 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     const label = (h: { dir: string; stat: string }) =>
       `${(h.dir || '').toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[h.stat] || h.stat.toUpperCase()}`;
     if (opposed.length) {
-      return `<span class="bp-placed-conflict" title="You already have money on ${prettyName(f.name)} the OTHER way — placed ${opposed.map(label).join(', ')}, while this pick is ${dir.toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[src] || src.toUpperCase()}. Taking both stakes opposite outcomes on one fighter.">⚠ PLACED ${opposed.map(label).join(', ')}</span>`;
+      // Only a SAME-STAT pair is comparable: OVER FT against UNDER SS are two
+      // different quantities and no window exists between them.
+      const sameStat = opposed.filter(h => h.stat === src && h.line != null);
+      const boardLine = curLine;
+      let windowNote = '';
+      let isMiddle = false;
+      if (sameStat.length === 1 && boardLine != null) {
+        const heldLine = sameStat[0].line as number;
+        const heldIsOver = (sameStat[0].dir || '').toLowerCase() === 'over';
+        // Held OVER at H and board UNDER at B: every result strictly between them
+        // clears the over AND stays under, so both win — but only when B > H.
+        // With B < H the same span loses both. The mirror holds for held UNDER.
+        const lo = Math.min(heldLine, boardLine), hi = Math.max(heldLine, boardLine);
+        isMiddle = heldIsOver ? boardLine > heldLine : boardLine < heldLine;
+        windowNote = heldLine === boardLine
+          ? ` Both sit on the SAME ${boardLine} line, so this is a straight contradiction with no window — one of them must lose.`
+          : isMiddle
+            ? ` But your leg was entered at ${heldLine} and the board is now calling ${boardLine}: the line moved ${Math.abs(boardLine - heldLine).toFixed(1)} between them, so any result in (${lo}, ${hi}) wins BOTH. This is a MIDDLE, not the model reversing on you — the board re-scores at the CURRENT line, and your leg is still priced at the old one.`
+            : ` Your leg was entered at ${heldLine} and the board is now calling ${boardLine}, which is the BAD side of the move: any result in (${lo}, ${hi}) loses BOTH. This is a genuine squeeze, not just line vintage.`;
+      }
+      const cls = isMiddle ? 'bp-placed-conflict bp-placed-middle' : 'bp-placed-conflict';
+      const glyph = isMiddle ? '⇅ MIDDLE' : `⚠ PLACED ${opposed.map(label).join(', ')}`;
+      return `<span class="${cls}" title="You already have money on ${prettyName(f.name)} the OTHER way — placed ${opposed.map(label).join(', ')}${sameStat.length === 1 && sameStat[0].line != null ? ` at ${sameStat[0].line}` : ''}, while this pick is ${dir.toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[src] || src.toUpperCase()}${boardLine != null ? ` ${boardLine}` : ''}.${windowNote}">${glyph}</span>`;
     }
     return `<span class="bp-placed-other" title="You've already placed a different stat on ${prettyName(f.name)}: ${other.map(label).join(', ')}. Same fighter, so this adds exposure to one outcome rather than diversifying.">● PLACED ${other.map(label).join(', ')}</span>`;
   };
@@ -9786,6 +9832,8 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   for (const m of overMetrics.values()) bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
   for (const m of underMetrics.values()) bpSrcCounts.set(m.src, (bpSrcCounts.get(m.src) || 0) + 1);
   const bpEvPosCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.ev != null && m.ev > 0).length;
+  const bpAllMetrics = [...overMetrics.values(), ...underMetrics.values()];
+  const bpRealOddsCount = bpAllMetrics.filter(m => m.ev != null && !m.assumedVig).length;
   const bpCleanCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.clean).length;
   const bpSevereCount = [...overMetrics.values(), ...underMetrics.values()].filter(m => m.caveats >= 2).length;
   const bpChipsHtml = Object.keys(BP_SRC_CHIP)
@@ -9799,12 +9847,14 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       <button class="bpc-btn${bestPicksSortMode === 'ev' ? ' on' : ''}" data-bp-sort="ev" title="Highest calibrated EV first — money order, not signal order">EV</button>
       <button class="bpc-btn${bestPicksSortMode === 'conf' ? ' on' : ''}" data-bp-sort="conf" title="Highest model confidence first">CONF%</button>
       <button class="bpc-btn${bestPicksSortMode === 'edge' ? ' on' : ''}" data-bp-sort="edge" title="Biggest gap between the model's projection and the line you'd enter (the Δ chip) — raw disagreement with the book, independent of how EV prices it">Δ EDGE</button>
+      <button class="bpc-btn${bestPicksSortMode === 'move' ? ' on' : ''}" data-bp-sort="move" title="Ranks by how far the line has moved IN YOUR FAVOUR since it opened — the ↑/↓ vintage chip. Every other sort here scores the pick against its current number and cannot see where that number came from. Picks with no baseline sort last, not as zero.">⇅ MOVE</button>
     </span>
     <span class="bpc-group">
       <span class="bpc-label">SHOW</span>
       <button class="bpc-chip${bestPicksStatFilter === 'all' ? ' on' : ''}" data-bp-stat="all" title="All stat families">ALL <i>${overs.length + unders.length}</i></button>
       ${bpChipsHtml}
       <button class="bpc-chip bpc-ev${bestPicksEvOnly ? ' on' : ''}" data-bp-evonly="1" title="Only picks whose calibrated EV clears breakeven">+EV <i>${bpEvPosCount}</i></button>
+      <button class="bpc-chip bpc-real${bestPicksRealOddsOnly ? ' on' : ''}" data-bp-realodds="1" title="Only picks whose EV is priced from a number the book actually posted. The rest fall back to an assumed -110, which is a placeholder — their EV estimates the SHAPE of the edge, not its size, and moves with whatever the real price turns out to be.">REAL ODDS <i>${bpRealOddsCount}</i></button>
       <button class="bpc-chip bpc-clean${bestPicksCleanOnly ? ' on' : ''}" data-bp-cleanonly="1" title="Only picks carrying no caveat — no ⚠ PROJ SAYS (projection opposes its own lean), no ⚠ NEEDS ROUNDS (volume over against a finisher), and not negative EV. The picks that need no explanation.">CLEAN <i>${bpCleanCount}</i></button>
       <button class="bpc-chip bpc-flagged${bestPicksFlaggedOnly ? ' on' : ''}" data-bp-flaggedonly="1" title="Only picks carrying at least one caveat — ⚠ PROJ SAYS, ⚠ NEEDS ROUNDS, or negative EV. Note this widens sharply once real prices post (negative EV alone can flag a third of the board); when it does, use 2+ CAVEATS for the picks whose objections actually compound.">FLAGGED <i>${(overs.length + unders.length) - bpCleanCount}</i></button>
       ${bpSevereCount > 0 ? `<button class="bpc-chip bpc-severe${bestPicksSevereOnly ? ' on' : ''}" data-bp-severeonly="1" title="Picks carrying TWO OR MORE caveats at once — e.g. negative EV AND the projection arguing against its own lean, or a volume over that needs rounds against a finisher AND prices badly. One objection is a note; two stacking is the actual review queue. Hidden when nothing on the board qualifies.">⚠⚠ 2+ CAVEATS <i>${bpSevereCount}</i></button>` : ''}
@@ -10185,9 +10235,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       // did, which the reader can check against the numbers printed beside it,
       // and colour ALONE carries whether that helped you (green) or hurt (red).
       const bpVin = pickLineVintage(f.name, clipBook, el._source, line, el.lean);
-      const VIN_MIN: Record<string, number> = { fp: 1.0, ss: 1.0, ss_r1: 0.5, td: 0.5, ft: 0.5, ctrl: 0.5, kd: 0.5 };
-      const vinMin = VIN_MIN[el._source || 'fp'] ?? 0.5;
-      const vintageChip = (bpVin && Math.abs(bpVin.delta) >= vinMin)
+      const vintageChip = (bpVin && vintageIsMaterial(bpVin))
         ? `<span class="bp-vintage ${bpVin.gain > 0 ? 'pos' : 'neg'}" title="Opened ${bpVin.open}, now ${line} — moved ${Math.abs(bpVin.delta).toFixed(1)} ${bpVin.delta > 0 ? 'up' : 'down'}, which makes this ${(el.lean || '').toUpperCase()} ${bpVin.gain > 0 ? 'CHEAPER than it opened — you are getting a better number than the market first offered' : 'MORE EXPENSIVE than it opened — the move has already gone, and you are paying up for it'}. This is the mechanical price effect only; whether the money moving that way AGREES with you is what the RLM tag answers, and the two can legitimately disagree.">${bpVin.delta > 0 ? '↑' : '↓'} <b>${bpVin.open}</b>→${line}</span>`
         : '';
       // ── GLOW-UP 305 L2 · the price EV was actually computed from ───────────
@@ -10235,7 +10283,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp')}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp', line ?? null)}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
@@ -10266,6 +10314,27 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       tierCounts['Low'] ? `<span class="bps-tally bps-low">${tierCounts['Low']} LOW</span>` : ''
     }${
       avgConf != null ? `<span class="bph-avg" title="Average model confidence across this column's picks">avg ${avgConf}%</span>` : ''
+    }${
+      // ── GLOW-UP 305 L7 · did this column's lines come TO you or away? ──────
+      // L1 gives every row a signed `gain`; aggregated, it answers a question the
+      // header could not previously ask: has the market been moving toward this
+      // column's picks or against them? Deliberately reported as a SPLIT (n toward
+      // / n against) rather than an average — a mean would let one 6-point move
+      // cancel three small adverse ones and report "flat", which is the opposite
+      // of what a reader needs. Rows with no baseline are excluded and the
+      // denominator says so, because a 2-of-3 split over eight picks is a much
+      // weaker statement than 2-of-8 and must not read the same.
+      (() => {
+        const vs = fighters
+          .map(f => (type === 'over' ? overMetrics : underMetrics).get(f.name)?.vintage)
+          .filter((v): v is LineVintage => vintageIsMaterial(v));
+        if (!vs.length) return '';
+        const toward = vs.filter(v => v.gain > 0).length;
+        const against = vs.filter(v => v.gain < 0).length;
+        if (!toward && !against) return '';
+        const cls = toward > against ? 'pos' : against > toward ? 'neg' : 'flat';
+        return `<span class="bph-move ${cls}" title="Of the ${vs.length} pick${vs.length === 1 ? '' : 's'} in this column with a measurable opening line (out of ${fighters.length}), ${toward} ${toward === 1 ? 'has' : 'have'} moved in your favour since open and ${against} against. Shown as a split rather than an average on purpose: one large move would otherwise cancel several small opposite ones and report a misleading 'flat'. Rows with no baseline are excluded entirely — they are unmeasured, not unmoved.">⇅ ${toward}↑/${against}↓ <i>of ${vs.length}</i></span>`;
+      })()
     }${
       // GLOW-UP 199 L5 — aggregate Δ. Every pick now carries a signed edge (GLOW-UP
       // 196, extended to FP by L1 above), so the column can report how far the model
@@ -10393,7 +10462,23 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       <span class="bpx-label">EXPOSURE</span>
       <span class="bpx-item" title="Distinct fights these ${shown.length} picks touch. Fewer fights than picks means repeated exposure to the same outcomes.">${distinctFights} fight${distinctFights === 1 ? '' : 's'} · ${shown.length} picks</span>
       <span class="bpx-item${concentrated ? ' warn' : ''}" title="${concentrated ? `${maxFight} of ${shown.length} picks ride on ${maxFightLabel} — that fight going the wrong way takes a large share of the board with it. Correlated, not diversified.` : `Heaviest single fight is ${maxFightLabel} with ${maxFight} pick${maxFight === 1 ? '' : 's'}.`}">${concentrated ? '⚠ ' : ''}MAX <b>${maxFight}</b> on ${maxFightLabel}</span>
-      <span class="bpx-books" title="Where these picks would be placed — one group per app you'd open">${bookChips}</span>
+      <span class="bpx-books" title="Where these picks would be placed — one group per app you'd open">${bookChips}</span>${
+      // ── GLOW-UP 305 L10 · how much of this board's EV is a placeholder ──────
+      // The strip prices the board by book and by fight but never said how much
+      // of it is even PRICED. An EV built on the assumed -110 fallback estimates
+      // the shape of an edge, not its size, and a board where most rows are
+      // assumed is a board whose headline "avg EV +10.5%" is softer than it
+      // reads. Only rendered when some rows ARE assumed — a fully priced board
+      // needs no chip, and a chip that always shows becomes furniture.
+      (() => {
+        const priced = shown.filter(x => x.m.ev != null);
+        if (!priced.length) return '';
+        const assumed = priced.filter(x => x.m.assumedVig).length;
+        if (!assumed) return '';
+        const pct = Math.round((assumed / priced.length) * 100);
+        return `<span class="bpx-item${pct >= 50 ? ' warn' : ''}" title="${assumed} of ${priced.length} priced picks have NO posted odds for the side being leaned, so their EV is computed against a standard -110 placeholder. Those numbers estimate the shape of an edge rather than its size, and they move with whatever the real price turns out to be. ${pct >= 50 ? 'Most of this board is unpriced, so read the headline average EV as provisional.' : 'The majority of the board is priced from real numbers.'}">${pct >= 50 ? '⚠ ' : ''}<b>${assumed}</b>/${priced.length} assumed price</span>`;
+      })()
+    }
     </div>`;
   })();
 
@@ -10815,6 +10900,9 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   });
   container.querySelectorAll<HTMLElement>('[data-bp-evonly]').forEach(btn => {
     btn.addEventListener('click', () => { bestPicksEvOnly = !bestPicksEvOnly; bpRerender(); });
+  });
+  container.querySelectorAll<HTMLElement>('[data-bp-realodds]').forEach(btn => {
+    btn.addEventListener('click', () => { bestPicksRealOddsOnly = !bestPicksRealOddsOnly; bpRerender(); });
   });
   // GLOW-UP 192 handlers
   /**
@@ -13751,6 +13839,20 @@ interface LineVintage {
  * the delta exceeds the stat's plausibility cap — an unmeasurable move must not
  * render as "didn't move". Same distinction the RLM chip draws with `n/a`.
  */
+/** Movement below this is noise for the stat and must not be reported as a move.
+ *  Module scope because the ROW chip and the column-header split both gate on it:
+ *  when they diverged, the header read "1 up / 1 down of 3" above two visible
+ *  chips and the missing third looked like a bug. Same rule the roadmap keeps
+ *  re-learning — a value classified in two places will eventually disagree. */
+const VINTAGE_MIN_DELTA: Record<string, number> = {
+  fp: 1.0, ss: 1.0, ss_r1: 0.5, td: 0.5, ft: 0.5, ctrl: 0.5, kd: 0.5,
+};
+/** True when a vintage is big enough to report at all. */
+function vintageIsMaterial(v: LineVintage | null | undefined): boolean {
+  if (!v) return false;
+  return Math.abs(v.delta) >= (VINTAGE_MIN_DELTA[v.stat] ?? 0.5);
+}
+
 function pickLineVintage(
   name: string,
   book: SourcePlatformKey | null | undefined,
