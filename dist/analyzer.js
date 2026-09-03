@@ -12171,8 +12171,26 @@ function renderParlayLab(container) {
                 .sort((a, b) => b - a)
                 .map((hits) => ({ hits, mult: table[hits], p: byHits[hits] || 0 }));
         };
-        const bestKey = Object.keys(PICKEM_PAYOUTS).find(k => PICKEM_PAYOUTS[k].label === (evRows[0]?.label));
-        const ladder = bestKey ? ladderFor(bestKey) : null;
+        // GLOW-UP 307b — the ladder must follow TIER STRUCTURE, not EV rank.
+        // First cut tied it to evRows[0], which hid it exactly when it mattered: on a
+        // live 3-leg slip UD 6x (single tier) and PP Flex 2.25x BOTH priced at -20%,
+        // UD sorted first, and the only book with partial tiers rendered nothing. At
+        // equal EV those are completely different bets — UD is all-or-nothing at ~13%,
+        // while Flex also pays 1.25x at 2 of 3, which is a real profit tier with a far
+        // higher chance of landing. So: highest-EV book that ACTUALLY has more than
+        // one paying tier, falling back to none. It is labelled with its own book
+        // name because it may not be the starred best-EV row.
+        const ladderRow = evRows.find((r) => {
+            const k = Object.keys(PICKEM_PAYOUTS).find(kk => PICKEM_PAYOUTS[kk].label === r.label);
+            const l = k ? ladderFor(k) : null;
+            return !!l && l.filter(x => x.mult > 1).length > 1;
+        }) || null;
+        const ladderKey = ladderRow
+            ? Object.keys(PICKEM_PAYOUTS).find(kk => PICKEM_PAYOUTS[kk].label === ladderRow.label)
+            : undefined;
+        const ladder = ladderKey ? ladderFor(ladderKey) : null;
+        const ladderLabel = ladderRow ? ladderRow.label : null;
+        const ladderEv = ladderRow ? ladderRow.ev : null;
         // P(profit) is NOT the combined probability. On a Flex ticket the all-hit
         // number badly understates your chance of ending up ahead, because tiers
         // below it still pay more than the stake. A tier paying <= 1.0x is NOT
@@ -12187,7 +12205,7 @@ function renderParlayLab(container) {
         // tile is gated on this rather than duplicating the tile beside it.
         const payingTiers = ladder ? ladder.filter(r => r.mult > 1).length : 0;
         return { n: nn, combined, evRows, best: evRows[0] || null, anyCorr, maxPosCorr: maxPos, anyRecal,
-            byHits, ladder, payingTiers,
+            byHits, ladder, payingTiers, ladderLabel, ladderEv,
             pProfit: pProfit == null ? null : Math.round(pProfit * 100), breakEvenHits };
     };
     // ── GLOW-UP 206 L2 ────────────────────────────────────────────────────────
@@ -12787,7 +12805,7 @@ function renderParlayLab(container) {
         // GLOW-UP 191 (L4): shared analysis — the suggestion cards run the exact
         // same function, so a suggestion's EV can't disagree with the slip's.
         const A = analyzeSlipLegs(selectedLegs);
-        const { n, combined, evRows, best, anyCorr, maxPosCorr, anyRecal, ladder, pProfit, breakEvenHits, payingTiers } = A;
+        const { n, combined, evRows, best, anyCorr, maxPosCorr, anyRecal, ladder, pProfit, breakEvenHits, payingTiers, ladderLabel, ladderEv } = A;
         const weakest = selectedLegs.reduce((w, l) => (l.confidence < w.confidence ? l : w), selectedLegs[0]);
         const weakestKey = parlayLegKeyOf(weakest);
         const slipContradiction = selectedLegs.map((l) => conflictsWithSlip(l)).find((m) => !!m) || null;
@@ -12839,7 +12857,11 @@ function renderParlayLab(container) {
             // is carrying its weight should say nothing rather than nominate a
             // "worst" that is actually fine — the existing WEAKEST chip already
             // always names someone, and two always-on chips would be noise.
-            if (worst && worst.gain > 0) {
+            // Silent when it would just repeat WEAKEST. The two ask different questions
+            // and often disagree — that is the point — but when they land on the SAME
+            // leg the second chip adds nothing and two chips naming one fighter reads
+            // like a double warning.
+            if (worst && worst.gain > 0 && worst.key !== weakestKey) {
                 dragHtml = `<span class="pss-drag" title="Dropping ${worst.label} and re-pricing the remaining ${n - 1} legs RAISES this slip's EV by ${worst.gain.toFixed(0)} points. That is a different question from WEAKEST, which names the lowest-confidence leg: a leg can be confident and still cost you, because correlation with another leg is priced into the joint distribution and never appears in its own confidence number. Verify before acting — a shorter slip also pays less.">↓ DRAG <b>${worst.label}</b> <i>+${worst.gain.toFixed(0)}% EV if dropped</i><button class="pss-weak-act" data-parlay-drop="${worst.key}" title="Drop this leg">✕ drop</button></span>`;
             }
         }
@@ -12857,7 +12879,6 @@ function renderParlayLab(container) {
           <div class="pss-tile" title="${anyCorr ? 'Joint P(all hit) — correlation-adjusted for same-fight legs via a duration copula, not the independent product' : 'Product of independent leg probabilities'} (clamped 35-85)"><span class="pss-t-label">COMBINED</span><b class="pss-t-val">~${combined}%</b></div>
           <div class="pss-tile" title="Highest-EV book for this ${n}-leg slip at ${anyRecal ? 'recalibrated' : 'model'} leg probabilities${anyCorr ? ', correlation-adjusted for same-fight legs' : ' (independent)'}. Verify multipliers in-app — promos and boosts change them."><span class="pss-t-label">BEST BOOK</span><b class="pss-t-val">${best.label} <i class="pss-t-mult">${best.mult}x</i></b></div>
           <div class="pss-tile" title="What a $${STAKE} stake returns if ALL ${n} legs hit, at ${best.label}'s ${best.mult}x. This is the payout, not the expected value — the EV tile prices how likely that is."><span class="pss-t-label">$${STAKE} RETURNS</span><b class="pss-t-val money">$${(STAKE * best.mult) % 1 === 0 ? (STAKE * best.mult).toFixed(0) : (STAKE * best.mult).toFixed(2)}</b></div>
-          ${(pProfit != null && payingTiers > 1) ? `<div class="pss-tile" title="Chance this slip returns MORE than the stake, summing every payout tier above 1.0x — not the same as COMBINED, which is only the all-hit case. On a Flex ticket these differ sharply: partial tiers still pay, so P(PROFIT) can be far higher than COMBINED. A tier paying 1.0x or less is NOT counted, because 0.4x is a 60% loss that merely looks like a win on the payout table."><span class="pss-t-label">P(PROFIT)</span><b class="pss-t-val ${pProfit >= 50 ? 'pos' : ''}">~${pProfit}%</b></div>` : ''}
           <div class="pss-tile" title="Expected value at the best book — the payout table weighted by the calibrated chance of each hit-count. Negative means the price doesn't clear the model's probability."><span class="pss-t-label">EV</span><b class="pss-t-val ${best.ev >= 0 ? 'pos' : 'neg'}">${best.ev >= 0 ? '+' : ''}${best.ev}%</b></div>
         </div>`
             : '';
@@ -12876,7 +12897,8 @@ function renderParlayLab(container) {
                 const isBE = breakEvenHits != null && r.hits === breakEvenHits;
                 return `<span class="psl-row${profits ? ' win' : ' lose'}${isBE ? ' be' : ''}" title="${r.hits} of ${n} legs hit: pays ${r.mult}x, about ${Math.round(r.p * 100)}% likely, $${STK} returns $${(STK * r.mult).toFixed(2).replace(/\.00$/, '')}.${profits ? (isBE ? ' This is the BREAK-EVEN tier — the fewest hits that still returns more than the stake.' : '') : ` This tier PAYS but still LOSES money: ${r.mult}x on a $${STK} stake returns $${(STK * r.mult).toFixed(2).replace(/\.00$/, '')}, a ${Math.round((1 - r.mult) * 100)}% loss.`}"><i class="psl-k">${r.hits}/${n}</i><i class="psl-m">${r.mult}x</i><i class="psl-p">${Math.round(r.p * 100)}%</i></span>`;
             }).join('');
-            ladderHtml = `<div class="pss-ladder"><span class="psl-label" title="Every payout tier ${best.label} pays on this ${n}-leg slip, with the probability of each from the same distribution the EV above is priced from. Tiers below the break-even marker pay something and still lose money.">${best.label} LADDER</span>${rowsHtml}${breakEvenHits != null ? `<span class="psl-need" title="You need at least ${breakEvenHits} of ${n} legs for this ticket to return more than it cost. Anything below that is a loss even where the book still pays a multiplier.">need <b>${breakEvenHits}/${n}</b> to profit</span>` : ''}</div>`;
+            const notBest = ladderLabel !== best.label;
+            ladderHtml = `<div class="pss-ladder"><span class="psl-label" title="Every payout tier ${ladderLabel} pays on this ${n}-leg slip, with the probability of each taken from the same distribution the EV above is priced from. Tiers below the break-even marker pay something and STILL lose money.${notBest ? ` Shown for ${ladderLabel} rather than the starred ${best.label} because ${best.label} is all-or-nothing here — it has a single paying tier, so it has no ladder to draw. At similar EV these are very different bets: the starred book pays more when everything lands, this one pays something more often.` : ''}">${ladderLabel} LADDER${notBest ? ` <i class="psl-alt">${(ladderEv ?? 0) >= 0 ? '+' : ''}${ladderEv}%</i>` : ''}</span>${rowsHtml}${breakEvenHits != null ? `<span class="psl-need" title="You need at least ${breakEvenHits} of ${n} legs for this ticket to return more than it cost. Anything below that is a loss even where the book still pays a multiplier.">need <b>${breakEvenHits}/${n}</b> to profit</span>` : ''}${pProfit != null ? `<span class="psl-need" title="Chance this ${ladderLabel} ticket returns MORE than the stake — every tier above 1.0x summed. NOT the same as COMBINED in the deck, which is only the all-hit case; on a partial-payout book these differ sharply. A tier paying 1.0x or less is excluded, because it is a loss that merely looks like a win on the payout table.">P(profit) <b>~${pProfit}%</b></span>` : ''}</div>`;
         }
         slipSummaryHtml = `<div class="parlay-slip-summary">
       ${deckHtml}
