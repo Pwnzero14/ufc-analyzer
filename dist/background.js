@@ -753,7 +753,22 @@ async function _fetchAndSettleFromUFCStats(opts) {
     let _shadowFixed = 0;
     const errors = [];
     // Inline normalizers matching PropArchiveService logic
-    const _baseNorm = (s) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    // Diacritics are STRIPPED here, matching analyzer.ts's normalizeName. Platforms
+    // disagree on accents for the same fighter \u2014 on the Paris card Betr posted
+    // "Morgan Charri\u00E8re" while pick6/underdog/prizepicks all posted "Morgan
+    // Charriere" \u2014 and the archive stores the RAW platform spelling
+    // (background.ts's own line archiver writes f.name unmodified). UFCStats parses
+    // the plain form, so without this strip _normName("Morgan Charri\u00E8re") never
+    // equals _normName("Morgan Charriere") and applyResult skips the accented row:
+    // it stays result-less forever and any leg placed on it is ungradeable.
+    // Confirmed live 2026-09-03 \u2014 'Far\u00E9s Ziam' and 'Morgan Charri\u00E8re' each sit in
+    // the archive in BOTH spellings. Alias entries would fix one name at a time;
+    // this fixes the class. Two people differing only by an accent would be a
+    // genuine collision, but that is already the bet analyzer.ts makes.
+    // NOTE deliberately NOT applied to PropArchiveService.normalizeName: that one
+    // feeds recordKey, so stripping there changes row IDENTITY and can merge or
+    // split existing rows. That is a migration with a backup, not a one-liner.
+    const _baseNorm = (s) => s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').normalize('NFD').replace(/[\u0300-\u036F]/g, '').replace(/\./g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
     // Alias-aware name normalizer. Archive rows carry platform spellings (e.g.
     // "Yadong Song") while UFCStats parses the canonical form ("Song Yadong");
     // without this bridge those siblings never match and settle leaves orphans.
