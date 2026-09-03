@@ -10291,17 +10291,76 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const ageChip = (bpAgeH != null && bpAgeH >= 12 && clipBook !== 'betr')
         ? `<span class="bp-age ${bpAgeH >= 36 ? 'stale' : 'aging'}" title="${BOOK_NAME[clipBook as SourcePlatformKey] || clipBook} last posted ${bpAgeH < 48 ? `${Math.round(bpAgeH)}h` : `${(bpAgeH / 24).toFixed(1)}d`} ago. The line shown is that snapshot, not necessarily what is on the board right now — re-fetch before entering if this matters.">⏱ ${bpAgeH < 48 ? `${Math.round(bpAgeH)}h` : `${(bpAgeH / 24).toFixed(1)}d`}</span>`
         : '';
+      // ── GLOW-UP 306 · the badge that anchors the board knew nothing ────────
+      // ★ TOP PICK is rank #1 under the CURRENT sort, and MODEL sort ranks by
+      // score + demotions — not by edge, not by price quality, not by caveat
+      // count. So the row people act on first can be the WORST row in its own
+      // column and still wear an unqualified endorsement. On the 2026-09-03
+      // board the #1 over was Mario Pinto at EV +18% carrying delta -21.5,
+      // "PROJ SAYS UNDER 21.5" AND an assumed price, under a column header
+      // already reading "AVG delta -5.3".
+      //
+      // `caveats` (0-3) has existed in bpViewMetric since GLOW-UP 205 and is
+      // used ONLY as a filter — it has never been rendered on a row. Deliberately
+      // NOT changed here: CLEAN / FLAGGED / 2+ CAVEATS all read that same number,
+      // and widening it would silently rewrite a board read on every card. This
+      // reads it and adds price-provenance and a negative edge alongside, as a
+      // SEPARATE count that no existing control consumes.
+      //
+      // Signalled with a glyph, not a colour: --gold (brand/selection, what the
+      // badge wears) and --amber (attention) are literally the SAME hex #f8c64a,
+      // so recolouring the badge would communicate nothing. Verified, not assumed.
+      const topFlags: string[] = [];
+      if (i === 0) {
+        const tm = (type === 'over' ? overMetrics : underMetrics).get(f.name);
+        if (tm) {
+          if (tm.projConflict) topFlags.push('its own projection argues the other way');
+          if (tm.needsRounds) topFlags.push('it is a volume over against a finisher, so it needs rounds it may not get');
+          if (tm.ev != null && tm.ev < 0) topFlags.push('its EV is below breakeven');
+          if (tm.assumedVig) topFlags.push('its EV rests on an assumed -110 placeholder rather than a posted price');
+          if (tm.edge != null && tm.edge < 0) topFlags.push(`the model projects ${Math.abs(tm.edge).toFixed(1)} on the WRONG side of the line being entered`);
+        }
+      }
+      const topPickBadge = i === 0
+        ? ` <span class="bp-top-pick${topFlags.length ? ' qualified' : ''}" title="${topFlags.length
+            ? `Ranked #1 by the current sort — but that sort is score-and-demotions, not a quality check, so read this before it anchors your slip. ${topFlags.length} thing${topFlags.length === 1 ? '' : 's'} to weigh: ${topFlags.join('; ')}. Being #1 does not mean unqualified.`
+            : 'Ranked #1 by the current sort, and carrying no caveat: no projection conflict, no rounds dependency, EV above breakeven off a real posted price.'}">★ TOP PICK${topFlags.length ? `<i class="bp-tp-warn">⚠${topFlags.length}</i>` : ''}</span>`
+        : '';
+      // ── GLOW-UP 306B · an edge too large to BE an edge ─────────────────────
+      // The COLUMN header has flagged a stretched average delta since GLOW-UP 199
+      // L5 ("a column disagreeing with every book at once is the shape MODEL v15
+      // found to be over-projection rather than edge"). The ROW never got the same
+      // check, so on the 2026-09-03 board Losene Keita rendered delta +62.4 against
+      // a 93.5 Betr FP line — a 28.8 average priced at 93.5 — in exactly the same
+      // green as a healthy +3.0, and it ranked #1 in its column at EV +37%.
+      //
+      // Measured against the LINE, not as an absolute: FP lines run ~90 and SS ~35,
+      // so a fixed cut-off would fire constantly on one stat and never on the other.
+      // The 35% bar is a judgement call and is stated as one — on this board it
+      // brackets the two live cases cleanly: Keita 62.4/93.5 = 67% flags, while
+      // Pinto 21.5/94.5 = 23% (a real, large, but arguable disagreement) does not.
+      //
+      // It WARNS, it never suppresses. A line this far from the model is usually a
+      // line worth re-reading — a combo prop summing both fighters, a stat-scale
+      // mismatch, or an average built on too little history — but it is occasionally
+      // just a soft number, and hiding the pick would decide that for the user.
+      const EDGE_SUSPECT_RATIO = 0.35;
+      const edgeRatio = (bpEdge != null && line != null && line > 0) ? Math.abs(bpEdge) / line : null;
+      const edgeSuspect = edgeRatio != null && edgeRatio >= EDGE_SUSPECT_RATIO;
+      const edgeSuspectChip = edgeSuspect
+        ? `<span class="bp-edge-suspect" title="The model projects ${bpProj != null ? bpProj.toFixed(1) : '?'} against a ${line} line — a gap of ${Math.abs(bpEdge as number).toFixed(1)}, which is ${Math.round((edgeRatio as number) * 100)}% of the line itself. Books do not miss by that margin. Treat this as a LINE to re-read before an edge to take: the usual causes are a combo prop summing BOTH fighters, a stat-scale mismatch between books, or an average built on too little history. Deliberately not hidden — occasionally the number really is soft, and that is your call, not the board's.">⚠ CHECK LINE</span>`
+        : '';
       const edgeChip = (bpEdge != null && bpProj != null)
         ? `<span class="bp-edge ${bpEdge > 0 ? 'pos' : bpEdge < 0 ? 'neg' : 'flat'}" title="Model projection ${bpProj.toFixed(1)} vs the ${line} line you'd enter — a ${Math.abs(bpEdge).toFixed(1)} gap on the ${bpEdge >= 0 ? (el.lean || '').toUpperCase() : 'opposite'} side. This is how far the model disagrees with the book: a bigger gap is a bigger claimed edge, and also the place the model is furthest from the market.">Δ <b>${bpEdge > 0 ? '+' : ''}${bpEdge.toFixed(1)}</b></span>`
         : '';
       return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i+1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${i === 0 ? ' <span class="bp-top-pick">★ TOP PICK</span>' : ''}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp', line ?? null)}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${topPickBadge}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp', line ?? null)}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${vintageChip}${priceChip}${ageChip}${onlyBookTag}${placedTag}${youTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${edgeSuspectChip}${vintageChip}${priceChip}${ageChip}${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
           ${evd ? `<div class="bp-hero-stats${i === 0 ? '' : ' bp-row-stats'}">
