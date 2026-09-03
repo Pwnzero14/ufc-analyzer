@@ -26,6 +26,22 @@ UFC Paris (Hooker vs. Parnasse) fights SATURDAY 2026-09-05.
          stored board is old and lines have moved all week)
       3. THEN invoke the ufc-lean-audit skill. That is what it is for.
 
+*** AFTER THE CARD, NOT BEFORE: FP THIN-HISTORY SHRINKAGE. ***
+  The delegated "should FP emit at n=1" question is ANSWERED BY MEASUREMENT, not
+  opinion — see [[project_fp_thin_history_shrinkage]] for the full table and the
+  ready-to-execute design. Headline: below 3 fights a fighter's own FP average is
+  WORSE than assuming they are league-average (n=1-2, 485 fights, t=-2.46 on a
+  test named in advance). n=1 alone is NOT individually significant (t=-1.50);
+  the crossover is n~6, not 3. Probe:
+  snippets/2026-09-03_fp_sample_size_readonly.js
+  DEFERRED DELIBERATELY: modest effect, and it is a model change to the engine
+  producing picks being bet on 09-05, with a subtle failure mode. GLOW-UP 306B/C
+  already LABEL the affected rows in the meantime.
+  KEY DESIGN CONSTRAINT so it is not got wrong later: do NOT shrink `avgFP` in
+  place. It is built once in buildFighterDB (~analyzer.ts:1275) and feeds BOTH
+  the model and the displayed "avg 28.8" text — shrinking in place would make the
+  UI misreport a fact about the fighter. Add a separate shrunk field.
+
 *** SECOND: THE v39 CHECK, WAITING SINCE 08-29. ***
   calcSSLean's duration-normalised hit rate needs DK ROUND MARKETS and DK has
   posted NOTHING all week ("DK none posted" as of 09-03). Once DK is in, read
