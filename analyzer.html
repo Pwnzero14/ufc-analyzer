@@ -28630,6 +28630,49 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 }
 
 /* L2 — the slip headline becomes a deck; the dollar return is the point */
+/* ── GLOW-UP 307 · payout ladder, break-even, and the EV drag chip ──────────
+   Lane discipline against the canonical mapping: the ladder's rows are axis 1
+   DIRECTION/OUTCOME — a tier either returns more than the stake (green) or it
+   does not (red) — which is the whole point, since PP Flex's 0.4x tier PAYS and
+   still loses 60%. The break-even row is the same axis, just marked with a ring
+   rather than a third colour. The DRAG chip is axis 2 ATTENTION (amber):
+   caution that still permits action. No new lane. */
+.pss-ladder {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);
+}
+.psl-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.09em; color: var(--text3); cursor: help; margin-right: 2px;
+}
+.psl-row {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 2px 7px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  background: var(--bg3); border: 1px solid var(--border); cursor: help;
+}
+.psl-row i { font-style: normal; }
+.psl-row .psl-k { font-weight: 800; }
+.psl-row .psl-m { font-weight: 700; opacity: 0.9; }
+.psl-row .psl-p { font-weight: 600; opacity: 0.62; font-size: 8px; }
+.psl-row.win  { color: var(--green); border-color: color-mix(in srgb, var(--green) 34%, transparent); }
+.psl-row.lose { color: var(--red);   border-color: color-mix(in srgb, var(--red) 30%, transparent); opacity: 0.85; }
+.psl-row.be   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 45%, transparent); }
+.psl-need {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+  color: var(--text2); cursor: help; margin-left: 2px;
+}
+.psl-need b { color: var(--green); }
+.pss-drag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+  cursor: help;
+}
+.pss-drag i { font-style: normal; font-weight: 600; opacity: 0.8; font-size: 8px; }
 .pss-deck {
   display: flex; flex-wrap: wrap; gap: 6px;
   margin-bottom: 6px;
