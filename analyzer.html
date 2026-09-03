@@ -702,6 +702,20 @@ body {
                    wrote the number). Contract says stay neutral, so it does —
                    deliberately NOT --purple, which is Underdog's book identity.
    No new colour lane is introduced by this pass. */
+/* GLOW-UP 306B — "this gap is too large to be an edge". Axis 2 ATTENTION
+   (--amber): caution that still permits action, which is exactly right — it
+   warns and never suppresses. Solid-filled rather than outlined so it separates
+   from the neutral .bp-edge chip sitting immediately to its left, since the two
+   describe the SAME number and must not read as one control. */
+.bp-edge-suspect {
+  display: inline-flex; align-items: center;
+  padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 42%, transparent);
+  cursor: help; white-space: nowrap;
+}
 .bp-vintage {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 1px 6px; border-radius: 4px;
@@ -20922,6 +20936,16 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
 /* ── GLOW-UP 138: AI Best Picks L5 — champion finale ── */
 
 /* ★ TOP PICK badge on each section's #1 */
+/* GLOW-UP 306 — a QUALIFIED top pick. Signalled structurally, never by colour:
+   --gold (what this badge wears: brand/selection) and --amber (attention) are
+   the SAME hex #f8c64a, so recolouring would say nothing at all. Instead the
+   solid fill is broken to a dashed edge and the count rides inside the badge,
+   so the endorsement still reads as an endorsement but visibly a hedged one. */
+.bp-top-pick.qualified { border-style: dashed; }
+.bp-top-pick .bp-tp-warn {
+  font-style: normal; font-weight: 800; margin-left: 5px;
+  padding-left: 5px; border-left: 1px solid currentColor; opacity: 0.85;
+}
 .bp-top-pick {
   display: inline-block;
   font-family: 'JetBrains Mono', monospace;
