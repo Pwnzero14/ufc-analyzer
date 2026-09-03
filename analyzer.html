@@ -584,6 +584,36 @@ body {
 }
 /* opposite side on a fighter you're staked on — a real conflict, not a note */
 .bp-placed-conflict { color: var(--red); background: rgba(255,58,96,0.12); border: 1px solid rgba(255,58,96,0.40); }
+/* GLOW-UP 305 L6 — a MIDDLE is not a conflict and must not wear conflict red.
+   Held OVER 33.5 against a board UNDER 39.5 both win on anything in between, so
+   this is the one case where the "you bet the other way" chip is GOOD news.
+   Axis 1 (direction/outcome), green, per the canonical mapping — the same axis
+   the red variant uses, flipped, which is exactly what the contract intends. */
+.bp-placed-conflict.bp-placed-middle {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green) 40%, transparent);
+}
+
+/* L7 — per-column movement split. Axis 1: it reports whether the market came to
+   this column or moved away, which is favourability, not caution. `flat` (an
+   even split) carries no verdict, so it stays neutral rather than picking a
+   side. */
+.bph-move {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 4px; margin-left: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+  cursor: help; white-space: nowrap;
+}
+.bph-move i { font-style: normal; font-weight: 500; opacity: 0.6; font-size: 8px; }
+.bph-move.pos  { color: var(--green); border-color: color-mix(in srgb, var(--green) 30%, transparent); }
+.bph-move.neg  { color: var(--red);   border-color: color-mix(in srgb, var(--red) 30%, transparent); }
+.bph-move.flat { color: var(--text3); }
+
+/* L9 — REAL ODDS filter chip. Inherits .bpc-chip; `on` state matches the
+   siblings so the row of chips stays one control family. */
+.bpc-chip.bpc-real.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 42%, transparent); background: color-mix(in srgb, var(--green) 12%, transparent); }
 /* different stat, same fighter — added exposure rather than diversification */
 .bp-placed-other { color: var(--gold); background: rgba(248,198,74,0.10); border: 1px solid rgba(248,198,74,0.32); }
 
