@@ -10350,6 +10350,35 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       const edgeSuspectChip = edgeSuspect
         ? `<span class="bp-edge-suspect" title="The model projects ${bpProj != null ? bpProj.toFixed(1) : '?'} against a ${line} line — a gap of ${Math.abs(bpEdge as number).toFixed(1)}, which is ${Math.round((edgeRatio as number) * 100)}% of the line itself. Books do not miss by that margin. Treat this as a LINE to re-read before an edge to take: the usual causes are a combo prop summing BOTH fighters, a stat-scale mismatch between books, or an average built on too little history. Deliberately not hidden — occasionally the number really is soft, and that is your call, not the board's.">⚠ CHECK LINE</span>`
         : '';
+      // ── GLOW-UP 306C · the sample the pick rests on ────────────────────────
+      // Losene Keita was the #1 under on this board at 72% WIN / +37% EV. His
+      // 28.8 FP average is ONE FIGHT — a split-decision loss where he landed 52
+      // significant strikes over a full 15 minutes. FP is finish-and-win weighted
+      // ([[feedback_fp_finish_weighted_not_volume]]), so 28.8 is depressed almost
+      // entirely by the missing win bonus rather than by low output: the number
+      // reads like a quiet fighter and is really a competitive one who lost.
+      //
+      // The row said none of that. Verified asymmetry behind it: calcSSLean,
+      // calcSSR1Lean, calcTDLean and calcCTRLLean all `return null` below three
+      // fights, and calcFTLean falls back to an explicitly-labelled MARKET-ONLY
+      // lean — FP alone emits an ordinary, unlabelled pick. Its confidence IS
+      // damped (calcMultivariateConfidence's sampleSizeFactor is (n-3)/10, so
+      // n=1 multiplies by 0.64) but it is never refused and never marked.
+      //
+      // NOT suppressed, deliberately: silently dropping FP picks could remove
+      // real edges, and calcFTLean already establishes this repo's preferred
+      // answer for low-sample spots — emit it, but say so. Because every other
+      // engine refuses below 3, this chip can in practice only appear on FP and
+      // market-only FT rows, so no source needs special-casing.
+      //
+      // Cyan, matching .nodata-badge: same data-provenance family as ⌀ NO
+      // HISTORY, which is this same statement at n=0.
+      const bpHistN = (f.db && f.db.loaded && Array.isArray(f.db.history)) ? f.db.history.length : null;
+      const thinChip = (bpHistN != null && bpHistN <= 2)
+        ? `<span class="bp-thin" title="${bpHistN === 0
+            ? 'No UFCStats fight history at all. Every average computes from an empty log, so this pick is reading the line, the opponent and the matchup — not this fighter.'
+            : `This fighter's averages come from ${bpHistN} UFCStats fight${bpHistN === 1 ? '' : 's'}. That is the whole sample behind the projection and the confidence beside it. Remember FP is finish-and-win weighted: a single LOSS drags the average down by the missing win bonus even when the fighter's output was competitive, so a low average on n=1 can describe the result rather than the fighter.`} Every other lean engine (SS, R1 SS, TD, CTRL) refuses to emit below three fights; FP does not, which is why this row exists at all. Its confidence is damped for sample size but not withheld — weigh it accordingly.">⌀ n=${bpHistN}</span>`
+        : '';
       const edgeChip = (bpEdge != null && bpProj != null)
         ? `<span class="bp-edge ${bpEdge > 0 ? 'pos' : bpEdge < 0 ? 'neg' : 'flat'}" title="Model projection ${bpProj.toFixed(1)} vs the ${line} line you'd enter — a ${Math.abs(bpEdge).toFixed(1)} gap on the ${bpEdge >= 0 ? (el.lean || '').toUpperCase() : 'opposite'} side. This is how far the model disagrees with the book: a bigger gap is a bigger claimed edge, and also the place the model is furthest from the market.">Δ <b>${bpEdge > 0 ? '+' : ''}${bpEdge.toFixed(1)}</b></span>`
         : '';
@@ -10360,7 +10389,7 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${edgeSuspectChip}${vintageChip}${priceChip}${ageChip}${onlyBookTag}${placedTag}${youTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${edgeSuspectChip}${thinChip}${vintageChip}${priceChip}${ageChip}${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
           ${evd ? `<div class="bp-hero-stats${i === 0 ? '' : ' bp-row-stats'}">
