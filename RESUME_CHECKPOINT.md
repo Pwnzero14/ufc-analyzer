@@ -1,85 +1,142 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-09-01 03:37:00 -04:00
+Last Saved: 2026-09-03 13:35:00 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 09ab93c
+HEAD: 524bb81
 
 ## Last Notes
 ################################################################################
-##  START HERE - NEXT SESSION'S FIRST TASK                                     ##
+##  START HERE - 2026-09-03 SESSION CLOSE                                      ##
 ################################################################################
 
-################################################################################
-##  CLOSED 2026-09-03: "WHY DIDN'T CHARRIERE HEAL?"  -> HE DID. NO BUG.        ##
-################################################################################
-DO NOT RE-OPEN. The premise was wrong, and it had been carried as fact for two
-sessions without ever being tested directly. That is the lesson worth keeping.
+STATE: everything below is SHIPPED, PUSHED and VERIFIED on BOTH branches
+(feature/sleek-theme-v1 + master, parity checked each time). Nothing half-done.
+UFC Paris (Hooker vs. Parnasse) fights SATURDAY 2026-09-05.
 
-Charriere is NOT stale. All three of his rev=1 fights already include the
-reversal:
-    Edwards vs. Brady        33.32
-    Moicano vs. Saint Denis 108.36
-    Allen vs. Curtis 2       46.46
-The join is exact (evLoose identical both sides, normalizeEvent true, date delta
-0), so the detector DID evaluate his row on both probe runs and flagged nothing.
-archivePerformanceForRosterFighter works.
+*** FIRST MOVE NEXT SESSION: IS THE SLATE COMPLETE YET? ***
+  As of 13:30 on 09-03 Slate Check still showed 5 warnings and real gaps:
+      P6 14 of 28 fighters without lines · PP 9 · UD 7 · BT 7 · DK none posted
+  Betr FANTASY props dropped mid-afternoon and took the board 8 -> 11 picks, so
+  props ARE flowing. Per [[feedback_audit_timing_full_props_friday]] do NOT audit
+  until TD + R1 SS + CTRL + FP are actually on the board. Check the gaps first;
+  if they have closed:
+      1. AUTO-FETCH LINES
+      2. GENERATE PREDICTIONS (MODEL v44 — the panel chip must say v44; the
+         stored board is old and lines have moved all week)
+      3. THEN invoke the ufc-lean-audit skill. That is what it is for.
 
-The 28 remaining stale-by-5xrev rows all belong to fighters NOT on the current
-roster. The heal only touches the current card, so they cannot heal and will
-correct at each fighter's next appearance. That is expected background, not a
-bug - do not count it as one again.
+*** SECOND: THE v39 CHECK, WAITING SINCE 08-29. ***
+  calcSSLean's duration-normalised hit rate needs DK ROUND MARKETS and DK has
+  posted NOTHING all week ("DK none posted" as of 09-03). Once DK is in, read
+  Hooker's SS lean reason for "(N/24 scaled to ~Xm)". Present = the term fired.
+  HOOKER ONLY — Parnasse is a debut and calcSSLean bails at history.length < 3.
 
-FOUR HYPOTHESES KILLED 2026-09-03, all by data, none by argument:
- 1. Diacritic normalizer split as the CAUSE of staleness.
-    G3 SILENT FALSE 0 / would hit 29 - updateResult finds the row every time.
-    The reasoning error: argued from "the line archiver stores raw platform
-    names" to "his stale row must be accented" without checking that the line
-    archiver wrote that row. It did not. His history rows are all plain.
- 2. Storage over quota (silent write failure).
-    unlimitedStorage is ALREADY in the manifest. The 10485760 ceiling came from
-    a constant hardcoded into the probe itself, not from Chrome. A 7MB
-    round-trip write landed clean: 10.96MB -> 18.3MB, read back intact, no
-    lastError. Storage sitting above 10MB is FINE. Do not "reclaim space".
- 3. Event-join mismatch for Charriere. evLoose identical on both sides.
- 4. (from 09-02) the four parse hypotheses - still dead.
-
-PROBE BUG worth remembering: the roster reconstruction read v.lines / a bare
-array, but the line stores are shaped { fighters: [...] } (STORAGE_LINE_KEYS
-analyzer.ts:1122, background.ts:145). rosterSet came back EMPTY and every row
-reported "G1 NO", which reads exactly like a finding. Only the stated caveat
-stopped it becoming one. STATE THE LIMITS OF A PROBE IN THE PROBE.
-
-WHAT THE SWEEP DID FIND, AND IT IS SHIPPED (714c9f1 / 0682437):
-  Platforms disagree on accents for the SAME fighter. On this Paris card Betr
-  posted "Morgan Charriere" ACCENTED while pick6/underdog/prizepicks posted it
-  plain, and background's line archiver stores f.name RAW. _baseNorm - which
-  every settle-path name comparison runs through - did not strip diacritics, so
-  applyResult could never match the accented row against UFCStats' plain
-  spelling: result-less forever, and any leg placed on it ungradeable.
-  Fixed by stripping diacritics in _baseNorm (background.ts:761). Verified on
-  the BUILT artifact, not by grepping dist: Charriere / Ziam / Prochazka each
-  unify with their plain twin, negative control confirms distinct fighters do
-  not collide. tsc clean, guard invariants OK, dist rebuilt and committed.
-
-  *** RELOAD THE EXTENSION (chrome://extensions, the arrow-circle button) or the
-      shipped dist will not be running. NEVER "Remove" - that wipes storage. ***
-
-STILL OPEN, deliberately not done:
-  PropArchiveService.normalizeName does NOT strip diacritics either, and it
-  feeds recordKey - so stripping there changes row IDENTITY and can merge or
-  split existing rows. That is a migration with a backup first, not a one-liner.
-  Until it is done, 'Fares Ziam' and 'Morgan Charriere' each still exist in the
-  archive under BOTH spellings as separate row identities. Settle now grades
-  both; only dedup is outstanding.
-  Also seen: Ion Cutelaba appears TWICE with identical event/value - a duplicate
-  archive row ([[project_duplicate_event_shadow_rows]] territory). Unexamined.
-
-A FULL STORAGE BACKUP was downloaded 2026-09-03 before any of this
-(ufc_storage_backup_*.json). Nothing was deleted; the deletion plan that
-preceded it was built on the bogus quota number and was abandoned.
+*** THIRD, ONLY AFTER THE CARD SETTLES: RUN 19. *** First learning cycle that is
+  both line-trained (v40) and post-v41/v44. Re-run both loop probes:
+      snippets/2026-09-01_learning_log_readonly.js   (SS)
+      snippets/2026-09-01_fp_loop_readonly.js        (FP)
 
 ################################################################################
+##  SHIPPED 2026-09-03                                                         ##
+################################################################################
+
+1. CHARRIERE HEAL QUESTION — CLOSED, NO BUG. He was never stale. All three of
+   his rev=1 fights already include the reversal; the join is exact (evLoose
+   identical, normalizeEvent true, date delta 0) so the detector evaluated his
+   row on every run and flagged nothing. archivePerformanceForRosterFighter
+   works. The checkpoint's premise had been carried as fact for two sessions
+   without anyone dumping the row — see [[feedback_test_inherited_premises]].
+   The 28 other stale-by-5xrev rows belong to fighters NOT on the current
+   roster; the heal only touches the current card, so they cannot heal and will
+   correct at each fighter's next appearance. EXPECTED BACKGROUND, not a bug.
+
+   FIVE hypotheses died, all to data: the diacritic normalizer split as the
+   CAUSE, storage-over-quota, an event-join mismatch, and (09-02) the four parse
+   hypotheses. DO NOT RE-OPEN ANY OF THEM.
+
+   *** THE QUOTA SCARE WAS MINE AND IT WAS WRONG. *** unlimitedStorage is
+   already in the manifest; the 10485760 ceiling came from a constant I
+   hardcoded into my own probe. A 7MB round-trip write landed clean
+   (10.96MB -> 18.3MB, read back intact, no lastError). Storage sitting above
+   10MB is FINE. DO NOT "reclaim space". A full backup was taken before any of
+   it and NOTHING was deleted.
+
+2. DIACRITIC FIXES (714c9f1 settle, 141e308 merge, e75c947 retraction).
+   Books disagree on accents for ONE fighter: Betr posted "Morgan Charriere"
+   ACCENTED on this card while pick6/underdog/prizepicks posted it plain, and
+   the line archiver stores f.name RAW. _baseNorm (every settle-path name
+   comparison) did not strip diacritics, so applyResult could never match the
+   accented row: result-less forever, any leg on it ungradeable. Fixed.
+   normalizeFighterName also now strips — but READ e75c947: I justified that one
+   as fixing a LIVE board ghost and that claim is RETRACTED. The analyzer builds
+   its own merge map on its own accent-stripping normalizeName
+   (analyzer.ts:25004), so the board was never ghosting. The change is
+   consistency hardening, not a demonstrated defect. See
+   [[project_diacritic_name_split]] — PropArchiveService.normalizeName still
+   does NOT strip and is deliberately left alone: it feeds recordKey, so
+   stripping there changes row IDENTITY. Migration with a backup, not a
+   one-liner.
+
+3. GLOW-UP 305 — BEST PICKS TEN-LEVEL PASS (8143f6d L1-L5, 4ba6e9f L6-L10,
+   plus a dedupe fix). Every level surfaced a value the code already computed
+   and discarded. Full detail in [[project_ui_evolution_roadmap]].
+   L1 line vintage (Best Picks referenced movement ZERO times while
+   _openingLines powers all of Line Movers) · L2 real posted price + vig ·
+   L3 recalibration mark · L4 bpViewMetric kept ONE of computeDetailedEV's six
+   fields · L5 per-pick line age · L6 placed-leg line vintage, which CLOSES the
+   item [[project_placed_leg_vs_board_line_vintage]] carried as open ·
+   L7 per-column movement split · L8 MOVE sort · L9 REAL ODDS filter ·
+   L10 exposure-strip price provenance.
+
+   VERIFIED ON THE LIVE BOARD, both branches of the sign convention:
+     Benouaich over ↑12.5→14.99 neg · Donchenko over ↑87.5→89.5 neg
+     Keita under ↑92.5→93.5 pos · Charriere under ↑33.5→39.5 pos
+   All four moved UP and the colour split purely on LEAN — which rules out the
+   failure mode a mixed sample could not have (colour following the delta sign
+   rather than favourability). The sign convention needs no further caveating.
+
+   STILL UNEXERCISED: the ⏱ age chip. Correctly so — the stores were 49 MINUTES
+   old, against a 12h floor. It will fire the first time a board goes stale
+   overnight. Everything else has now run on real data, including L2's ≈ -110
+   (the four Betr FP rows carry no posted side odds) and L10's "4/11 assumed
+   price".
+
+################################################################################
+##  IN FLIGHT — GLOW-UP 306, the L6-L10 follow-ons the user asked to continue  ##
+################################################################################
+Two items from the original ten were skipped as low-value and the user has now
+asked to continue past L10. Candidates, in the order they were justified:
+
+  A. TOP PICK carrying caveats. On the 09-03 board the #1 over is Mario Pinto
+     at EV +18% with Δ −21.5, "⚠ PROJ SAYS UNDER 21.5", AND an assumed price.
+     Three compounding caveats on the row that anchors the whole board, and the
+     ★ TOP PICK badge does not know. `caveats` (0-3) is already computed in
+     bpViewMetric and is only used as a FILTER — never rendered per row.
+  B. Row-height raggedness. Measured 95-118px on the 8-pick board; re-measure on
+     the 11-pick board before deciding it is worth touching.
+  C. Book-disagreement spread — ALREADY DONE, the 🏪 chip reads "best of 4 · 1.0".
+     Do not rebuild it.
+
+*** TO WORK ON THIS THE HARNESS NEEDS A FRESH BACKUP. *** dev/preview-server.js
+globs ~/Downloads for the newest `ufc-storage-backup-*.json` (HYPHENS — a file
+named with underscores is invisible to it, which bit this session), and the
+newest one predates the Betr fantasy drop, so the harness renders the OLD 8-pick
+board. Hit 💾 Backup in the extension and the preview upgrades automatically.
+
+################################################################################
+##  TRAPS RE-CONFIRMED THIS SESSION                                            ##
+################################################################################
+- python io.open(...,'w') on Windows rewrites the WHOLE FILE to CRLF and the
+  guard's `\n}\n` search then returns -1, failing an invariant that has nothing
+  to do with the edit. Always pass newline='' and re-check with:
+      node -e "...(s.match(/\r\n/g)||[]).length"
+- Backticks in a git commit -m body trigger shell substitution. Write the
+  message to a file and use `git commit -F`.
+- A timed-out javascript_tool call STILL EXECUTES server-side. Repeated retries
+  of a tab-click walked the view past Best Picks to Parlay Lab and the next
+  measurement read zeros. Re-assert the target view, do not just re-click.
+- Cherry-picking an EMPTY commit needs --allow-empty or it stalls mid-pick.
 
 
 RESUMING FRIDAY 2026-09-04/05. UFC Paris (Hooker vs. Parnasse) is Saturday.
