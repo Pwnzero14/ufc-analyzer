@@ -707,6 +707,20 @@ body {
    warns and never suppresses. Solid-filled rather than outlined so it separates
    from the neutral .bp-edge chip sitting immediately to its left, since the two
    describe the SAME number and must not read as one control. */
+/* GLOW-UP 306C — sample size behind the pick. Cyan, matching .nodata-badge:
+   the DATA-PROVENANCE family, of which "⌀ NO HISTORY" is the n=0 case and this
+   is n=1-2. Deliberately NOT amber — a thin sample is not a caution about the
+   bet, it is a statement about what the number is made of, and the canonical
+   mapping keeps those axes apart. */
+.bp-thin {
+  display: inline-flex; align-items: center;
+  padding: 1px 6px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  color: rgb(94,205,225);
+  background: rgba(94,205,225,0.12);
+  border: 1px solid rgba(94,205,225,0.42);
+  cursor: help; white-space: nowrap;
+}
 .bp-edge-suspect {
   display: inline-flex; align-items: center;
   padding: 1px 6px; border-radius: 4px;
