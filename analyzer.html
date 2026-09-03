@@ -27114,6 +27114,56 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
    worst of freshness and coverage. DK is freshness-only (progressive
    posting makes partial coverage normal there). A clean slate now still
    reports its state instead of rendering nothing. ── */
+/* ── GLOW-UP 308 · per-stat coverage, still-to-drop, per-book gaps ──────────
+   LANE NOTE. Completeness is a three-state ordinal (complete / partial /
+   absent) and a naive green-amber-red would mix two axes at once, which the
+   canonical mapping forbids. Resolved by giving each state the axis it actually
+   belongs to:
+     complete -> carries NO axis. It is a statement of fact with nothing to act
+                 on, so per the contract's own rule it stays NEUTRAL.
+     partial  -> axis 2 ATTENTION (--amber): caution that still permits action.
+                 You can lean on a partial stat, it is just a smaller field.
+     absent   -> axis 1 (--red), which the mapping explicitly assigns to "cannot
+                 be placed". A stat no book has posted cannot be placed, and no
+                 amount of re-fetching changes that.
+   No new lane. */
+.qa-stat-strip {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin-top: 5px;
+}
+.qa-stat {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 2px 7px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); cursor: help; white-space: nowrap;
+}
+.qa-stat b { font-weight: 800; letter-spacing: 0.04em; }
+.qa-stat i { font-style: normal; font-weight: 600; opacity: 0.85; }
+.qa-stat em { font-style: normal; font-size: 8px; opacity: 0.5; letter-spacing: 0.06em; }
+.qa-stat-ok      { color: var(--text2); }
+.qa-stat-partial { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 32%, transparent); }
+.qa-stat-none    { color: var(--red);   border-color: color-mix(in srgb, var(--red) 34%, transparent); }
+
+.qa-drop, .qa-bookgaps {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+}
+.qa-drop-label {
+  font-size: 8px; font-weight: 800; letter-spacing: 0.1em;
+  color: var(--text3); cursor: help;
+}
+.qa-drop-absent  { color: var(--red);   font-weight: 700; cursor: help; }
+.qa-drop-partial { color: var(--amber); font-weight: 700; cursor: help; }
+.qa-drop-none    { color: var(--green); font-weight: 700; cursor: help; }
+.qa-bookgap {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--bg3); border: 1px solid color-mix(in srgb, var(--red) 26%, transparent);
+  color: var(--text2); cursor: help; white-space: nowrap;
+}
+.qa-bookgap b { color: var(--red); font-weight: 800; }
 .qa-cov-strip {
   display: flex;
   flex-wrap: wrap;
