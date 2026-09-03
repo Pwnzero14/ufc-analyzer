@@ -9784,7 +9784,21 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
     if (!held || !held.length) return '';
     const other = held.filter(h => !(h.dir === dir && h.stat === src));
     if (!other.length) return '';
-    const opposed = other.filter(h => h.dir && h.dir !== dir);
+    // GLOW-UP 305 L6b — dedupe by dir+stat before labelling. The placed map key
+    // can carry a BOOK (`name|dir|source|book`, GLOW-UP 211b), so two legs on the
+    // same side of the same stat at two different books are two entries here and
+    // the label printed twice: Michael Page read
+    // "PLACED UNDER SS, UNDER SS" on the live 2026-09-03 board. The chip names
+    // WHICH SIDE you already hold, and that is one fact however many books it was
+    // spread across — the book breakdown belongs in the ledger, not this chip.
+    const seenLabel = new Set<string>();
+    const opposed = other.filter(h => {
+      if (!h.dir || h.dir === dir) return false;
+      const k = `${h.dir}|${h.stat}`;
+      if (seenLabel.has(k)) return false;
+      seenLabel.add(k);
+      return true;
+    });
     const label = (h: { dir: string; stat: string }) =>
       `${(h.dir || '').toUpperCase()} ${EFFECTIVE_LEAN_STAT_LABEL[h.stat] || h.stat.toUpperCase()}`;
     if (opposed.length) {
