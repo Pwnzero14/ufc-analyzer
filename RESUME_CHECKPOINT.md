@@ -1,9 +1,9 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-09-03 14:30:00 -04:00
+Last Saved: 2026-09-03 14:50:00 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 60a47da
+HEAD: fa8a19b
 
 ## Last Notes
 ################################################################################
@@ -215,6 +215,62 @@ LIVE NUMBERS, 3 legs (Peek SS + Keita FP + Donchenko FP):
   UD 6x       +118% EV, all-or-nothing, COMBINED ~36%
   PP Flex     +38%  EV, P(profit) ~82%  (3/3 2.25x 36% | 2/3 1.25x 45%)
 Same three legs, completely different bets. Only the first was visible before.
+
+
+################################################################################
+##  PRE-CARD DATA HYGIENE 2026-09-03 — ALL CLEAN, NOTHING OUTSTANDING          ##
+################################################################################
+
+*** THE ONE THAT MATTERED: SATURDAY'S LEGS ALL GRADE. ***
+  All 21 placed legs on the Hooker/Parnasse card resolve to archive rows they can
+  settle against. That was the question worth asking before the card and it is
+  answered. No action needed.
+
+SHIPPED: PropArchiveService.normalizeName now STRIPS DIACRITICS, completing the
+  set (analyzer normalizeName and background _baseNorm already did). This was the
+  one that mattered most because it feeds recordKey — row IDENTITY — so until now
+  'Fares Ziam' / 'Morgan Charriere' were SEPARATE identities from their plain
+  twins and updateResult could not reach them.
+  *** I had called this "a migration with a backup, not a one-liner". That was
+  OVER-CAUTIOUS and the measurement says so — retracted. *** recordKey was
+  recomputed under both normalizers across all 40,867 rows:
+      NEW collisions caused by stripping: 0  |  of those LOSSY: 0
+  Eleven of the twelve call sites are LOOKUPS, where finding more IS the fix;
+  only recordKey carried risk, and here it carried none.
+  PUNCTUATION still diverges deliberately (analyzer also drops . - '), is NOT
+  collision-tested, and the function comment says so. Re-measure before widening.
+
+AUDITED CLEAN, do not re-investigate without new evidence:
+  · Archive duplicates: 0 suspect groups, 0 extra rows across 40,867 rows. All
+    1,635 multi-row groups are per-book, which is correct by design.
+    Probe: snippets/2026-09-03_archive_dupes_readonly.js
+
+*** TWO OF MY OWN LEADS WERE FALSE POSITIVES. Written up so nobody re-chases. ***
+  1. "Ion Cutelaba duplicate archive row" — NOT a duplicate. Two `Fantasy` rows
+     for one fighter+event are NORMAL: the line archiver writes Fantasy WITH a
+     platform (the FP line), the heal writes Fantasy WITHOUT one (the result).
+     A table omitting the platform column makes them look identical.
+  2. "8 ungradeable placed legs (Orolbai x4, Su Mudaerji x4)" — NOT ungradeable.
+     All 8 carry outcome hit/miss with actuals, resolved 08-16 and 08-29. My
+     probe re-implemented the name matcher WITHOUT NAME_ALIASES, which already
+     carries entries for both fighters (added 08-30) — and a comment in
+     config/index.ts names these exact 8 legs.
+  BOTH are the same mistake: a probe simplifying production's matching, or a
+  table hiding the distinguishing column. See the corollary now recorded in
+  [[feedback_test_inherited_premises]] — check the OUTCOME directly rather than
+  re-deriving whether a match is possible, and grep the 49-entry alias map before
+  writing up any name bug.
+
+NOTED, NOT CHASED (no impact on Saturday, low value):
+  · UFC 330 still exists in the archive under TWO event strings
+    ('UFC 330: Makhachev vs. Machado Garry' 279 rows and 'UFC Fight Night: Ian
+    Machado Garry vs …' 117 rows) — the documented shadow-row pair. It has
+    already settled, so it is history, not risk. Same shape appears on the
+    Hernandez cards.
+  · This weekend's card is archived as 'UFC Fight Night: Dan Hooker vs Salahdine
+    Parnasse' while upcoming_ufc_card.event reads 'UFC Fight Night: Hooker vs.
+    Parnasse'. ONE spelling in the archive, so no shadow pair — but that is the
+    precondition shape, worth a glance if grading looks odd after the card.
 
 
 ################################################################################
