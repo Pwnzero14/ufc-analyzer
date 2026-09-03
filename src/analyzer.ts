@@ -7791,10 +7791,106 @@ async function renderQAPanel(): Promise<void> {
     const ageLabel = p.ageMin < 1 ? 'now' : p.ageMin < 60 ? `${p.ageMin}m` : `${Math.floor(p.ageMin / 60)}h`;
     const covTip = nonePosted
       ? `captured ${ageLabel} ago and returned NOTHING for this card — the book has not posted these props yet, so another fetch will not help.${p.manual ? ' Manual book: enter rows when it posts.' : ' Check the book itself before suspecting the scraper.'}`
-      : `captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''}`;
+      : `captured ${ageLabel} ago · ${covered}/${totalFighters} fighters with lines${p.manual ? ' · manual entry (no auto-scrape)' : ''}${isDk ? ' · DK partial coverage is normal' : ''} — NOTE this counts a fighter as covered if they have ANY of FP/SS/TD/FT, so it does NOT see R1 SS, CTRL or KD. The STILL TO DROP row below measures per stat.`;
     return `<span class="qa-cov qa-cov-${state}" title="${p.label}: ${covTip}"><b>${p.label}</b><span class="qa-cov-age">${ageLabel}</span><span class="qa-cov-n">${nonePosted ? 'none posted' : `${covered}/${totalFighters}`}</span>${covDelta(p.label)}</span>`;
   }).join('');
   const covStrip = `<div class="qa-cov-strip">${covChips}</div>`;
+  // ── GLOW-UP 308 L1 · the panel measured 4 of 7 stat types ─────────────────
+  // hasPlatformLine (above) returns true when a fighter has ANY of fp/ss/td/ft.
+  // So `P6 16/28` means "16 fighters have at least one of four stats" — and
+  // ss_r1, ctrl and kd were never measured ANYWHERE in this panel. That is why
+  // the strip could read 50% ready while the actual blocker was "R1 SS has not
+  // dropped at all", a sentence Slate Check had no way to say.
+  //
+  // Built from LINE_STAT_ACCESSORS rather than a hand-written book x stat list,
+  // so it cannot fall behind what the app actually reads — the same reason the
+  // stat-first regrouping below it is derived rather than duplicated. A book only
+  // gets a cell for a stat it is CAPABLE of posting (p6 has no ss_r1 and no kd),
+  // so an absent capability never renders as a missing line.
+  const STAT_ORDER: Array<[string, string]> = [
+    ['fp', 'FP'], ['ss', 'SS'], ['ss_r1', 'R1 SS'], ['td', 'TD'],
+    ['ft', 'FT'], ['ctrl', 'CTRL'], ['kd', 'KD'],
+  ];
+  const PLAT_LABEL: Record<string, string> = { p6: 'P6', ud: 'UD', pp: 'PP', betr: 'BT', dk: 'DK' };
+  // stat -> { plat -> covered count }, counting only books that captured at all.
+  const statCov = new Map<string, Map<string, number>>();
+  const statCapable = new Map<string, Set<string>>();
+  const capturedPlats = new Set(
+    platformInfo.filter(p => p.ageMin != null)
+      .map(p => p.key.replace('lines_', '').replace('draftkings_sportsbook', 'dk').replace('pick6', 'p6')
+        .replace('underdog', 'ud').replace('prizepicks', 'pp')));
+  for (const [plat, stat, getVal] of LINE_STAT_ACCESSORS) {
+    if (!statCapable.has(stat)) statCapable.set(stat, new Set());
+    statCapable.get(stat)!.add(plat);
+    if (!capturedPlats.has(plat)) continue;
+    const n = allFighters.filter(f => getVal(f) != null).length;
+    if (!statCov.has(stat)) statCov.set(stat, new Map());
+    statCov.get(stat)!.set(plat, n);
+  }
+  const statChips = STAT_ORDER.map(([stat, label]) => {
+    const per = statCov.get(stat);
+    const capable = statCapable.get(stat) || new Set<string>();
+    if (!per || !per.size) return '';
+    // Best single-book coverage, plus how many books have it at all. A stat is
+    // "in" when at least one book covers the whole card — that is the threshold
+    // at which it becomes usable for a lean, not when it merely exists somewhere.
+    let best = 0; const have: string[] = [];
+    for (const [plat, n] of per) { if (n > best) best = n; if (n > 0) have.push(PLAT_LABEL[plat] || plat); }
+    const cls = best >= totalFighters ? 'ok' : best > 0 ? 'partial' : 'none';
+    const detail = [...per.entries()].filter(([, n]) => n > 0)
+      .map(([plat, n]) => `${PLAT_LABEL[plat] || plat} ${n}/${totalFighters}`).join(' · ') || 'nothing posted';
+    const capableTxt = [...capable].map(pl => PLAT_LABEL[pl] || pl).join(', ');
+    return `<span class="qa-stat qa-stat-${cls}" title="${label}: ${detail}. Books that CAN post this stat: ${capableTxt}. A stat reads as complete only when at least one book covers all ${totalFighters} fighters — that is when it becomes usable for a lean, not merely when it exists somewhere. The per-book chips above count a fighter as covered if they have ANY of fp/ss/td/ft, so they cannot see this."><b>${label}</b><i>${best > 0 ? `${best}/${totalFighters}` : 'none'}</i>${have.length ? `<em>${have.join('')}</em>` : ''}</span>`;
+  }).filter(Boolean).join('');
+
+  // ── GLOW-UP 308 L2 · the question this panel is actually asked ────────────
+  // "Is it worth auditing yet?" Today that is answered by eyeballing five book
+  // chips and knowing which stats each book is supposed to carry. Stated
+  // directly instead: which stats have NOT landed on any book, and which are
+  // only partially in. Absent beats partial in the ordering, because a stat with
+  // nothing posted is the one that blocks, and a fetch cannot fix it.
+  const absent: string[] = [];
+  const partial: string[] = [];
+  for (const [stat, label] of STAT_ORDER) {
+    const per = statCov.get(stat);
+    if (!per || !per.size) continue;
+    const best = Math.max(0, ...per.values());
+    if (best === 0) absent.push(label);
+    else if (best < totalFighters) partial.push(`${label} ${best}/${totalFighters}`);
+  }
+  const dropLine = (absent.length || partial.length)
+    ? `<div class="qa-drop"><span class="qa-drop-label" title="What is still outstanding, by STAT rather than by book. Absent stats are listed first because nothing posted is what blocks an audit — and no amount of re-fetching produces a line the book has not published. Partial stats are usable but incomplete: a lean built on them is ranked against a smaller field.">STILL TO DROP</span>${
+        absent.length ? `<span class="qa-drop-absent" title="No book has posted these at all on this card.">✗ ${absent.join(' · ')}</span>` : ''
+      }${
+        partial.length ? `<span class="qa-drop-partial" title="Posted, but no single book covers the full card yet.">◑ ${partial.join(' · ')}</span>` : ''
+      }</div>`
+    : `<div class="qa-drop"><span class="qa-drop-label">STILL TO DROP</span><span class="qa-drop-none" title="Every stat any book is capable of posting covers the full card. Nothing is outstanding.">✓ nothing — all stats complete</span></div>`;
+
+  // ── GLOW-UP 308 L4 · per-book stat gaps, phrased the way the slate is read ─
+  // "DK is missing TD / SS / R1 SS" is how the outstanding work actually gets
+  // described out loud, and no chip could say it: the book chips count FIGHTERS,
+  // the stat chips count the best book per STAT, and neither crosses the two.
+  // Only books that captured are listed — a book with no store at all is a
+  // freshness matter and already has its own chip and its own directive.
+  const bookGaps: string[] = [];
+  for (const p of platformInfo) {
+    if (p.ageMin == null) continue;
+    const plat = p.key.replace('lines_', '').replace('draftkings_sportsbook', 'dk')
+      .replace('pick6', 'p6').replace('underdog', 'ud').replace('prizepicks', 'pp');
+    const missing: string[] = [];
+    for (const [stat, label] of STAT_ORDER) {
+      if (!(statCapable.get(stat) || new Set()).has(plat)) continue;   // not capable, not a gap
+      const n = statCov.get(stat)?.get(plat) ?? 0;
+      if (n === 0) missing.push(label);
+    }
+    if (missing.length) bookGaps.push(`<span class="qa-bookgap" title="${p.label} has captured, but has posted NOTHING for ${missing.join(', ')} on this card. These are stats ${p.label} IS capable of posting (per LINE_STAT_ACCESSORS), so their absence is the book not having published them yet — re-fetching cannot produce them."><b>${p.label}</b> missing ${missing.join(' · ')}</span>`);
+  }
+  const bookGapLine = bookGaps.length
+    ? `<div class="qa-bookgaps"><span class="qa-drop-label" title="Per book, which of ITS OWN capable stats have nothing posted yet.">BY BOOK</span>${bookGaps.join('')}</div>`
+    : '';
+
+  const statStrip = statChips ? `<div class="qa-stat-strip">${statChips}</div>${dropLine}${bookGapLine}` : '';
+
 
   const manualBetr = manualPayload[STORAGE_BETR_MANUAL_KEY];
   const manualRowCount = manualBetr?.fighters?.length || 0;
@@ -7997,7 +8093,12 @@ async function renderQAPanel(): Promise<void> {
     : betrBlocker
     ? nextRow(`Enter the ${totalFighters - manualRowCount} missing Betr row${totalFighters - manualRowCount === 1 ? '' : 's'} — or ACK if they can't be entered yet`, `<button class="qa-fix" data-fix="betr">✎ BETR</button>`)
     : missingWarns.length
-    ? nextRow(`Wait for props to post — or acknowledge the ${missingWarns.length} known gap${missingWarns.length === 1 ? '' : 's'} to clear the slate`, `<button class="qa-ack-all" title="Acknowledge all known coverage gaps for this event">✓ ACK ALL</button>`)
+    // GLOW-UP 308 L5 — name WHAT is outstanding. "Wait for props to post" is
+    // correct and useless: it does not say which props, so the only way to know
+    // whether the wait is nearly over was to read five chips and know each book's
+    // stat capability by heart. Absent stats are named because they are what
+    // actually blocks; the gap COUNT stays for the ACK ALL affordance it belongs to.
+    ? nextRow(`Wait for props to post${absent.length ? ` — still absent: <b>${absent.join(', ')}</b>` : ''} — or acknowledge the ${missingWarns.length} known gap${missingWarns.length === 1 ? '' : 's'} to clear the slate`, `<button class="qa-ack-all" title="Acknowledge all known coverage gaps for this event">✓ ACK ALL</button>`)
     : agingWarn
     ? nextRow(fightDay ? 'Fight day — refresh lines before entering' : 'Lines aging — refresh when convenient', `<button class="qa-fix" data-fix="fetch">⚡ FETCH</button>`)
     : `<div class="qa-next qa-next-ok"><span class="qa-next-label">NEXT</span><span class="qa-next-text">Slate ready — build your entries from Best Picks</span></div>`;
@@ -8034,7 +8135,7 @@ async function renderQAPanel(): Promise<void> {
           <button class="qa-go-btn" data-goview="parlaylab" title="Open Parlay Lab">🔗 Parlay Lab →</button>
         </div>
       </div>
-      <div class="qa-go-sub">${covStrip}${ackedHtml}</div>
+      <div class="qa-go-sub">${covStrip}${statStrip}${ackedHtml}</div>
     `;
   } else {
     panel.innerHTML = `
@@ -8047,6 +8148,7 @@ async function renderQAPanel(): Promise<void> {
     ${readinessBar}
     ${nextHtml}
     ${covStrip}
+    ${statStrip}
     ${chipsHtml}
     ${issuesHtml}${ackedHtml}
   `;
