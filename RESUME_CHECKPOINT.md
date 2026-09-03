@@ -1,9 +1,9 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-09-03 13:35:00 -04:00
+Last Saved: 2026-09-03 14:30:00 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: 524bb81
+HEAD: 60a47da
 
 ## Last Notes
 ################################################################################
@@ -169,6 +169,53 @@ rebuilt: the 🏪 badge already reads "best of 4 · 1.0".
 STILL UNEXERCISED ON LIVE DATA: the ⏱ age chip only. Correctly so — the stores
 were 49 MINUTES old against a 12h floor. It fires the first time a board goes
 stale overnight.
+
+################################################################################
+##  ALSO SHIPPED 2026-09-03 — GLOW-UP 307, PARLAY LAB (ff16e37 + 60a47da)     ##
+################################################################################
+VERIFIED ON THE LIVE BOARD.
+
+THE GAP: analyzeSlipLegs computed `byHits` (probability of EXACTLY k legs
+hitting), priced every EV number from it, then did not return it. So the UI could
+only ever describe the ALL-HIT case. Fine for UD and PP Power, which are
+single-tier. Badly wrong for PP Flex, where a 5-leg pays 10x / 2x / 0.4x at
+5 / 4 / 3 hits: most of the EV lives in tiers the deck never mentioned, and the
+0.4x tier PAYS while losing 60% of stake.
+
+  L3 plumbing FIRST — byHits, ladder, P(profit), break-even and a paying-tier
+     count returned, so ladder / tiles / EV all read ONE distribution.
+  L1 payout ladder: hits, multiplier, probability, green if it beats the stake,
+     RED if it pays and still loses.
+  L2 break-even marker + explicit "need N/M to profit".
+  L5 P(profit) — every tier above 1.0x summed. NOT the all-hit number.
+  L4 EV DRAG chip.
+
+*** L4 IS A DIFFERENT QUESTION FROM WEAKEST — keep them straight. *** WEAKEST
+names the lowest-CONFIDENCE leg. DRAG re-prices the slip WITHOUT each leg and
+names whichever removal RAISES EV most. A confident leg correlated with one
+already on the slip can cost more than a weak independent one, because
+correlation is priced into the joint distribution and never shows in a leg's own
+confidence number. Silent when it would only repeat WEAKEST.
+
+*** THE DESIGN BUG THIS ALMOST SHIPPED WITH, and how it was caught. ***
+L1 first tied the ladder to evRows[0]. On a real 3-leg slip UD 6x (single tier)
+and PP Flex BOTH priced -20%, UD sorted first, and NOTHING rendered — the one
+book with partial tiers was suppressed exactly where it mattered. The math was
+correct and a unit test would have passed; the feature was simply UNREACHABLE.
+Only looking at a real slip found it, and the harness could not have (its Best
+Picks renders empty on the current backup).
+Now: highest-EV book that ACTUALLY has >1 paying tier, labelled with that book's
+name AND its own EV when it is not the starred row. P(profit) moved out of the
+deck into the ladder for the same reason — it is per-book, and the deck's BEST
+BOOK tile can now name a different book.
+GENERALISE: unit tests settle "is this number right"; only a real screenshot
+settles "can anyone actually see it".
+
+LIVE NUMBERS, 3 legs (Peek SS + Keita FP + Donchenko FP):
+  UD 6x       +118% EV, all-or-nothing, COMBINED ~36%
+  PP Flex     +38%  EV, P(profit) ~82%  (3/3 2.25x 36% | 2/3 1.25x 45%)
+Same three legs, completely different bets. Only the first was visible before.
+
 
 ################################################################################
 ##  TRAPS RE-CONFIRMED THIS SESSION                                            ##
