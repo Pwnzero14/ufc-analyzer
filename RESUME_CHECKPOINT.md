@@ -103,26 +103,56 @@ UFC Paris (Hooker vs. Parnasse) fights SATURDAY 2026-09-05.
    price".
 
 ################################################################################
-##  IN FLIGHT — GLOW-UP 306, the L6-L10 follow-ons the user asked to continue  ##
+##  ALSO SHIPPED 2026-09-03 — GLOW-UP 306 A/B/C                               ##
 ################################################################################
-Two items from the original ten were skipped as low-value and the user has now
-asked to continue past L10. Candidates, in the order they were justified:
+All three verified on the LIVE board, not just the harness.
 
-  A. TOP PICK carrying caveats. On the 09-03 board the #1 over is Mario Pinto
-     at EV +18% with Δ −21.5, "⚠ PROJ SAYS UNDER 21.5", AND an assumed price.
-     Three compounding caveats on the row that anchors the whole board, and the
-     ★ TOP PICK badge does not know. `caveats` (0-3) is already computed in
-     bpViewMetric and is only used as a FILTER — never rendered per row.
-  B. Row-height raggedness. Measured 95-118px on the 8-pick board; re-measure on
-     the 11-pick board before deciding it is worth touching.
-  C. Book-disagreement spread — ALREADY DONE, the 🏪 chip reads "best of 4 · 1.0".
-     Do not rebuild it.
+306A QUALIFIED TOP PICK. The badge marks rank #1 under the CURRENT sort, and
+   MODEL sort is score + demotions — not edge, price quality or caveat count. So
+   the row acted on first can be the worst in its column wearing an unqualified
+   endorsement. Live: Mario Pinto renders "TOP PICK ⚠3" (projection conflict +
+   negative edge + assumed price). `caveats` was deliberately NOT widened —
+   CLEAN / FLAGGED / 2+ CAVEATS all read that number and changing it would
+   silently rewrite a board read every card.
+   Signalled by GLYPH + BORDER STYLE, never colour: --gold and --amber are the
+   SAME hex #f8c64a. Verified in the stylesheet, not assumed.
 
-*** TO WORK ON THIS THE HARNESS NEEDS A FRESH BACKUP. *** dev/preview-server.js
-globs ~/Downloads for the newest `ufc-storage-backup-*.json` (HYPHENS — a file
-named with underscores is invisible to it, which bit this session), and the
-newest one predates the Betr fantasy drop, so the harness renders the OLD 8-pick
-board. Hit 💾 Backup in the extension and the preview upgrades automatically.
+306B EXTREME-EDGE GUARD (⚠ CHECK LINE). The column header has flagged a
+   stretched average delta since GLOW-UP 199 L5; the ROW never got the check.
+   Threshold |edge|/line >= 0.35, measured against the LINE because FP lines run
+   ~90 and SS ~35. Live verification: 11/11 rows agree, exactly one flagged
+   (Keita 0.67); Pinto at 0.23 correctly does not. WARNS, never suppresses.
+
+306C THIN-SAMPLE MARK (⌀ n=N). Following 306B to its cause rather than stopping
+   at the flag: Keita's entire UFCStats record is ONE fight — a split-decision
+   loss, 900s, 52 sig strikes. The LINE was never the outlier (Betr FP lines
+   cluster 89-95 card-wide, so combo-prop and stat-scale are both ruled out);
+   his AVERAGE is. And FP being finish-and-win weighted, 28.8 is depressed by
+   the missing win bonus — the number describes the RESULT, not the fighter.
+   VERIFIED ASYMMETRY, read from source: calcSSLean / calcSSR1Lean / calcTDLean
+   / calcCTRLLean all `return null` below 3 fights; calcFTLean falls back to an
+   explicitly-labelled MARKET-ONLY lean; FP alone emits an ordinary, unlabelled
+   pick. FP confidence IS damped (sampleSizeFactor (n-3)/10, x0.64 at n=1) but
+   never refused and never marked.
+   NOT suppressed, deliberately — dropping FP picks could remove real edges, and
+   calcFTLean sets the repo's precedent: emit it, but say so. Live: Keita ⌀ n=1,
+   and Benouaich picks it up on FT's market-only path, which is exactly the two
+   cases predicted and no others.
+
+*** OPEN, AND IT IS THE USER'S CALL, NOT MINE: should the FP engine emit a lean
+    at all at n=1, or fall back to a market-only form the way calcFTLean does?
+    That is a MODEL change with real downside either way and should be measured
+    against the archive before anyone argues it. ***
+
+NOT DONE, deliberately, so it is not re-proposed: row-height normalisation.
+Measured 93-116px, a 23px spread that is entirely content-driven (two-line
+reasons + factor rails). GLOW-UP 198 L5 already settled this trade-off for this
+repo — "visibility beats layout tidiness". Book-disagreement spread was also NOT
+rebuilt: the 🏪 badge already reads "best of 4 · 1.0".
+
+STILL UNEXERCISED ON LIVE DATA: the ⏱ age chip only. Correctly so — the stores
+were 49 MINUTES old against a 12h floor. It fires the first time a board goes
+stale overnight.
 
 ################################################################################
 ##  TRAPS RE-CONFIRMED THIS SESSION                                            ##
