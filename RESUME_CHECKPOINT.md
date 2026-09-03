@@ -11,43 +11,76 @@ HEAD: 09ab93c
 ################################################################################
 
 ################################################################################
-##  FIRST TASK NEXT SESSION (user's instruction, 2026-09-02):                  ##
-##  WHY DIDN'T CHARRIERE HEAL?                                                 ##
+##  CLOSED 2026-09-03: "WHY DIDN'T CHARRIERE HEAL?"  -> HE DID. NO BUG.        ##
 ################################################################################
-Morgan Charriere is on the CURRENT Paris roster and STILL carries a stale
-archive Fantasy row (UFC FN: Edwards vs. Brady, rev 1, stored 5 too low).
-He should have been rewritten on any board load since, because:
-  archivePerformanceForRosterFighter runs on EVERY fetch for a roster fighter
-  (including a cache HIT - it is called off fetchFromUFCStats regardless), and
-  PropArchiveService.updateResult overwrites unconditionally: row.result = ...
-So the heal either is not firing for him, or it fires and finds no row to write.
-*** THIS IS A QUESTION ABOUT THE HEAL PATH, NOT THE PARSE. The parse is settled:
-the live page reads Rev correctly, the cache is right, the archive is stale. ***
+DO NOT RE-OPEN. The premise was wrong, and it had been carried as fact for two
+sessions without ever being tested directly. That is the lesson worth keeping.
 
-CONCRETE FIRST MOVES - check in this order, they get cheaper to rule out:
- 1. Is he actually in rosterNameSet()? archivePerformanceForRosterFighter
-    early-returns on `if (!roster.has(fighterNorm.toLowerCase())) return;`
-    Roster spelling vs normalizeName(name) is exactly the kind of thing that has
-    bitten this repo before ([[project_mononym_validator_ate_aliased_names]]).
- 2. Does his ufcstats cache fightHistory actually contain that event? The loop
-    only writes rows for events present in the cache.
- 3. Does updateResult FIND a candidate? It filters on fighter + propType FIRST
-    (any event) and returns false when `!candidates.length` - silently. Then it
-    narrows by normalizeEvent. A normalizeEvent mismatch between the archive row
-    and cache `fight.event` would make it a silent no-op.
- 4. Only then consider ordering/timing.
+Charriere is NOT stale. All three of his rev=1 fights already include the
+reversal:
+    Edwards vs. Brady        33.32
+    Moicano vs. Saint Denis 108.36
+    Allen vs. Curtis 2       46.46
+The join is exact (evLoose identical both sides, normalizeEvent true, date delta
+0), so the detector DID evaluate his row on both probe runs and flagged nothing.
+archivePerformanceForRosterFighter works.
 
-DO NOT re-open the parse hypotheses. Four are dead and written up below:
-fighter-page-vs-detail, trailing-range loss, opponent-cell fallback, and the
-settle-vs-backfill writer. All four were killed by data, not argument.
+The 28 remaining stale-by-5xrev rows all belong to fighters NOT on the current
+roster. The heal only touches the current card, so they cannot heal and will
+correct at each fighter's next appearance. That is expected background, not a
+bug - do not count it as one again.
 
-TIMING NOTE, NOT AN OVERRIDE: if this session IS Friday and the full props have
-landed, the BEST PICKS AUDIT is boxed to a card that fights Saturday and the
-Charriere question is not. The user asked for Charriere first; do that, but do
-not let it eat the audit window. The archive row has been stale for months and
-will keep.
+FOUR HYPOTHESES KILLED 2026-09-03, all by data, none by argument:
+ 1. Diacritic normalizer split as the CAUSE of staleness.
+    G3 SILENT FALSE 0 / would hit 29 - updateResult finds the row every time.
+    The reasoning error: argued from "the line archiver stores raw platform
+    names" to "his stale row must be accented" without checking that the line
+    archiver wrote that row. It did not. His history rows are all plain.
+ 2. Storage over quota (silent write failure).
+    unlimitedStorage is ALREADY in the manifest. The 10485760 ceiling came from
+    a constant hardcoded into the probe itself, not from Chrome. A 7MB
+    round-trip write landed clean: 10.96MB -> 18.3MB, read back intact, no
+    lastError. Storage sitting above 10MB is FINE. Do not "reclaim space".
+ 3. Event-join mismatch for Charriere. evLoose identical on both sides.
+ 4. (from 09-02) the four parse hypotheses - still dead.
+
+PROBE BUG worth remembering: the roster reconstruction read v.lines / a bare
+array, but the line stores are shaped { fighters: [...] } (STORAGE_LINE_KEYS
+analyzer.ts:1122, background.ts:145). rosterSet came back EMPTY and every row
+reported "G1 NO", which reads exactly like a finding. Only the stated caveat
+stopped it becoming one. STATE THE LIMITS OF A PROBE IN THE PROBE.
+
+WHAT THE SWEEP DID FIND, AND IT IS SHIPPED (714c9f1 / 0682437):
+  Platforms disagree on accents for the SAME fighter. On this Paris card Betr
+  posted "Morgan Charriere" ACCENTED while pick6/underdog/prizepicks posted it
+  plain, and background's line archiver stores f.name RAW. _baseNorm - which
+  every settle-path name comparison runs through - did not strip diacritics, so
+  applyResult could never match the accented row against UFCStats' plain
+  spelling: result-less forever, and any leg placed on it ungradeable.
+  Fixed by stripping diacritics in _baseNorm (background.ts:761). Verified on
+  the BUILT artifact, not by grepping dist: Charriere / Ziam / Prochazka each
+  unify with their plain twin, negative control confirms distinct fighters do
+  not collide. tsc clean, guard invariants OK, dist rebuilt and committed.
+
+  *** RELOAD THE EXTENSION (chrome://extensions, the arrow-circle button) or the
+      shipped dist will not be running. NEVER "Remove" - that wipes storage. ***
+
+STILL OPEN, deliberately not done:
+  PropArchiveService.normalizeName does NOT strip diacritics either, and it
+  feeds recordKey - so stripping there changes row IDENTITY and can merge or
+  split existing rows. That is a migration with a backup first, not a one-liner.
+  Until it is done, 'Fares Ziam' and 'Morgan Charriere' each still exist in the
+  archive under BOTH spellings as separate row identities. Settle now grades
+  both; only dedup is outstanding.
+  Also seen: Ion Cutelaba appears TWICE with identical event/value - a duplicate
+  archive row ([[project_duplicate_event_shadow_rows]] territory). Unexamined.
+
+A FULL STORAGE BACKUP was downloaded 2026-09-03 before any of this
+(ufc_storage_backup_*.json). Nothing was deleted; the deletion plan that
+preceded it was built on the bogus quota number and was abandoned.
 
 ################################################################################
+
 
 RESUMING FRIDAY 2026-09-04/05. UFC Paris (Hooker vs. Parnasse) is Saturday.
 Everything from the 09-01 session is SHIPPED, PUSHED and VERIFIED - nothing is
