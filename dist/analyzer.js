@@ -6987,12 +6987,12 @@ function computeDetailedEV(f, el) {
         // Real odds available — compute vig from both sides if possible
         const vig = computeVig(isOver ? leanOdds : oppOdds, isOver ? oppOdds : leanOdds);
         const ev = Math.round((winProb * profit - (1 - winProb)) * 100);
-        return { ev, isAssumedVig: false, vig, profit, prob: winProb, recalibrated };
+        return { ev, isAssumedVig: false, vig, profit, prob: winProb, recalibrated, leanOdds };
     }
     // No real odds — use assumed -110 standard vig (breakeven 52.38%)
     const ASSUMED_PROFIT = 100 / 110; // 0.909
     const ev = Math.round((winProb * ASSUMED_PROFIT - (1 - winProb)) * 100);
-    return { ev, isAssumedVig: true, vig: null, profit: ASSUMED_PROFIT, prob: winProb, recalibrated };
+    return { ev, isAssumedVig: true, vig: null, profit: ASSUMED_PROFIT, prob: winProb, recalibrated, leanOdds: null };
 }
 function computePerBookEV(f, el) {
     if (el.lean !== 'over' && el.lean !== 'under')
@@ -9367,10 +9367,17 @@ function renderBestPicks(container, renderSeq = 0) {
             const edge = (proj != null && line != null)
                 ? parseFloat((el.lean === 'under' ? line - proj : proj - line).toFixed(1))
                 : null;
+            const resolvedBook = book ?? getSourceActivePlatformKey(f, el._source) ?? null;
             return {
                 src: el._source || 'fp', ev, conf: Number(el.conf) || 0,
-                book: book ?? getSourceActivePlatformKey(f, el._source) ?? null,
+                book: resolvedBook,
                 line, projConflict, needsRounds, clean, caveats, proj, edge,
+                assumedVig: evd ? evd.isAssumedVig : false,
+                recalibrated: evd ? evd.recalibrated : false,
+                vig: evd ? evd.vig : null,
+                leanOdds: evd ? evd.leanOdds : null,
+                vintage: pickLineVintage(f.name, resolvedBook, el._source, line, el.lean),
+                ageH: bookAgeHours(resolvedBook),
             };
         };
         const overMetrics = new Map(overs.map(f => [f.name, bpViewMetric(f, 'over')]));
@@ -9847,6 +9854,63 @@ function renderBestPicks(container, renderSeq = 0) {
                 const bpEdge = (bpProj != null && line != null)
                     ? parseFloat((el.lean === 'under' ? line - bpProj : bpProj - line).toFixed(1))
                     : null;
+                // ── GLOW-UP 305 L1 · line vintage ──────────────────────────────────────
+                // Where this number came from. `gain` is signed so positive always means the
+                // move went YOUR way (see pickLineVintage — mechanical price effect, not a
+                // market-agreement read). Rendered only when the move clears the stat's own
+                // half-step, because a 0.5 wobble on an SS line is noise and a chip that
+                // fires on noise stops being read.
+                //
+                // GLYPH vs COLOUR, and the mistake worth not repeating: the arrow was first
+                // keyed to FAVOURABILITY, which rendered `↗ 38.5→36.5` — an up-arrow beside
+                // numbers that visibly go down. Two direction signals in one chip,
+                // contradicting each other on screen. The arrow now states what the LINE
+                // did, which the reader can check against the numbers printed beside it,
+                // and colour ALONE carries whether that helped you (green) or hurt (red).
+                const bpVin = pickLineVintage(f.name, clipBook, el._source, line, el.lean);
+                const VIN_MIN = { fp: 1.0, ss: 1.0, ss_r1: 0.5, td: 0.5, ft: 0.5, ctrl: 0.5, kd: 0.5 };
+                const vinMin = VIN_MIN[el._source || 'fp'] ?? 0.5;
+                const vintageChip = (bpVin && Math.abs(bpVin.delta) >= vinMin)
+                    ? `<span class="bp-vintage ${bpVin.gain > 0 ? 'pos' : 'neg'}" title="Opened ${bpVin.open}, now ${line} — moved ${Math.abs(bpVin.delta).toFixed(1)} ${bpVin.delta > 0 ? 'up' : 'down'}, which makes this ${(el.lean || '').toUpperCase()} ${bpVin.gain > 0 ? 'CHEAPER than it opened — you are getting a better number than the market first offered' : 'MORE EXPENSIVE than it opened — the move has already gone, and you are paying up for it'}. This is the mechanical price effect only; whether the money moving that way AGREES with you is what the RLM tag answers, and the two can legitimately disagree.">${bpVin.delta > 0 ? '↑' : '↓'} <b>${bpVin.open}</b>→${line}</span>`
+                    : '';
+                // ── GLOW-UP 305 L2 · the price EV was actually computed from ───────────
+                // A `~` was the only mark separating an EV priced off a real posted number
+                // from one priced off an assumed -110, and it sat on the EV value where it
+                // read as decoration. Naming the price makes the weaker claim legible AS a
+                // weaker claim: `@ -118` is a measurement, `assumed -110` is a placeholder.
+                // Price formatting has TWO formats to serve and they are not interchangeable.
+                // oddsToProfit accepts either American odds (|x| >= 100) or a raw payout
+                // MULTIPLIER (0.78x, 1.34x — what Underdog and some DK props post), so
+                // stamping a '+' on everything renders a 0.78x multiplier as '+0.78',
+                // which reads as American odds of plus-nothing. Format by the same
+                // threshold oddsToProfit branches on, so the chip can never disagree with
+                // the number the EV was actually computed from.
+                const fmtOdds = (o) => Math.abs(o) >= 100 ? `${o > 0 ? '+' : ''}${Math.round(o)}` : `${o.toFixed(2)}×`;
+                // computeVig ALREADY returns percentage points ("4.5 means 4.5% juice"),
+                // so this must NOT be multiplied by 100 — doing so rendered a 1.4% vig as
+                // 140.0%. Same class of unit error as the ctrl seconds-vs-minutes bug.
+                //
+                // A vig of <= 0 is not a tight market, it is the symmetric-multiplier
+                // artifact: [[project_underdog_api_quirks]] — UD returns mirrored
+                // multipliers even where the app is one-sided, which makes the two implied
+                // probabilities sum to exactly 1. Printing "0.0%" would dress that artifact
+                // up as a measured overround, so it is suppressed instead.
+                const vigTxt = (evd && evd.vig != null && evd.vig > 0) ? `${evd.vig.toFixed(1)}%` : '';
+                const priceChip = evd
+                    ? (evd.isAssumedVig
+                        ? `<span class="bp-price assumed" title="No posted odds for this side, so EV is computed against a standard -110 (52.4% breakeven). This is a PLACEHOLDER, not this book's price — the true number could be materially better or worse, and the EV moves with it. Treat the EV as an estimate of shape, not size.">≈ -110</span>`
+                        : `<span class="bp-price real" title="EV priced from the book's own posted number for this side (${evd.leanOdds != null ? fmtOdds(evd.leanOdds) : 'unknown'})${vigTxt ? ` — two-way vig ${vigTxt}` : ', and the two sides imply exactly 100% so no vig can be measured — pick-em books post mirrored multipliers, which is an artifact of the feed rather than a juice-free market'}. This is a real posted price, not the assumed-vig fallback.">@ ${evd.leanOdds != null ? fmtOdds(evd.leanOdds) : '?'}${vigTxt ? `<i class="bp-vig">${vigTxt}</i>` : ''}</span>`)
+                    : '';
+                // ── GLOW-UP 305 L5 · which book's clock this line is on ────────────────
+                // The masthead age is a slate-wide worst case. Per pick it matters which
+                // book: a 2h PrizePicks line and a 49h Betr line are different claims about
+                // whether the number is still live. Only shown past 12h so fresh boards stay
+                // quiet, and Betr is excluded — it is hand-entered, so its age measures when
+                // the user last typed, not staleness.
+                const bpAgeH = bookAgeHours(clipBook);
+                const ageChip = (bpAgeH != null && bpAgeH >= 12 && clipBook !== 'betr')
+                    ? `<span class="bp-age ${bpAgeH >= 36 ? 'stale' : 'aging'}" title="${BOOK_NAME[clipBook] || clipBook} last posted ${bpAgeH < 48 ? `${Math.round(bpAgeH)}h` : `${(bpAgeH / 24).toFixed(1)}d`} ago. The line shown is that snapshot, not necessarily what is on the board right now — re-fetch before entering if this matters.">⏱ ${bpAgeH < 48 ? `${Math.round(bpAgeH)}h` : `${(bpAgeH / 24).toFixed(1)}d`}</span>`
+                    : '';
                 const edgeChip = (bpEdge != null && bpProj != null)
                     ? `<span class="bp-edge ${bpEdge > 0 ? 'pos' : bpEdge < 0 ? 'neg' : 'flat'}" title="Model projection ${bpProj.toFixed(1)} vs the ${line} line you'd enter — a ${Math.abs(bpEdge).toFixed(1)} gap on the ${bpEdge >= 0 ? (el.lean || '').toUpperCase() : 'opposite'} side. This is how far the model disagrees with the book: a bigger gap is a bigger claimed edge, and also the place the model is furthest from the market.">Δ <b>${bpEdge > 0 ? '+' : ''}${bpEdge.toFixed(1)}</b></span>`
                     : '';
@@ -9857,14 +9921,14 @@ function renderBestPicks(container, renderSeq = 0) {
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>
-          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${onlyBookTag}${placedTag}${youTag}
+          <span class="best-pick-platform plat-${displayPlatform ?? getSourceActivePlatformKey(f, el._source) ?? 'none'}">${formatSourcePlatformLabel(f, el._source, displayPlatform)}</span>${edgeChip}${vintageChip}${priceChip}${ageChip}${onlyBookTag}${placedTag}${youTag}
         </div>
         <div class="best-pick-line-wrap">
           ${evd ? `<div class="bp-hero-stats${i === 0 ? '' : ' bp-row-stats'}">
             <div class="best-pick-line">${line || '—'}</div>
             <div class="bp-hero-side">
               <div class="bp-hs" title="Calibrated win probability for this pick — the number EV is priced from"><span class="bp-hs-label">WIN</span><b class="bp-hs-val">${Math.round(evd.prob * 100)}%</b></div>
-              <div class="bp-hs" title="EV from ${Math.round(evd.prob * 100)}% win prob${evd.recalibrated ? ' (recalibrated ↻)' : ''} · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}"><span class="bp-hs-label">EV</span><b class="bp-hs-val ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}">${evd.isAssumedVig ? '~' : ''}${evd.ev > 0 ? '+' : ''}${evd.ev}%</b></div>
+              <div class="bp-hs" title="EV from ${Math.round(evd.prob * 100)}% win prob${evd.recalibrated ? ' (recalibrated ↻)' : ''} · ${evd.isAssumedVig ? 'assumed -110 vig' : 'actual odds'}"><span class="bp-hs-label">EV${evd.recalibrated && Math.abs(Math.round(evd.prob * 100) - (Number(el.conf) || 0)) >= 2 ? '<i class="bp-recal" title="The win probability this EV is priced from was moved ${Math.abs(Math.round(evd.prob * 100) - (Number(el.conf) || 0))} points off the model&#39;s raw ${Number(el.conf) || 0}% — by the CLV boost and then the recalibration engine, which corrects each source-type and confidence bucket against its realized hit rate. Shown only when that adjustment is 2+ points: the engine touches essentially every row, so a mark that fired on all of them would be decoration rather than signal.">&#8635;</i>' : ''}</span><b class="bp-hs-val ${evd.ev > 0 ? 'pos' : evd.ev < 0 ? 'neg' : ''}">${evd.isAssumedVig ? '~' : ''}${evd.ev > 0 ? '+' : ''}${evd.ev}%</b></div>
             </div>
           </div>` : `<div class="best-pick-line">${line || '—'}</div>`}
           ${el.conf ? `<div class="best-pick-conf ${tier.label.toLowerCase()}" title="Model confidence: ${el.conf}%"><i style="width:${Math.min(100, Math.max(8, Number(el.conf) || 0))}%"></i></div>` : ''}
@@ -13302,6 +13366,71 @@ const LINE_HISTORY_MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48h
 let _lineHistory = { eventKey: '', updatedAt: 0, series: {} };
 function openingLineKey(platform, stat, name) {
     return `${platform}|${stat}|${name.toLowerCase().trim()}`;
+}
+// ── GLOW-UP 305 L1 · the board you bet from was line-vintage blind ──────────
+// `_openingLines` is maintained by a dedicated writer (GLOW-UP 210), survives
+// reloads, and powers the whole Line Movers surface — and Best Picks referenced
+// it ZERO times. Measured on the 2026-09-03 board: lines 49h old, header
+// reporting `max Δ5.0`. So a row could show `PrizePicks 23.5` with no way to
+// tell whether 23.5 was the opening number or the end of a three-point slide,
+// which is the difference between catching a move and arriving after it.
+//
+// Module scope on purpose: the row, the metric object and any later consumer
+// must derive vintage from ONE function or they will eventually disagree — the
+// same reason pickDistinctFactors and memoryTagsForFighter were hoisted.
+const OPEN_PLAT_TOKEN = {
+    pick6: 'p6', underdog: 'ud', prizepicks: 'pp', betr: 'betr', draftkings_sportsbook: 'dk',
+};
+/**
+ * Open→current movement for one pick's OWN book and stat.
+ *
+ * `gain` follows GLOW-UP 201 L2's convention exactly, and deliberately: it
+ * reports what the move did to the PRICE of the side you lean — a rising line
+ * makes an UNDER easier — NOT whether the market agrees with you. That is purely
+ * mechanical, so it cannot be wrong. The market-psychology read is what the
+ * existing RLM tag covers, and the two legitimately point opposite ways on the
+ * same row. Do not "fix" one to match the other.
+ *
+ * Returns null rather than a zero when there is no baseline, no current line, or
+ * the delta exceeds the stat's plausibility cap — an unmeasurable move must not
+ * render as "didn't move". Same distinction the RLM chip draws with `n/a`.
+ */
+function pickLineVintage(name, book, stat, current, lean) {
+    if (!book || !stat || current == null || !Number.isFinite(current))
+        return null;
+    const token = OPEN_PLAT_TOKEN[book];
+    if (!token)
+        return null;
+    const open = _openingLines.get(openingLineKey(token, stat, name));
+    if (open == null || !Number.isFinite(open))
+        return null;
+    if (!isPlausibleBaseline(stat, open))
+        return null;
+    const delta = sanitizeDelta(stat, current - open);
+    if (delta == null)
+        return null;
+    return { open, delta, gain: lean === 'under' ? delta : -delta, stat };
+}
+// ── GLOW-UP 305 L5 · per-pick line age ─────────────────────────────────────
+// The masthead already knows the slate is "51.1h old", but that is a slate-wide
+// worst case: on a mixed board one book can be minutes fresh while another is two
+// days stale, and the pick rows never said which one they were quoting. Populated
+// in loadData from the same `capturedAt` the QA panel reads, so the two surfaces
+// cannot drift.
+const _bookCapturedAt = new Map();
+const BOOK_STORE_KEY = {
+    pick6: 'lines_pick6', underdog: 'lines_underdog', betr: 'lines_betr',
+    prizepicks: 'lines_prizepicks', draftkings_sportsbook: 'lines_draftkings_sportsbook',
+};
+/** Age in hours of the store this pick's line came from, or null if unknown. */
+function bookAgeHours(book) {
+    if (!book)
+        return null;
+    const ts = _bookCapturedAt.get(book);
+    if (!ts)
+        return null;
+    const h = (Date.now() - ts) / 3600000;
+    return Number.isFinite(h) && h >= 0 ? h : null;
 }
 // Maximum plausible line movement per stat type. Anything beyond this is a
 // stale/corrupt baseline and should be discarded rather than displayed.
@@ -25237,6 +25366,24 @@ async function loadData() {
             // mutation below), so the periodic heartbeat — which reads raw storage —
             // compares apples to apples.
             const loadedSig = lineDataSigFromResult(result);
+            // GLOW-UP 305 L5 — per-book capture times for the Best Picks staleness chip.
+            // Read from the SAME raw payloads the signature above uses, before the betr
+            // manual-override mutation, so a hand-entered Betr board does not read as
+            // "49h stale" off lines_betr.capturedAt (the trap GLOW-UP 226 documents).
+            _bookCapturedAt.clear();
+            for (const bk of Object.keys(BOOK_STORE_KEY)) {
+                const payload = result[BOOK_STORE_KEY[bk]];
+                const ts = Number(payload?.capturedAt);
+                if (Number.isFinite(ts) && ts > 0)
+                    _bookCapturedAt.set(bk, ts);
+            }
+            {
+                const manualBetr = result[STORAGE_BETR_MANUAL_KEY];
+                const mts = Number(manualBetr?.capturedAt);
+                if (Array.isArray(manualBetr?.fighters) && manualBetr.fighters.length && Number.isFinite(mts) && mts > 0) {
+                    _bookCapturedAt.set('betr', Math.max(mts, _bookCapturedAt.get('betr') || 0));
+                }
+            }
             const rawOdds = result[STORAGE_ODDS_KEY];
             dkCountryByName = result['fighter_countries_dk_v1'] || {};
             dkTrueProbByName = result['fight_trueprob_dk_v1'] || {};
