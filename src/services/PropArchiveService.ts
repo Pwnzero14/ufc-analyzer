@@ -3,10 +3,32 @@ import type { PropArchiveRecord, PropType } from '../types/index.js';
 const ARCHIVE_KEY = 'prop_archive_v1';
 const BACKFILL_META_KEY = 'prop_archive_backfill_meta_v1';
 
+// Diacritics are STRIPPED, completing the set: analyzer.ts's normalizeName and
+// background.ts's _baseNorm both already do this, and this was the last holdout.
+// Books disagree on accents for the SAME fighter \u2014 on the 2026-09 Paris card Betr
+// posted "Morgan Charri\u00E8re" while pick6/underdog/prizepicks posted "Morgan
+// Charriere" \u2014 and the line archiver stores f.name RAW, so both spellings land in
+// the archive. Without the strip, `Far\u00E9s Ziam` and `Morgan Charri\u00E8re` were
+// SEPARATE ROW IDENTITIES from their plain twins: updateResult could not find
+// them from a stripped search name, and recordKey kept them permanently apart.
+//
+// This function is the risky one to widen, because recordKey (below) is row
+// IDENTITY \u2014 widening it makes addProps MERGE rows it previously kept distinct.
+// The other eleven call sites are lookups, where finding more is the fix.
+// So it was measured before changing rather than argued: recordKey was recomputed
+// under both normalizers across all 40,867 archive rows, and stripping causes
+// ZERO new collisions, hence zero rows whose line or result could be silently
+// overwritten by a merge. Probe: snippets/2026-09-03_archive_dupes_readonly.js's
+// companion collision check. Re-measure before widening this any further \u2014
+// punctuation (periods, hyphens, apostrophes) is deliberately NOT normalized the
+// way analyzer.ts does it, and that divergence has not been tested.
+// See [[project_diacritic_name_split]].
 function normalizeName(name: unknown): string {
   if (typeof name !== 'string') return '';
   return name
     .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036F]/g, '')
     .replace(/\./g, '')
     .replace(/-/g, ' ')
     .replace(/\s+/g, ' ')
