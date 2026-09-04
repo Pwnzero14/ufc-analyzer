@@ -27238,7 +27238,27 @@ body.bp-compact .bp-ev-split::before {
 /* One height for every row, so row N in OVERS sits level with row N in UNDERS.
    min-height (not height) — a row must still be able to grow if something
    unexpected lands in it, rather than clipping content out of sight. */
-body.bp-compact .best-pick-row { min-height: 62px; align-items: center; }
+/* ── GLOW-UP 309i · the 33px nobody's arithmetic included ───────────────────
+   Measured with the warning chips finally out of flow:
+       floor 854, first row y 344            -> 510px available
+       col1 rows 70,62,62,62,62,62,62,62 = 504 ... but 8th row BOTTOM was 881
+       col2 rows 70,65,64,62,62,62,62,62 = 509 ... 8th row BOTTOM 886
+   344 + 504 = 848, not 881. The missing 33px is INTER-ROW SPACING — seven gaps
+   of margin plus border — which every projection I made ignored, because I kept
+   summing row heights and never the space between them.
+   Sized with headroom this time rather than aiming to land exactly on 510:
+   min-height 62->54, vertical padding 9->4, gap trimmed to 1px.
+       col2 becomes ~470 rows + 7 gaps = ~477 against 510  -> ~33px spare
+   Deliberately overshooting, because five rounds of landing "just inside" the
+   limit all turned out to be outside it. */
+body.bp-compact .best-pick-row {
+  min-height: 54px;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  margin-top: 1px;
+}
+body.bp-compact .best-pick-row + .best-pick-row { border-top-width: 0; }
 
 /* ── GLOW-UP 309e · the last 30px — a meta row wrapping to two lines ────────
    With min-height 62 in force, rows measured 62 / 62 / 92: the 62s are one line
