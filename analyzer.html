@@ -4484,6 +4484,21 @@ body.loading {
     padding: 6px 14px;
   }
   .qa-panel.qa-compact .qa-summary { font-size: 11px; font-weight: 500; color: var(--text2); }
+  /* ── GLOW-UP 309j · GLOW-UP 308's rows broke the COMPACT layout ───────────
+     `.qa-panel.qa-compact` is `flex-direction: row` — every child lays out
+     side by side, because compact is meant to be a ONE-LINE summary. GLOW-UP
+     308 added three block-level rows (per-stat coverage, STILL TO DROP, BY
+     BOOK) without noticing, so in compact they were laid out horizontally and
+     spilled off the right edge, shredding the panel into two crammed lines.
+     Regression I introduced; caught from a screenshot, not a test.
+     They belong to the EXPANDED panel only — compact already carries the
+     verdict chip, which is the whole point of compact. */
+  .qa-panel.qa-compact .qa-stat-strip,
+  .qa-panel.qa-compact .qa-drop,
+  .qa-panel.qa-compact .qa-bookgaps { display: none; }
+  /* Belt and braces: even expanded, these must never force the panel wider
+     than its container — they wrap instead. */
+  .qa-stat-strip, .qa-drop, .qa-bookgaps { max-width: 100%; flex-wrap: wrap; }
   .qa-issues       { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
   .qa-issues li    { font-size:11px; color:var(--text-muted); padding-left:14px; position:relative; line-height:1.4; }
   .qa-issues li::before { content:'•'; position:absolute; left:2px; color:var(--text-muted); }
