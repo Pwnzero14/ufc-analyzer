@@ -7850,19 +7850,31 @@ async function renderQAPanel(): Promise<void> {
   // only partially in. Absent beats partial in the ordering, because a stat with
   // nothing posted is the one that blocks, and a fetch cannot fix it.
   const absent: string[] = [];
-  const partial: string[] = [];
+  // ── 308b · listing EVERY partial stat just re-printed the chips above ──────
+  // First cut enumerated all partials, which on a mid-week board is all seven —
+  // rendering a row byte-identical to the stat strip directly above it. Seen
+  // immediately on the live 09-04 board and fixed there: the useful question is
+  // not "which stats are incomplete" (the chips already answer that) but "what
+  // is the BOTTLENECK", so only the stats tied at the LOWEST coverage are named.
+  // Those are the ones the slate is actually waiting on; FP at 24/28 is not what
+  // is holding an audit up when R1 SS sits at 10/28.
+  const partialPairs: Array<[string, number]> = [];
   for (const [stat, label] of STAT_ORDER) {
     const per = statCov.get(stat);
     if (!per || !per.size) continue;
     const best = Math.max(0, ...per.values());
     if (best === 0) absent.push(label);
-    else if (best < totalFighters) partial.push(`${label} ${best}/${totalFighters}`);
+    else if (best < totalFighters) partialPairs.push([label, best]);
   }
+  const worstN = partialPairs.length ? Math.min(...partialPairs.map(([, n]) => n)) : 0;
+  const partial = partialPairs.length
+    ? [`${partialPairs.filter(([, n]) => n === worstN).map(([l]) => l).join(' · ')} ${worstN}/${totalFighters}`]
+    : [];
   const dropLine = (absent.length || partial.length)
     ? `<div class="qa-drop"><span class="qa-drop-label" title="What is still outstanding, by STAT rather than by book. Absent stats are listed first because nothing posted is what blocks an audit — and no amount of re-fetching produces a line the book has not published. Partial stats are usable but incomplete: a lean built on them is ranked against a smaller field.">STILL TO DROP</span>${
         absent.length ? `<span class="qa-drop-absent" title="No book has posted these at all on this card.">✗ ${absent.join(' · ')}</span>` : ''
       }${
-        partial.length ? `<span class="qa-drop-partial" title="Posted, but no single book covers the full card yet.">◑ ${partial.join(' · ')}</span>` : ''
+        partial.length ? `<span class="qa-drop-partial" title="The stats furthest from complete — no single book covers the full card for these, and they are tied at the lowest coverage on the board, so they are what an audit is actually waiting on. Stats further along (see the chips above) are not the bottleneck. ${partialPairs.length - partialPairs.filter(([, n]) => n === worstN).length} other stat(s) are also partial but better covered.">◑ slowest ${partial.join(' · ')}</span>` : ''
       }</div>`
     : `<div class="qa-drop"><span class="qa-drop-label">STILL TO DROP</span><span class="qa-drop-none" title="Every stat any book is capable of posting covers the full card. Nothing is outstanding.">✓ nothing — all stats complete</span></div>`;
 
