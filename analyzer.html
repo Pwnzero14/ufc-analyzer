@@ -27189,6 +27189,34 @@ body.bp-compact .best-pick-name {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* ── GLOW-UP 309d · uniform row height, so the two columns LINE UP ──────────
+   The warning notes (PROJ SAYS UNDER / NEEDS ROUNDS / the EV split note) are
+   block-level divs inside .best-pick-line-wrap, so each one adds a full line to
+   whichever rows carry it. With three of sixteen rows a line taller, the OVERS
+   and UNDERS columns drift out of step and OVERS ends short — the gap.
+
+   In COMPACT they collapse to a single ⚠ glyph rendered inline. The text is
+   hidden with font-size:0 rather than display:none ON PURPOSE: the element
+   keeps its `title`, so the full sentence is still one hover away and nothing
+   is actually lost. Outside COMPACT they render in full as before. */
+body.bp-compact .bp-proj-split,
+body.bp-compact .bp-dur-split,
+body.bp-compact .bp-ev-split {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0; line-height: 1;
+  width: 16px; height: 16px; padding: 0; margin: 2px 0 0 4px;
+  border-radius: 3px; vertical-align: middle;
+}
+body.bp-compact .bp-proj-split::before,
+body.bp-compact .bp-dur-split::before,
+body.bp-compact .bp-ev-split::before {
+  content: '⚠'; font-size: 9px; line-height: 1;
+}
+/* One height for every row, so row N in OVERS sits level with row N in UNDERS.
+   min-height (not height) — a row must still be able to grow if something
+   unexpected lands in it, rather than clipping content out of sight. */
+body.bp-compact .best-pick-row { min-height: 62px; align-items: center; }
+
 .bpc-btn.bpc-focus.on, .bpc-btn.bpc-compact.on {
   color: var(--gold);
   border-color: color-mix(in srgb, var(--gold) 45%, transparent);
