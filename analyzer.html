@@ -3303,7 +3303,10 @@ body {
      it here would leave a 6px overlap, which is the same class of bug.
      See [[project_sticky_layer_stack]]. */
   position: sticky;
-  top: 94px;
+  /* NOTE: this `top` is OVERRIDDEN later by the rule near .filter-bar-bottom —
+     see GLOW-UP 309l. Change it THERE, not here. Left at the historical 54 so
+     the two do not look like they disagree on purpose. */
+  top: 54px;
   z-index: 50;
   margin-bottom: 6px;
 }
@@ -6223,8 +6226,18 @@ body::before {
   backdrop-filter: blur(12px) saturate(1.4);
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
 }
-.fighter-header-row { top: 88px; }
+/* GLOW-UP 309l — THIS is the rule that actually governs, not the `top` in the
+   base .fighter-header-row block ~3000 lines above. 309h edited that one from
+   54 to 94 and it was outranked here and never applied — a dead edit, exactly
+   the failure [[project_glow_up_111_wip]] records ("the gold was never faint,
+   it was DEAD — outranked on specificity"). Grep every rule for a selector
+   before editing one of them.
+   filter-bar-bottom pins at 54 and is ~40px tall, so it occupies 54-94; 88
+   leaves a 6px overlap. 94 clears it exactly. */
+.fighter-header-row { top: 94px; }
 @media (max-width: 1100px) {
+  /* Below 1100 the control bar is NOT sticky, so there is nothing above this
+     row to clear and it pins directly under the 54px header. */
   .filter-bar-bottom { position: static; }
   .fighter-header-row { top: 54px; }
 }
