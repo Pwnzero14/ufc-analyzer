@@ -27217,6 +27217,27 @@ body.bp-compact .bp-ev-split::before {
    unexpected lands in it, rather than clipping content out of sight. */
 body.bp-compact .best-pick-row { min-height: 62px; align-items: center; }
 
+/* ── GLOW-UP 309e · the last 30px — a meta row wrapping to two lines ────────
+   With min-height 62 in force, rows measured 62 / 62 / 92: the 62s are one line
+   of meta, the 92s are two. At 100% zoom the columns are half as wide in CSS px
+   as they are at 50%, so the chip rail no longer fits on one line — the same
+   width trap that made the ORIGINAL "rows are fine" reading wrong.
+   Held to one line by scrolling rather than clipping: chips that do not fit
+   remain reachable by dragging the rail, so nothing is silently lost the way
+   `overflow:hidden` would lose it. Scrollbar kept hairline so it does not
+   reintroduce the height it just saved. */
+body.bp-compact .best-pick-meta {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+body.bp-compact .best-pick-meta::-webkit-scrollbar { height: 3px; }
+body.bp-compact .best-pick-meta::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text3) 40%, transparent); border-radius: 2px;
+}
+body.bp-compact .best-pick-meta > * { flex: 0 0 auto; }
+
 .bpc-btn.bpc-focus.on, .bpc-btn.bpc-compact.on {
   color: var(--gold);
   border-color: color-mix(in srgb, var(--gold) 45%, transparent);
