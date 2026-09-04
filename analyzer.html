@@ -3292,8 +3292,18 @@ body {
   background: rgb(6,7,16);
   border-bottom: 1px solid var(--border2);
   box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+  /* ── GLOW-UP 309h · this row was being hidden by the bar above it ─────────
+     .fighter-header-row and .filter-bar-bottom BOTH stuck at top:54px, and the
+     filter bar wins on z-index (95 vs 50) — so whenever both were pinned, the
+     column labels sat underneath it and rendered as a half-clipped line of text.
+     Reported from a screenshot; confirmed in the stylesheet, not guessed.
+     filter-bar-bottom is 40px tall pinned at 54, so it occupies 54-94: this row
+     stacks at 94 to clear it exactly. NOT the 88px that .data-subnav uses —
+     that offset is for contexts where filter-bar-bottom is absent, and copying
+     it here would leave a 6px overlap, which is the same class of bug.
+     See [[project_sticky_layer_stack]]. */
   position: sticky;
-  top: 54px;
+  top: 94px;
   z-index: 50;
   margin-bottom: 6px;
 }
