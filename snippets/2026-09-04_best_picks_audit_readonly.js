@@ -56,13 +56,58 @@
     kd: ['PP'],
   };
   const FIELD = { fp: 'line_fp', ss: 'line_ss', ss_r1: 'line_ss_r1', td: 'line_td', ft: 'line_ft', ctrl: 'line_ctrl', kd: 'line_kd' };
+
+  // ── PLACEABILITY MUST BE APPLIED BEFORE ANY PRICE COMPARISON ──────────────
+  // Added after this probe reported two false "giveaways" on 2026-09-04. It
+  // compared raw stored lines and found Felipe Lima's SS UNDER shown at P6 37.5
+  // while UD had 39.5 — but UD SS unders are offered to DOGS ONLY and Lima is a
+  // -205 FAVOURITE, so that 39.5 is a bet he cannot place. His opponent
+  // Charriere (+170, DOG) showed the mirror image: P6 39.5 blocked, UD 38.5
+  // shown. `bestSideLineForPick` in analyzer.ts was sorting correctly the whole
+  // time; it filters unplaceable books first, which is exactly right.
+  //
+  // The rule (from the SS-under gate in analyzer.ts, kept in sync here):
+  //   PrizePicks / DraftKings — both sides for every fighter
+  //   Betr                    — trust betr_ss_under_avail; unset = permissive
+  //   Pick6                   — SS UNDER for FAVOURITES only
+  //   Underdog                — SS UNDER for UNDERDOGS only
+  // A comparison that ignores this manufactures giveaways on every fight where
+  // the two fighters' roles split the books, which is most of them.
+  const roleOf = (name, oppName) => {
+    const a = mlOf(name), b = mlOf(oppName);
+    if (a == null || b == null) return 'unknown';
+    return a > b ? 'dog' : a < b ? 'fav' : 'even';
+  };
+  const underPlaceable = (stat, book, role, rec) => {
+    if (stat !== 'ss' && stat !== 'fp') return true;   // only these two are role-gated here
+    if (book === 'PP' || book === 'DK') return true;
+    if (stat === 'fp') {
+      // Dog FP UNDER is blocked on Pick6 and Betr; placeable on UD and PP.
+      if (role !== 'dog') return true;
+      return book !== 'P6' && book !== 'BT';
+    }
+    if (book === 'BT') return (rec && rec.betr_ss_under_avail) !== false;
+    if (book === 'UD') return role === 'dog';
+    if (book === 'P6') return role === 'fav';
+    return true;
+  };
   const BOOK_ABBR = { Pick6: 'P6', Underdog: 'UD', PrizePicks: 'PP', Betr: 'BT', DraftKings: 'DK',
                       P6: 'P6', UD: 'UD', PP: 'PP', BT: 'BT', BTR: 'BT', DK: 'DK' };
 
-  const all = await get(Object.values(STORES));
+  const all = await get([...Object.values(STORES), 'fight_odds_moneyline']);
   const norm = (s) => String(s || '').toLowerCase().normalize('NFD')
     .replace(/\p{M}/gu, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
 
+  const ml = all['fight_odds_moneyline'] || {};
+  const mlOf = (n) => {
+    const k = norm(n);
+    for (const [nm, o] of Object.entries(ml)) if (norm(nm) === k) return o;
+    for (const [nm, o] of Object.entries(ml)) {
+      const A = norm(nm).split(' '), B = k.split(' ');
+      if (A[A.length - 1] === B[B.length - 1]) return o;
+    }
+    return null;
+  };
   const byBook = {};
   for (const [abbr, key] of Object.entries(STORES)) {
     const store = all[key];
@@ -132,11 +177,20 @@
     if (!p.stat) continue;
     const key = norm(p.name);
     const found = [];
+    const role = roleOf(p.name, p.opp);
+    const blocked = [];
     for (const abbr of CAPABLE[p.stat] || []) {
       const rec = byBook[abbr].get(key);
       const v = rec ? rec[FIELD[p.stat]] : undefined;
-      if (v != null && Number.isFinite(Number(v))) found.push([abbr, Number(v)]);
+      if (v == null || !Number.isFinite(Number(v))) continue;
+      // Only placeable books may set the benchmark — see the note above FIELD.
+      if (p.side === 'UNDER' && !underPlaceable(p.stat, abbr, role, rec)) {
+        blocked.push(`${abbr} ${Number(v)}`);
+        continue;
+      }
+      found.push([abbr, Number(v)]);
     }
+    if (blocked.length) console.log(`     ${colRank(p)} ${p.name} (${role}) — NOT placeable, excluded: ${blocked.join('  ')}`);
     if (!found.length) {
       shop.push({ '#': colRank(p), fighter: p.name, stat: p.statLbl, side: p.side, shown: `${p.line} ${p.book}`, allBooks: '(none found)', best: '', giveaway: '' });
       continue;
