@@ -27199,14 +27199,27 @@ body.bp-compact .best-pick-name {
    hidden with font-size:0 rather than display:none ON PURPOSE: the element
    keeps its `title`, so the full sentence is still one hover away and nothing
    is actually lost. Outside COMPACT they render in full as before. */
+/* 309g — `inline-flex` did NOT make these inline. .best-pick-line-wrap is a
+   COLUMN flex container, so an inline-flex child still takes a full row of its
+   own. Measured consequence: linewrap 66px against a 62px min-height, giving
+   rows of 92 / 87 / 77 / 70 wherever a warning was present, and columns
+   overflowing the slate-tray floor by 54-64px.
+   Taken out of flow entirely and pinned to the row's bottom-right. Offsets are
+   per-class so two or three warnings sit side by side instead of stacking on
+   top of each other — deterministic, since each is 16px wide. */
+body.bp-compact .best-pick-row { position: relative; }
 body.bp-compact .bp-proj-split,
 body.bp-compact .bp-dur-split,
 body.bp-compact .bp-ev-split {
+  position: absolute; bottom: 4px;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 0; line-height: 1;
-  width: 16px; height: 16px; padding: 0; margin: 2px 0 0 4px;
-  border-radius: 3px; vertical-align: middle;
+  width: 16px; height: 16px; padding: 0; margin: 0;
+  border-radius: 3px;
 }
+body.bp-compact .bp-proj-split { right: 4px; }
+body.bp-compact .bp-dur-split  { right: 23px; }
+body.bp-compact .bp-ev-split   { right: 42px; }
 body.bp-compact .bp-proj-split::before,
 body.bp-compact .bp-dur-split::before,
 body.bp-compact .bp-ev-split::before {
