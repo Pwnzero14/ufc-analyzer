@@ -27144,6 +27144,16 @@ body.bp-focus #slateStatusBanner { display: none !important; }
    169/196/204), so collapsing the roll-up hides a restatement, not a signal.
    That is the test for what belongs in focus — duplicated elsewhere, or not. */
 body.bp-focus .bp-fight-rollup { display: none !important; }
+/* 309b — the sort/filter groups and the EXPOSURE strip join focus as well.
+   The view toggles are in `.bpc-chrome`, deliberately EXCLUDED: they are the
+   only way back out, and a mode whose exit control is inside the thing it hides
+   is a one-way door. Stated as a tradeoff in the FOCUS tooltip rather than
+   hidden: changing sort or filter means toggling FOCUS off, which is a real
+   cost and the reason those two buttons never collapse. */
+body.bp-focus .bp-controls .bpc-group:not(.bpc-chrome) { display: none !important; }
+body.bp-focus .bp-exposure { display: none !important; }
+/* With one group left the strip should not keep the full-width chrome of six. */
+body.bp-focus .bp-controls { gap: 6px; padding-top: 4px; padding-bottom: 4px; }
 /* A slate BLOCKER wins over focus. Hiding the panel that says your lines are
    stale, in the one case it matters, would make FOCUS harmful rather than tidy. */
 body.bp-focus.bp-focus-keepslate #slateStatusBanner { display: block !important; }
