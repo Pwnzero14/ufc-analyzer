@@ -184,6 +184,27 @@ export const NAME_ALIASES = {
     // shape of the 8 legs (Orolbai, Sumudaerji) the 2026-08-30 ledger audit could
     // not re-grade until aliases were applied.
     'Matthieu Letho Duclos': 'Matthieu Duclos',
+    // 2026-09-04 (same card, found by the pre-card audit): THREE more variants on
+    // this one board, each holding the ONLY copy of that book's lines. Underdog and
+    // PrizePicks carry no canonical record at all for Hooker or Naimov -- their UD/PP
+    // SS and Round-1 SS live exclusively under the long spellings:
+    //     Dan Hooker      -> UD r1 14.5,  PP ss 30.5 / r1 14.5
+    //     Muhammad Naimov -> UD ss 24.5 / r1 11.5,  PP ss 28.5 / r1 11.5
+    //     Klaudia Sygula  -> BT ss 45.5   (Betr alone spells her with the Polish L-stroke)
+    // The live board is fine: namesMatch is surname-token based, so hooker/hooker and
+    // naimov/naimov merge on their own. resolveVsArchive is the exposure -- it looks up
+    // an EXACT `event|normalizedName|propType` key, exactly as written above for Duclos.
+    'Daniel Hooker': 'Dan Hooker',
+    'Muhammadjon Naimov': 'Muhammad Naimov',
+    // Sygula needs an ALIAS rather than a normalizer change. Every normalizer in this
+    // repo strips diacritics with `normalize('NFD').replace(/[̀-ͯ]/g,'')`,
+    // which only removes COMBINING MARKS. U+0142 L-STROKE is a standalone letter that
+    // NFD does not decompose, so it survives every one of them -- as do o-slash,
+    // d-stroke and sharp-s. Widening that strip touches recordKey for all ~41k archive
+    // rows and must be collision-measured first (the way the 2026-09-03 diacritic change
+    // was: 0 collisions, 0 lossy). Not the night before a card. See
+    // [[project_diacritic_name_split]].
+    'Klaudia Syguła': 'Klaudia Sygula',
     // 2026-08-21: PrizePicks lists him "Sergey Spivak"; UFCStats canonical is
     // "Serghei Spivac". namesMatch is surname-token based, so Spivak/Spivac never
     // matched and the stale-opponent guard concluded PP had priced Vitor Petrino
