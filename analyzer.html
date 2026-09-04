@@ -27127,6 +27127,42 @@ div[style*="Per-Stat Calibration"] > div[style*="display:flex"][style*="padding:
                  be placed". A stat no book has posted cannot be placed, and no
                  amount of re-fetching changes that.
    No new lane. */
+/* ── GLOW-UP 309 · FOCUS + COMPACT for the pick-building views ──────────────
+   Collapse by CSS, not by unmounting: the panels keep rendering and keep their
+   own state, so restoring is a class flip with nothing to rebuild and no risk
+   of a half-initialised panel coming back.
+   Measured on the live 2026-09-04 board: slateStatusBanner 492px +
+   learningDiagnosticsWidget 156px + lineMovementSummary 239px = 887px sitting
+   above a column of 8 pick rows worth 690px, with the first row at y=1443
+   against a ~898px viewport — zero picks visible without scrolling. */
+body.bp-focus #learningDiagnosticsWidget,
+body.bp-focus #lineMovementSummary,
+body.bp-focus #slateStatusBanner { display: none !important; }
+/* The SHARED FIGHTS roll-up (92px) joins them in focus for a specific reason:
+   everything it says is ALREADY on the rows it summarises. Every pick in a
+   multi-pick fight carries its own SAME FIGHT / DUAL / CONFLICT badge (GLOW-UP
+   169/196/204), so collapsing the roll-up hides a restatement, not a signal.
+   That is the test for what belongs in focus — duplicated elsewhere, or not. */
+body.bp-focus .bp-fight-rollup { display: none !important; }
+/* A slate BLOCKER wins over focus. Hiding the panel that says your lines are
+   stale, in the one case it matters, would make FOCUS harmful rather than tidy. */
+body.bp-focus.bp-focus-keepslate #slateStatusBanner { display: block !important; }
+
+/* COMPACT — rows only. Factor rail hidden and the reason held to one line; both
+   stay reachable (the rail's content is in the chip tooltips, the reason keeps
+   its own title), so this trims presentation, not information. */
+body.bp-compact .best-pick-row .bp-factors { display: none; }
+body.bp-compact .best-pick-row .best-pick-reason {
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+}
+body.bp-compact .best-pick-row { padding-top: 6px; padding-bottom: 6px; }
+body.bp-compact .best-pick-meta { gap: 3px; }
+
+.bpc-btn.bpc-focus.on, .bpc-btn.bpc-compact.on {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
 .qa-stat-strip {
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
   margin-top: 5px;

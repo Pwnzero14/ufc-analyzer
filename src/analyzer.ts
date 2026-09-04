@@ -370,6 +370,48 @@ let bestPicksRenderSeq = 0;
 type BestPicksSortMode = 'model' | 'ev' | 'conf' | 'edge' | 'move';
 type BestPicksStatFilter = 'all' | 'fp' | 'ss' | 'ss_r1' | 'td' | 'ft' | 'kd' | 'ctrl';
 let bestPicksSortMode: BestPicksSortMode = 'model';
+// ── GLOW-UP 309 · the board you came to read started 1443px down the page ──
+// MEASURED on the live 2026-09-04 board, not eyeballed. Above the first pick row:
+//     header                       54px
+//     slateStatusBanner           492px   (largest single block)
+//     learningDiagnosticsWidget   156px
+//     lineMovementSummary         239px
+//     bp-fight-rollup              92px
+//     -> first .best-pick-row at y = 1443, for a column of 8 rows worth 690px
+// At a ~898px viewport that is ZERO picks visible without scrolling, which is
+// why the board was being read at 50% browser zoom. The rows were never the
+// problem: heights run 67-93-99 and the meta row wraps on 0 of 16.
+//
+// FOCUS collapses the three REFERENCE panels on the pick-building views only.
+// Slate Check keeps its verdict — the sticky `SLATE nn%` chip in the tab bar
+// (GLOW-UP 163) survives independently — so nothing silently disappears.
+// Session-scoped like `_leanCompact` (GLOW-UP 194 L3), deliberately: it is a
+// reading preference, not a setting, and [[feedback_no_my_slate_persistence]]
+// establishes that this user builds and places in one sitting.
+let bpFocus = true;
+let bpCompact = false;
+
+/**
+ * Body classes drive the collapse, so the panels are hidden by CSS rather than
+ * unmounted — they keep rendering and keep their own state, and restoring is a
+ * class flip with nothing to rebuild. Applied on EVERY view render (including
+ * leaving the view) so the classes can never be left stranded on a view that
+ * did not ask for them, which is how `_slatePresentSlots` style flags have gone
+ * wrong here before.
+ *
+ * GLOW-UP 309 L6 — a BLOCKER overrides focus. Slate Check exists to stop you
+ * building on stale or missing data; hiding it in exactly that case would make
+ * the feature actively harmful rather than merely tidy. The panel sets
+ * `qa-err` on itself, so the override reads the rendered state rather than
+ * re-deriving the verdict and risking a disagreement with the panel.
+ */
+function applyBpChrome(): void {
+  const focusView = currentView === 'bestpicks' || currentView === 'parlaylab';
+  const blocker = !!document.querySelector('#slateStatusBanner .qa-panel.qa-err');
+  document.body.classList.toggle('bp-focus', bpFocus && focusView);
+  document.body.classList.toggle('bp-focus-keepslate', blocker);
+  document.body.classList.toggle('bp-compact', bpCompact && currentView === 'bestpicks');
+}
 let bestPicksStatFilter: BestPicksStatFilter = 'all';
 let bestPicksEvOnly = false;
 // GLOW-UP 305 L9 — hide picks whose EV rests on the assumed -110 placeholder
@@ -9975,6 +10017,8 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
       <button class="bpc-btn${bestPicksSortMode === 'ev' ? ' on' : ''}" data-bp-sort="ev" title="Highest calibrated EV first — money order, not signal order">EV</button>
       <button class="bpc-btn${bestPicksSortMode === 'conf' ? ' on' : ''}" data-bp-sort="conf" title="Highest model confidence first">CONF%</button>
       <button class="bpc-btn${bestPicksSortMode === 'edge' ? ' on' : ''}" data-bp-sort="edge" title="Biggest gap between the model's projection and the line you'd enter (the Δ chip) — raw disagreement with the book, independent of how EV prices it">Δ EDGE</button>
+      <button class="bpc-btn bpc-focus${bpFocus ? ' on' : ''}" data-bp-focus="1" title="FOCUS hides the three reference panels stacked above this board — Slate Check, Learning Drilldown and Line Movers. Measured on this card they occupy 887px, which pushed the first pick row to y=1443 against a ~900px viewport: literally no pick visible without scrolling. They keep rendering and keep their own state; this is a CSS collapse, so restoring is instant and nothing rebuilds. Slate Check's verdict survives regardless — the SLATE nn% chip in the tab bar is independent. A slate BLOCKER overrides this and forces the panel back, because hiding the thing that says your data is stale would be worse than the scrolling.">△ FOCUS</button>
+      <button class="bpc-btn bpc-compact${bpCompact ? ' on' : ''}" data-bp-compact="1" title="COMPACT trims each pick row: the factor chip rail is hidden and the reason is held to one line. Rows measured 67-93-99px on this board; compact holds them near 62 and uniform, so a column of 8 fits a standard viewport. Nothing is removed from the model — the factors are still in the row's tooltip and the reason still has its title text.">▤ COMPACT</button>
       <button class="bpc-btn${bestPicksSortMode === 'move' ? ' on' : ''}" data-bp-sort="move" title="Ranks by how far the line has moved IN YOUR FAVOUR since it opened — the ↑/↓ vintage chip. Every other sort here scores the pick against its current number and cannot see where that number came from. Picks with no baseline sort last, not as zero.">⇅ MOVE</button>
     </span>
     <span class="bpc-group">
@@ -11119,6 +11163,12 @@ function renderBestPicks(container: HTMLElement, renderSeq = 0): Promise<void> {
   });
   container.querySelectorAll<HTMLElement>('[data-bp-realodds]').forEach(btn => {
     btn.addEventListener('click', () => { bestPicksRealOddsOnly = !bestPicksRealOddsOnly; bpRerender(); });
+  });
+  container.querySelectorAll<HTMLElement>('[data-bp-focus]').forEach(btn => {
+    btn.addEventListener('click', () => { bpFocus = !bpFocus; applyBpChrome(); bpRerender(); });
+  });
+  container.querySelectorAll<HTMLElement>('[data-bp-compact]').forEach(btn => {
+    btn.addEventListener('click', () => { bpCompact = !bpCompact; applyBpChrome(); bpRerender(); });
   });
   // GLOW-UP 192 handlers
   /**
@@ -20781,6 +20831,7 @@ function _renderFightersImpl(): void {
   primeCaches();
   updateViewTabCounts();
   container.innerHTML = '';
+  applyBpChrome();
   if (currentView === 'bestpicks') { bestPicksRenderSeq++; void renderBestPicks(container, bestPicksRenderSeq); return; }
   if (currentView === 'parlaylab') { renderParlayLab(container); return; }
   if (currentView === 'calibration') { void renderCalibrationPanel(container); return; }
