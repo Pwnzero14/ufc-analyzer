@@ -6219,7 +6219,22 @@ body::before {
 }
 
 /* Sticky glass control bar (sort + view tabs follow you down the page) */
-.filter-bar-bottom {
+/* ── GLOW-UP 309m · this bar was never actually sticky ─────────────────────
+   `.header, .filter-bar { position: relative; }` sits ~27,000 lines further
+   down. Same specificity (0,1,0), later in source order, so it CLOBBERED the
+   `sticky` here and the control bar has been `position: relative` all along —
+   despite the comment above claiming it follows you down the page.
+   And because this rule still carried `top: 54px`, on a RELATIVE element that
+   is not a pin offset, it is a 54px VISUAL SHIFT that leaves the layout box
+   behind. Measured on the live board:
+       filter-bar-bottom  paints 149-189, layout box 95-135
+       slateStatusBanner  lays out at 135 + 28px margin = 163
+   ...so the bar painted 26px on top of the banner's header. Every earlier
+   theory failed because the LAYOUT was correct; only the PAINTING was wrong,
+   which is why reading geometry never found it and elementFromPoint did.
+   Selector raised to (0,2,0) so it wins on specificity rather than on source
+   order — the media-query override below is raised to match. */
+.filter-bar.filter-bar-bottom {
   position: sticky; top: 54px; z-index: 95;
   background: rgba(13,18,33,0.82);
   -webkit-backdrop-filter: blur(12px) saturate(1.4);
@@ -6238,7 +6253,7 @@ body::before {
 @media (max-width: 1100px) {
   /* Below 1100 the control bar is NOT sticky, so there is nothing above this
      row to clear and it pins directly under the 54px header. */
-  .filter-bar-bottom { position: static; }
+  .filter-bar.filter-bar-bottom { position: static; }
   .fighter-header-row { top: 54px; }
 }
 
