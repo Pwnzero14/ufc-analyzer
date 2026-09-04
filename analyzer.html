@@ -27232,10 +27232,21 @@ body.bp-compact .best-pick-meta {
   overflow-y: hidden;
   scrollbar-width: thin;
 }
-body.bp-compact .best-pick-meta::-webkit-scrollbar { height: 3px; }
-body.bp-compact .best-pick-meta::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text3) 40%, transparent); border-radius: 2px;
+/* 309f — the scrollbar was self-defeating. It made every one of 16 rows carry a
+   grey rail AND it cost ~3px of height, which was the last thing standing
+   between 8 rows and the viewport:
+       898 viewport - 35 MY SLATE bar - 344 first-row offset = 519 available
+       8 x 65 (62 + scrollbar) = 520  -> over by 1px
+       8 x 62 (no scrollbar)   = 496  -> fits
+   The rail still SCROLLS, so no chip is ever silently lost — it just loses the
+   visible chrome. Chips also shrink so most rows do not need to scroll at all. */
+body.bp-compact .best-pick-meta { scrollbar-width: none; }
+body.bp-compact .best-pick-meta::-webkit-scrollbar { display: none; }
+body.bp-compact .best-pick-meta > * {
+  font-size: 8px;
+  padding-left: 4px; padding-right: 4px;
 }
+body.bp-compact .best-pick-meta { gap: 3px; }
 body.bp-compact .best-pick-meta > * { flex: 0 0 auto; }
 
 .bpc-btn.bpc-focus.on, .bpc-btn.bpc-compact.on {
