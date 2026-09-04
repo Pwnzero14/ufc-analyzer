@@ -6269,23 +6269,33 @@ body::before {
    New stack, no gaps to guess at:
        .filter-bar-bottom   0-40   (40px measured live: painted 95-135)
        .fighter-header-row  40     stacks flush under it
-       .data-subnav         40     same slot; DATA views hide the header row */
-.fighter-header-row { top: 40px; }
+       .data-subnav         40     same slot; DATA views hide the header row
+
+   ── GLOW-UP 309o · MEASURED, not copied ─────────────────────────────────
+   `--chrome-h` is published by publishChromeHeight() in analyzer.ts from the
+   control bar's real height, via a ResizeObserver on the bar. Every follower
+   below keys off it. The bar's height is CONTENT-DEPENDENT — it wraps
+   differently per view and per width, and grows once the webfonts land
+   (measured: 40px on the extension board, 47px in the dev harness at the same
+   1280px width) — so any hardcoded copy of it is wrong somewhere. The fallback
+   in each var() is only for the frame before the observer's first callback.
+   When the bar is not sticky the publisher writes 0, which is why the
+   breakpoint block below no longer needs to restate the offsets. */
+.fighter-header-row { top: var(--chrome-h, 40px); }
 @media (max-width: 1100px) {
   /* Below 1100 the control bar goes column-direction and grows tall enough that
-     pinning it costs more than it returns, so it stays static — and with the
-     site header not sticky either, nothing is above this row to clear. */
+     pinning it costs more than it returns, so it stays static. --chrome-h then
+     publishes 0 on its own, so the followers need no override here. */
   .filter-bar.filter-bar-bottom { position: static; }
-  .fighter-header-row { top: 0; }
 }
 
 /* ── DATA VIEW SUB-NAV ──────────────────────────────────────────────────
    Jump rail for the Archive (14 sections) and Calibration (5) accordions.
    Sits in the same sticky stack as .fighter-header-row, which the DATA views
-   hide, so that slot is free. Tracks it: see GLOW-UP 309n above for why the
-   stack is 0/40 and no longer 54/88. */
+   hide, so that slot is free. Tracks the bar via --chrome-h — see GLOW-UP
+   309n/309o above for why the stack is measured and no longer 54/88. */
 .data-subnav {
-  position: sticky; top: 40px; z-index: 48;
+  position: sticky; top: var(--chrome-h, 40px); z-index: 48;
   display: flex; align-items: center; gap: 10px;
   margin: 0 0 12px; padding: 7px 10px;
   background: rgba(9,13,24,0.92);
@@ -6345,9 +6355,7 @@ body::before {
    already meaningless there, and the rail would sit on top of it. Scoped from
    body because the header is an EARLIER sibling than #cardContainer. */
 body:has(#cardContainer > .data-subnav) .fighter-header-row { display: none; }
-@media (max-width: 1100px) {
-  .data-subnav { top: 0; }
-}
+/* No breakpoint override needed — --chrome-h publishes 0 when the bar is static. */
 
 /* Fighter avatar medallions */
 .fighter-avatar {
@@ -31841,9 +31849,15 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
        sticky scrollport. The box never scrolls, so the header scrolls away with
        the page. Same mechanism that hid two fighters in GLOW-UP 269 — an
        overflow declared for rounded corners quietly changing layout semantics.
-     · `top: 0` aims at the viewport edge, which on this app is under 98px of
+     · `top: 0` aims at the viewport edge, which on this app was under 98px of
        chrome (header 54 + filter bar 44) at z-index 100/95 against this
        element's 4. Even sticking perfectly it would stick out of sight.
+       *** BOTH HALVES OF THAT 98 ARE NOW FALSE (GLOW-UP 309n/309o). The header
+       never stuck at all — `.header, .filter-bar { position: relative }`
+       outranked its `sticky` — and the bar is not 44px; its height depends on
+       view, width and whether the webfonts have landed. The constant left a
+       ~51px strip of page content scrolling between the pinned bar and this
+       head. It now keys off --chrome-h, which is measured. ***
 
    `overflow: clip` still clips to the radius but is NOT a scroll container, so
    sticky resolves against the page again. Parked at the real bottom of the
@@ -31855,12 +31869,13 @@ body:has(#cardContainer > .parlay-lab) .fighter-header-row { display: none; }
    chips and the column header. A sticky element has to be opaque; that is not a
    style choice, it is the price of leaving the flow. */
 .parlay-pool-head-sticky {
-  top: 98px; z-index: 6;
+  top: var(--chrome-h, 40px); z-index: 6;
   background: var(--bg2, #0d1221);
   box-shadow: 0 6px 14px -8px rgba(0,0,0,0.85);
 }
 .plr-head { background: var(--bg2, #0d1221); }
-@media (max-width: 1100px) { .parlay-pool-head-sticky { top: 64px; } }
+/* The old `top: 64px` here was the same stale constant scaled for the narrow
+   breakpoint; --chrome-h publishes 0 there, which is correct. */
 
 /* ── GLOW-UP 275 · the pool cut off the number it is sorted by ─────────────
    At 1280px the two columns split 1fr/1fr — 572px each — while a leg row needs

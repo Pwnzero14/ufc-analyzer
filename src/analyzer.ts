@@ -411,6 +411,49 @@ function applyBpChrome(): void {
   document.body.classList.toggle('bp-focus', bpFocus && focusView);
   document.body.classList.toggle('bp-focus-keepslate', blocker);
   document.body.classList.toggle('bp-compact', bpCompact && currentView === 'bestpicks');
+  publishChromeHeight();
+}
+
+// ── GLOW-UP 309o · the sticky stack measures the bar instead of assuming it ──
+// Every element below the control bar used to hardcode the bar's height as its
+// own `top`, and the bar's height is CONTENT-DEPENDENT: it wraps differently per
+// view, per width, and before/after the webfonts land. Measured live it is 40px
+// on the extension board and 47px in the dev harness at the same 1280px width.
+//
+// That single assumption has now produced four separate shipped bugs — the 26px
+// .data-subnav overlap, GLOW-UP 309h's 6px one, 309n's empty 54px strip, and a
+// ~51px strip above the Parlay Lab pool head, whose comment still reads
+// "header 54 + filter bar 44" for an offset of 98. Each was fixed by picking a
+// better constant, which is why there were four of them.
+//
+// So publish the bar's REAL height as --chrome-h and let the followers key off
+// it. When the bar is not sticky (below the 1100px breakpoint it goes static)
+// there is no pinned chrome at all and the value is 0 — the followers then pin
+// to the viewport edge, which is what that breakpoint wants.
+function publishChromeHeight(): void {
+  const bar = document.querySelector<HTMLElement>('.filter-bar-bottom');
+  if (!bar) return;
+  const pinned = getComputedStyle(bar).position === 'sticky';
+  const h = pinned ? Math.round(bar.getBoundingClientRect().height) : 0;
+  const root = document.documentElement;
+  // Writing an unchanged value still invalidates style on some Chrome builds,
+  // and this runs from a ResizeObserver, so guard it.
+  if (root.style.getPropertyValue('--chrome-h') !== `${h}px`) {
+    root.style.setProperty('--chrome-h', `${h}px`);
+  }
+}
+
+let _chromeObserver: ResizeObserver | null = null;
+function watchChromeHeight(): void {
+  const bar = document.querySelector<HTMLElement>('.filter-bar-bottom');
+  if (!bar || _chromeObserver) return;
+  _chromeObserver = new ResizeObserver(() => publishChromeHeight());
+  _chromeObserver.observe(bar);
+  // The 1100px breakpoint flips the bar between sticky and static. That changes
+  // `position`, which a ResizeObserver does not report on its own, so listen for
+  // the width change too.
+  window.addEventListener('resize', publishChromeHeight);
+  publishChromeHeight();
 }
 let bestPicksStatFilter: BestPicksStatFilter = 'all';
 let bestPicksEvOnly = false;
@@ -30196,6 +30239,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addDynamicEffects();
   }
   if (!performanceMonitorStarted) monitorPerformance();
+  // GLOW-UP 309o — start measuring the control bar so the sticky stack below it
+  // keys off its REAL height rather than a hardcoded copy of it.
+  watchChromeHeight();
 
   // Add loading animation to body
   document.body.classList.add('loading');
