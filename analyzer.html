@@ -3297,11 +3297,10 @@ body {
      filter bar wins on z-index (95 vs 50) — so whenever both were pinned, the
      column labels sat underneath it and rendered as a half-clipped line of text.
      Reported from a screenshot; confirmed in the stylesheet, not guessed.
-     filter-bar-bottom is 40px tall pinned at 54, so it occupies 54-94: this row
-     stacks at 94 to clear it exactly. NOT the 88px that .data-subnav uses —
-     that offset is for contexts where filter-bar-bottom is absent, and copying
-     it here would leave a 6px overlap, which is the same class of bug.
-     See [[project_sticky_layer_stack]]. */
+     SUPERSEDED by GLOW-UP 309n: the site header does not stick either, so the
+     bar now pins at 0-40 and this row stacks at 40. .data-subnav rides the same
+     40. All three offsets live together near .filter-bar-bottom — change them
+     THERE. See [[project_sticky_layer_stack]]. */
   position: sticky;
   /* NOTE: this `top` is OVERRIDDEN later by the rule near .filter-bar-bottom —
      see GLOW-UP 309l. Change it THERE, not here. Left at the historical 54 so
@@ -6235,7 +6234,7 @@ body::before {
    Selector raised to (0,2,0) so it wins on specificity rather than on source
    order — the media-query override below is raised to match. */
 .filter-bar.filter-bar-bottom {
-  position: sticky; top: 54px; z-index: 95;
+  position: sticky; top: 0; z-index: 95;
   background: rgba(13,18,33,0.82);
   -webkit-backdrop-filter: blur(12px) saturate(1.4);
   backdrop-filter: blur(12px) saturate(1.4);
@@ -6247,22 +6246,46 @@ body::before {
    the failure [[project_glow_up_111_wip]] records ("the gold was never faint,
    it was DEAD — outranked on specificity"). Grep every rule for a selector
    before editing one of them.
-   filter-bar-bottom pins at 54 and is ~40px tall, so it occupies 54-94; 88
-   leaves a 6px overlap. 94 clears it exactly. */
-.fighter-header-row { top: 94px; }
+   ── GLOW-UP 309n · the whole 54/88/94 stack was built on a header that does
+   not stick ──────────────────────────────────────────────────────────────
+   `.header { position: sticky; top: 0 }` (line ~131) is clobbered by the SAME
+   rule that clobbered the control bar: `.header, .filter-bar { position:
+   relative }` at ~33206, equal specificity (0,1,0) and later in source. So the
+   site header has never pinned — it scrolls away, which is visible in any
+   scrolled screenshot (no UFC ANALYZER bar at the top).
+
+   That made `top: 54px` on the control bar an offset reserved for something no
+   longer there: viewport rows 0-54 sat empty and page content scrolled THROUGH
+   them, above the pinned bar. Read as a floating box, and was.
+
+   Chosen fix (option B of three): the bar pins at 0 and the header keeps
+   scrolling away. 66px of permanently pinned chrome instead of 120px for the
+   full stack — the view tabs are worth always-on, the header is not, and this
+   board has been fought over for vertical space all session. Restoring the
+   header instead means dropping `.header` from the 33206 selector; `sticky` is
+   itself a positioned value, so the `::before` scanline that rule exists to
+   anchor would still work.
+
+   New stack, no gaps to guess at:
+       .filter-bar-bottom   0-40   (40px measured live: painted 95-135)
+       .fighter-header-row  40     stacks flush under it
+       .data-subnav         40     same slot; DATA views hide the header row */
+.fighter-header-row { top: 40px; }
 @media (max-width: 1100px) {
-  /* Below 1100 the control bar is NOT sticky, so there is nothing above this
-     row to clear and it pins directly under the 54px header. */
+  /* Below 1100 the control bar goes column-direction and grows tall enough that
+     pinning it costs more than it returns, so it stays static — and with the
+     site header not sticky either, nothing is above this row to clear. */
   .filter-bar.filter-bar-bottom { position: static; }
-  .fighter-header-row { top: 54px; }
+  .fighter-header-row { top: 0; }
 }
 
 /* ── DATA VIEW SUB-NAV ──────────────────────────────────────────────────
    Jump rail for the Archive (14 sections) and Calibration (5) accordions.
    Sits in the same sticky stack as .fighter-header-row, which the DATA views
-   hide, so 88px is free. */
+   hide, so that slot is free. Tracks it: see GLOW-UP 309n above for why the
+   stack is 0/40 and no longer 54/88. */
 .data-subnav {
-  position: sticky; top: 88px; z-index: 48;
+  position: sticky; top: 40px; z-index: 48;
   display: flex; align-items: center; gap: 10px;
   margin: 0 0 12px; padding: 7px 10px;
   background: rgba(9,13,24,0.92);
@@ -6323,7 +6346,7 @@ body::before {
    body because the header is an EARLIER sibling than #cardContainer. */
 body:has(#cardContainer > .data-subnav) .fighter-header-row { display: none; }
 @media (max-width: 1100px) {
-  .data-subnav { top: 54px; }
+  .data-subnav { top: 0; }
 }
 
 /* Fighter avatar medallions */
