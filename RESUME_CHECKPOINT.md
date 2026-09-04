@@ -1,11 +1,149 @@
 ﻿# Resume Checkpoint
 
-Last Saved: 2026-09-03 14:50:00 -04:00
+Last Saved: 2026-09-04 19:05:00 -04:00
 Repository: C:\Users\abdir\Downloads\ufc_project_v2
 Branch: feature/sleek-theme-v1
-HEAD: fa8a19b
+HEAD: 4f65cbb
 
 ## Last Notes
+################################################################################
+##  START HERE - 2026-09-04 SESSION CLOSE (card is TOMORROW, 2026-09-05)       ##
+################################################################################
+
+*** THE ONE THAT MATTERED: NOTHING WAS DELETED, AND NOTHING SHOULD BE. ***
+  A pre-card audit measured SS coverage of 31/28 on a 28-fighter card and I read
+  it as cross-promotion ghost contamination. The user said "clear the ghost
+  lines". READ-ONLY DIAGNOSIS FIRST (the standing rule) found ZERO ghosts — all
+  four "extra" names are fighters on this card, and for three of them the VARIANT
+  spelling holds the ONLY copy that book has:
+      Dan Hooker       UD + PP have NO canonical record | variant: r1 14.5, ss 30.5
+      Muhammad Naimov  UD + PP have NO canonical record | variant: ss 24.5/28.5, r1 11.5
+      Matthieu Duclos  UD + PP have NO canonical record | variant: ss, ft, kd 0.5
+      Klaudia Sygula   BT  has NO canonical record      | variant: ss 45.5
+  A delete would have destroyed live lines the night before the card. The rule
+  paid for itself. Do not shortcut it next time either.
+
+SHIPPED: 3 NAME_ALIASES entries (src/config/index.ts), verified in the BUILT output:
+      "Daniel Hooker" -> Dan Hooker | "Muhammadjon Naimov" -> Muhammad Naimov
+      "Klaudia Sygu(U+0142)a" -> Klaudia Sygula      (total aliases now 52)
+  The live board was never broken — namesMatch is surname-token based, which is
+  why Hooker shows a PP SS 30.5 chip that exists only under "Daniel Hooker". The
+  exposure is resolveVsArchive: it uses an EXACT event|normalizedName|propType
+  key, so these legs would NOT have graded after settle. Same shape as the 8
+  Orolbai/Sumudaerji legs from the 2026-08-30 audit.
+
+*** OPEN, HIGH VALUE, DO AFTER THE CARD: THE NON-COMBINING DIACRITIC GAP. ***
+  The 2026-09-03 fix — which I described as "completing the set" — closed only
+  HALF the problem. All three normalizers strip combining marks ONLY
+  (normalize NFD, then drop U+0300-U+036F). NFD does not decompose standalone
+  letters, so these survive everywhere:
+      L-stroke U+0142   o-slash   d-stroke   ae-ligature   sharp-s
+  Worse: a normalizer that also filters [^a-z ] turns L-stroke into a SPACE, so
+  "Sygula-with-L-stroke" becomes key "klaudia sygu a" and THE SURNAME TOKEN
+  BECOMES "a" — which is how my probe filed a real fighter on this card as a
+  GHOST, the one bucket whose recommended action is deletion.
+  FIX DESIGNED BUT DELIBERATELY NOT SHIPPED: widening the strip re-keys recordKey
+  across ~41k archive rows and must be collision-measured first, exactly as the
+  combining-mark change was (0 collisions, 0 lossy). Not the night before a card.
+  See [[project_diacritic_name_split]].
+
+################################################################################
+##  PRE-CARD AUDIT 2026-09-04 — WHAT SURVIVED VERIFICATION                     ##
+################################################################################
+Board: 16 picks (8 overs / 8 unders). Slate 96%, all five books fresh.
+Probe: snippets/2026-09-04_best_picks_audit_readonly.js (read-only, validated).
+
+CLEAN — do not re-investigate:
+  · LINE-SIDE SELECTION: all 16 picks sit on the best PLACEABLE line. I first
+    reported 2.0 and 1.0 point "giveaways" on Felipe Lima and Morgan Charriere.
+    BOTH FALSE. bestSideLineForPick filters unplaceable books BEFORE sorting, and
+    the SS-under gate is role-dependent: Pick6 = FAVOURITES only, Underdog =
+    UNDERDOGS only. Lima is -205 (FAV) so UD 39.5 is unplaceable for him;
+    Charriere is +170 (DOG) so P6 39.5 is unplaceable for HIM.
+    *** THE MIRROR IMAGE IS THE DIAGNOSTIC *** — when both fighters in one fight
+    show a "better" line on the OTHER's book, that is the role gate, not a
+    sorting bug. Acting on it would have surfaced two unplaceable picks.
+  · PLACEABILITY: Duclos (-118) and Keita (-395) are both FAVOURITES, so their
+    Pick6 / Betr FP UNDERs are placeable. Flag raised, resolved clean.
+
+STILL OPEN — user's judgement, not defects:
+  · U1 Oumar Sy TD UNDER 2.5, TOP PICK, WIN 81% / EV +62%, UD ONLY. Underdog
+    posted exactly 2 TD lines on the whole card and this is one of them. No book
+    corroborates it, proj 0.9 vs a 2.5 line, and the cross-book outlier guard WAS
+    REMOVED FOR TD in MODEL v19. Highest-EV pick, zero cross-check, guard off.
+  · U6 Duclos (n=1, avg 13.3 vs 67.5) and U8 Keita (n=1, avg 20.8 vs 93.5) are
+    n=1 artifacts — exactly the regime MEASURED as worse than the league mean
+    (t=-2.46). Keita is also a -395 FAVOURITE taking an FP UNDER, and FP is
+    finish-weighted: an R1 finish is ~100 FP on bonuses alone, so the likeliest
+    path for a heavy favourite blows through 93.5. All three books price him
+    87-93.5; the model says 20.8 because it has seen him once.
+  · 3 negative-EV overs (O6 -5%, O7 -4%, O8 -7%). O8 also carries
+    "PROJ SAYS UNDER 3.7" — its own projection opposes the pick.
+  · 4 of the 8 overs are FT OVER 14.99, ALL Underdog, ALL "UD ONLY" — half the
+    column is one distance thesis on one book.
+  · Felipe Lima is picked on BOTH sides with opposing fight-length needs:
+    O7 FT OVER (needs distance) against U7 SS UNDER + U3 Charriere SS UNDER
+    (need low volume). FT is SHARED — one fight, one duration.
+
+COVERAGE, measured from the raw stores rather than the chips:
+      fp 28/28 (P6:28 UD:9 PP:4 BT:6 — P6 monopoly, no FP shopping on this card)
+      ss 31/28 -> duplicate spellings, explained above, NOT contamination
+      ss_r1 14/28 (UD:12 DK:12)   td 13/28   ft 20/28   ctrl 10/28   kd 12/28
+  *** UNDERDOG DID NOT POST THE FULL CARD ON R1 SS *** — 12 of 28, contrary to
+  its usual behaviour. Treat R1 SS as informational here. Recorded in
+  [[project_r1_ss_underdog_and_lean]].
+
+################################################################################
+##  UI — GLOW-UP 309m/n/o: THE STICKY STACK IS MEASURED NOW, NOT ASSUMED       ##
+################################################################################
+Root cause of a whole family of bugs: the rule
+`.header, .filter-bar { position: relative }` (analyzer.html ~33206) has the SAME
+specificity (0,1,0) as the `sticky` rules for BOTH .header and
+.filter-bar-bottom, and wins on source order ~27,000 lines later. So NEITHER ever
+stuck. On a relative element `top: 54px` is not a pin offset — it is a VISUAL
+SHIFT that leaves the layout box behind, which is why the control bar painted
+26px over the Slate Check banner while every geometry reading came back correct.
+elementFromPoint found it in one line; reading geometry never could. FIVE
+diagnoses failed first.
+
+309o then removed the generator: every follower HARDCODED the bar's height, and
+that height is CONTENT-DEPENDENT — measured 40px on the extension board and 47px
+in the dev harness AT THE SAME 1280px WIDTH. Four shipped bugs came from that one
+assumption (26px rail overlap, 309h's 6px, 309n's 54px strip, 309o's ~51px Parlay
+Lab strip), each previously "fixed" by choosing a better constant.
+NOW: publishChromeHeight() writes the real height to --chrome-h via a
+ResizeObserver (plus a window resize listener, because the 1100px breakpoint
+flips the bar sticky<->static and that does not fire a ResizeObserver).
+.fighter-header-row / .data-subnav / .parlay-pool-head-sticky all use
+`top: var(--chrome-h, 40px)`; the publisher writes 0 when the bar is static.
+Layout chosen by the user (option B of three): bar pins at 0, site header keeps
+scrolling away — 66px of pinned chrome instead of 120px.
+TO RESTORE THE HEADER LATER: drop `.header` from the 33206 selector. `sticky` is
+itself a positioned value, so the ::before scanline that rule exists to anchor
+keeps working.
+
+################################################################################
+##  MY OWN ERROR RATE — READ BEFORE TRUSTING A PROBE                           ##
+################################################################################
+THREE probes this session re-implemented production matching WITHOUT production's
+filters and reported phantom defects with full confidence:
+  1. the line-shop check ignored the placeability gate -> two false "giveaways",
+     and acting on it would have surfaced unplaceable picks;
+  2. the ghost check ignored NAME_ALIASES -> re-reported Duclos, aliased 08-31;
+  3. the ghost check's own normalizer mangled U+0142 -> filed a REAL FIGHTER as a
+     ghost, the one bucket whose recommended action is DELETION.
+[[feedback_test_inherited_premises]] already carried this rule from last session.
+A probe must apply NAME_ALIASES and the placeability gates, or it is not
+measuring what production does.
+
+ALSO: the Best Picks DOM has five parsing traps, every one found by running
+against the real markup and none visible in the code (full detail in the
+snippet's header comment): data-fight is NULL; the BOOK PRECEDES THE LINE; FP
+picks print NO stat label; a "PLACED UNDER FT" badge names a DIFFERENT stat and
+hijacks side/stat parsing, so side and tier must come from the ROW CLASS; and
+books render as full name OR abbreviation, so full-name-only matching returns
+null for every DK pick.
+
 ################################################################################
 ##  START HERE - 2026-09-03 SESSION CLOSE                                      ##
 ################################################################################
