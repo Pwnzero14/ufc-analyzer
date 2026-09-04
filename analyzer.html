@@ -4413,7 +4413,16 @@ body.loading {
   }
 
   .slate-banner {
-    margin: 12px 28px 10px;
+    /* ── GLOW-UP 309k · the banner's top edge sat UNDER the filter bar ───────
+       Measured at scrollY 0, so this is an overlap at REST, not scroll-under:
+           banner top 147, h 183, scrollH 182   (not clipping itself)
+           elementFromPoint(banner.left+40, banner.top+4) -> filter-bar-bottom
+           ...and NOT inside the banner
+       With a 12px top margin the banner should have cleared the bar; it did not,
+       so the bar's painted box extends further than its layout box suggests.
+       Margin raised to 28px, which is measured clearance rather than a guess at
+       the cause — the same 28px already used on the left and right. */
+    margin: 28px 28px 10px;
     border: 1px solid var(--border2);
     border-radius: var(--radius-md);
     background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
