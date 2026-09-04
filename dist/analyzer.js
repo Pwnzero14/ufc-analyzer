@@ -10246,7 +10246,28 @@ function renderBestPicks(container, renderSeq = 0) {
                 return `<div class="best-pick-row tier-${tier.label.toLowerCase()} ${typeClass}${evClass}${inSlate ? ' in-slate' : ''}${isPlaced ? ' placed' : ''}" data-jump="${f.name}"${fightAttr} title="Open fighter card">
         <div class="best-pick-rank">#${i + 1}</div>
         <div class="bp-avatar"><span class="bp-avatar-flag">${f.db?.country || '🥊'}</span><img class="bp-avatar-img" data-name="${f.name}" alt="" /></div>
-        <div><div class="best-pick-name">${prettyName(f.name)}${topPickBadge}${riskTag}${invTag}${vsTag}${sameFightTag}${conflictTag}${lineShopTag}${placedElsewhereTag(f, el.lean, el._source || 'fp', line ?? null)}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
+        <div><div class="best-pick-name">${prettyName(f.name)}${topPickBadge}${vsTag}${(() => {
+                    // ── GLOW-UP 309c · the badge stack was 74% of the row ────────────────
+                    // MEASURED at 100% zoom on the live board: nameLine averaged 84px of a
+                    // 114px row and wrapped on 16 of 16 rows. The earlier reading that said
+                    // rows were fine (nameLine 21px) was taken at 50% BROWSER ZOOM, where
+                    // the columns are twice as wide in CSS px and the badges fit on one
+                    // line — the measurement hid the very thing it was measuring. CSS px
+                    // are zoom-independent, but COLUMN WIDTH in CSS px is not.
+                    //
+                    // In COMPACT the secondary badges collapse behind one ⋯N chip. The
+                    // split is by PRIORITY, not by available width, so it is deterministic
+                    // and cannot reorder itself between renders: TOP PICK and the opponent
+                    // stay inline (identity and matchup), everything else is secondary.
+                    // Nothing is dropped — the chip's tooltip names every hidden badge.
+                    const extras = [riskTag, invTag, sameFightTag, conflictTag, lineShopTag,
+                        placedElsewhereTag(f, el.lean, el._source || 'fp', line ?? null)].filter(Boolean);
+                    if (!extras.length)
+                        return '';
+                    const plain = extras.join(' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    return `<span class="bp-badge-extra">${extras.join('')}</span>`
+                        + `<span class="bp-badge-more" title="${extras.length} more badge${extras.length === 1 ? '' : 's'} on this pick, collapsed by COMPACT to hold the row to one line: ${plain.replace(/"/g, '&quot;')}. Turn COMPACT off to see them inline.">⋯${extras.length}</span>`;
+                })()}</div><div class="best-pick-reason" title="${reason.replace(/"/g, '&quot;')}">${reasonHtml}</div>${factorChips}</div>
         <div class="best-pick-meta">
           <span class="best-pick-type ${typeClass} bpt-${el._source || 'fp'}">${type.toUpperCase()}${el._label ? `<i class="bpt-stat">${el._label}</i>` : ''}</span>
           <span class="best-pick-tier ${tier.label.toLowerCase()}">${tier.label}</span>

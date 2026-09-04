@@ -27167,6 +27167,27 @@ body.bp-compact .best-pick-row .best-pick-reason {
 }
 body.bp-compact .best-pick-row { padding-top: 6px; padding-bottom: 6px; }
 body.bp-compact .best-pick-meta { gap: 3px; }
+/* 309c — the badge stack, measured at 100% zoom, was 84px of a 114px row and
+   wrapped on 16 of 16 rows. COMPACT collapses the secondary badges behind one
+   ⋯N chip; TOP PICK and the opponent stay inline. The ⋯N chip exists in the DOM
+   at all times and is simply hidden outside COMPACT, so toggling is a pure
+   class flip with no re-render and no chance of the count disagreeing with what
+   is displayed. */
+.bp-badge-more { display: none; }
+body.bp-compact .bp-badge-extra { display: none; }
+body.bp-compact .bp-badge-more {
+  display: inline-flex; align-items: center;
+  margin-left: 5px; padding: 0 5px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+  color: var(--text3); background: var(--bg3); border: 1px solid var(--border);
+  cursor: help; vertical-align: middle;
+}
+body.bp-compact .bp-badge-more:hover { color: var(--text2); }
+/* With the extras gone the name is a single line; clamp it so a very long
+   fighter+opponent pair still cannot wrap and undo the saving. */
+body.bp-compact .best-pick-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 .bpc-btn.bpc-focus.on, .bpc-btn.bpc-compact.on {
   color: var(--gold);
