@@ -66,11 +66,26 @@ CLEAN — do not re-investigate:
   · PLACEABILITY: Duclos (-118) and Keita (-395) are both FAVOURITES, so their
     Pick6 / Betr FP UNDERs are placeable. Flag raised, resolved clean.
 
+RESOLVED 2026-09-04 21:30 — U1 OUMAR SY TD UNDER 2.5 IS NOT A JUNK LINE.
+  I had flagged it as "highest-EV pick, zero cross-check, guard off": UD posted
+  only 2 TD lines on the whole card, this is one, no book corroborates it, and
+  the cross-book outlier guard was REMOVED FOR TD in MODEL v19. Checked the
+  history instead of the books (ufcstats_v51_* cache, read-only):
+      Oumar Sy  landed 3+ TD in  0/5  UFC fights   (0,2,1,2,2)  avg 1.40
+      Bukauskas conceded 3+ in   0/13 UFC fights   avg 0.38
+  EIGHTEEN fights, the OVER condition has never occurred. And conditioning on a
+  LONG fight — the scenario that maximises takedowns — Sy's two full 15m fights
+  produced 1 and 2; Bukauskas has gone 15m six times conceding 0,1,0,1,2,0. Both
+  ceilings are exactly 2, so the OVER needs a career first from one of them.
+  The line is high because of what Sy LOOKS like (grappler, sub finishes) rather
+  than what he does: he subbed Tokkos with 2 TDs and was himself subbed by
+  Cutelaba with 0. Guard being off is still true; the risk it guards against is
+  not present here.
+  CAVEATS KEPT: Sy's sample is 5 fights, and what the history confirms is the
+  DIRECTION, not the model's specific 81%/+62% (which still comes from the
+  unguarded TD path).
+
 STILL OPEN — user's judgement, not defects:
-  · U1 Oumar Sy TD UNDER 2.5, TOP PICK, WIN 81% / EV +62%, UD ONLY. Underdog
-    posted exactly 2 TD lines on the whole card and this is one of them. No book
-    corroborates it, proj 0.9 vs a 2.5 line, and the cross-book outlier guard WAS
-    REMOVED FOR TD in MODEL v19. Highest-EV pick, zero cross-check, guard off.
   · U6 Duclos (n=1, avg 13.3 vs 67.5) and U8 Keita (n=1, avg 20.8 vs 93.5) are
     n=1 artifacts — exactly the regime MEASURED as worse than the league mean
     (t=-2.46). Keita is also a -395 FAVOURITE taking an FP UNDER, and FP is
